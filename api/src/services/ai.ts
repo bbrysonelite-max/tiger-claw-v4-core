@@ -1,5 +1,5 @@
 import { GoogleGenerativeAI, Content, Part } from '@google/generative-ai';
-import { getTenant, getPool, getBotState, setBotState } from './db.js';
+import { getTenant, getPool, getBotState, setBotState, getTenantBotToken } from './db.js';
 import TelegramBot from 'node-telegram-bot-api';
 import IORedis from 'ioredis';
 import * as fs from 'fs';
@@ -112,6 +112,11 @@ const redis = new IORedis(redisUrl, {
 });
 
 // ─── Chat history ────────────────────────────────────────────────────────────
+export async function getTenantChatIds(tenantId: string): Promise<number[]> {
+    const keys = await redis.keys(`chat_history:${tenantId}:*`);
+    return keys.map(k => parseInt(k.split(':')[2], 10)).filter(id => !isNaN(id));
+}
+
 export async function getChatHistory(tenantId: string, chatId: number): Promise<Content[]> {
     try {
         const raw = await redis.get(`chat_history:${tenantId}:${chatId}`);
@@ -437,12 +442,39 @@ export async function processSystemRoutine(tenantId: string, routineType: string
         const systemPrompts: Record<string, string> = {
             daily_scout:   'SYSTEM: Run your Daily Scout routine. Find new leads to contact.',
             nurture_check: 'SYSTEM: Run your Nurture Check. Review follow-ups and reach out where due.',
+            trial_reminder_24h: `SYSTEM: Write a 1-sentence, highly conversational Telegram message to your operator reminding them they have 48 hours left on their free trial. Tell them to securely plug in their API key at https://app.tigerclaw.io so you don't have to stop working for them. Use your exact flavor and personality. NEVER use placeholders. Do NOT execute any tools.`,
+            trial_reminder_48h: `SYSTEM: Write a 1-sentence, highly conversational Telegram message to your operator reminding them they have 24 hours left on their free trial. Tell them to securely plug in their API key at https://app.tigerclaw.io so you don't have to stop working for them. Use your exact flavor and personality. NEVER use placeholders. Do NOT execute any tools.`,
+            trial_reminder_72h: `SYSTEM: Write a 1-sentence, highly conversational Telegram message to your operator telling them their 72-hour free trial is officially complete, and you have paused your operations so their flywheel has stopped. Tell them to log into https://app.tigerclaw.io to securely add their API key so you can instantly resume scouting for them. Use your exact flavor and personality. NEVER use placeholders. Do NOT execute any tools.`,
         };
         const prompt = systemPrompts[routineType] ?? `SYSTEM: Execute routine: ${routineType}`;
 
         const chat = model.startChat({ history: [] });
         const initial = await chat.sendMessage(prompt);
-        await runToolLoop(chat, initial.response, toolContext, `AI Routine:${routineType}`);
+        
+        // Trial Reminder Handling — extract text and broadcast entirely securely
+        if (routineType.startsWith('trial_reminder_')) {
+            const finalResponse = initial.response.text?.() ?? '';
+            if (finalResponse) {
+                const botToken = await getTenantBotToken(tenantId);
+                if (botToken) {
+                    const chatIds = await getTenantChatIds(tenantId);
+                    const bot = new TelegramBot(botToken);
+                    for (const cid of chatIds) {
+                        await bot.sendMessage(cid, finalResponse).catch(err => 
+                            console.error(`[AI Routine] Failed to send reminder to ${cid}:`, err.message)
+                        );
+                    }
+                }
+                if (routineType === 'trial_reminder_72h') {
+                    const botState = JSON.parse(await getBotState(tenantId, 'key_state.json') || '{}');
+                    botState.tenantPaused = true;
+                    await setBotState(tenantId, 'key_state.json', botState);
+                }
+            }
+        } else {
+            // Standard tool loop for Nurture/Scouting
+            await runToolLoop(chat, initial.response, toolContext, `AI Routine:${routineType}`);
+        }
 
         console.log(`[AI Routine] ${routineType} complete for tenant ${tenantId}.`);
     } catch (err: any) {

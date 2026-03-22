@@ -278,13 +278,45 @@ export const cronWorker = SHOULD_RUN_WORKERS ? new Worker(
         console.log(`[Cron] Global Heartbeat triggered. Polling PostgreSQL for tasks...`);
         try {
             const pool = getPool();
-            // Fetch all active tenants
-            const { rows: tenants } = await pool.query("SELECT id FROM tenants WHERE status = 'active'");
+            // Fetch all active tenants and check hours since creation for Trial Engine
+            const { rows: tenants } = await pool.query("SELECT id, created_at FROM tenants WHERE status = 'active'");
 
             const nowHour = new Date().getUTCHours();
             const today = new Date().toISOString().split('T')[0];
 
             for (const tenant of tenants) {
+                // Handle 72hr free trial engine natively using the bot memory states
+                const hoursElapsed = (Date.now() - new Date(tenant.created_at).getTime()) / (1000 * 60 * 60);
+                
+                // Read underlying Bot State explicitly to ensure idempotency so we do not spam messages
+                const { getBotState, setBotState } = await import('./db.js');
+                const botState = JSON.parse(await getBotState(tenant.id, 'key_state.json') || '{}');
+                
+                if (!botState.layer2Key) {
+                    botState.trialRemindersSent = botState.trialRemindersSent || {};
+                    const { h24, h48, h72 } = botState.trialRemindersSent;
+
+                    let fireReminder: string | null = null;
+                    if (hoursElapsed >= 72 && !h72 && !botState.tenantPaused) {
+                        fireReminder = 'trial_reminder_72h';
+                        botState.trialRemindersSent.h72 = true;
+                    } else if (hoursElapsed >= 48 && hoursElapsed < 72 && !h48) {
+                        fireReminder = 'trial_reminder_48h';
+                        botState.trialRemindersSent.h48 = true;
+                    } else if (hoursElapsed >= 24 && hoursElapsed < 48 && !h24) {
+                        fireReminder = 'trial_reminder_24h';
+                        botState.trialRemindersSent.h24 = true;
+                    }
+
+                    if (fireReminder) {
+                        await setBotState(tenant.id, 'key_state.json', botState);
+                        await routineQueue.add(fireReminder, {
+                            tenantId: tenant.id,
+                            routineType: fireReminder,
+                        }, { jobId: `${fireReminder}_${tenant.id}`, removeOnComplete: true });
+                    }
+                }
+
                 // Nurture check — runs every cron cycle (dedup prevents parallel runs)
                 await routineQueue.add('nurture_check', {
                     tenantId: tenant.id,
