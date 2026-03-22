@@ -363,7 +363,7 @@ interface WizardData {
 
 function renderWizardPage(data: WizardData): string {
   const telegramStatus = data.botUsername
-    ? `<span class="status active">Active</span> — <a href="https://t.me/${esc(data.botUsername)}" target="_blank">@${esc(data.botUsername)}</a>`
+    ? `<span class="status active">Active</span> — <a href="https://t.me/${esc(data.botUsername)}" target="_blank" class="accent-link">@${esc(data.botUsername)}</a>`
     : `<span class="status pending">Pending</span> — token assignment in progress`;
 
   const waChecked = data.whatsappEnabled ? "checked" : "";
@@ -376,118 +376,299 @@ function renderWizardPage(data: WizardData): string {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Channel Wizard — ${esc(data.name)}</title>
+<title>Channel Configuration &middot; ${esc(data.name)}</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
+  :root {
+    --bg-dark: #0a0a0c;
+    --card-bg: rgba(22, 27, 34, 0.6);
+    --card-border: rgba(255, 255, 255, 0.08);
+    --text-main: #f0f3f6;
+    --text-muted: #8b949e;
+    --accent: #58a6ff;
+    --accent-hover: #79c0ff;
+    --success: #3fb950;
+    --success-bg: rgba(63, 185, 80, 0.15);
+    --warning: #d29922;
+    --warning-bg: rgba(210, 153, 34, 0.15);
+    --danger: #f85149;
+    --danger-bg: rgba(248, 81, 73, 0.15);
+    --input-bg: #0d1117;
+    --btn-primary: #238636;
+    --btn-hover: #2ea043;
+  }
+  
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f1117; color: #e1e4e8; line-height: 1.6; padding: 2rem 1rem; }
-  .container { max-width: 640px; margin: 0 auto; }
-  h1 { font-size: 1.5rem; font-weight: 600; margin-bottom: 0.25rem; color: #f0f3f6; }
-  .subtitle { color: #8b949e; font-size: 0.9rem; margin-bottom: 2rem; }
-  .card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 1.5rem; margin-bottom: 1rem; }
-  .card h2 { font-size: 1.1rem; font-weight: 600; margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem; }
-  .card p { color: #8b949e; font-size: 0.875rem; margin-bottom: 0.75rem; }
-  .status { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; }
-  .status.active { background: #0d4429; color: #3fb950; }
-  .status.pending { background: #3d2e00; color: #d29922; }
-  .status.off { background: #21262d; color: #8b949e; }
-  a { color: #58a6ff; text-decoration: none; }
-  a:hover { text-decoration: underline; }
-  label { display: block; font-size: 0.875rem; font-weight: 500; margin-bottom: 0.5rem; color: #c9d1d9; }
-  input[type="text"] { width: 100%; padding: 0.5rem 0.75rem; background: #0d1117; border: 1px solid #30363d; border-radius: 6px; color: #e1e4e8; font-size: 0.875rem; }
-  input[type="text"]:focus { outline: none; border-color: #58a6ff; box-shadow: 0 0 0 2px rgba(88,166,255,0.15); }
-  .toggle-row { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem; }
+  body { 
+    font-family: 'Inter', sans-serif; 
+    background: radial-gradient(circle at top center, #1b212c 0%, var(--bg-dark) 40%); 
+    background-attachment: fixed;
+    color: var(--text-main); 
+    line-height: 1.6; 
+    padding: 3rem 1rem; 
+    -webkit-font-smoothing: antialiased;
+  }
+  
+  .container { max-width: 600px; margin: 0 auto; }
+  
+  header { margin-bottom: 2.5rem; text-align: center; }
+  h1 { font-size: 1.75rem; font-weight: 600; letter-spacing: -0.02em; margin-bottom: 0.5rem; }
+  .subtitle { color: var(--text-muted); font-size: 0.95rem; }
+  
+  .card { 
+    background: var(--card-bg); 
+    border: 1px solid var(--card-border); 
+    border-radius: 12px; 
+    padding: 1.75rem; 
+    margin-bottom: 1.25rem; 
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  .card:hover { transform: translateY(-2px); box-shadow: 0 12px 32px rgba(0,0,0,0.3); border-color: rgba(255, 255, 255, 0.12); }
+  
+  .card h2 { font-size: 1.15rem; font-weight: 600; margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.6rem; }
+  .card p { color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1rem; }
+  
+  .status { display: inline-flex; align-items: center; padding: 0.15rem 0.6rem; border-radius: 12px; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.03em; text-transform: uppercase; border: 1px solid transparent; }
+  .status.active { background: var(--success-bg); color: var(--success); border-color: rgba(63, 185, 80, 0.3); }
+  .status.pending { background: var(--warning-bg); color: var(--warning); border-color: rgba(210, 153, 34, 0.3); }
+  .status.off { background: rgba(139, 148, 158, 0.1); color: var(--text-muted); border-color: rgba(139, 148, 158, 0.2); }
+  
+  a.accent-link { color: var(--accent); text-decoration: none; font-weight: 500; transition: color 0.15s ease; }
+  a.accent-link:hover { color: var(--accent-hover); text-decoration: underline; }
+  
+  label { display: block; font-size: 0.85rem; font-weight: 500; margin-bottom: 0.5rem; color: #c9d1d9; }
+  
+  input[type="text"] { 
+    width: 100%; 
+    padding: 0.6rem 0.85rem; 
+    background: var(--input-bg); 
+    border: 1px solid var(--card-border); 
+    border-radius: 8px; 
+    color: var(--text-main); 
+    font-size: 0.9rem; 
+    font-family: 'Inter', monospace;
+    transition: all 0.2s ease;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
+  }
+  input[type="text"]:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(88,166,255,0.2), inset 0 2px 4px rgba(0,0,0,0.2); }
+  input[type="text"][readonly] { cursor: pointer; }
+  
+  .toggle-row { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem; }
   .toggle { position: relative; width: 44px; height: 24px; flex-shrink: 0; }
   .toggle input { opacity: 0; width: 0; height: 0; }
-  .toggle .slider { position: absolute; inset: 0; background: #30363d; border-radius: 12px; cursor: pointer; transition: background 0.2s; }
-  .toggle .slider::before { content: ""; position: absolute; width: 18px; height: 18px; left: 3px; bottom: 3px; background: #c9d1d9; border-radius: 50%; transition: transform 0.2s; }
-  .toggle input:checked + .slider { background: #238636; }
+  .toggle .slider { position: absolute; inset: 0; background: rgba(255,255,255,0.1); border-radius: 12px; cursor: pointer; transition: background 0.3s ease; box-shadow: inset 0 2px 4px rgba(0,0,0,0.2); }
+  .toggle .slider::before { content: ""; position: absolute; width: 18px; height: 18px; left: 3px; bottom: 3px; background: #fff; border-radius: 50%; transition: transform 0.3s cubic-bezier(0.4, 0.0, 0.2, 1); box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
+  .toggle input:checked + .slider { background: var(--btn-primary); }
   .toggle input:checked + .slider::before { transform: translateX(20px); }
-  .details { overflow: hidden; max-height: 0; transition: max-height 0.3s ease; }
-  .details.open { max-height: 200px; }
-  details summary { list-style: none; }
-  details summary::-webkit-details-marker { display: none; }
-  details summary::before { content: "\\25B6 "; font-size: 0.7rem; }
-  details[open] summary::before { content: "\\25BC "; }
-  .btn { display: inline-block; padding: 0.5rem 1.25rem; background: #238636; color: #fff; border: none; border-radius: 6px; font-size: 0.875rem; font-weight: 500; cursor: pointer; transition: background 0.15s; }
-  .btn:hover { background: #2ea043; }
-  .btn:disabled { background: #21262d; color: #484f58; cursor: not-allowed; }
-  .msg { margin-top: 1rem; padding: 0.75rem; border-radius: 6px; font-size: 0.875rem; display: none; }
-  .msg.ok { display: block; background: #0d4429; color: #3fb950; border: 1px solid #238636; }
-  .msg.err { display: block; background: #3d1519; color: #f85149; border: 1px solid #da3633; }
-  .icon { font-size: 1.25rem; }
+  
+  .details { overflow: hidden; max-height: 0; opacity: 0; transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease; }
+  .details.open { max-height: 250px; opacity: 1; margin-top: 1rem; }
+  
+  .instruction-guide { background: rgba(0,0,0,0.2); border-radius: 8px; padding: 1rem; margin-bottom: 1.25rem; font-size: 0.85rem; border: 1px solid rgba(255,255,255,0.05); }
+  .instruction-guide ol { padding-left: 1.5rem; color: var(--text-muted); }
+  .instruction-guide li { margin-bottom: 0.4rem; }
+  
+  .action-bar { display: flex; justify-content: flex-end; align-items: center; margin-top: 2rem; gap: 1rem; }
+  
+  .btn { 
+    display: inline-flex; 
+    align-items: center; 
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.6rem 1.5rem; 
+    background: var(--btn-primary); 
+    color: #fff; 
+    border: 1px solid rgba(255,255,255,0.1); 
+    border-radius: 8px; 
+    font-size: 0.95rem; 
+    font-weight: 500; 
+    cursor: pointer; 
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 12px rgba(35, 134, 54, 0.2);
+  }
+  .btn:hover:not(:disabled) { background: var(--btn-hover); box-shadow: 0 6px 16px rgba(35, 134, 54, 0.3); transform: translateY(-1px); }
+  .btn:disabled { background: rgba(255,255,255,0.1); color: var(--text-muted); cursor: not-allowed; box-shadow: none; border-color: transparent; }
+  
+  .spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    display: none;
+  }
+  .btn.saving .spinner { display: inline-block; }
+  @keyframes spin { 100% { transform: rotate(360deg); } }
+  
+  /* Toast Notification */
+  .toast-container {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(100px);
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    backdrop-filter: blur(12px);
+    padding: 12px 24px;
+    border-radius: 30px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--text-main);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+    opacity: 0;
+    transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s ease;
+    pointer-events: none;
+    z-index: 1000;
+  }
+  .toast-container.show {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+  }
+  .toast-container.success { border-bottom: 2px solid var(--success); }
+  .toast-container.error { border-bottom: 2px solid var(--danger); }
+  .toast-icon { font-size: 1.1rem; }
+  
+  details summary { cursor: pointer; color: var(--accent); font-size: 0.85rem; font-weight: 500; outline: none; user-select: none; transition: color 0.2s; }
+  details summary:hover { color: var(--accent-hover); }
+  details summary::marker { color: var(--text-muted); }
 </style>
 </head>
 <body>
+
+<div class="toast-container" id="toast">
+  <span class="toast-icon" id="toast-icon">✅</span>
+  <span id="toast-msg">Settings saved successfully.</span>
+</div>
+
 <div class="container">
-  <h1>Channel Wizard</h1>
-  <p class="subtitle">${esc(data.name)} &middot; ${esc(data.slug)}</p>
+  <header>
+    <h1>Agent Configuration</h1>
+    <p class="subtitle">${esc(data.name)} &middot; ${esc(data.slug)}</p>
+  </header>
 
   <!-- Telegram -->
   <div class="card">
-    <h2><span class="icon">✈️</span> Telegram</h2>
-    <p>Your primary channel. Always active.</p>
-    <p>${telegramStatus}</p>
+    <h2><span style="font-size:1.3rem;">✈️</span> Telegram</h2>
+    <p>Your primary, always-on AI responder channel.</p>
+    <div style="margin-top: 0.5rem;">${telegramStatus}</div>
   </div>
 
   <!-- WhatsApp -->
   <div class="card">
-    <h2><span class="icon">💬</span> WhatsApp</h2>
-    <p>Optional outreach channel via WhatsApp Web. ${waStatus}</p>
-    <div class="toggle-row">
-      <label class="toggle">
-        <input type="checkbox" id="wa-toggle" ${waChecked}>
-        <span class="slider"></span>
-      </label>
-      <span id="wa-label">${data.whatsappEnabled ? "Enabled" : "Disabled"}</span>
-    </div>
-    <div class="details${data.whatsappEnabled ? " open" : ""}" id="wa-details">
-      <p>When enabled, your agent will send a QR code to your Telegram chat. Scan it with WhatsApp to link your account. Session persists across restarts.</p>
+    <h2><span style="font-size:1.3rem;">💬</span> WhatsApp</h2>
+    <p>Optional outreach channel linked via WhatsApp Web Session. ${waStatus}</p>
+    
+    <div style="background: rgba(0,0,0,0.2); padding: 1rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); margin-top: 1rem;">
+      <div class="toggle-row">
+        <label class="toggle">
+          <input type="checkbox" id="wa-toggle" ${waChecked}>
+          <span class="slider"></span>
+        </label>
+        <span id="wa-label" style="font-weight: 500;">${data.whatsappEnabled ? "Channel Enabled" : "Channel Disabled"}</span>
+      </div>
+      <div class="details${data.whatsappEnabled ? " open" : ""}" id="wa-details">
+        <p style="margin-bottom:0; color:var(--text-muted); font-size: 0.85rem;">When enabled, your active bot will transmit a secure QR code into your primary Telegram chat. Scan it using your physical WhatsApp mobile app to authorize the agent terminal. Sessions strictly persist across microservice restarts.</p>
+      </div>
     </div>
   </div>
 
   <!-- LINE -->
   <div class="card">
-    <h2><span class="icon">🟢</span> LINE</h2>
-    <p>Optional outreach channel. ${data.lineConfigured ? '<span class="status active">Configured</span>' : '<span class="status off">Not configured</span>'}</p>
-    <p>LINE requires a free <a href="https://developers.line.biz/" target="_blank">LINE Official Account</a>. You create and manage your own account.</p>
-    <details>
-      <summary style="cursor:pointer;color:#58a6ff;font-size:0.875rem;margin-bottom:0.75rem;">Setup guide</summary>
-      <ol style="color:#8b949e;font-size:0.85rem;padding-left:1.25rem;margin-bottom:0.75rem;line-height:1.8;">
-        <li>Go to <a href="https://developers.line.biz/" target="_blank">developers.line.biz</a> and sign in with a LINE account</li>
-        <li>Create a new <strong>Provider</strong>, then create a <strong>Messaging API</strong> channel</li>
-        <li>Under channel settings &rarr; <strong>Basic settings</strong> tab &rarr; copy the <strong>Channel secret</strong></li>
-        <li>Under the <strong>Messaging API</strong> tab &rarr; scroll to <strong>Channel access token</strong> &rarr; issue and copy it</li>
-        <li>Paste both values below</li>
-      </ol>
-    </details>
-    <label for="line-secret">Channel Secret</label>
-    <input type="text" id="line-secret" placeholder="${data.lineConfigured ? "Leave blank to keep existing secret" : "Paste your LINE channel secret"}" maxlength="200" style="margin-bottom:0.75rem;">
-    <label for="line-access-token">Channel Access Token</label>
-    <input type="text" id="line-access-token" placeholder="${data.lineConfigured ? "Leave blank to keep existing token" : "Paste your LINE channel access token"}" maxlength="200">
+    <h2><span style="font-size:1.3rem;">🟢</span> LINE Messenger</h2>
+    <p>Optional regional outreach channel. ${data.lineConfigured ? '<span class="status active">Secured</span>' : '<span class="status off">Not Configured</span>'}</p>
+    
+    <div class="instruction-guide">
+      <details>
+        <summary>View Official LINE Integration Guide</summary>
+        <div style="margin-top: 0.75rem;">
+          <ol>
+            <li>Navigate to the <a href="https://developers.line.biz/" target="_blank" class="accent-link">LINE Developer Console</a> and authenticate.</li>
+            <li>Construct a new <strong>Provider</strong>, followed by a <strong>Messaging API</strong> Application.</li>
+            <li>Under <strong>Basic Settings</strong>, copy your <strong>Channel Secret</strong>.</li>
+            <li>Under <strong>Messaging API</strong>, generate and copy your <strong>Channel Access Token</strong>.</li>
+            <li>Paste the explicit cryptographic values below. They will be AES-256 encrypted centrally.</li>
+          </ol>
+        </div>
+      </details>
+    </div>
+    
+    <!-- HARDENED INPUTS: Password Manager Bypass via readonly switch and anti-fill attributes -->
+    <label for="line-secret">Channel Secret 🔒</label>
+    <input type="text" id="line-secret" 
+      placeholder="${data.lineConfigured ? "Encrypted Vault (Leave blank to keep)" : "Paste your LINE channel secret"}" 
+      maxlength="200" 
+      data-lpignore="true" autocomplete="new-password" spellcheck="false" 
+      readonly onfocus="this.removeAttribute('readonly')"
+      style="margin-bottom:1.25rem;">
+      
+    <label for="line-access-token">Channel Access Token 🔒</label>
+    <input type="text" id="line-access-token" 
+      placeholder="${data.lineConfigured ? "Encrypted Vault (Leave blank to keep)" : "Paste your LINE channel access token"}" 
+      maxlength="200"
+      data-lpignore="true" autocomplete="new-password" spellcheck="false" 
+      readonly onfocus="this.removeAttribute('readonly')">
   </div>
 
-  <button class="btn" id="save-btn" onclick="saveConfig()">Save Changes</button>
-  <div class="msg" id="msg"></div>
+  <div class="action-bar">
+    <button class="btn" id="save-btn" onclick="saveConfig()">
+      <span class="spinner"></span>
+      <span id="btn-text">Synchronize Configuration</span>
+    </button>
+  </div>
 </div>
 
 <script>
-  var waToggle = document.getElementById("wa-toggle");
-  var waDetails = document.getElementById("wa-details");
-  var waLabel = document.getElementById("wa-label");
+  const waToggle = document.getElementById("wa-toggle");
+  const waDetails = document.getElementById("wa-details");
+  const waLabel = document.getElementById("wa-label");
+  const btn = document.getElementById("save-btn");
+  const btnText = document.getElementById("btn-text");
+  const toast = document.getElementById("toast");
+  const toastIcon = document.getElementById("toast-icon");
+  const toastMsg = document.getElementById("toast-msg");
+  
+  let toastTimeout;
+
+  function showToast(message, type) {
+    clearTimeout(toastTimeout);
+    toastMsg.textContent = message;
+    
+    if (type === 'success') {
+      toast.className = "toast-container success show";
+      toastIcon.textContent = "✅";
+    } else {
+      toast.className = "toast-container error show";
+      toastIcon.textContent = "❌";
+    }
+    
+    toastTimeout = setTimeout(() => {
+      toast.classList.remove("show");
+    }, 4000);
+  }
 
   waToggle.addEventListener("change", function() {
-    waDetails.classList.toggle("open", this.checked);
-    waLabel.textContent = this.checked ? "Enabled" : "Disabled";
+    if (this.checked) {
+      waDetails.classList.add("open");
+      waLabel.textContent = "Channel Enabled";
+    } else {
+      waDetails.classList.remove("open");
+      waLabel.textContent = "Channel Disabled";
+    }
   });
 
   function saveConfig() {
-    var btn = document.getElementById("save-btn");
-    var msg = document.getElementById("msg");
     btn.disabled = true;
-    msg.className = "msg";
-    msg.style.display = "none";
+    btn.classList.add("saving");
+    btnText.textContent = "Encrypting...";
 
-    var body = {
+    const body = {
       whatsappEnabled: waToggle.checked,
       lineChannelSecret: document.getElementById("line-secret").value.trim(),
       lineChannelAccessToken: document.getElementById("line-access-token").value.trim()
@@ -498,24 +679,36 @@ function renderWizardPage(data: WizardData): string {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body)
     })
-    .then(function(r) { return r.json(); })
-    .then(function(d) {
+    .then(r => r.json())
+    .then(d => {
       btn.disabled = false;
+      btn.classList.remove("saving");
+      btnText.textContent = "Synchronize Configuration";
+      
       if (d.ok) {
-        msg.className = "msg ok";
-        msg.textContent = "Settings saved.";
-        msg.style.display = "block";
+        showToast("Configuration encrypted and synchronized successfully.", "success");
+        // Clear inputs as they are now securely stored
+        document.getElementById("line-secret").value = "";
+        document.getElementById("line-access-token").value = "";
+        document.getElementById("line-secret").placeholder = "Encrypted Vault (Leave blank to keep)";
+        document.getElementById("line-access-token").placeholder = "Encrypted Vault (Leave blank to keep)";
+        // Update LINE status pill locally if they just provided the keys
+        if (body.lineChannelSecret && body.lineChannelAccessToken) {
+           const lineStatusPill = document.querySelector('.card:nth-of-type(3) p .status');
+           if (lineStatusPill) {
+             lineStatusPill.className = "status active";
+             lineStatusPill.textContent = "Secured";
+           }
+        }
       } else {
-        msg.className = "msg err";
-        msg.textContent = d.error || "Save failed.";
-        msg.style.display = "block";
+        showToast(d.error || "Failed to synchronize configuration.", "error");
       }
     })
-    .catch(function(e) {
+    .catch(e => {
       btn.disabled = false;
-      msg.className = "msg err";
-      msg.textContent = "Network error: " + e.message;
-      msg.style.display = "block";
+      btn.classList.remove("saving");
+      btnText.textContent = "Synchronize Configuration";
+      showToast("Network execution error: " + e.message, "error");
     });
   }
 </script>
