@@ -91,11 +91,11 @@ router.get("/auth", async (req: Request, res: Response) => {
 
     // Return the botId so the React wizard can attach AI keys to it
     // In the new architecture, tenant.id is actually the botId when migrating to V4 DB
-    return res.json({ 
-      ok: true, 
-      botId: tenant.id, 
+    return res.json({
+      ok: true,
+      botId: tenant.id,
       name: tenant.name,
-      status: tenant.status 
+      status: tenant.status
     });
   } catch (err: any) {
     console.error("[wizard] Auth error:", err);
@@ -202,14 +202,14 @@ router.post("/validate-key", async (req: Request, res: Response) => {
   const { botId, keys } = parsed.data;
 
   const results: any[] = [];
-  
+
   for (let i = 0; i < keys.length; i++) {
     const k = keys[i];
     console.log(`[wizard] Validating ${k.provider} key for bot ${botId}...`);
 
     try {
       let isValid = false;
-      
+
       // Provider-specific validation logic
       if (k.provider === "google") {
         const testUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(k.key)}`;
@@ -222,7 +222,7 @@ router.post("/validate-key", async (req: Request, res: Response) => {
         isValid = response.ok;
       } else {
         // Fallback for other providers: assume valid if format is correct
-        isValid = k.key.length > 10; 
+        isValid = k.key.length > 10;
       }
 
       if (isValid) {
@@ -250,7 +250,7 @@ router.post("/validate-key", async (req: Request, res: Response) => {
             keyPreview: preview,
           });
         }
-        
+
         results.push({ provider: k.provider, status: "success" });
       } else {
         results.push({ provider: k.provider, status: "error", error: "Validation failed" });
@@ -261,9 +261,9 @@ router.post("/validate-key", async (req: Request, res: Response) => {
   }
 
   const allValid = results.every(r => r.status === "success");
-  return res.json({ 
-    valid: allValid, 
-    details: results 
+  return res.json({
+    valid: allValid,
+    details: results
   });
 });
 
@@ -334,7 +334,7 @@ router.post("/:slug/save", async (req: Request, res: Response) => {
       finalEncryptedToken = lineChannelAccessToken
         ? (lineChannelAccessToken === "" ? null : encryptToken(lineChannelAccessToken))
         : undefined;
-    } catch(err) {
+    } catch (err) {
       return res.status(500).json({ error: "Encryption error" });
     }
 

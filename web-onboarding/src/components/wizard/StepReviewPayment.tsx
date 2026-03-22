@@ -39,29 +39,29 @@ export default function StepReviewPayment({ state, isDeploying, setIsDeploying, 
                         }))
                     })
                 });
-                
+
                 const keyData = await keyResponse.json();
                 if (!keyResponse.ok || !keyData.valid) {
-                     const errDetails = keyData.details?.filter((d: any) => d.status === "error").map((d: any) => `${d.provider}: ${d.error}`).join(", ");
-                     throw new Error("Invalid AI Keys: " + (errDetails || "Validation failed"));
+                    const errDetails = keyData.details?.filter((d: any) => d.status === "error").map((d: any) => `${d.provider}: ${d.error}`).join(", ");
+                    throw new Error("Invalid AI Keys: " + (errDetails || "Validation failed"));
                 }
             }
 
             // 2. Transmit final wizard settings & Hatch Target
             const hatchResponse = await fetch(`${base}/wizard/hatch`, {
-                 method: "POST",
-                 headers: { "Content-Type": "application/json" },
-                 body: JSON.stringify({
-                     botId: state.botId,
-                     name: state.botName || state.yourName, // Bot Display Name
-                     email: state.email,
-                     flavor: state.nicheId,
-                 })
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    botId: state.botId,
+                    name: state.botName || state.yourName, // Bot Display Name
+                    email: state.email,
+                    flavor: state.nicheId,
+                })
             });
-            
+
             const hatchData = await hatchResponse.json();
             if (!hatchResponse.ok || !hatchData.ok) {
-                 throw new Error(hatchData.error || "Failed to hatch agent.");
+                throw new Error(hatchData.error || "Failed to hatch agent.");
             }
 
             // Success! Proceed to the hatching spinner screen
@@ -103,7 +103,7 @@ export default function StepReviewPayment({ state, isDeploying, setIsDeploying, 
                             <span className="text-white/70">Subscription Plan</span>
                             <span className="font-bold text-white">{state.planName}</span>
                         </div>
-                        
+
                         <div className="flex justify-between items-center text-sm border-b border-white/5 pb-3">
                             <span className="text-white/70">AI Computations</span>
                             <span className="font-bold text-white flex items-center gap-2">
@@ -117,7 +117,7 @@ export default function StepReviewPayment({ state, isDeploying, setIsDeploying, 
                                 <span className="text-3xl font-black text-white tracking-tighter">{state.price}</span>
                             </div>
                         </div>
-                        
+
                         {state.price !== "$0.00" && (
                             <div className="p-3 bg-white/5 rounded-xl border border-white/10 flex gap-3 text-left">
                                 <div className="mt-0.5">
@@ -133,7 +133,7 @@ export default function StepReviewPayment({ state, isDeploying, setIsDeploying, 
 
                 <div className="space-y-4">
 
-                    
+
                     {error && <p className="text-sm text-red-500 text-center font-bold">{error}</p>}
 
                     <button
@@ -145,8 +145,8 @@ export default function StepReviewPayment({ state, isDeploying, setIsDeploying, 
                             {isDeploying ? (
                                 <><Loader2 className="w-6 h-6 animate-spin" /> {state.price !== "$0.00" ? "REDIRECTING..." : "HATCHING..."}</>
                             ) : (
-                                state.price !== "$0.00" 
-                                    ? <>PROCEED TO SECURE CHECKOUT <ArrowRight className="w-6 h-6 group-hover:translate-x-1 transition-transform" /></> 
+                                state.price !== "$0.00"
+                                    ? <>PROCEED TO SECURE CHECKOUT <ArrowRight className="w-6 h-6 group-hover:translate-x-1 transition-transform" /></>
                                     : <>ACTIVATE AGENT NOW <ArrowRight className="w-6 h-6 group-hover:translate-x-1 transition-transform" /></>
                             )}
                         </span>
