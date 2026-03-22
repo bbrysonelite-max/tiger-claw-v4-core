@@ -177,13 +177,7 @@ export async function resolveGoogleKey(tenantId: string): Promise<string | undef
         const pool = getPool();
         const configRes = await pool.query(
             `SELECT * FROM bot_ai_config
-             WHERE bot_id = (
-               SELECT id FROM bots
-               WHERE user_id = (
-                 SELECT id FROM users
-                 WHERE email = (SELECT email FROM tenants WHERE id = $1)
-               ) LIMIT 1
-             )`,
+             WHERE tenant_id = $1`,
             [tenantId],
         );
         if (configRes.rows.length > 0) {
