@@ -111,6 +111,7 @@ export const provisionWorker = new Worker(
         connection: connection as any,
         // Concurrency protection: Do not provision more than 10 pods simultaneously per worker
         concurrency: 10,
+        autorun: process.env.DISABLE_WORKERS !== 'true',
         // Optional limits: max 50 jobs per minute per node
         limiter: {
             max: 50,
@@ -175,6 +176,7 @@ export const telegramWorker = new Worker(
     {
         connection: connection as any,
         concurrency: 50, // Higher concurrency since these are chat payloads
+        autorun: process.env.DISABLE_WORKERS !== 'true',
     }
 );
 
@@ -215,6 +217,7 @@ export const lineWorker = new Worker(
     {
         connection: connection as any,
         concurrency: 50,
+        autorun: process.env.DISABLE_WORKERS !== 'true',
     }
 );
 
@@ -251,6 +254,7 @@ export const routineWorker = new Worker(
     {
         connection: connection as any,
         concurrency: 20,
+        autorun: process.env.DISABLE_WORKERS !== 'true',
     }
 );
 
@@ -296,7 +300,11 @@ export const cronWorker = new Worker(
             throw err;
         }
     },
-    { connection: connection as any, concurrency: 1 }
+    { 
+        connection: connection as any, 
+        concurrency: 1,
+        autorun: process.env.DISABLE_WORKERS !== 'true' 
+    }
 );
 
 cronWorker.on('failed', (job, err) => {

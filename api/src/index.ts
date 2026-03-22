@@ -53,12 +53,14 @@ const PORT = Number(process.env["PORT"] ?? 4000);
 // ---------------------------------------------------------------------------
 
 // CORS — must be before raw body parsers so preflight OPTIONS requests are handled
-const ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://localhost:3001",
-    "https://wizard.tigerclaw.io",
-    "https://tigerclaw.io"
-];
+const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS 
+  ? process.env.ALLOWED_ORIGINS.split(',').map(s => s.trim())
+  : [
+      "http://localhost:3000",
+      "http://localhost:3001",
+      "https://wizard.tigerclaw.io",
+      "https://tigerclaw.io"
+    ];
 
 app.use(cors({
   origin: ALLOWED_ORIGINS,
