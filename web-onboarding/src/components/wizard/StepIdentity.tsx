@@ -23,7 +23,6 @@ const NICHES = [
     { id: "plumber", name: "Home Services", icon: "🔧" },
     { id: "sales-tiger", name: "Sales Professional", icon: "📈" },
     { id: "director-of-operations", name: "Director of Ops", icon: "🦅" },
-    { id: "executive-assistant", name: "Executive Assistant", icon: "📅" },
     { id: "intelligence-specialist", name: "OSINT Researcher", icon: "🕵️" },
 ];
 
