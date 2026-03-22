@@ -22,7 +22,7 @@ export default function StepReviewPayment({ state, isDeploying, setIsDeploying, 
         setIsDeploying(true);
 
         try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://api.tigerclaw.io";
+            const apiUrl = "https://api.tigerclaw.io";
             const base = apiUrl.endsWith('/') ? apiUrl.slice(0, -1) : apiUrl;
 
             // 1. Validate & Store AI Keys

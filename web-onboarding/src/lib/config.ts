@@ -1,1 +1,1 @@
-export const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://api.tigerclaw.io";
+export const API_BASE = "https://api.tigerclaw.io";
