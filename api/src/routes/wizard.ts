@@ -21,8 +21,37 @@ import {
 } from "../services/db.js";
 import { encryptToken } from "../services/pool.js";
 import { provisionQueue } from "../services/queue.js";
+import { z } from "zod";
 
 const router = Router();
+
+const ImportContactsSchema = z.object({
+  tenantId: z.string(),
+  contacts: z.array(z.object({
+    name: z.string().min(1),
+    email: z.string().email().optional(),
+    phone: z.string().optional()
+  })).min(1)
+});
+
+const HatchSchema = z.object({
+  botId: z.string(),
+  name: z.string().min(1),
+  email: z.string().email(),
+  flavor: z.string().optional(),
+  language: z.string().optional(),
+  timezone: z.string().optional(),
+  preferredChannel: z.string().optional()
+});
+
+const ValidateKeySchema = z.object({
+  botId: z.string(),
+  keys: z.array(z.object({
+    provider: z.string(),
+    key: z.string(),
+    model: z.string()
+  })).min(1)
+});
 
 const stripe = process.env["STRIPE_SECRET_KEY"]
   ? new Stripe(process.env["STRIPE_SECRET_KEY"])
@@ -31,14 +60,11 @@ const stripe = process.env["STRIPE_SECRET_KEY"]
 // ── POST /wizard/import-contacts ─────────────────────────────────────────────
 // Hunter Framework: Import Circle of Influence contacts during onboarding.
 router.post("/import-contacts", async (req: Request, res: Response) => {
-  const { tenantId, contacts } = req.body as {
-    tenantId?: string;
-    contacts?: { name: string; email?: string; phone?: string }[];
-  };
-
-  if (!tenantId || !contacts) {
-    return res.status(400).json({ error: "tenantId and contacts are required." });
+  const parsed = ImportContactsSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: "Invalid payload.", details: parsed.error.format() });
   }
+  const { tenantId, contacts } = parsed.data;
 
   try {
     const count = await importContacts(tenantId, contacts);
@@ -81,11 +107,11 @@ router.get("/auth", async (req: Request, res: Response) => {
 // The capstone of the Stan Store flow. Extracts completed Wizard Config and 
 // enqueues the actual Agent Provisioning process.
 router.post("/hatch", async (req: Request, res: Response) => {
-  const { botId, name, email, flavor, language, timezone, preferredChannel } = req.body;
-
-  if (!botId || !email) {
-    return res.status(400).json({ error: "botId and email are required" });
+  const parsed = HatchSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: "Invalid payload.", details: parsed.error.format() });
   }
+  const { botId, name, email, flavor, language, timezone, preferredChannel } = parsed.data;
 
   try {
     const tenant = await getTenantByEmail(email);
@@ -169,14 +195,11 @@ router.get("/status", async (req: Request, res: Response) => {
 // Validates each key, then encrypts and stores them in bot_ai_keys.
 
 router.post("/validate-key", async (req: Request, res: Response) => {
-  const { botId, keys } = req.body as {
-    botId?: string;
-    keys?: { provider: string; key: string; model: string }[];
-  };
-
-  if (!botId || !keys || !Array.isArray(keys) || keys.length === 0) {
-    return res.status(400).json({ valid: false, error: "botId and an array of keys are required." });
+  const parsed = ValidateKeySchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ valid: false, error: "Invalid payload format.", details: parsed.error.format() });
   }
+  const { botId, keys } = parsed.data;
 
   const results: any[] = [];
   

@@ -37,8 +37,10 @@ export interface ProvisionJobData {
     timezone?: string;
 }
 
+const SHOULD_RUN_WORKERS = process.env.ENABLE_WORKERS === 'true';
+
 // Background worker that provisions the tenant state and sets up webhook listeners
-export const provisionWorker = new Worker(
+export const provisionWorker = SHOULD_RUN_WORKERS ? new Worker(
     'tenant-provisioning',
     async (job: Job<ProvisionJobData>) => {
         console.log(`[Worker] Started provisioning job ${job.id} for slug: ${job.data.slug}`);
@@ -111,18 +113,19 @@ export const provisionWorker = new Worker(
         connection: connection as any,
         // Concurrency protection: Do not provision more than 10 pods simultaneously per worker
         concurrency: 10,
-        autorun: process.env.DISABLE_WORKERS !== 'true',
         // Optional limits: max 50 jobs per minute per node
         limiter: {
             max: 50,
             duration: 60000,
         }
     }
-);
+) : null;
 
-provisionWorker.on('failed', (job, err) => {
-    console.error(`[Worker] Provisioning Job ${job?.id} failed. Error:`, err);
-});
+if (provisionWorker) {
+    provisionWorker.on('failed', (job, err) => {
+        console.error(`[Worker] Provisioning Job ${job?.id} failed. Error:`, err);
+    });
+}
 
 // ---------------------------------------------------------------------------
 // Telegram Webhook Queue (Stateless Architecture)
@@ -137,7 +140,7 @@ export interface TelegramWebhookJobData {
     payload: any;
 }
 
-export const telegramWorker = new Worker(
+export const telegramWorker = SHOULD_RUN_WORKERS ? new Worker(
     'telegram-webhooks',
     async (job: Job<TelegramWebhookJobData>) => {
         const { tenantId, botToken, payload } = job.data;
@@ -176,13 +179,14 @@ export const telegramWorker = new Worker(
     {
         connection: connection as any,
         concurrency: 50, // Higher concurrency since these are chat payloads
-        autorun: process.env.DISABLE_WORKERS !== 'true',
     }
-);
+) : null;
 
-telegramWorker.on('failed', (job, err) => {
-    console.error(`[Worker] Telegram Job ${job?.id} failed. Error:`, err);
-});
+if (telegramWorker) {
+    telegramWorker.on('failed', (job, err) => {
+        console.error(`[Worker] Telegram Job ${job?.id} failed. Error:`, err);
+    });
+}
 
 // ---------------------------------------------------------------------------
 // LINE Webhook Queue
@@ -198,7 +202,7 @@ export interface LineWebhookJobData {
     text: string;
 }
 
-export const lineWorker = new Worker(
+export const lineWorker = SHOULD_RUN_WORKERS ? new Worker(
     'line-webhooks',
     async (job: Job<LineWebhookJobData>) => {
         const { tenantId, encryptedChannelAccessToken, userId, text } = job.data;
@@ -217,13 +221,14 @@ export const lineWorker = new Worker(
     {
         connection: connection as any,
         concurrency: 50,
-        autorun: process.env.DISABLE_WORKERS !== 'true',
     }
-);
+) : null;
 
-lineWorker.on('failed', (job, err) => {
-    console.error(`[Worker] LINE Job ${job?.id} failed. Error:`, err);
-});
+if (lineWorker) {
+    lineWorker.on('failed', (job, err) => {
+        console.error(`[Worker] LINE Job ${job?.id} failed. Error:`, err);
+    });
+}
 
 // ---------------------------------------------------------------------------
 // Background AI Routines (Scouting, Nurture Checks, Daily Reports)
@@ -234,7 +239,7 @@ export interface AIRoutineJobData {
     routineType: 'daily_scout' | 'nurture_check';
 }
 
-export const routineWorker = new Worker(
+export const routineWorker = SHOULD_RUN_WORKERS ? new Worker(
     'ai-routines',
     async (job: Job<AIRoutineJobData>) => {
         const { tenantId, routineType } = job.data;
@@ -254,19 +259,20 @@ export const routineWorker = new Worker(
     {
         connection: connection as any,
         concurrency: 20,
-        autorun: process.env.DISABLE_WORKERS !== 'true',
     }
-);
+) : null;
 
-routineWorker.on('failed', (job, err) => {
-    console.error(`[Worker] Routine Job ${job?.id} failed. Error:`, err);
-});
+if (routineWorker) {
+    routineWorker.on('failed', (job, err) => {
+        console.error(`[Worker] Routine Job ${job?.id} failed. Error:`, err);
+    });
+}
 
 // ---------------------------------------------------------------------------
 // Global Heartbeat Scheduler
 // ---------------------------------------------------------------------------
 
-export const cronWorker = new Worker(
+export const cronWorker = SHOULD_RUN_WORKERS ? new Worker(
     'global-cron',
     async () => {
         console.log(`[Cron] Global Heartbeat triggered. Polling PostgreSQL for tasks...`);
@@ -303,18 +309,19 @@ export const cronWorker = new Worker(
     { 
         connection: connection as any, 
         concurrency: 1,
-        autorun: process.env.DISABLE_WORKERS !== 'true' 
     }
-);
+) : null;
 
-cronWorker.on('failed', (job, err) => {
-    console.error(`[Worker] Cron Job ${job?.id} failed. Global heartbeat may have missed a cycle. Error:`, err);
-});
+if (cronWorker) {
+    cronWorker.on('failed', (job, err) => {
+        console.error(`[Worker] Cron Job ${job?.id} failed. Global heartbeat may have missed a cycle. Error:`, err);
+    });
 
-// Schedule the global cron to run every minute
-cronQueue.add('heartbeat', {}, {
-    repeat: { pattern: '* * * * *' },
-    jobId: 'global_heartbeat_cron' // ensures singleton
-}).catch(err => {
-    console.error('[Queue] Failed to schedule global cron:', err);
-});
+    // Schedule the global cron to run every minute ONLY if worker is initialized
+    cronQueue.add('heartbeat', {}, {
+        repeat: { pattern: '* * * * *' },
+        jobId: 'global_heartbeat_cron' // ensures singleton
+    }).catch(err => {
+        console.error('[Queue] Failed to schedule global cron:', err);
+    });
+}

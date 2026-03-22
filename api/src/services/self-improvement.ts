@@ -4,12 +4,7 @@
 // Implements the Log-Review-Promote cycle from ClawHub.
 // Integrates with Lossless Memory to turn session failures into architectural knowledge.
 
-import { appendFileSync, readFileSync, writeFileSync, existsSync } from "fs";
-import { join } from "path";
-
-const LEARNINGS_DIR = join(process.cwd(), ".learnings");
-const ERRORS_LOG = join(LEARNINGS_DIR, "ERRORS.md");
-const LEARNINGS_LOG = join(LEARNINGS_DIR, "LEARNINGS.md");
+import { logAdminEvent } from "./db.js";
 
 export interface SelfImprovementEvent {
   type: "ERROR" | "LEARNING" | "PATTERN";
@@ -19,32 +14,26 @@ export interface SelfImprovementEvent {
 }
 
 export async function logLearning(event: SelfImprovementEvent): Promise<void> {
-  const timestamp = new Date().toISOString();
-  const entry = `
-## [${event.code}] ${event.type} - ${timestamp}
-- **Description:** ${event.description}
-- **Context:** ${JSON.stringify(event.context, null, 2)}
-- **Status:** Logged
----
-`;
-
-  const targetFile = event.type === "ERROR" ? ERRORS_LOG : LEARNINGS_LOG;
+  const action = `self_improvement_${event.type.toLowerCase()}`;
   
   try {
-    if (!existsSync(LEARNINGS_DIR)) return;
-    appendFileSync(targetFile, entry);
-    console.log(`[self-improvement] Successfully logged ${event.type}: ${event.code}`);
+    await logAdminEvent(action, undefined, {
+      code: event.code,
+      description: event.description,
+      context: event.context
+    });
+    console.log(`[self-improvement] Successfully synchronized ${event.type}: ${event.code} to PostgreSQL`);
   } catch (err) {
-    console.error("[self-improvement] Failed to write to learnings log:", err);
+    console.error("[self-improvement] Failed to write to telemetry database:", err);
   }
 }
 
 /**
  * Analyzes the Lossless Memory for patterns.
- * If a failure (like BotFather rate limit) occurs 3+ times, it flags a candidate for 'Promotion'.
+ * If a failure occurs 3+ times, it flags a candidate for 'Promotion'.
  */
 export async function analyzePatterns(tenantId: string): Promise<string[]> {
-  // TODO: Query the 'key_events' or 'admin_events' table for high-frequency failures
+  // TODO: Query the 'admin_events' table for high-frequency failures
   // For now, return a placeholder indicating the engine is watching.
   return ["Pattern recognition active for tenant: " + tenantId];
 }

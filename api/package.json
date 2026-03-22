@@ -28,7 +28,8 @@
     "pg": "^8.11.3",
     "redis": "^5.11.0",
     "resend": "^6.9.3",
-    "stripe": "^14.14.0"
+    "stripe": "^14.14.0",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
