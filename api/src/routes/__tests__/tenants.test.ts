@@ -5,6 +5,7 @@ import express from 'express'
 const mockDb = vi.hoisted(() => ({
   getTenant: vi.fn(),
   updateTenantStatus: vi.fn(),
+  logAdminEvent: vi.fn(),
 }))
 
 const mockProvisioner = vi.hoisted(() => ({
@@ -14,6 +15,9 @@ const mockProvisioner = vi.hoisted(() => ({
 
 const mockQueue = vi.hoisted(() => ({
   scoutQueue: {
+    add: vi.fn(),
+  },
+  routineQueue: {
     add: vi.fn(),
   },
 }))

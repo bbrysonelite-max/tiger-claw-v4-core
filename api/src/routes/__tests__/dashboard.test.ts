@@ -8,6 +8,7 @@ const mockDb = vi.hoisted(() => ({
   getBotForTenant: vi.fn(),
   getKeyState: vi.fn(),
   getSubscriptionStatus: vi.fn(),
+  getTenantBotUsername: vi.fn(),
 }))
 
 vi.mock('../../services/db.js', () => mockDb)

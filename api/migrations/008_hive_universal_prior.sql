@@ -30,7 +30,7 @@ VALUES
   ('FTC_MLM',
    'FTC Business Guidance on Multi-Level Marketing', 2023,
    'https://www.ftc.gov/business-guidance/resources/multilevel-marketing',
-   NULL,
+   'FTC Business Guidance',
    'network-marketer, universal — regulatory context', 'active'),
 
   ('INSIDESALES_MIT',

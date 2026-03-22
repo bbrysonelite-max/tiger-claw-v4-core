@@ -38,6 +38,7 @@ export async function emitHiveEvent(
   try {
     const tenant = await getTenant(tenantId);
     if (!tenant) return;
+    if ((tenant as any).flavor === 'admin' || (tenant as any).vertical === 'internal') return;
     if (!(tenant as any).hiveOptIn) return; // Use any for dynamic typing since we didn't inject all types
 
     const vertical = (tenant as any).vertical ?? 'other';

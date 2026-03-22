@@ -1,12 +1,33 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { tiger_briefing } from '../tiger_briefing.js'
 import { makeContext, type Storage, type ToolResult } from './helpers.js'
+
+vi.mock('../../services/db.js', () => ({
+  getPool: vi.fn(() => ({
+    query: vi.fn().mockResolvedValue({ rows: [{ count: '0' }] })
+  })),
+  getHiveSignalWithFallback: vi.fn().mockRejectedValue(new Error("No DB config in test")),
+}))
+
+let mockStorageMap = new Map();
+
+vi.mock('../../services/tenant_data.js', () => ({
+  getTenantState: vi.fn(async () => {
+    const state: any = {};
+    for (const [key, val] of mockStorageMap.entries()) {
+      state[`${key}.json`] = val;
+    }
+    return state;
+  }),
+  saveTenantState: vi.fn(),
+}))
 
 describe('tiger_briefing', () => {
   let storage: Storage
 
   beforeEach(() => {
     storage = new Map()
+    mockStorageMap = storage
     storage.set('contacts', [
       { id: 'c1', name: 'Alice', status: 'customer', score: 90, lastContact: '2026-03-01' },
       { id: 'c2', name: 'Bob', status: 'lead', score: 45, lastContact: '2026-02-15' },
@@ -21,15 +42,16 @@ describe('tiger_briefing', () => {
 
   it('returns a briefing summary and ok:true', async () => {
     const ctx = makeContext(storage)
-    const result: ToolResult = await tiger_briefing.execute({}, ctx)
+    const result: ToolResult = await tiger_briefing.execute({ action: 'generate' }, ctx)
 
+    if (!result.ok) console.error("TEST ERROR:", result.error)
     expect(result.ok).toBe(true)
     expect(result.output).toBeTruthy()
   })
 
   it('includes hot leads (high score) in the briefing', async () => {
     const ctx = makeContext(storage)
-    const result = await tiger_briefing.execute({}, ctx)
+    const result = await tiger_briefing.execute({ action: 'generate' }, ctx)
 
     // Carol has score 70 and recent contact — should be highlighted
     expect(result.output).toContain('Carol')
@@ -37,7 +59,7 @@ describe('tiger_briefing', () => {
 
   it('includes recent activity count', async () => {
     const ctx = makeContext(storage)
-    const result = await tiger_briefing.execute({}, ctx)
+    const result = await tiger_briefing.execute({ action: 'generate' }, ctx)
 
     // Should mention recent events
     expect(result.output).toBeTruthy()
@@ -46,7 +68,7 @@ describe('tiger_briefing', () => {
 
   it('returns a scoped briefing when contactId is provided', async () => {
     const ctx = makeContext(storage)
-    const result = await tiger_briefing.execute({ contactId: 'c1' }, ctx)
+    const result = await tiger_briefing.execute({ action: 'generate', contactId: 'c1' }, ctx)
 
     expect(result.ok).toBe(true)
     expect(result.output).toContain('Alice')
@@ -56,7 +78,7 @@ describe('tiger_briefing', () => {
 
   it('returns ok:false for unknown contactId scope', async () => {
     const ctx = makeContext(storage)
-    const result = await tiger_briefing.execute({ contactId: 'ghost' }, ctx)
+    const result = await tiger_briefing.execute({ action: 'generate', contactId: 'ghost' }, ctx)
 
     expect(result.ok).toBe(false)
   })
@@ -67,7 +89,7 @@ describe('tiger_briefing', () => {
     emptyStorage.set('settings', { followUpDays: 7 })
     const ctx = makeContext(emptyStorage)
 
-    const result = await tiger_briefing.execute({}, ctx)
+    const result = await tiger_briefing.execute({ action: 'generate' }, ctx)
 
     expect(result.ok).toBe(true)
     // Should indicate no contacts, not crash
@@ -80,7 +102,7 @@ describe('tiger_briefing', () => {
       { id: 'c2', name: 'Bob Overdue', status: 'lead', score: 45, lastContact: '2026-02-15' },
     ])
     const ctx = makeContext(storage)
-    const result = await tiger_briefing.execute({}, ctx)
+    const result = await tiger_briefing.execute({ action: 'generate' }, ctx)
 
     expect(result.ok).toBe(true)
     // Should mention overdue or Bob

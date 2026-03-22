@@ -13,7 +13,7 @@ ALTER TABLE tenants
 -- Track when founding member status was granted and why
 CREATE TABLE IF NOT EXISTS founding_member_events (
   id          BIGSERIAL PRIMARY KEY,
-  tenant_id   TEXT NOT NULL REFERENCES tenants(id),
+  tenant_id   UUID NOT NULL REFERENCES tenants(id),
   event_type  TEXT NOT NULL,  -- 'granted' | 'milestone_reached' | 'counter_updated'
   payload     JSONB NOT NULL,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now()

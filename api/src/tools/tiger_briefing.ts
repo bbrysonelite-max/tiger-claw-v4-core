@@ -204,6 +204,9 @@ interface BriefingData {
   // Section 9: Hive Intelligence
   gongPattern?: { description: string, sourceLabel: string };
   icpTargets?: { name: string, description: string, sourceLabel: string }[];
+
+  // Section 10: Admin Fleet Summary
+  adminFleet?: { active: number, paused: number, trials: {slug: string, hoursRemaining: number}[], conversions: number };
 }
 
 async function aggregateData(context: ToolContext, lastBriefingAt?: string): Promise<BriefingData> {
@@ -354,6 +357,40 @@ async function aggregateData(context: ToolContext, lastBriefingAt?: string): Pro
     }));
   }
 
+  // ---- Admin Fleet Intelligence ----
+  let adminFleet;
+  if (flavor === "admin") {
+      const { getPool } = await import("../services/db.js");
+      const pool = getPool();
+      
+      const activeRes = await pool.query("SELECT COUNT(*) as count FROM tenants WHERE status = 'active'");
+      const pausedRes = await pool.query("SELECT COUNT(*) as count FROM tenants WHERE status = 'paused'");
+      
+      const trialsRes = await pool.query(`
+        SELECT slug, 
+               EXTRACT(EPOCH FROM ((created_at + INTERVAL '72 hours') - NOW()))/3600 AS hours_remaining 
+        FROM tenants 
+        WHERE is_founding_member = false 
+          AND created_at > NOW() - INTERVAL '72 hours'
+          AND status = 'active'
+        ORDER BY hours_remaining ASC
+      `);
+      
+      const convRes = await pool.query(`
+        SELECT COUNT(*) as count 
+        FROM admin_events 
+        WHERE event_type = 'trial_conversion_unlock' 
+          AND created_at > NOW() - INTERVAL '24 hours'
+      `);
+      
+      adminFleet = {
+         active: parseInt(activeRes.rows[0].count, 10),
+         paused: parseInt(pausedRes.rows[0].count, 10),
+         trials: trialsRes.rows.map(r => ({ slug: r.slug, hoursRemaining: Math.max(0, Number(r.hours_remaining)) })),
+         conversions: parseInt(convRes.rows[0].count, 10)
+      };
+  }
+
   return {
     tenantName,
     flavor,
@@ -370,6 +407,7 @@ async function aggregateData(context: ToolContext, lastBriefingAt?: string): Pro
     aftercareAlerts,
     gongPattern,
     icpTargets,
+    adminFleet,
   };
 }
 
@@ -534,6 +572,24 @@ function assembleBriefing(data: BriefingData): string {
     }
   }
 
+  // ---- Section 10: Admin Fleet Briefing ----
+  if (data.adminFleet) {
+    lines.push(``);
+    lines.push(`---`);
+    lines.push(`🐅 FLEET STATUS (ADMIN)`);
+    lines.push(`  • Active Tenants: ${data.adminFleet.active}`);
+    lines.push(`  • Paused Tenants: ${data.adminFleet.paused}`);
+    lines.push(`  • Trial Conversions (24h): ${data.adminFleet.conversions}`);
+    lines.push(`  • Active Trials (${data.adminFleet.trials.length}):`);
+    if (data.adminFleet.trials.length === 0) {
+       lines.push(`      None currently.`);
+    } else {
+       for (const t of data.adminFleet.trials) {
+          lines.push(`      - @${t.slug}: ${t.hoursRemaining.toFixed(1)}h remaining`);
+       }
+    }
+  }
+
   return lines.join("\n");
 }
 
@@ -671,6 +727,7 @@ async function execute(
     }
   } catch (err) {
     logger.error("tiger_briefing error", { action, err: String(err) });
+    console.error("TIGER BRIEFING ERROR STACK:", err instanceof Error ? err.stack : err);
     return {
       ok: false,
       error: `tiger_briefing error in action "${action}": ${String(err)}`,

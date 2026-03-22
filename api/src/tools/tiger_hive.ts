@@ -236,6 +236,69 @@ async function handleQuery(
 ): Promise<ToolResult> {
   const onboard = await loadJson<OnboardState>(context, "onboard_state.json");
   const flavor = onboard?.flavor ?? (context.config["BOT_FLAVOR"] as string) ?? "network-marketer";
+
+  // ADMIN DETAIL MODE
+  if (flavor === "admin") {
+      const { getPool } = await import("../services/db.js");
+      const pool = getPool();
+      
+      const lines = ["🐅 TIGER CLAW ADMIN — HIVE HEALTH INTELLIGENCE:\n"];
+      
+      // 1. Source Staleness
+      lines.push("--- SOURCE STALENESS ---");
+      try {
+        const staleRes = await pool.query(`
+          SELECT source_name, 
+                 EXTRACT(YEAR FROM AGE(CURRENT_DATE, date_collected)) AS years_old, 
+                 AGE(CURRENT_DATE, date_collected) > INTERVAL '3 years' as is_stale 
+          FROM hive_prior_sources
+          ORDER BY years_old DESC
+        `);
+        if (staleRes.rows.length === 0) lines.push("No prior sources found.");
+        staleRes.rows.forEach(r => {
+            lines.push(`• ${r.source_name}: ${r.years_old} years old${r.is_stale ? " [STALE WARNING]" : " [FRESH]"}`);
+        });
+      } catch(e) { lines.push(`Error loading sources: ${String(e)}`); }
+      lines.push("");
+
+      // 2. ICP Signal Health
+      lines.push("--- ICP SIGNAL HEALTH ---");
+      try {
+        const icpRes = await pool.query(`
+          SELECT vertical, region, scouted_count, hours_since_update 
+          FROM hive_icp_signal_health
+          ORDER BY scouted_count DESC
+        `);
+        if (icpRes.rows.length === 0) lines.push("No active ICP signals aggregated.");
+        icpRes.rows.forEach(r => {
+            lines.push(`• ${r.vertical} (${r.region}): ${r.scouted_count} samples | Freshness: ${Number(r.hours_since_update).toFixed(1)}h ago`);
+        });
+      } catch(e) { lines.push(`Error loading ICP health: ${String(e)}`); }
+      lines.push("");
+
+      // 3. Community Unlock Progress
+      lines.push("--- COMMUNITY UNLOCK PROGRESS (FOUNDING MEMBERS) ---");
+      try {
+        const fmRes = await pool.query(`
+          SELECT vertical, COUNT(*) as member_count
+          FROM tenants
+          WHERE is_founding_member = true
+          GROUP BY vertical
+          ORDER BY member_count DESC
+        `);
+        if (fmRes.rows.length === 0) lines.push("No founding members unlocked yet.");
+        fmRes.rows.forEach(r => {
+            lines.push(`• ${r.vertical}: ${r.member_count}/50 founders secured`);
+        });
+      } catch(e) { lines.push(`Error loading unlock progress: ${String(e)}`); }
+
+      return {
+        ok: true,
+        output: lines.join("\n"),
+        data: { adminMode: true }
+      };
+  }
+
   const region = (context.config["REGION"] as string) ?? "us-en";
   const apiBase = getApiBase(context.config);
   const limit = params.limit ?? 10;
