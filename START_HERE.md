@@ -16,9 +16,10 @@
 3. **Verified E2E Provisioning Webhook:** Successfully seeded a live dummy `john@agent.test` tenant into Postgres and executed the Next.js `/wizard/hatch` Cloud Run webhook. It correctly assigned `bot_pool` entries without failing constraints.
 4. **Architectural Locks & CI:** Addressed the Claude Code external audit. Removed hardcoded admin bypasses (`s3825`), solved `006`/`007` SQL migration sequence collisions, and installed a GitHub Actions CI pipeline (`.github/workflows/ci.yml`).
 5. **Restored 4-Layer Key Fallback:** The backend natively handles the fallback using the 4-layer system (`api/src/services/ai.ts`).
+6. **Test Suite Baseline & CI Lock:** Ingested 29 Claude-generated unit tests into `/tests`. Built an AST migration algorithm (`fix_tool_tests.js`) to dynamically rewrite hallucinated tool signatures into strict V4 parity. Isolated the Node environment via `vitest.setup.ts`. Achieved a flawless green TypeScript compile and established an official 101-passing baseline matrix.
 
 ## 3. Your Immediate Directives
-You have two strict priorities to execute the exact second you boot up. Do not do anything else until these are finished:
+You have three strict priorities to execute the exact second you boot up. Do not do anything else until these are finished:
 
 ### [ ] Priority 1: Verify the Agent Runtime Spool-Up
 The `/wizard/hatch` webhook successfully fires the `provisionQueue`. You must verify that the `tenant-provisioning` BullMQ worker actually spins up the Gemini instance perfectly without crashing, and that the agent correctly responds on Telegram.
