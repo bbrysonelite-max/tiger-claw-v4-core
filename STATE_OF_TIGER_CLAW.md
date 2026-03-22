@@ -17,19 +17,15 @@ If you are reading this, you are working on the **Tiger Claw Multi-Tenant SaaS**
 ---
 
 ## What We Just Accomplished
-We fully executed the **SWOP Remediation Plan**:
-- **Phase 2 (Security):** Locked down CORS arrays natively, engaged API Rate Limiting across public webhooks, and instituted a fatal Encryption Panic Switch if secrets are missing.
-- **Phase 3 (Tech Debt):** Eradicated ephemeral container file tracking (`/.learnings/`) by mapping directly to Postgres telemetry. Gated BullMQ workers to prevent Cloud Run instantiation collision, and successfully wrapped the external `/wizard/*` APIs inside strict Zod payload ast validations.
-- **Phase 4 (Tier-1 UI/UX):** Refactored the `renderWizardPage()` frontend into a premium dark SaaS glassmorphic architecture. Heavily armored the LINE payload input logic (`readonly` locks) to perfectly bypass hyperactive browser password managers.
-- **Phase 5 (Testing & Deploy):** Upgraded vitest schemas mapping to the new Multi-Key database `addAIKey` payload logic. Deployed `tiger-claw-api` to Google Cloud and securely spawned an E2E Browser Sub-Agent onto a live sandbox environment resolving successfully.
+We executed a monumental sweep of the conversational AI Engine and 72-Hour Trial architecture:
+- **Phase 1 (The Gemini Fix):** Diagnosed and patched a silent function-calling output suppression bug occurring exclusively on GCP arrays for `gemini-2.5-flash`. Downgraded the native internal routing model to the robust `gemini-2.0-flash`, and hardcoded `SchemaType.OBJECT` enums directly replacing the raw lowercase JSON schema maps. The AI logic is completely stable.
+- **Phase 2 (Onboarding Friction):** Physically eradicated the API Key collection requirement (Phase 3 & 4) from the conversational Telegram Wizard. Users now sail straight from ICP confirmation directly into naming the bot, accelerating immediate utilization.
+- **Phase 3 (72-Hour Native Trial Engine):** Constructed a fully decoupled, completely stateless 72-hour trial engine. Tapped into the hourly global heartbeat inside Postgres via `queue.ts`. At 24, 48, and 72 hours, the cron job executes a single-shot generative request through Gemini (inheriting the user's exact Flavor Persona) to securely drop an upbeat conversation reminder cleanly into the operator's active Telegram chat. At exactly 72 hours, it natively locks `tenantPaused = true` in JSON state until an API key is provided seamlessly through the web wizard.
 
 ## The Immediate Backlog (Starting Point)
 
-### Priority 1: The Final Telegram Smoke Test
-A `tenant-provisioning` BullMQ cycle is active natively via Cloud Run. We must physically text `@tigerclawjohnhidebrandbot` via Telegram and verify the `processTelegramMessage` loop spins correctly, processes Webhooks, and delegates native intelligence.
-
-### Priority 2: Web-Onboarding Completion
-The Stripe PR (`feat/stanstore-webhook`) must be finalized so that customers directly route from Stan Store into the `wizard.tigerclaw.io` E2E React flow natively.
+### Priority 1: Web-Onboarding Completion
+The Stripe PR (`feat/stanstore-webhook`) must be finalized so that customers directly route from Stan Store into the `wizard.tigerclaw.io` E2E React flow natively, providing the ultimate entry bridge now that the 72-hour backend is complete.
 
 ---
 *Locked. Proceed.*
