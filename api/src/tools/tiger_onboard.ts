@@ -393,15 +393,20 @@ async function transitionAfterICPConfirm(state: OnboardState, tenantId: string):
     };
   }
 
-  // Both ICP phases complete (customer_confirm or single_confirm) — move to key setup
-  state.phase = "keys_primary";
+  // Both ICP phases complete (customer_confirm or single_confirm)
+  // Skip key setup for 72-hour trial tenants. Move directly to Naming stage.
+  state.phase = "naming";
   state.questionIndex = 0;
   await saveState(tenantId, state);
 
   return {
     ok: true,
-    output: buildKeySetupIntro(),
-    data: { phase: "keys_primary", progressPercent: 55 },
+    output: [
+      `Your profiles are set. Let's get right into it.`,
+      ``,
+      `What do you want to call me? (e.g., Tiger, Shadow, Assistant, etc.)`
+    ].join("\n"),
+    data: { phase: "naming", progressPercent: 80 },
   };
 }
 
