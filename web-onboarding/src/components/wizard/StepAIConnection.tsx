@@ -103,7 +103,7 @@ export default function StepAIConnection({ state, updateState, onNext }: AIConne
 
                             <div className="flex gap-2">
                                 <input
-                                    type="password"
+                                    type="text"
                                     value={tempKey}
                                     onChange={(e) => setTempKey(e.target.value)}
                                     placeholder={`Paste ${currentProvider.name} key...`}
