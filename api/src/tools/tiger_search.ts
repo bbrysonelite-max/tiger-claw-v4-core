@@ -1,3 +1,4 @@
+import { ToolContext, ToolResult } from "./ToolContext.js";
 // Tiger Claw — tiger_search Tool
 // /search [keyword] — tenant-facing contact search — Block 3 of TIGERCLAW-MASTER-SPEC-v2.md
 //
@@ -15,23 +16,9 @@ import { getLeads, getNurture, getContacts, getTenantState, LeadRecord, NurtureR
 
 // Types imported from tenant_data
 
-interface ToolContext {
-  sessionKey: string;
-  workdir: string;
-  config: Record<string, unknown>;
-  logger: {
-    info(msg: string, ...args: unknown[]): void;
-    warn(msg: string, ...args: unknown[]): void;
-    error(msg: string, ...args: unknown[]): void;
-  };
-}
+/* removed */
 
-interface ToolResult {
-  ok: boolean;
-  output?: string;
-  error?: string;
-  data?: unknown;
-}
+
 
 // ---------------------------------------------------------------------------
 // Persistence helpers

@@ -1,3 +1,4 @@
+import { ToolContext, ToolResult } from "./ToolContext.js";
 // Tiger Claw — tiger_score_1to10 Tool
 // Standalone 1-10 Framework handler — Block 3.6 of TIGERCLAW-MASTER-SPEC-v2.md
 //
@@ -94,25 +95,9 @@ interface OnboardState {
   botName?: string;
 }
 
-interface ToolContext {
-  sessionKey: string;
-  agentId: string;
-  config: Record<string, unknown>;
-  abortSignal: AbortSignal;
-  logger: {
-    debug(msg: string, ...args: unknown[]): void;
-    info(msg: string, ...args: unknown[]): void;
-    warn(msg: string, ...args: unknown[]): void;
-    error(msg: string, ...args: unknown[]): void;
-  };
-}
+/* removed */
 
-interface ToolResult {
-  ok: boolean;
-  output?: string;
-  error?: string;
-  data?: unknown;
-}
+
 
 // ---------------------------------------------------------------------------
 // Persistence

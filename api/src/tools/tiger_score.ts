@@ -1,3 +1,4 @@
+import { ToolContext, ToolResult } from "./ToolContext.js";
 // Tiger Claw — tiger_score Tool
 // Lead scoring engine — Block 3.2 of TIGERCLAW-MASTER-SPEC-v2.md
 //
@@ -191,28 +192,9 @@ type ScoreParams =
   | ({ action: "get" } & GetInput)
   | ({ action: "list" } & ListInput);
 
-interface ToolContext {
-  sessionKey: string;
-  agentId: string;
-  workdir: string;
-  config: Record<string, unknown>;
-  abortSignal: AbortSignal;
-  logger: {
-    debug(msg: string, ...args: unknown[]): void;
-    info(msg: string, ...args: unknown[]): void;
-    warn(msg: string, ...args: unknown[]): void;
-    error(msg: string, ...args: unknown[]): void;
-  };
 
-  storage: { get: (key: string) => Promise<any>; set: (key: string, value: any) => Promise<void>; };
-}
 
-interface ToolResult {
-  ok: boolean;
-  output?: string;
-  error?: string;
-  data?: unknown;
-}
+
 
 // ---------------------------------------------------------------------------
 // Scoring Math

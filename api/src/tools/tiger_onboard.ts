@@ -1,3 +1,4 @@
+import { ToolContext, ToolResult } from "./ToolContext.js";
 // Tiger Claw — tiger_onboard Tool
 // Onboarding interview flow — Block 5, Section 5.2 of TIGERCLAW-MASTER-SPEC-v2.md
 //
@@ -82,27 +83,9 @@ interface OnboardParams {
   response?: string;
 }
 
-interface ToolContext {
-  sessionKey: string;
-  agentId: string;
-  tenantId: string;
-  workdir?: string;
-  config: Record<string, unknown>;
-  abortSignal: AbortSignal;
-  logger: {
-    debug(msg: string, ...args: unknown[]): void;
-    info(msg: string, ...args: unknown[]): void;
-    warn(msg: string, ...args: unknown[]): void;
-    error(msg: string, ...args: unknown[]): void;
-  };
-}
+/* removed */
 
-interface ToolResult {
-  ok: boolean;
-  output?: string;
-  error?: string;
-  data?: unknown;
-}
+
 
 // ---------------------------------------------------------------------------
 // Constants — Questions per phase

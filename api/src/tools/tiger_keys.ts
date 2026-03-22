@@ -1,3 +1,4 @@
+import { ToolContext, ToolResult } from "./ToolContext.js";
 // Tiger Claw — tiger_keys Tool
 // Four-layer API key management — Block 1.7 + Block 4 of TIGERCLAW-MASTER-SPEC-v2.md
 //
@@ -171,26 +172,9 @@ type KeysParams =
   | RotateParams
   | StatusParams;
 
-interface ToolContext {
-  sessionKey: string;
-  agentId: string;
-  workdir: string;
-  config: Record<string, unknown>;
-  abortSignal: AbortSignal;
-  logger: {
-    debug(msg: string, ...args: unknown[]): void;
-    info(msg: string, ...args: unknown[]): void;
-    warn(msg: string, ...args: unknown[]): void;
-    error(msg: string, ...args: unknown[]): void;
-  };
-}
+/* removed */
 
-interface ToolResult {
-  ok: boolean;
-  output?: string;
-  error?: string;
-  data?: unknown;
-}
+
 
 // ---------------------------------------------------------------------------
 // State persistence

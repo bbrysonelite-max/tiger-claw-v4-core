@@ -1,3 +1,4 @@
+import { ToolContext, ToolResult } from "./ToolContext.js";
 // Tiger Claw — tiger_move Tool
 // /move [name] [status] — manually override a contact's status
 //
@@ -27,22 +28,9 @@ type LeadStatus = (typeof VALID_STATUSES)[number];
 
 // Interfaces imported from tenant_data.js
 
-interface ToolContext {
-  sessionKey: string;
-  config: Record<string, unknown>;
-  logger: {
-    info(msg: string, ...args: unknown[]): void;
-    warn(msg: string, ...args: unknown[]): void;
-    error(msg: string, ...args: unknown[]): void;
-  };
-}
+/* removed */
 
-interface ToolResult {
-  ok: boolean;
-  output?: string;
-  error?: string;
-  data?: unknown;
-}
+
 
 // ---------------------------------------------------------------------------
 // Persistence helpers

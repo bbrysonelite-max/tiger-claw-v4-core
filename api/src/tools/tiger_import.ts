@@ -1,3 +1,4 @@
+import { ToolContext, ToolResult } from "./ToolContext.js";
 // Tiger Claw — tiger_import Tool
 // CSV import for warm contacts and organization nurture
 // TIGERCLAW-MASTER-SPEC-v2.md Block 3.8 "Organization Nurture"
@@ -22,23 +23,9 @@ import { getLeads, saveLeads as dbsaveLeads, getTenantState, saveTenantState } f
 // Types
 // ---------------------------------------------------------------------------
 
-interface ToolContext {
-  sessionKey: string;
-  workdir: string;
-  logger: {
-    info: (msg: string, data?: Record<string, unknown>) => void;
-    error: (msg: string, data?: Record<string, unknown>) => void;
-  };
 
-  storage: { get: (key: string) => Promise<any>; set: (key: string, value: any) => Promise<void>; };
-}
 
-interface ToolResult {
-  ok: boolean;
-  output?: string;
-  error?: string;
-  data?: Record<string, unknown>;
-}
+
 
 interface LeadRecord {
   id: string;

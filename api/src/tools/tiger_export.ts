@@ -1,3 +1,4 @@
+import { ToolContext, ToolResult } from "./ToolContext.js";
 // Tiger Claw — tiger_export Tool
 // /export — generates CSV of all contacts and sends as file attachment
 //
@@ -56,27 +57,9 @@ interface ContactRecord {
   queuedAt: string;
 }
 
-interface ToolContext {
-  sessionKey: string;
-  workdir: string;
-  config: Record<string, unknown>;
-  logger: {
-    info(msg: string, ...args: unknown[]): void;
-    warn(msg: string, ...args: unknown[]): void;
-    error(msg: string, ...args: unknown[]): void;
-  };
 
-  storage: { get: (key: string) => Promise<any>; set: (key: string, value: any) => Promise<void>; };
-}
 
-interface ToolResult {
-  ok: boolean;
-  output?: string;
-  error?: string;
-  data?: unknown;
-  // File attachment: { filename, content (base64 or utf8), mimeType }
-  file?: { filename: string; content: string; mimeType: string; encoding: string };
-}
+
 
 // ---------------------------------------------------------------------------
 // Persistence helpers
@@ -235,6 +218,7 @@ async function execute(
   params: Record<string, unknown>,
   context: ToolContext
 ): Promise<ToolResult> {
+  const tenantId = context.agentId;
   const { workdir, logger } = context;
   const filterRaw = String(params.filter ?? "").trim().toLowerCase();
   // Valid filter values: "" (all), "converted", "nurture"

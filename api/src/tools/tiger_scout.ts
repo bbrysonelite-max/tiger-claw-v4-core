@@ -1,3 +1,4 @@
+import { ToolContext, ToolResult } from "./ToolContext.js";
 // Tiger Claw — tiger_scout Tool
 // Prospect discovery engine — Block 3.4 of TIGERCLAW-MASTER-SPEC-v2.md
 //
@@ -149,26 +150,9 @@ interface HuntParams {
   limit?: number;
 }
 
-interface ToolContext {
-  sessionKey: string;
-  agentId: string;
-  workdir: string;
-  config: Record<string, unknown>;
-  abortSignal: AbortSignal;
-  logger: {
-    debug(msg: string, ...args: unknown[]): void;
-    info(msg: string, ...args: unknown[]): void;
-    warn(msg: string, ...args: unknown[]): void;
-    error(msg: string, ...args: unknown[]): void;
-  };
-}
+/* removed */
 
-interface ToolResult {
-  ok: boolean;
-  output?: string;
-  error?: string;
-  data?: unknown;
-}
+
 
 // ---------------------------------------------------------------------------
 // Stop words for keyword extraction

@@ -1,3 +1,4 @@
+import { ToolContext, ToolResult } from "./ToolContext.js";
 // Tiger Claw — tiger_email Tool
 // Allows operators to instruct the AI to send a one-off email to a prospect.
 // Built natively for the V4 Stateless Architecture using Resend.

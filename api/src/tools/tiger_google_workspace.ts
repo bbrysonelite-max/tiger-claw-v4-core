@@ -1,3 +1,4 @@
+import { ToolContext, ToolResult } from "./ToolContext.js";
 // Tiger Claw — tiger_google_workspace Tools
 // Replaces the legacy OpenClaw `@googleworkspace/cli` (gws) bash script.
 // Built natively for the V4 Stateless Architecture using standard Google APIs.

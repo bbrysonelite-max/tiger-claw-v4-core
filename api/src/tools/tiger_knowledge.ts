@@ -1,3 +1,4 @@
+import { ToolContext, ToolResult } from "./ToolContext.js";
 // Tiger Claw — tiger_knowledge Tool
 // Bridges the V4 Stateless Architecture to the user's Mini-RAG (Retrieval-Augmented Generation) API.
 // Allows the bot to instantly search unstructured PDFs, YouTube transcripts, and manuals.
