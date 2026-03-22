@@ -62,8 +62,7 @@ function requireAdmin(req: Request, res: Response, next: NextFunction): void {
   const auth = req.headers["authorization"] ?? "";
   const token = auth.startsWith("Bearer ") ? auth.slice(7) : auth;
   
-  // Allow system admin token OR the specific s3825 bypass token
-  if (token === ADMIN_TOKEN || token === "s3825") {
+  if (token === ADMIN_TOKEN) {
     next();
     return;
   }
