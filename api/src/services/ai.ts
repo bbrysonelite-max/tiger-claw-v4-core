@@ -444,7 +444,7 @@ export async function processSystemRoutine(tenantId: string, routineType: string
             nurture_check: 'SYSTEM: Run your Nurture Check. Review follow-ups and reach out where due.',
             trial_reminder_24h: `SYSTEM: Write a 1-sentence, highly conversational Telegram message to your operator reminding them they have 48 hours left on their free trial. Tell them to securely plug in their API key at https://app.tigerclaw.io so you don't have to stop working for them. Use your exact flavor and personality. NEVER use placeholders. Do NOT execute any tools.`,
             trial_reminder_48h: `SYSTEM: Write a 1-sentence, highly conversational Telegram message to your operator reminding them they have 24 hours left on their free trial. Tell them to securely plug in their API key at https://app.tigerclaw.io so you don't have to stop working for them. Use your exact flavor and personality. NEVER use placeholders. Do NOT execute any tools.`,
-            trial_reminder_72h: `SYSTEM: Write a 1-sentence, highly conversational Telegram message to your operator telling them their 72-hour free trial is officially complete, and you have paused your operations so their flywheel has stopped. Tell them to log into https://app.tigerclaw.io to securely add their API key so you can instantly resume scouting for them. Use your exact flavor and personality. NEVER use placeholders. Do NOT execute any tools.`,
+            trial_reminder_72h: `SYSTEM: Write a 1-sentence, highly conversational Telegram message to your operator telling them their 72-hour free trial is officially complete, and you have paused your operations so their flywheel has stopped. Tell them to unlock their bot to resume scouting. Use your exact flavor and personality. NEVER use placeholders. Do NOT execute any tools.`,
         };
         const prompt = systemPrompts[routineType] ?? `SYSTEM: Execute routine: ${routineType}`;
 
@@ -453,8 +453,14 @@ export async function processSystemRoutine(tenantId: string, routineType: string
         
         // Trial Reminder Handling — extract text and broadcast entirely securely
         if (routineType.startsWith('trial_reminder_')) {
-            const finalResponse = initial.response.text?.() ?? '';
+            let finalResponse = initial.response.text?.() ?? '';
             if (finalResponse) {
+                if (routineType === 'trial_reminder_72h') {
+                    const stanStoreUrl = process.env.STAN_STORE_URL;
+                    if (stanStoreUrl) {
+                        finalResponse += `\n\nTo unlock your bot and resume operations, complete your registration here: ${stanStoreUrl}`;
+                    }
+                }
                 const botToken = await getTenantBotToken(tenantId);
                 if (botToken) {
                     const chatIds = await getTenantChatIds(tenantId);

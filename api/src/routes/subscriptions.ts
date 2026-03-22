@@ -128,4 +128,44 @@ router.post("/checkout", async (req: Request, res: Response) => {
     }
 });
 
+// GET /trial-checkout
+// Returns the Stan Store URL for trial conversions
+router.get("/trial-checkout", async (req: Request, res: Response) => {
+    try {
+        const { slug } = req.query;
+        if (!slug || typeof slug !== "string") {
+            return res.status(400).json({ error: "slug is required" });
+        }
+
+        const STAN_STORE_URL = process.env.STAN_STORE_URL;
+        if (!STAN_STORE_URL) {
+            console.warn("[subscriptions] Missing STAN_STORE_URL env var.");
+            return res.status(503).json({ error: "Stan Store URL not configured" });
+        }
+
+        const tenantRes = await getPool().query(
+            "SELECT id FROM tenants WHERE slug = $1",
+            [slug]
+        );
+
+        if (tenantRes.rows.length === 0) {
+            return res.status(404).json({ error: "tenant_not_found" });
+        }
+
+        const tenant = tenantRes.rows[0];
+
+        const { getBotState } = await import("../services/db.js");
+        const botState = JSON.parse((await getBotState(tenant.id, "key_state.json")) || "{}");
+
+        if (!botState.tenantPaused) {
+            return res.status(400).json({ error: "tenant_not_paused" });
+        }
+
+        return res.json({ url: STAN_STORE_URL });
+    } catch (err) {
+        console.error("[subscriptions] Trial checkout error:", err);
+        return res.status(500).json({ error: "failed_to_get_checkout_url" });
+    }
+});
+
 export default router;

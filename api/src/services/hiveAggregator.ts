@@ -16,7 +16,7 @@ export async function aggregateIcpSignals(): Promise<{ processedConversions: num
       payload
     FROM hive_events
     WHERE event_type = 'conversion'
-      AND occurred_at >= NOW() - INTERVAL '90 days'
+      AND created_at >= NOW() - INTERVAL '90 days'
   `);
   
   if (!result.rows.length) {
@@ -38,11 +38,10 @@ export async function aggregateIcpSignals(): Promise<{ processedConversions: num
     const [vertical, region] = key.split(':');
     const totalFounders = conversions.length;
     
-    // We only aggregate if we have enough sample size > 50 (ignoring for dev testing, let's set it to > 50 for production spec)
     // NOTE: Spec says "Restricts saves to minimum 50 samples and >5% conversion lift"
-    if (totalFounders < 5) {
-       console.log(`[hiveAggregator] Skipping ICP aggregation for ${vertical}:${region} (Insufficent sample: ${totalFounders} < 5)`);
-       continue; // Using 5 to keep it testable. Change to 50 per PRD if enforcing strictly later.
+    if (totalFounders < 50) {
+       console.log(`[hiveAggregator] Skipping ICP aggregation for ${vertical}:${region} (Insufficient sample: ${totalFounders} < 50)`);
+       continue;
     }
     
     const patternCounts: Record<string, number> = {};

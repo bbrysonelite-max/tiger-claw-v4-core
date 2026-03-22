@@ -24,6 +24,9 @@ import {
   createBYOKSubscription,
   getTenant,
   logAdminEvent,
+  getPool,
+  getBotState,
+  setBotState,
 } from "../services/db.js";
 import { decryptToken } from "../services/pool.js";
 import { sendAdminAlert } from "./admin.js";
@@ -122,13 +125,41 @@ router.post("/stripe", async (req: Request, res: Response) => {
       // 1. Create User
       const userId = await createBYOKUser(email, name, typeof session.customer === "string" ? session.customer : undefined);
 
-      // 2. Identify Bot record (pre-registered vs new)
-      const preBotId = meta["botId"] && meta["botId"] !== "pending" ? meta["botId"] : null;
-      // Stan Store purchases don't have a preBotId, so we create a blank 'pending' bot here
-      const botId = preBotId ?? await createBYOKBot(userId, meta["botName"] ?? name, flavor, "pending");
+      // Trial-to-paid conversion check!
+      const pool = getPool();
+      const existingBotRes = await pool.query(
+        "SELECT id FROM bots WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1",
+        [userId]
+      );
+      
+      let botId;
+      let preBotId = meta["botId"] && meta["botId"] !== "pending" ? meta["botId"] : null;
+      let isTrialConversion = false;
+
+      if (existingBotRes.rows.length > 0) {
+        // This user already has a bot — unlock it
+        botId = existingBotRes.rows[0].id;
+        const botState = JSON.parse(await getBotState(botId, "key_state.json") || "{}");
+        
+        if (botState.tenantPaused) {
+            botState.tenantPaused = false;
+            await setBotState(botId, "key_state.json", botState);
+            isTrialConversion = true;
+            
+            await pool.query("UPDATE bots SET status = 'live' WHERE id = $1", [botId]);
+            await pool.query("UPDATE tenants SET status = 'active' WHERE id = $1", [botId]);
+            
+            console.log(`[stripe-webhook] 🔓 Trial-to-paid conversion! Unlocked bot ${botId}`);
+            await logAdminEvent("trial_conversion_unlock", botId, { email, sessionId: session.id });
+        }
+      } else {
+        // 2. Identify Bot record (pre-registered vs new)
+        // Stan Store purchases don't have a preBotId, so we create a blank 'pending' bot here
+        botId = preBotId ?? await createBYOKBot(userId, meta["botName"] ?? name, flavor, "pending");
+      }
 
       // 3. Create AI Config only if no pre-registration (wizard already stored key via /wizard/validate-key)
-      if (!preBotId) {
+      if (!preBotId && !isTrialConversion) {
         console.log(`[stripe-webhook] Creating fallback AI config for bot ${botId}`);
         await createBYOKConfig({
           botId,
@@ -152,7 +183,7 @@ router.post("/stripe", async (req: Request, res: Response) => {
       }
 
       // HALT AUTO-PROVISIONING IF STAN STORE
-      if (!preBotId) {
+      if (!preBotId && !isTrialConversion) {
         console.log(`[stripe-webhook] 🛍️ STAN STORE PRE-SALE for ${email}. User created, waiting for Wizard completion.`);
         await logAdminEvent("stan_store_purchase", botId, { email, slug, sessionId: session.id });
         
@@ -160,6 +191,12 @@ router.post("/stripe", async (req: Request, res: Response) => {
         await sendStanStoreWelcome(email, name);
         
         return; // The wizard's hatch endpoint will do the actual provisioning later
+      }
+
+      if (isTrialConversion) {
+        // We unlocked them. No need to provision again.
+        console.log(`[stripe-webhook] ✅ Trial-to-paid conversion complete for ${slug}`);
+        return;
       }
 
       // 5. Enqueue provisioning job (Legacy V3 Native flow where Wizard ran first)
