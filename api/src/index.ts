@@ -74,12 +74,16 @@ app.use(cors({
   allowedHeaders: ["Content-Type", "Authorization"],
 }));
 
+// Trust proxy required for Google Cloud Run
+app.set("trust proxy", 1);
+
 // Rate Limiting (SWOP Remediation)
 const strictLimiter = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 minute
   max: 60, // Limit each IP to 60 requests per window
   standardHeaders: true,
   legacyHeaders: false,
+  validate: { xForwardedForHeader: false, default: true }
 });
 app.use("/wizard", strictLimiter);
 app.use("/webhooks", strictLimiter);
