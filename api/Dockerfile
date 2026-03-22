@@ -4,8 +4,8 @@ FROM node:22-slim AS builder
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm ci --only=production && cp -R node_modules /tmp/prod_modules
-RUN npm ci
+RUN npm install --omit=dev && cp -R node_modules /tmp/prod_modules
+RUN npm install
 
 COPY . .
 RUN npm run build

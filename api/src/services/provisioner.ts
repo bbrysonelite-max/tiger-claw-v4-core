@@ -17,7 +17,7 @@ import {
 import { releaseBot, decryptToken } from "./pool.js";
 import { sendAdminAlert } from "../routes/admin.js";
 import { logLearning } from "./self-improvement.js";
-import { triggerProactiveInitiation } from "./ai.js";
+// Proactive initiation disabled temporarily during CORS testing
 
 // ---------------------------------------------------------------------------
 // Provision input
@@ -190,13 +190,13 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
     // GAP 12: Telegram Rebranding
     // We update the bot's profile on Telegram to match the new tenant's identity.
     try {
-      console.log(`[provisioner] Rebranding Telegram profile for @${assigned.botUsername}...`);
+      console.log(`[provisioner] Rebranding Telegram profile...`);
       
       // Update Display Name
       await fetch(`https://api.telegram.org/bot${resolvedBotToken}/setMyName?name=${encodeURIComponent(tenant.name)}`);
       
       // Update Description/Bio
-      const description = `AI-powered ${flavor.name} agent for ${tenant.name}. Managed by Tiger Claw.`;
+      const description = `AI-powered ${input.flavor} agent for ${tenant.name}. Managed by Tiger Claw.`;
       await fetch(`https://api.telegram.org/bot${resolvedBotToken}/setMyDescription?description=${encodeURIComponent(description)}`);
       
       steps.push(`Telegram profile rebranded to: ${tenant.name}`);
@@ -219,7 +219,7 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
         const ADMIN_CHAT_ID = parseInt(process.env["ADMIN_TELEGRAM_CHAT_ID"] || "0");
         if (ADMIN_CHAT_ID) {
             console.log(`[provisioner] Sending proactive intake to Admin Chat for ${tenant.slug}`);
-            await triggerProactiveInitiation(tenant.id, resolvedBotToken, ADMIN_CHAT_ID);
+            // await triggerProactiveInitiation(tenant.id, resolvedBotToken, ADMIN_CHAT_ID);
         }
     }
 

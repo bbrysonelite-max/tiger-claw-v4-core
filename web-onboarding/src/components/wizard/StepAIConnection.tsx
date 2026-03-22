@@ -107,7 +107,9 @@ export default function StepAIConnection({ state, updateState, onNext }: AIConne
                                     value={tempKey}
                                     onChange={(e) => setTempKey(e.target.value)}
                                     placeholder={`Paste ${currentProvider.name} key...`}
-                                    className="flex-1 bg-black/40 border border-white/10 rounded-lg p-3 text-sm font-mono focus:border-primary outline-none"
+                                    style={{ WebkitUserSelect: 'text', userSelect: 'text' }}
+                                    tabIndex={0}
+                                    className="flex-1 bg-black/40 border border-white/10 rounded-lg p-3 text-sm font-mono focus:border-primary outline-none select-text cursor-text"
                                 />
                                 <button
                                     onClick={addKey}
