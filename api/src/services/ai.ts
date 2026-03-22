@@ -65,8 +65,10 @@ const toolsMap = {
     tiger_gmail_send,
     tiger_drive_list,
 };
-// Fix: Google Generative AI strictly requires UPPERCASE type names (e.g. 'OBJECT', 'STRING')
+// Fix: Use STRICT @google/generative-ai Type enums to prevent silent JSON stripping
 // standard OpenClaw JSON schema uses lowercase 'object', 'string'. We recursively map it here.
+import { SchemaType } from '@google/generative-ai';
+
 function mapToGoogleSchema(param: any): any {
     if (!param) return param;
     if (Array.isArray(param)) return param.map(mapToGoogleSchema);
@@ -74,7 +76,14 @@ function mapToGoogleSchema(param: any): any {
     
     const mapped = { ...param };
     if (mapped.type && typeof mapped.type === 'string') {
-        mapped.type = mapped.type.toUpperCase();
+        const t = mapped.type.toLowerCase();
+        if (t === 'object') mapped.type = SchemaType.OBJECT;
+        else if (t === 'string') mapped.type = SchemaType.STRING;
+        else if (t === 'array') mapped.type = SchemaType.ARRAY;
+        else if (t === 'boolean') mapped.type = SchemaType.BOOLEAN;
+        else if (t === 'number') mapped.type = SchemaType.NUMBER;
+        else if (t === 'integer') mapped.type = SchemaType.INTEGER;
+        else mapped.type = mapped.type.toUpperCase();
     }
     if (mapped.properties) {
         for (const [k, v] of Object.entries(mapped.properties)) {
@@ -365,7 +374,7 @@ export async function processTelegramMessage(
 
         const genAI = new GoogleGenerativeAI(googleKey);
         const model = genAI.getGenerativeModel({
-            model: 'gemini-2.5-flash',
+            model: 'gemini-2.0-flash',
             systemInstruction: buildSystemPrompt(tenant),
             tools: geminiTools as any,
         });
