@@ -19,8 +19,8 @@ import { ToolContext, ToolResult } from "./ToolContext.js";
 // State persisted to {workdir}/leads.json (per-tenant, keyed by leadId).
 // Score recalculates dynamically on every new signal.
 
-import * as crypto from "crypto";
 import { getLeads, saveLeads as dbsaveLeads } from "../services/tenant_data.js";
+import { emitHiveEvent } from "../services/hiveEmitter.js";
 
 // ---------------------------------------------------------------------------
 // Constants — LOCKED per spec
@@ -607,6 +607,14 @@ async function handleScore(
   leads[record.id] = record;
   await saveLeads(context, leads);
 
+  if (record.isUnicorn) {
+    emitHiveEvent(context.sessionKey, 'unicorn_profile', {
+      source: record.platform,
+      intentScore: record.intentScore,
+      qualifyingScore: record.qualifyingScore
+    }).catch(() => {});
+  }
+
   logger.info("tiger_score: scored new lead", {
     id: record.id,
     displayName: record.displayName,
@@ -689,7 +697,17 @@ async function handleUpdateEngagement(
     };
   }
 
+  const wasUnicorn = lead.isUnicorn;
   recomputeScores(lead);
+  
+  if (!wasUnicorn && lead.isUnicorn) {
+    emitHiveEvent(context.sessionKey, 'unicorn_profile', {
+      source: lead.platform,
+      intentScore: lead.intentScore,
+      qualifyingScore: lead.qualifyingScore
+    }).catch(() => {});
+  }
+
   leads[lead.id] = lead;
   await saveLeads(context, leads);
 
@@ -732,7 +750,18 @@ async function handleRecalculate(
   for (const lead of targets) {
     if (lead.optedOut) continue;
     const wasQualified = lead.qualified;
+    const wasUnicorn = lead.isUnicorn;
+
     recomputeScores(lead);
+
+    if (!wasUnicorn && lead.isUnicorn) {
+      emitHiveEvent(context.sessionKey, 'unicorn_profile', {
+        source: lead.platform,
+        intentScore: lead.intentScore,
+        qualifyingScore: lead.qualifyingScore
+      }).catch(() => {});
+    }
+
     if (lead.qualified && !wasQualified) newlyQualified++;
     leads[lead.id] = lead;
     count++;

@@ -25,8 +25,9 @@ import { ToolContext, ToolResult } from "./ToolContext.js";
 //   list_buckets    — list all buckets for current flavor
 //   log             — log an objection handling event for record-keeping
 
-import { getBotState } from "../services/db.js";
+import { getBotState, getHiveSignalWithFallback } from "../services/db.js";
 import { getTenantState, saveTenantState } from "../services/tenant_data.js";
+import { emitHiveEvent, hiveAttributionLabel } from "../services/hiveEmitter.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -789,18 +790,35 @@ async function handleClassify(
   logger.info("tiger_objection: classify", { bucket, flavor });
 
   const label = def?.label ?? "Unknown objection";
+  
+  // Hive Phase 3: Universal Fallback & Descriptive Labels
+  const hiveSignal = await getHiveSignalWithFallback('objection', flavor, region).catch(() => null);
+  let hiveApproach = "";
+  if (hiveSignal && Array.isArray((hiveSignal.payload as any).patterns)) {
+    const patterns = (hiveSignal.payload as any).patterns;
+    const match = patterns.find((p: any) => p.objection === bucket || p.objection === 'general') || patterns[0];
+    if (match && match.approach) {
+      hiveApproach = `🌟 Hive Strategy (${hiveAttributionLabel(hiveSignal)}): ${match.approach}`;
+    }
+  }
+
+  const outputLines = [
+    `Classified as: ${bucket} (${label})`,
+    ``,
+    `Response:`,
+    `---`,
+    responseText,
+    `---`,
+  ];
+  
+  if (hiveApproach) {
+    outputLines.push(``, hiveApproach);
+  }
 
   return {
     ok: true,
-    output: [
-      `Classified as: ${bucket} (${label})`,
-      ``,
-      `Response:`,
-      `---`,
-      responseText,
-      `---`,
-    ].join("\n"),
-    data: { bucket, label, responseText, flavor },
+    output: outputLines.join("\n"),
+    data: { bucket, label, responseText, flavor, hiveApproach: hiveApproach || undefined },
   };
 }
 
@@ -851,10 +869,26 @@ async function handleRespond(
 
   logger.info("tiger_objection: respond", { bucket: params.bucket, flavor });
 
+  // Hive Phase 3: Universal Fallback & Descriptive Labels
+  const hiveSignal = await getHiveSignalWithFallback('objection', flavor, region).catch(() => null);
+  let hiveApproach = "";
+  if (hiveSignal && Array.isArray((hiveSignal.payload as any).patterns)) {
+    const patterns = (hiveSignal.payload as any).patterns;
+    const match = patterns.find((p: any) => p.objection === params.bucket || p.objection === 'general') || patterns[0];
+    if (match && match.approach) {
+      hiveApproach = `🌟 Hive Strategy (${hiveAttributionLabel(hiveSignal)}): ${match.approach}`;
+    }
+  }
+
+  const outputLines = [`${def.label} response:`, `---`, responseText, `---`];
+  if (hiveApproach) {
+    outputLines.push(``, hiveApproach);
+  }
+
   return {
     ok: true,
-    output: [`${def.label} response:`, `---`, responseText, `---`].join("\n"),
-    data: { bucket: params.bucket, label: def.label, responseText, flavor },
+    output: outputLines.join("\n"),
+    data: { bucket: params.bucket, label: def.label, responseText, flavor, hiveApproach: hiveApproach || undefined },
   };
 }
 
@@ -968,6 +1002,7 @@ interface LogParams {
   leadId?: string;
   prospectText?: string;
   notes?: string;
+  regulatoryViolation?: boolean;
 }
 
 async function handleLog(params: LogParams, tenantId: string): Promise<ToolResult> {
@@ -984,10 +1019,19 @@ async function handleLog(params: LogParams, tenantId: string): Promise<ToolResul
     loggedAt: new Date().toISOString(),
   });
 
+  // Hive Phase 3: Regulatory Tone Logging natively without PII attached
+  if (params.regulatoryViolation) {
+    emitHiveEvent(tenantId, "regulatory_violation", {
+      bucket: params.bucket,
+      flavor,
+      violationDetected: true
+    }).catch(() => {});
+  }
+
   return {
     ok: true,
-    output: `Objection logged: ${params.bucket}${params.leadId ? ` for lead ${params.leadId}` : ""}.`,
-    data: { bucket: params.bucket, flavor },
+    output: `Objection logged: ${params.bucket}${params.leadId ? ` for lead ${params.leadId}` : ""}.${params.regulatoryViolation ? " Regulatory violation flagged to Hive." : ""}`,
+    data: { bucket: params.bucket, flavor, regulatoryViolation: !!params.regulatoryViolation },
   };
 }
 
@@ -1084,6 +1128,10 @@ export const tiger_objection = {
       autoLog: {
         type: "boolean",
         description: "Whether to automatically log the classify result. Defaults to true.",
+      },
+      regulatoryViolation: {
+        type: "boolean",
+        description: "Set to true if you detect the prospect or your proposed response brushing against regulatory boundaries (e.g., income guarantees, medical claims). Records a secure compliance flag.",
       },
     },
     required: ["action"],

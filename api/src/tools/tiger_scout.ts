@@ -27,6 +27,8 @@ import * as https from "https";
 import * as crypto from "crypto";
 import { getLeads, saveLeads as dbsaveLeads, getTenantState, saveTenantState } from "../services/tenant_data.js";
 import { loadFlavorConfig } from "./flavorConfig.js";
+import { getHiveSignalWithFallback } from "../services/db.js";
+import { emitHiveEvent } from "../services/hiveEmitter.js";
 
 // ---------------------------------------------------------------------------
 // Scoring constants — LOCKED per spec. Must match tiger_score.ts exactly.
@@ -358,7 +360,8 @@ async function buildAndSaveLead(
   profileFit: number,
   matchedKeywords: string[],
   negativeSignals: string[],
-  oar: OarType
+  oar: OarType,
+  icpBonus: number = 0
 ): Promise<LeadRecord> {
   const leads = await loadLeads(tenantId);
 
@@ -395,7 +398,8 @@ async function buildAndSaveLead(
   // New lead
   const now = new Date().toISOString();
   const id = crypto.randomUUID();
-  const intentScore = computeIntentScore(intentSignals);
+  const baseIntentScore = computeIntentScore(intentSignals);
+  const intentScore = Math.min(100, baseIntentScore + icpBonus);
 
   const rawBuilderScore = oar !== "customer" ? computeCompositeScore(profileFit, intentScore, "builder") : 0;
   const rawCustomerScore = oar !== "builder" ? computeCompositeScore(profileFit, intentScore, "customer") : 0;
@@ -1030,11 +1034,14 @@ async function runHunt(
 ): Promise<{
   discovered: number;
   qualified: number;
-  qualifiedLeads: Array<{ displayName: string; platform: string; score: number; oar: string }>;
+  qualifiedLeads: Array<{ displayName: string; platform: string; score: number; oar: string; icpPrefix?: string }>;
   below: number;
   sources: string[];
 }> {
   const oar: OarType = flavor === "network-marketer" ? "both" : "customer";
+
+  // Pre-fetch ICP bias signal
+  const icpSignal = await getHiveSignalWithFallback('ideal_customer_profile', flavor, region).catch(() => null);
 
   // Load ICP
   const onboardState = await loadOnboardState(tenantId);
@@ -1092,7 +1099,8 @@ async function runHunt(
   // Score each profile and write to leads.json
   let qualified = 0;
   let below = 0;
-  const qualifiedLeads: Array<{ displayName: string; platform: string; score: number; oar: string }> = [];
+  const qualifiedLeads: Array<{ displayName: string; platform: string; score: number; oar: string; icpPrefix?: string }> = [];
+  const allEmittedIntentScores: Array<{ intentScore: number; source: string }> = [];
 
   for (const profile of allProfiles) {
     // Score profileFit against the relevant ICP
@@ -1105,6 +1113,21 @@ async function runHunt(
       profile.postExcerpt ?? profile.recentPostText.slice(0, 200)
     );
 
+    // Inject ICP Bias
+    let icpBonus = 0;
+    let icpPrefix = "";
+    if (icpSignal && Array.isArray((icpSignal.payload as any).topConvertingProfiles)) {
+      const textForIcp = `${profile.bio ?? ""} ${profile.recentPostText}`.toLowerCase();
+      for (const icpProfile of (icpSignal.payload as any).topConvertingProfiles) {
+        const patterns = Array.isArray(icpProfile.patterns) ? icpProfile.patterns : [];
+        if (patterns.length > 0 && patterns.some((p: string) => textForIcp.includes(p.toLowerCase()))) {
+          icpBonus = 5;
+          icpPrefix = `[ICP Priority Focus: ${icpProfile.name || icpProfile.profileName || 'High-Intent'}] `;
+          break;
+        }
+      }
+    }
+
     // Write lead — deduplicates automatically
     const lead = await buildAndSaveLead(
       tenantId,
@@ -1113,10 +1136,14 @@ async function runHunt(
       fitResult.score,
       fitResult.matchedKeywords,
       fitResult.flaggedNegatives,
-      oar
+      oar,
+      icpBonus
     );
 
     if (lead.optedOut) continue; // Skip opted-out leads
+    
+    // Store intent score for PII-stripped Hive emit
+    allEmittedIntentScores.push({ intentScore: lead.intentScore, source: lead.platform });
 
     if (lead.qualified) {
       qualified++;
@@ -1125,10 +1152,20 @@ async function runHunt(
         platform: lead.platform,
         score: lead.qualifyingScore,
         oar: lead.qualifyingOar,
+        icpPrefix: icpPrefix || undefined,
       });
     } else {
       below++;
     }
+  }
+
+  // Emit anonymized aggregate back into the Hive
+  if (allEmittedIntentScores.length > 0) {
+    emitHiveEvent(tenantId, 'scout_profile', {
+      intentScores: allEmittedIntentScores.map(r => r.intentScore),
+      sources: [...new Set(allEmittedIntentScores.map(r => r.source))],
+      count: allEmittedIntentScores.length
+    }).catch(() => {});
   }
 
   return {
@@ -1259,7 +1296,7 @@ function formatHuntOutput(
   result: {
     discovered: number;
     qualified: number;
-    qualifiedLeads: Array<{ displayName: string; platform: string; score: number; oar: string }>;
+    qualifiedLeads: Array<{ displayName: string; platform: string; score: number; oar: string; icpPrefix?: string }>;
     below: number;
     sources: string[];
   },
@@ -1277,7 +1314,8 @@ function formatHuntOutput(
     lines.push(`Qualified leads ready for contact:`);
     for (const lead of result.qualifiedLeads) {
       const unicorn = lead.oar === "both" ? " 🦄" : "";
-      lines.push(`  • ${lead.displayName} (${lead.platform}) — Score: ${lead.score}, Oar: ${lead.oar}${unicorn}`);
+      const prefix = lead.icpPrefix ? `${lead.icpPrefix}` : "";
+      lines.push(`  • ${prefix}${lead.displayName} (${lead.platform}) — Score: ${lead.score}, Oar: ${lead.oar}${unicorn}`);
     }
   }
 

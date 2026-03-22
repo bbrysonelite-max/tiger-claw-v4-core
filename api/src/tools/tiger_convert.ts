@@ -37,6 +37,8 @@ import { ToolContext, ToolResult } from "./ToolContext.js";
 
 import * as crypto from "crypto";
 import { getLeads, saveLeads as dbsaveLeads, getNurture, saveNurture as dbsaveNurture, getTenantState, saveTenantState } from "../services/tenant_data.js";
+import { getLeadScoutProfile } from '../services/db.js';
+import { emitHiveEvent } from '../services/hiveEmitter.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -669,6 +671,29 @@ async function handleConfirm(
     (nurture as Record<string, unknown>)["completedAt"] = now;
     nurtures[record.nurtureId] = nurture;
     await saveJson(context, "nurture.json", nurtures);
+  }
+
+  // --- HIVE PHASE 3: CONVERSION LINKAGE ---
+  try {
+    const scoutProfile = await getLeadScoutProfile(context.sessionKey, lead?.id || record.leadId);
+    
+    // Enrich with intent patterns if retrieved
+    const intentPatterns = scoutProfile.intentPatternTypes || [];
+    const source = scoutProfile.source || lead?.platform || record.platform;
+
+    emitHiveEvent(context.sessionKey, 'conversion', {
+      source,
+      oar: record.oar,
+      flavor: record.flavor,
+      score: record.score,
+      intentPatterns,
+      isUnicorn: Boolean(lead?.isUnicorn),
+      touchesToConvert: record.journeySummary.touchesCompleted,
+      daysToConvert: record.journeySummary.daysInNurture,
+      profileFitScore: scoutProfile.profileFitScore,
+    }).catch(() => {});
+  } catch (err) {
+    logger.warn("tiger_convert: failed to emit conversion hive event", { err: String(err) });
   }
 
   logger.info("tiger_convert: confirmed", {

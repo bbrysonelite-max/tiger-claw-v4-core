@@ -27,6 +27,8 @@ import { ToolContext, ToolResult } from "./ToolContext.js";
 
 import * as crypto from "crypto";
 import { getLeads, saveLeads as dbsaveLeads, getContacts, saveContacts as dbsaveContacts, getNurture, saveNurture as dbsaveNurture, getTenantState, saveTenantState } from "../services/tenant_data.js";
+import { getHiveSignalWithFallback } from "../services/db.js";
+import { hiveAttributionLabel } from "../services/hiveEmitter.js";
 
 // ---------------------------------------------------------------------------
 // Types from other tools (minimal shape required)
@@ -198,6 +200,10 @@ interface BriefingData {
   // Section 8: Aftercare highlights
   aftercareActive: Array<{ name: string; platform: string; oar: string; tier?: string; status: string; nextTouch?: string }>;
   aftercareAlerts: Array<{ name: string; platform: string; alertType: string }>;
+
+  // Section 9: Hive Intelligence
+  gongPattern?: { description: string, sourceLabel: string };
+  icpTargets?: { name: string, description: string, sourceLabel: string }[];
 }
 
 async function aggregateData(context: ToolContext, lastBriefingAt?: string): Promise<BriefingData> {
@@ -208,6 +214,7 @@ async function aggregateData(context: ToolContext, lastBriefingAt?: string): Pro
 
   const tenantName = onboard?.identity?.name ?? "there";
   const flavor = onboard?.flavor ?? "network-marketer";
+  const region = (context.config["REGION"] as string) ?? "us-en";
   const cutoff = lastBriefingAt ? new Date(lastBriefingAt) : yesterday();
   const now = new Date();
 
@@ -325,6 +332,28 @@ async function aggregateData(context: ToolContext, lastBriefingAt?: string): Pro
       alertType: r.status === "upgrade_flagged" ? "builder upgrade signal" : "inactive — 2 no-responses",
     }));
 
+  // ---- Hive Intelligence ----
+  const gongSignal = await getHiveSignalWithFallback('conversation', 'universal', 'universal').catch(() => null);
+  const icpSignal = await getHiveSignalWithFallback('ideal_customer_profile', flavor, region).catch(() => null);
+
+  let gongPattern;
+  if (gongSignal && Array.isArray((gongSignal.payload as any).patterns) && (gongSignal.payload as any).patterns.length > 0) {
+    const p = (gongSignal.payload as any).patterns[0];
+    gongPattern = {
+      description: p.description || "Top performers listen more than they talk.",
+      sourceLabel: hiveAttributionLabel(gongSignal)
+    };
+  }
+
+  let icpTargets;
+  if (icpSignal && Array.isArray((icpSignal.payload as any).topConvertingProfiles) && (icpSignal.payload as any).topConvertingProfiles.length > 0) {
+    icpTargets = (icpSignal.payload as any).topConvertingProfiles.slice(0, 2).map((p: any) => ({
+      name: p.name || p.profileName || "High-Intent",
+      description: Array.isArray(p.patterns) ? p.patterns.join(", ") : "Strong conversion history",
+      sourceLabel: hiveAttributionLabel(icpSignal)
+    }));
+  }
+
   return {
     tenantName,
     flavor,
@@ -339,6 +368,8 @@ async function aggregateData(context: ToolContext, lastBriefingAt?: string): Pro
     activeConversations,
     aftercareActive,
     aftercareAlerts,
+    gongPattern,
+    icpTargets,
   };
 }
 
@@ -483,6 +514,25 @@ function assembleBriefing(data: BriefingData): string {
   }
 
   lines.push(`— Your Tiger Claw bot`);
+  
+  // ---- Section 9: Hive Intelligence Insights ----
+  if (data.gongPattern || (data.icpTargets && data.icpTargets.length > 0)) {
+    lines.push(``);
+    lines.push(`---`);
+    lines.push(`🧠 HIVE NETWORK INTELLIGENCE`);
+    
+    if (data.icpTargets && data.icpTargets.length > 0) {
+      lines.push(`Top Converting Profiles (${data.icpTargets[0].sourceLabel}):`);
+      for (const t of data.icpTargets) {
+        lines.push(`  • ${t.name}: Look for — ${t.description}`);
+      }
+    }
+    
+    if (data.gongPattern) {
+      lines.push(`Baseline Expected Conversation Pattern (${data.gongPattern.sourceLabel}):`);
+      lines.push(`  • ${data.gongPattern.description}`);
+    }
+  }
 
   return lines.join("\n");
 }

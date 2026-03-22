@@ -18,6 +18,7 @@ import {
   upsertBYOKConfig,
   addAIKey,
   importContacts,
+  getFoundingMemberDisplay,
 } from "../services/db.js";
 import { encryptToken } from "../services/pool.js";
 import { provisionQueue } from "../services/queue.js";
@@ -41,7 +42,9 @@ const HatchSchema = z.object({
   flavor: z.string().optional(),
   language: z.string().optional(),
   timezone: z.string().optional(),
-  preferredChannel: z.string().optional()
+  preferredChannel: z.string().optional(),
+  region: z.string().optional(),
+  hiveOptIn: z.boolean().optional()
 });
 
 const ValidateKeySchema = z.object({
@@ -111,14 +114,14 @@ router.post("/hatch", async (req: Request, res: Response) => {
   if (!parsed.success) {
     return res.status(400).json({ error: "Invalid payload.", details: parsed.error.format() });
   }
-  const { botId, name, email, flavor, language, timezone, preferredChannel } = parsed.data;
+  const { botId, name, email, flavor, language, timezone, preferredChannel, region, hiveOptIn } = parsed.data;
 
   try {
     const tenant = await getTenantByEmail(email);
     if (!tenant) return res.status(404).json({ error: "Tenant not found" });
 
     const slug = tenant.slug || name.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 30);
-    const region = language === "th" ? "th-th" : "us-en";
+    const finalRegion = region || (language === "th" ? "th-th" : "us-en");
 
     // Enqueue the heavy lifting
     await provisionQueue.add('tenant-provisioning', {
@@ -128,10 +131,11 @@ router.post("/hatch", async (req: Request, res: Response) => {
       name: name || tenant.name,
       email,
       flavor: flavor || "network-marketer",
-      region,
+      region: finalRegion,
       language: language || "en",
       preferredChannel: preferredChannel || "telegram",
       timezone: timezone || "UTC",
+      hiveOptIn: hiveOptIn ?? true
     }, {
       attempts: 5,
       backoff: { type: 'exponential', delay: 10000 },
@@ -278,6 +282,16 @@ router.get("/:slug", async (req: Request, res: Response) => {
     }
 
     const botUsername = await getTenantBotUsername(tenant.id);
+    const rawFounder = await getFoundingMemberDisplay(tenant.id).catch(() => null);
+    
+    let founderDisplay: any = null;
+    if (rawFounder && rawFounder.isFounding) {
+      founderDisplay = {
+        title: "Founding Member",
+        badge: "✨",
+        description: `You are Founding Member #${rawFounder.rank} of ${rawFounder.totalFoundersInVertical} in the ${rawFounder.vertical} vertical. Thank you for anchoring the Hive.`
+      };
+    }
 
     // Never send LINE credentials back to the browser — show configured/not status only
     const html = renderWizardPage({
@@ -286,6 +300,7 @@ router.get("/:slug", async (req: Request, res: Response) => {
       botUsername,
       whatsappEnabled: tenant.whatsappEnabled,
       lineConfigured: !!(tenant.lineChannelSecret && tenant.lineChannelAccessToken),
+      founderDisplay,
     });
 
     res.setHeader("Content-Type", "text/html; charset=utf-8");
@@ -359,6 +374,7 @@ interface WizardData {
   botUsername: string | null;
   whatsappEnabled: boolean;
   lineConfigured: boolean; // true if both LINE credentials are stored — never expose the values
+  founderDisplay?: { title: string; badge: string; description: string } | null;
 }
 
 function renderWizardPage(data: WizardData): string {
@@ -578,6 +594,17 @@ function renderWizardPage(data: WizardData): string {
       </div>
     </div>
   </div>
+
+  ${data.founderDisplay ? `
+  <!-- Hive Phase 4: Founding Member Achievement -->
+  <div class="card" style="border: 1px solid var(--accent); background: rgba(88, 166, 255, 0.05);">
+    <h2><span style="font-size:1.3rem;">👑</span> ${data.founderDisplay.title}</h2>
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 0.5rem;">
+      <p style="margin: 0;">${data.founderDisplay.description}</p>
+      <span style="font-size:2.5rem; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.4));">${data.founderDisplay.badge}</span>
+    </div>
+  </div>
+  ` : ''}
 
   <!-- LINE -->
   <div class="card">

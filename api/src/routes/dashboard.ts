@@ -7,7 +7,10 @@ import {
     getTenantBySlug,
     getTenantBotUsername,
     getBYOKStatus,
+    getFoundingMemberDisplay,
+    getHiveSignalWithFallback
 } from "../services/db.js";
+import { hiveAttributionLabel } from "../services/hiveEmitter.js";
 
 const router = Router();
 
@@ -73,10 +76,53 @@ router.get("/:slug", async (req: Request, res: Response) => {
             plan: "byok_basic",
             status: tenant.status === "active" ? "active" : tenant.status,
         },
+        foundingMember: null as any,
+        hive: {
+            benchmarks: {} as any,
+            icp: null as any
+        },
         // URLs for wizard integrations
         wizardUrl: `/wizard/${tenant.slug}`,
         channelConfigUrl: `${apiBase}/wizard/${tenant.slug}`,
     };
+
+    // Hive Phase 4: Inject Founding Member
+    try {
+      const founderInfo = await getFoundingMemberDisplay(tenant.id);
+      dashboard.foundingMember = founderInfo;
+    } catch {
+      dashboard.foundingMember = null;
+    }
+
+    // Hive Phase 4: Inject ICP layer bounds
+    try {
+      const icpSignal = await getHiveSignalWithFallback('ideal_customer_profile', tenant.flavor || 'network-marketer', tenant.region || 'us-en');
+      if (icpSignal) {
+        dashboard.hive.icp = {
+          signalKey: icpSignal.signalKey,
+          sourceLabel: hiveAttributionLabel(icpSignal),
+          payload: icpSignal.payload,
+          updatedAt: icpSignal.updatedAt.toISOString(),
+          sampleSize: icpSignal.sampleSize
+        };
+      }
+    } catch {
+      dashboard.hive.icp = null;
+    }
+
+    // Hive Phase 4: Inject Prior Benchmarks
+    try {
+      const objectionSignal = await getHiveSignalWithFallback('objection', tenant.flavor || 'network-marketer', tenant.region || 'us-en');
+      if (objectionSignal) {
+        dashboard.hive.benchmarks['objection'] = {
+          signalKey: objectionSignal.signalKey,
+          sourceLabel: hiveAttributionLabel(objectionSignal),
+          payload: objectionSignal.payload
+        };
+      }
+    } catch {
+      dashboard.hive.benchmarks['objection'] = null;
+    }
 
     return res.json(dashboard);
   } catch (err) {

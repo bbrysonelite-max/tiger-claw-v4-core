@@ -889,3 +889,294 @@ export async function getBYOKStatus(tenantId: string) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Hive Phase 1 Foundation Emitters
+// ---------------------------------------------------------------------------
+
+export async function insertHiveEvent(event: {
+  tenantHash: string;
+  vertical: string;
+  region: string;
+  eventType: 'objection' | 'conversion' | 'score' | 'scout_hit' | 'scout_profile' | 'unicorn_profile' | 'regulatory_violation' | 'tenant_metrics' | 'objection_encountered' | 'objection_resolved';
+  payload: Record<string, unknown>;
+}): Promise<void> {
+  const pool = getWritePool();
+  await pool.query(
+    `INSERT INTO hive_events (tenant_hash, vertical, region, event_type, payload)
+     VALUES ($1, $2, $3, $4, $5)`,
+    [event.tenantHash, event.vertical, event.region, event.eventType, event.payload]
+  );
+}
+
+export async function upsertHiveSignal(
+  signalKey: string,
+  vertical: string,
+  region: string,
+  signalType: string,
+  payload: Record<string, unknown>,
+  sampleSize: number
+): Promise<void> {
+  const pool = getWritePool();
+  await pool.query(
+    `INSERT INTO hive_signals (signal_key, vertical, region, signal_type, payload, sample_size, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, now())
+     ON CONFLICT (signal_key) DO UPDATE SET
+       payload = EXCLUDED.payload,
+       sample_size = EXCLUDED.sample_size,
+       updated_at = now()`,
+    [signalKey, vertical, region, signalType, payload, sampleSize]
+  );
+}
+
+export async function getHiveSignal(signalKey: string): Promise<{
+  payload: Record<string, unknown>;
+  sampleSize: number;
+  updatedAt: Date;
+} | null> {
+  const pool = getReadPool();
+  const res = await pool.query(
+    `SELECT payload, sample_size, updated_at FROM hive_signals WHERE signal_key = $1`,
+    [signalKey]
+  );
+  if (!res.rows.length) return null;
+  return {
+    payload: (res.rows[0] as any).payload,
+    sampleSize: (res.rows[0] as any).sample_size,
+    updatedAt: (res.rows[0] as any).updated_at
+  };
+}
+
+export async function getScoutCache(companyKey: string): Promise<Record<string, unknown> | null> {
+  const pool = getReadPool();
+  const res = await pool.query(`SELECT profile FROM hive_scout_cache WHERE company_key = $1`, [companyKey]);
+  return res.rows.length ? ((res.rows[0] as any).profile as Record<string, unknown>) : null;
+}
+
+export async function upsertScoutCache(
+  companyKey: string,
+  profile: Record<string, unknown>
+): Promise<void> {
+  const pool = getWritePool();
+  await pool.query(
+    `INSERT INTO hive_scout_cache (company_key, profile, scout_count, first_scouted, last_updated)
+     VALUES ($1, $2, 1, now(), now())
+     ON CONFLICT (company_key) DO UPDATE SET
+       profile = EXCLUDED.profile,
+       scout_count = hive_scout_cache.scout_count + 1,
+       last_updated = now()`,
+    [companyKey, profile]
+  );
+}
+
+export async function incrementHiveContribution(tenantId: string): Promise<void> {
+  const pool = getWritePool();
+  await pool.query(
+    `UPDATE tenants SET hive_events_contributed = hive_events_contributed + 1 WHERE id = $1`,
+    [tenantId]
+  );
+}
+
+export async function incrementHiveReceived(tenantId: string): Promise<void> {
+  const pool = getWritePool();
+  await pool.query(
+    `UPDATE tenants SET hive_signals_received = hive_signals_received + 1 WHERE id = $1`,
+    [tenantId]
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Hive Universal Prior & Founding Member
+// ---------------------------------------------------------------------------
+
+export async function getHiveSignalWithFallback(
+  signalType: string,
+  vertical: string,
+  region: string
+): Promise<{
+  payload:          Record<string, unknown>;
+  sampleSize:       number;
+  updatedAt:        Date;
+  isUniversalPrior: boolean;
+  userLabel:        string;
+  signalKey:        string;
+} | null> {
+  const pool = getReadPool();
+
+  const candidates = [
+    `${signalType}:${vertical}:${region}`,
+    `${signalType}:${vertical}:universal`,
+    `${signalType}:universal:${region}`,
+    `${signalType}:universal:universal`,
+  ];
+
+  for (const key of candidates) {
+    const result = await pool.query(
+      `SELECT payload, sample_size, updated_at, signal_key
+       FROM hive_signals WHERE signal_key = $1`,
+      [key]
+    );
+    if (!result.rows.length) continue;
+
+    const row = result.rows[0];
+    const isUniversalPrior = key.includes(':universal');
+
+    // Skip community signals below minimum threshold
+    if (!isUniversalPrior && row.sample_size < 50) continue;
+
+    // Skip placeholder signals (sample_size = 0)
+    if (row.sample_size === 0) continue;
+
+    const payload   = (row as Record<string, any>).payload as Record<string, unknown>;
+    const userLabel = (payload['userLabel'] as string) ?? '';
+
+    return {
+      payload,
+      sampleSize:       (row as Record<string, any>).sample_size,
+      updatedAt:        (row as Record<string, any>).updated_at,
+      isUniversalPrior,
+      userLabel,
+      signalKey:        (row as Record<string, any>).signal_key,
+    };
+  }
+  return null;
+}
+
+export async function checkAndGrantFoundingMember(
+  tenantId: string,
+  vertical: string,
+  region: string,
+  foundingThreshold: number = 50
+): Promise<{ isFoundingMember: boolean; rank: number }> {
+  const client = await getWritePool().connect();
+  try {
+    await client.query('BEGIN');
+
+    const countResult = await client.query(
+      `SELECT COUNT(*) as count FROM tenants
+       WHERE vertical = $1 AND region = $2 AND id != $3
+         AND status != 'terminated'`,
+      [vertical, region, tenantId]
+    );
+    const existingCount = parseInt((countResult.rows[0] as Record<string, any>).count);
+    const rank = existingCount + 1;
+
+    if (rank <= foundingThreshold) {
+      await client.query(
+        `UPDATE tenants SET
+           is_founding_member    = true,
+           founding_member_since = now(),
+           founding_vertical     = $1,
+           founding_region       = $2,
+           founding_member_rank  = $3
+         WHERE id = $4`,
+        [vertical, region, rank, tenantId]
+      );
+      await client.query(
+        `INSERT INTO founding_member_events (tenant_id, event_type, payload)
+         VALUES ($1, 'granted', $2)`,
+        [tenantId, JSON.stringify({ rank, vertical, region, threshold: foundingThreshold })]
+      );
+      await client.query('COMMIT');
+      return { isFoundingMember: true, rank };
+    }
+
+    await client.query('COMMIT');
+    return { isFoundingMember: false, rank };
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+export async function getFoundingMemberDisplay(tenantId: string): Promise<{
+  isFounding:          boolean;
+  rank:                number | null;
+  since:               Date | null;
+  vertical:            string | null;
+  region:              string | null;
+  contributed:         number;
+  received:            number;
+  contributionPct:     number | null;
+  totalFoundersInVertical: number;
+} | null> {
+  const pool = getReadPool();
+  const result = await pool.query(
+    `SELECT
+       t.is_founding_member,
+       t.founding_member_rank,
+       t.founding_member_since,
+       t.founding_vertical,
+       t.founding_region,
+       t.hive_events_contributed,
+       t.hive_signals_received,
+       (
+         SELECT COUNT(*) FROM tenants t2
+         WHERE t2.vertical = t.vertical
+           AND t2.region   = t.region
+           AND t2.is_founding_member = true
+       ) AS total_founders_in_vertical,
+       (
+         SELECT COUNT(*) FROM tenants t3
+         WHERE t3.vertical = t.vertical
+           AND t3.region   = t.region
+           AND t3.is_founding_member = true
+           AND t3.hive_events_contributed < t.hive_events_contributed
+       )::float /
+       NULLIF((
+         SELECT COUNT(*) FROM tenants t4
+         WHERE t4.vertical = t.vertical
+           AND t4.region   = t.region
+           AND t4.is_founding_member = true
+       ), 0) AS contribution_percentile
+     FROM tenants t WHERE t.id = $1`,
+    [tenantId]
+  );
+
+  if (!result.rows.length) return null;
+  const row = result.rows[0] as Record<string, any>;
+
+  return {
+    isFounding:              row.is_founding_member,
+    rank:                    row.founding_member_rank,
+    since:                   row.founding_member_since,
+    vertical:                row.founding_vertical,
+    region:                  row.founding_region,
+    contributed:             row.hive_events_contributed || 0,
+    received:                row.hive_signals_received || 0,
+    contributionPct:         row.contribution_percentile
+                               ? Math.round(row.contribution_percentile * 100)
+                               : null,
+    totalFoundersInVertical: parseInt(row.total_founders_in_vertical || '0'),
+  };
+}
+
+export async function getLeadScoutProfile(
+  tenantId: string,
+  contactId: string,
+  storage?: any
+): Promise<{ intentPatternTypes: string[], source: string | null, profileFitScore: number | null }> {
+  try {
+    const pool = getReadPool();
+    const result = await pool.query(
+      `SELECT raw_data FROM tenant_leads WHERE tenant_id = $1 AND id = $2`,
+      [tenantId, contactId]
+    );
+    if (!result.rows.length) {
+      return { intentPatternTypes: [], source: null, profileFitScore: null };
+    }
+    const lead = result.rows[0].raw_data as any;
+    
+    const intentPatternsFired = Array.isArray(lead.intentPatternsFired) ? lead.intentPatternsFired : [];
+    const intentPatternTypes = intentPatternsFired.map((p: any) => p.type).filter(Boolean);
+    const source = typeof lead.source === 'string' ? lead.source : null;
+    const profileFitScore = typeof lead.profileFitScore === 'number' ? lead.profileFitScore : null;
+
+    return { intentPatternTypes, source, profileFitScore };
+  } catch (err) {
+    console.error(`[db] getLeadScoutProfile error:`, err);
+    return { intentPatternTypes: [], source: null, profileFitScore: null };
+  }
+}
+

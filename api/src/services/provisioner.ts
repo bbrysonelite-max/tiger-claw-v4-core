@@ -12,6 +12,7 @@ import {
   getPoolStats,
   getPool,
   getBotState,
+  checkAndGrantFoundingMember,
   type Tenant,
 } from "./db.js";
 import { releaseBot, decryptToken } from "./pool.js";
@@ -33,6 +34,8 @@ export interface ProvisionInput {
   preferredChannel: string;
   botToken?: string;
   timezone?: string;
+  vertical?: string;
+  hiveOptIn?: boolean;
 }
 
 export interface ProvisionResult {
@@ -247,6 +250,16 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
     flavor: input.flavor,
     region: input.region,
   });
+
+  // 5. Fire-and-forget Check & Grant Founding Member
+  const vertical = input.vertical || input.flavor;
+  const hiveOptIn = input.hiveOptIn ?? true;
+  if (hiveOptIn && vertical && input.region) {
+    checkAndGrantFoundingMember(tenant.id, vertical, input.region).catch((err) => {
+      console.error(`[provisioner] Failed to grant founding member status to ${tenant.id}`, err);
+    });
+    steps.push(`Evaluated Founding Member eligibility for ${vertical}:${input.region}`);
+  }
 
   return { success: true, tenant, steps };
 }
