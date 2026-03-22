@@ -1,5 +1,14 @@
 # Tiger Claw — Anti-Gravity Agent Rules
 
+## 🛑 ABSOLUTE ZERO-TOLERANCE MANDATE 🛑
+**Before writing a single letter of code in ANY LINE in ANY FILE, you MUST read:**
+1. `ARCHITECTURE.md` (The complete V4 Stateless architecture map)
+2. `START_HERE.md` (The Master Resurrection Briefing)
+
+**Failure to read these exact documents before executing code will result in immediate termination.**
+
+---
+
 ## STOP. READ THIS FIRST. NO EXCEPTIONS.
 
 **Before writing a single line of code, read:**
