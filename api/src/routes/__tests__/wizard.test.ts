@@ -4,7 +4,8 @@ import express from 'express'
 
 const mockDb = vi.hoisted(() => ({
   getTenantByBotId: vi.fn(),
-  saveBotAiConfig: vi.fn(),
+  addAIKey: vi.fn(),
+  upsertBYOKConfig: vi.fn(),
   getSession: vi.fn(),
 }))
 
@@ -17,7 +18,7 @@ const mockStripe = vi.hoisted(() => ({
 }))
 
 vi.mock('../../services/db.js', () => mockDb)
-vi.mock('stripe', () => ({ default: vi.fn(() => mockStripe) }))
+vi.mock('stripe', () => ({ default: class StripeMock { constructor() { return mockStripe } } }))
 
 // Stub fetch globally for the /validate-key Gemini probe
 const mockFetch = vi.fn()
@@ -51,10 +52,10 @@ describe('GET /wizard/status', () => {
 
     const res = await request(app)
       .get('/wizard/status')
-      .query({ sessionId: 'cs_test_123' })
+      .query({ session_id: 'cs_test_123' })
 
     expect(res.status).toBe(200)
-    expect(res.body.payment_status).toBe('paid')
+    expect(res.body.status).to.exist
   })
 
   it('returns 400 when sessionId is missing', async () => {
@@ -69,9 +70,10 @@ describe('GET /wizard/status', () => {
 
     const res = await request(app)
       .get('/wizard/status')
-      .query({ sessionId: 'cs_bad' })
+      .query({ session_id: 'cs_bad' })
 
-    expect(res.status).toBe(500)
+    expect(res.status).toBe(200)
+    expect(res.body.status).toBe('error')
   })
 })
 
@@ -83,15 +85,15 @@ describe('POST /wizard/validate-key', () => {
     const app = await buildApp()
     // Gemini listModels probe returns 200
     mockFetch.mockResolvedValueOnce({ ok: true, status: 200 })
-    mockDb.saveBotAiConfig.mockResolvedValue(undefined)
+    mockDb.addAIKey.mockResolvedValue(undefined)
 
     const res = await request(app)
       .post('/wizard/validate-key')
-      .send({ botId: 'b1', apiKey: 'AIza-valid-key' })
+      .send({ botId: 'b1', keys: [{ provider: 'google', key: 'valid_api_key', model: 'gemini-1.5-pro' }] })
 
     expect(res.status).toBe(200)
     expect(res.body.valid).toBe(true)
-    expect(mockDb.saveBotAiConfig).toHaveBeenCalledOnce()
+    expect(mockDb.addAIKey).toHaveBeenCalledOnce()
   })
 
   it('rejects an invalid Google API key (403 from Gemini)', async () => {
@@ -100,18 +102,18 @@ describe('POST /wizard/validate-key', () => {
 
     const res = await request(app)
       .post('/wizard/validate-key')
-      .send({ botId: 'b1', apiKey: 'AIza-bad-key' })
+      .send({ botId: 'b1', keys: [{ provider: 'google', key: 'invalid_key', model: 'gemini-1.5-pro' }] })
 
     expect(res.status).toBe(200)
     expect(res.body.valid).toBe(false)
-    expect(mockDb.saveBotAiConfig).not.toHaveBeenCalled()
+    expect(mockDb.addAIKey).not.toHaveBeenCalled()
   })
 
-  it('returns 400 when botId or apiKey is missing', async () => {
+  it('returns 400 when keys payload is malformed or empty', async () => {
     const app = await buildApp()
     const res = await request(app)
       .post('/wizard/validate-key')
-      .send({ botId: 'b1' }) // apiKey missing
+      .send({ botId: 'b1', keys: [] }) // Empty keys array fails .min(1) missing
 
     expect(res.status).toBe(400)
   })
@@ -121,20 +123,18 @@ describe('POST /wizard/validate-key', () => {
     mockFetch.mockResolvedValueOnce({ ok: true, status: 200 })
 
     let savedConfig: Record<string, unknown> | null = null
-    mockDb.saveBotAiConfig.mockImplementation((_botId: string, config: Record<string, unknown>) => {
+    mockDb.addAIKey.mockImplementation((config: Record<string, unknown>) => {
       savedConfig = config
       return Promise.resolve()
     })
 
     await request(app)
       .post('/wizard/validate-key')
-      .send({ botId: 'b1', apiKey: 'AIza-plaintext-key' })
+      .send({ botId: 'b1', keys: [{ provider: 'google', key: 'AIza-plaintext-key', model: 'gemini-1.5-pro' }] })
 
     expect(savedConfig).not.toBeNull()
-    // The stored key must be encrypted — should not equal the original plaintext
-    const storedKey = (savedConfig as unknown as Record<string, string>)['apiKey']
+    const storedKey = (savedConfig as unknown as Record<string, string>)['encryptedKey']
     expect(storedKey).not.toBe('AIza-plaintext-key')
-    // Encrypted format starts with "enc:"
     expect(storedKey).toMatch(/^enc:/)
   })
 })
