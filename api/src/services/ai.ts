@@ -65,12 +65,33 @@ const toolsMap = {
     tiger_gmail_send,
     tiger_drive_list,
 };
+// Fix: Google Generative AI strictly requires UPPERCASE type names (e.g. 'OBJECT', 'STRING')
+// standard OpenClaw JSON schema uses lowercase 'object', 'string'. We recursively map it here.
+function mapToGoogleSchema(param: any): any {
+    if (!param) return param;
+    if (Array.isArray(param)) return param.map(mapToGoogleSchema);
+    if (typeof param !== 'object') return param;
+    
+    const mapped = { ...param };
+    if (mapped.type && typeof mapped.type === 'string') {
+        mapped.type = mapped.type.toUpperCase();
+    }
+    if (mapped.properties) {
+        for (const [k, v] of Object.entries(mapped.properties)) {
+            mapped.properties[k] = mapToGoogleSchema(v);
+        }
+    }
+    if (mapped.items) {
+        mapped.items = mapToGoogleSchema(mapped.items);
+    }
+    return mapped;
+}
 
 const geminiTools = [{
     functionDeclarations: Object.values(toolsMap).map((tool: any) => ({
         name: tool.name,
         description: tool.description,
-        parameters: tool.parameters,
+        parameters: mapToGoogleSchema(tool.parameters),
     })),
 }];
 
