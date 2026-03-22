@@ -37,7 +37,7 @@ gcloud run deploy "$SERVICE_NAME" \
   --port 4000 \
   --memory 2Gi \
   --cpu 2 \
-  --min-instances 2 \
+  --min-instances 1 \
   --max-instances 100 \
   --timeout 300 \
   --concurrency 100 \

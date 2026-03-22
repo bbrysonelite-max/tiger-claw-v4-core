@@ -28,6 +28,7 @@ loadSecrets(); // Inject volume-mounted secrets before anything else
 
 import express, { type Request, type Response, type NextFunction } from "express";
 import cors from "cors";
+import rateLimit from "express-rate-limit";
 import { initSchema, listTenants, updateTenantStatus, logAdminEvent } from "./services/db.js";
 import { runMigrations } from "./services/migrate.js";
 import { getPoolStatus } from "./services/pool.js";
@@ -53,20 +54,35 @@ const PORT = Number(process.env["PORT"] ?? 4000);
 // ---------------------------------------------------------------------------
 
 // CORS — must be before raw body parsers so preflight OPTIONS requests are handled
-const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS 
-  ? process.env.ALLOWED_ORIGINS.split(',').map(s => s.trim())
-  : [
-      "http://localhost:3000",
-      "http://localhost:3001",
-      "https://wizard.tigerclaw.io",
-      "https://tigerclaw.io"
-    ];
+let ALLOWED_ORIGINS: string[];
+if (process.env.ALLOWED_ORIGINS) {
+  ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS.split(',').map(s => s.trim());
+} else if (process.env.NODE_ENV === 'production') {
+  throw new Error("[FATAL] ALLOWED_ORIGINS must be set in production to prevent open CORS vulnerabilities.");
+} else {
+  ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "http://localhost:3001",
+    "https://wizard.tigerclaw.io",
+    "https://tigerclaw.io"
+  ];
+}
 
 app.use(cors({
   origin: ALLOWED_ORIGINS,
   methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
 }));
+
+// Rate Limiting (SWOP Remediation)
+const strictLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 60, // Limit each IP to 60 requests per window
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use("/wizard", strictLimiter);
+app.use("/webhooks", strictLimiter);
 
 // Stripe requires raw body for signature verification
 app.use("/webhooks/stripe", express.raw({ type: "application/json" }));

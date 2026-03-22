@@ -49,10 +49,7 @@ function getEncKey(): Buffer | null {
 export function encryptToken(plaintext: string): string {
   const key = getEncKey();
   if (!key) {
-    // ENCRYPTION_KEY not set — tokens stored as plaintext. Safe in dev only.
-    // In production this is a critical security failure.
-    console.error("[pool] SECURITY WARNING: ENCRYPTION_KEY not set. Bot tokens stored as PLAINTEXT. Set ENCRYPTION_KEY in production immediately.");
-    return plaintext;
+    throw new Error("[FATAL] ENCRYPTION_KEY is required but not set in the environment. Cannot safely encrypt.");
   }
 
   const iv = crypto.randomBytes(16);
@@ -63,10 +60,10 @@ export function encryptToken(plaintext: string): string {
 }
 
 export function decryptToken(stored: string): string {
-  if (!stored.startsWith("enc:")) return stored; // plaintext (dev/test)
+  if (!stored.startsWith("enc:")) return stored; // plaintext (support legacy dev/test data)
 
   const key = getEncKey();
-  if (!key) throw new Error("ENCRYPTION_KEY not set but token is encrypted");
+  if (!key) throw new Error("[FATAL] ENCRYPTION_KEY is required but not set in the environment.");
 
   const [, ivHex, authTagHex, ciphertextHex] = stored.split(":");
   if (!ivHex || !authTagHex || !ciphertextHex) throw new Error("Malformed encrypted token");
