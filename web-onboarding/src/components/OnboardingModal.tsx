@@ -26,7 +26,7 @@ export interface WizardState {
     planId: "demo" | "lite" | "pro" | "white-label";
     planName: string;
     price: string;
-    connectionType: "byok";
+    connectionType: "byok" | "managed";
     aiKeys: AIKeyConfig[];
     whatsappEnabled: boolean;
     lineToken?: string;
@@ -44,7 +44,7 @@ const initialState: WizardState = {
     planId: "demo",
     planName: "72-Hour Trial",
     price: "$0.00",
-    connectionType: "byok",
+    connectionType: "managed",
     aiKeys: [],
     whatsappEnabled: false,
     contactsRaw: "",

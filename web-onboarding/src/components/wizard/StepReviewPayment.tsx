@@ -25,24 +25,26 @@ export default function StepReviewPayment({ state, isDeploying, setIsDeploying, 
             const apiUrl = "https://api.tigerclaw.io";
             const base = apiUrl.endsWith('/') ? apiUrl.slice(0, -1) : apiUrl;
 
-            // 1. Validate & Store AI Keys
-            const keyResponse = await fetch(`${base}/wizard/validate-key`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    botId: state.botId,
-                    keys: state.aiKeys.map(k => ({
-                        provider: k.provider,
-                        key: k.key,
-                        model: k.model
-                    }))
-                })
-            });
-            
-            const keyData = await keyResponse.json();
-            if (!keyResponse.ok || !keyData.valid) {
-                 const errDetails = keyData.details?.filter((d: any) => d.status === "error").map((d: any) => `${d.provider}: ${d.error}`).join(", ");
-                 throw new Error("Invalid AI Keys: " + (errDetails || "Validation failed"));
+            // 1. Validate & Store AI Keys (ONLY if BYOK)
+            if (state.connectionType === "byok" && state.aiKeys.length > 0) {
+                const keyResponse = await fetch(`${base}/wizard/validate-key`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        botId: state.botId,
+                        keys: state.aiKeys.map(k => ({
+                            provider: k.provider,
+                            key: k.key,
+                            model: k.model
+                        }))
+                    })
+                });
+                
+                const keyData = await keyResponse.json();
+                if (!keyResponse.ok || !keyData.valid) {
+                     const errDetails = keyData.details?.filter((d: any) => d.status === "error").map((d: any) => `${d.provider}: ${d.error}`).join(", ");
+                     throw new Error("Invalid AI Keys: " + (errDetails || "Validation failed"));
+                }
             }
 
             // 2. Transmit final wizard settings & Hatch Target
@@ -105,7 +107,7 @@ export default function StepReviewPayment({ state, isDeploying, setIsDeploying, 
                         <div className="flex justify-between items-center text-sm border-b border-white/5 pb-3">
                             <span className="text-white/70">AI Computations</span>
                             <span className="font-bold text-white flex items-center gap-2">
-                                {state.aiKeys.length > 0 ? "Bring Your Own Key" : "No Keys Configured"}
+                                {state.connectionType === "managed" ? "BotCraft Free Brain (72h)" : (state.aiKeys.length > 0 ? "Bring Your Own Key" : "No Keys Configured")}
                             </span>
                         </div>
 
