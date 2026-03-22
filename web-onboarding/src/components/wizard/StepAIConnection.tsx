@@ -236,13 +236,7 @@ export default function StepAIConnection({ state, updateState, onNext }: AIConne
                 </div>
             )}
 
-            <div className="mt-8 flex justify-between items-center">
-                <button
-                    onClick={onNext}
-                    className="text-white/30 hover:text-white/60 text-xs font-bold transition-colors"
-                >
-                    [Mockup] Skip AI
-                </button>
+            <div className="mt-8 flex justify-end items-center">
 
                 <button
                     onClick={onNext}
