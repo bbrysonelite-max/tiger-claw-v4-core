@@ -38,7 +38,7 @@ export default function StepIdentity({ state, updateState, onNext }: IdentityPro
         setError("");
 
         try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://api.tigerclaw.io";
             // Strip any trailing slash
             const base = apiUrl.endsWith('/') ? apiUrl.slice(0, -1) : apiUrl;
             

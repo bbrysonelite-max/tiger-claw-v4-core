@@ -1,1 +1,1 @@
-export const API_BASE = process.env.NEXT_PUBLIC_API_URL || (process.env.NODE_ENV === "production" ? (() => { throw new Error("NEXT_PUBLIC_API_URL must be set in production"); })() : "http://localhost:4000");
+export const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://api.tigerclaw.io";
