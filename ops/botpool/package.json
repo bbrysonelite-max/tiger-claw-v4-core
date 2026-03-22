@@ -1,0 +1,20 @@
+{
+  "name": "tiger-claw-botpool",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Bot token pool management — manual import and MTProto automation",
+  "scripts": {
+    "provision": "tsx provision_accounts.ts",
+    "auth": "tsx auth_session.ts",
+    "create": "tsx create_bots.ts"
+  },
+  "dependencies": {
+    "telegram": "^2.26.22",
+    "input": "^1.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.5",
+    "typescript": "^5.3.3",
+    "tsx": "^4.7.0"
+  }
+}

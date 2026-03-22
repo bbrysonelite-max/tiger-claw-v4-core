@@ -1,0 +1,41 @@
+# Dependencies
+node_modules/
+
+# Environment files (NEVER commit secrets)
+.env
+.env.local
+.env.deploy
+*.pem
+
+# Docker volumes
+postgres-data/
+tiger-claw-data/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+!.cursor/
+
+# Build artifacts
+dist/
+build/
+
+# Logs
+*.log
+
+# Test output
+test-results/
+
+# Bot pool sensitive data (phone numbers, session strings, API tokens)
+ops/botpool/sms_numbers.json
+ops/botpool/sessions.json
+ops/botpool/sessions/
+ops/create-bot-pool/sessions/
+ops/create-bot-pool/run.sh
+ops/gcp-terraform/.terraform/
+ops/gcp-terraform/terraform.tfstate*
+ops/gcp-terraform/.terraform.lock.hcl
+web-onboarding/playwright-report/

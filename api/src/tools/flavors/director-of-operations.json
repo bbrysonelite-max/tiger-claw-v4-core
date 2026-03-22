@@ -1,0 +1,20 @@
+{
+    "id": "director-of-operations",
+    "name": "Ops-Core Director",
+    "professionLabel": "agency operations and platform management",
+    "defaultKeywords": ["status", "pool", "database", "webhook", "stripe", "customer"],
+    "nurtureTemplates": {
+        "value_drop": "System report generated. — {{botName}}",
+        "testimonial": "System report generated. — {{botName}}",
+        "authority_transfer": "System report generated. — {{botName}}",
+        "personal_checkin": "System report generated. — {{botName}}",
+        "one_to_ten_part1": "System report generated. — {{botName}}",
+        "one_to_ten_part2": "System report generated. — {{botName}}",
+        "gap_closing": "System report generated. — {{botName}}",
+        "scarcity_takeaway": "System report generated. — {{botName}}",
+        "pattern_interrupt": "System report generated. — {{botName}}",
+        "final_takeaway": "System report generated. — {{botName}}",
+        "slow_drip_value": "System report generated. — {{botName}}",
+        "default_fallback": "Awaiting operations command. — {{botName}}"
+    }
+}

@@ -1,0 +1,99 @@
+{
+  "builds": [
+    {
+      "tcVersion": "v2026.03.07.11",
+      "builtAt": "2026-03-08T02:00:00.000000Z",
+      "commitHash": "55ae7c5",
+      "gitTagged": false,
+      "gapsCompleted": ["GAP-8", "GAP-1", "GAP-7", "GAP-4", "GAP-2", "GAP-5", "GAP-6", "GAP-9", "GAP-3"],
+      "notes": "ALL GAPS COMPLETE. GAP-3: Admin dashboard wired to live data. Full build order complete."
+    },
+    {
+      "tcVersion": "v2026.03.07.10",
+      "builtAt": "2026-03-08T01:00:00.000000Z",
+      "commitHash": "6a0d7de",
+      "gitTagged": false,
+      "gapsCompleted": ["GAP-8", "GAP-1", "GAP-7", "GAP-4", "GAP-2", "GAP-5", "GAP-6", "GAP-9"],
+      "notes": "GAP-9 full implementation: Customer Dashboard complete with all screens wired."
+    },
+    {
+      "tcVersion": "v2026.03.07.9",
+      "builtAt": "2026-03-08T00:30:00.000000Z",
+      "commitHash": "bc3de5b",
+      "gitTagged": false,
+      "gapsCompleted": ["GAP-8", "GAP-1", "GAP-7", "GAP-4", "GAP-2", "GAP-5", "GAP-6", "GAP-9"],
+      "notes": "GAP-9: Customer dashboard — bot status, channel cards, LINE wizard, API key status."
+    },
+    {
+      "tcVersion": "v2026.03.07.8",
+      "builtAt": "2026-03-07T23:59:00.000000Z",
+      "commitHash": "e0402ce",
+      "gitTagged": false,
+      "gapsCompleted": ["GAP-8", "GAP-1", "GAP-7", "GAP-4", "GAP-2", "GAP-5", "GAP-6"],
+      "notes": "GAP-6: Bot token pipeline complete — JuicySMS → Telegram accounts → BotFather → bot_pool. Target 100 tokens."
+    },
+    {
+      "tcVersion": "v2026.03.07.7",
+      "builtAt": "2026-03-07T23:30:00.000000Z",
+      "commitHash": "254a721",
+      "gitTagged": false,
+      "gapsCompleted": ["GAP-8", "GAP-1", "GAP-7", "GAP-4", "GAP-2", "GAP-5"],
+      "notes": "Fix .env.example: Google API key format (AIza...), not Anthropic (sk-ant-...). Added GOOGLE_API_KEY, STRIPE_PRICE_MANAGED, STRIPE_PRICE_BYOK, FRONTEND_URL."
+    },
+    {
+      "tcVersion": "v2026.03.07.6",
+      "builtAt": "2026-03-07T23:00:00.000000Z",
+      "commitHash": "e6485dc",
+      "gitTagged": false,
+      "gapsCompleted": ["GAP-8", "GAP-1", "GAP-7", "GAP-4", "GAP-2", "GAP-5"],
+      "notes": "GAP-5: GCP infrastructure deployed — Terraform, Cloud Run, Secret Manager."
+    },
+    {
+      "tcVersion": "v2026.03.07.5",
+      "builtAt": "2026-03-07T22:30:00.000000Z",
+      "commitHash": "11beb6e",
+      "gitTagged": false,
+      "gapsCompleted": ["GAP-8", "GAP-1", "GAP-7", "GAP-4", "GAP-2"],
+      "notes": "GAP-2: Demo trial endpoint POST /admin/demo."
+    },
+    {
+      "tcVersion": "v2026.03.07.4",
+      "builtAt": "2026-03-07T22:00:00.000000Z",
+      "commitHash": "e2aff6a",
+      "gitTagged": false,
+      "gapsCompleted": ["GAP-8", "GAP-1", "GAP-7", "GAP-4"],
+      "notes": "GAP-7: BYOK key validation. GAP-4: Stripe wired into wizard."
+    },
+    {
+      "tcVersion": "v2026.03.07.2",
+      "builtAt": "2026-03-07T21:00:00.000000Z",
+      "commitHash": "8057bce",
+      "gitTagged": false,
+      "gapsCompleted": ["GAP-8", "GAP-1"],
+      "notes": "GAP-8: DB migrations. GAP-1: 11 flavor JSON files."
+    },
+    {
+      "tcVersion": "v2026.03.04.1",
+      "builtAt": "2026-03-05T04:25:20.581650Z",
+      "commitHash": "080afbc",
+      "gitTagged": true,
+      "notes": "Initial Gemini migration build."
+    }
+  ],
+  "tigerClaw": {
+    "current": "v2026.03.07.11",
+    "previous": "v2026.03.07.10"
+  },
+  "gapStatus": {
+    "GAP-8": "✅ complete",
+    "GAP-1": "✅ complete",
+    "GAP-7": "✅ complete",
+    "GAP-4": "✅ complete",
+    "GAP-2": "✅ complete",
+    "GAP-5": "✅ complete",
+    "GAP-6": "✅ complete",
+    "GAP-9": "✅ complete",
+    "GAP-3": "✅ complete"
+  },
+  "buildOrder": "GAP-8 → GAP-1 → GAP-7 → GAP-4 → GAP-2 → GAP-5 → GAP-6 → GAP-9 → GAP-3"
+}

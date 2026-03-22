@@ -1,0 +1,20 @@
+{
+    "id": "intelligence-specialist",
+    "name": "OSINT Researcher",
+    "professionLabel": "deep research, web scraping, and intelligence synthesis",
+    "defaultKeywords": ["research", "check", "verify", "scrape", "search", "trend"],
+    "nurtureTemplates": {
+        "value_drop": "Intelligence report ready. — {{botName}}",
+        "testimonial": "Intelligence report ready. — {{botName}}",
+        "authority_transfer": "Intelligence report ready. — {{botName}}",
+        "personal_checkin": "Intelligence report ready. — {{botName}}",
+        "one_to_ten_part1": "Intelligence report ready. — {{botName}}",
+        "one_to_ten_part2": "Intelligence report ready. — {{botName}}",
+        "gap_closing": "Intelligence report ready. — {{botName}}",
+        "scarcity_takeaway": "Intelligence report ready. — {{botName}}",
+        "pattern_interrupt": "Intelligence report ready. — {{botName}}",
+        "final_takeaway": "Intelligence report ready. — {{botName}}",
+        "slow_drip_value": "Intelligence report ready. — {{botName}}",
+        "default_fallback": "Awaiting research query. — {{botName}}"
+    }
+}

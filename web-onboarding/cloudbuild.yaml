@@ -1,0 +1,19 @@
+steps:
+  # Build the container image
+  - name: 'gcr.io/cloud-builders/docker'
+    args: [
+      'build',
+      '--build-arg', '_NEXT_PUBLIC_API_URL=${_NEXT_PUBLIC_API_URL}',
+      '-t', 'gcr.io/${PROJECT_ID}/tiger-claw-frontend:latest',
+      '.'
+    ]
+
+# Push the container image to Container Registry
+images:
+  - 'gcr.io/${PROJECT_ID}/tiger-claw-frontend:latest'
+
+substitutions:
+  _NEXT_PUBLIC_API_URL: 'https://api.tigerclaw.io'
+
+options:
+  logging: CLOUD_LOGGING_ONLY

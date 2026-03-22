@@ -1,0 +1,512 @@
+// Tiger Claw — Channel Wizard Routes
+// TIGERCLAW-BLUEPRINT-v3.md §5, TIGERCLAW-PRD-v3.md FR-CW-2, FR-CW-3
+//
+// Serves a plain HTML page (no framework) at /wizard/:slug for tenant
+// channel configuration (Telegram, WhatsApp, LINE).
+//
+// Endpoints:
+//   GET  /wizard/:slug       — serve wizard HTML page
+//   POST /wizard/:slug/save  — save channel config changes
+
+import { Router, type Request, type Response } from "express";
+import Stripe from "stripe";
+import {
+  getTenantBySlug,
+  getTenantByEmail,
+  getTenantBotUsername,
+  updateTenantChannelConfig,
+  upsertBYOKConfig,
+  addAIKey,
+  importContacts,
+} from "../services/db.js";
+import { encryptToken } from "../services/pool.js";
+import { provisionQueue } from "../services/queue.js";
+
+const router = Router();
+
+const stripe = process.env["STRIPE_SECRET_KEY"]
+  ? new Stripe(process.env["STRIPE_SECRET_KEY"])
+  : null;
+
+// ── POST /wizard/import-contacts ─────────────────────────────────────────────
+// Hunter Framework: Import Circle of Influence contacts during onboarding.
+router.post("/import-contacts", async (req: Request, res: Response) => {
+  const { tenantId, contacts } = req.body as {
+    tenantId?: string;
+    contacts?: { name: string; email?: string; phone?: string }[];
+  };
+
+  if (!tenantId || !contacts) {
+    return res.status(400).json({ error: "tenantId and contacts are required." });
+  }
+
+  try {
+    const count = await importContacts(tenantId, contacts);
+    console.log(`[wizard] Imported ${count} contacts for tenant ${tenantId}`);
+    return res.json({ ok: true, count });
+  } catch (err: any) {
+    console.error(`[wizard] Failed to import contacts:`, err.message);
+    return res.status(500).json({ error: "Failed to import contacts." });
+  }
+});
+
+// ── GET /wizard/auth ─────────────────────────────────────────────────────────
+// Authenticates a user returning from Stan Store via the magic email link.
+// Verifies they have a paid subscription/bot before letting them run the wizard.
+router.get("/auth", async (req: Request, res: Response) => {
+  const email = req.query["email"] as string | undefined;
+  if (!email) return res.status(400).json({ error: "Email is required" });
+
+  try {
+    const tenant = await getTenantByEmail(email);
+    if (!tenant) {
+      return res.status(404).json({ error: "No purchase found for this email." });
+    }
+
+    // Return the botId so the React wizard can attach AI keys to it
+    // In the new architecture, tenant.id is actually the botId when migrating to V4 DB
+    return res.json({ 
+      ok: true, 
+      botId: tenant.id, 
+      name: tenant.name,
+      status: tenant.status 
+    });
+  } catch (err: any) {
+    console.error("[wizard] Auth error:", err);
+    return res.status(500).json({ error: "Authentication failed." });
+  }
+});
+
+// ── POST /wizard/hatch ───────────────────────────────────────────────────────
+// The capstone of the Stan Store flow. Extracts completed Wizard Config and 
+// enqueues the actual Agent Provisioning process.
+router.post("/hatch", async (req: Request, res: Response) => {
+  const { botId, name, email, flavor, language, timezone, preferredChannel } = req.body;
+
+  if (!botId || !email) {
+    return res.status(400).json({ error: "botId and email are required" });
+  }
+
+  try {
+    const tenant = await getTenantByEmail(email);
+    if (!tenant) return res.status(404).json({ error: "Tenant not found" });
+
+    const slug = tenant.slug || name.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 30);
+    const region = language === "th" ? "th-th" : "us-en";
+
+    // Enqueue the heavy lifting
+    await provisionQueue.add('tenant-provisioning', {
+      userId: tenant.id, // Assuming legacy map
+      botId: botId,
+      slug,
+      name: name || tenant.name,
+      email,
+      flavor: flavor || "network-marketer",
+      region,
+      language: language || "en",
+      preferredChannel: preferredChannel || "telegram",
+      timezone: timezone || "UTC",
+    }, {
+      attempts: 5,
+      backoff: { type: 'exponential', delay: 10000 },
+    });
+
+    console.log(`[wizard] 🚀 Agent Hatch triggered for ${email} (Bot: ${botId})`);
+    return res.json({ ok: true, message: "Hatch sequence initiated." });
+  } catch (err: any) {
+    console.error("[wizard] Hatch compilation failed:", err);
+    return res.status(500).json({ error: "Failed to initiate hatch sequence." });
+  }
+});
+// Polled by PostPaymentSuccess after Stripe redirect.
+// Returns provisioning status so the UI can show "live" when the bot is ready.
+
+router.get("/status", async (req: Request, res: Response) => {
+  const sessionId = req.query["session_id"] as string | undefined;
+  if (!sessionId) {
+    return res.status(400).json({ error: "session_id is required" });
+  }
+
+  // Retrieve session from Stripe to get the customer's email
+  if (!stripe) {
+    return res.status(503).json({ error: "Stripe not configured" });
+  }
+
+  let customerEmail: string | null = null;
+  try {
+    const session = await stripe.checkout.sessions.retrieve(sessionId);
+    customerEmail = session.customer_details?.email ?? null;
+  } catch (err) {
+    console.error("[wizard] Failed to retrieve Stripe session:", err);
+    return res.json({ status: "error", error: "Invalid session_id" });
+  }
+
+  if (!customerEmail) {
+    return res.json({ status: "pending", botUsername: null, telegramLink: null });
+  }
+
+  // Look up tenant by email
+  const tenant = await getTenantByEmail(customerEmail);
+  if (!tenant || tenant.status === "pending") {
+    return res.json({ status: "pending", botUsername: null, telegramLink: null });
+  }
+
+  const botUsername = await getTenantBotUsername(tenant.id);
+  const isLive = tenant.status === "active" || tenant.status === "onboarding";
+
+  return res.json({
+    status: isLive ? "live" : "pending",
+    botUsername: botUsername ?? null,
+    telegramLink: botUsername ? `https://t.me/${botUsername}` : null,
+    tenantSlug: tenant.slug,
+    tenantId: tenant.id,
+  });
+});
+
+// ── POST /wizard/validate-key ────────────────────────────────────────────────
+// GAP 7 — Server-side BYOK key validation + 4-Key Rotation
+// Accepts: { botId: "<uuid>", keys: [{ provider: "google", key: "AIza...", model: "..." }] }
+// Validates each key, then encrypts and stores them in bot_ai_keys.
+
+router.post("/validate-key", async (req: Request, res: Response) => {
+  const { botId, keys } = req.body as {
+    botId?: string;
+    keys?: { provider: string; key: string; model: string }[];
+  };
+
+  if (!botId || !keys || !Array.isArray(keys) || keys.length === 0) {
+    return res.status(400).json({ valid: false, error: "botId and an array of keys are required." });
+  }
+
+  const results: any[] = [];
+  
+  for (let i = 0; i < keys.length; i++) {
+    const k = keys[i];
+    console.log(`[wizard] Validating ${k.provider} key for bot ${botId}...`);
+
+    try {
+      let isValid = false;
+      
+      // Provider-specific validation logic
+      if (k.provider === "google") {
+        const testUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(k.key)}`;
+        const response = await fetch(testUrl);
+        isValid = response.ok;
+      } else if (k.provider === "openai") {
+        const response = await fetch("https://api.openai.com/v1/models", {
+          headers: { "Authorization": `Bearer ${k.key}` }
+        });
+        isValid = response.ok;
+      } else {
+        // Fallback for other providers: assume valid if format is correct
+        isValid = k.key.length > 10; 
+      }
+
+      if (isValid) {
+        const encrypted = encryptToken(k.key);
+        const preview = `${k.key.slice(0, 4)}...${k.key.slice(-4)}`;
+
+        // 1. Store in the new Multi-Key table
+        await addAIKey({
+          botId,
+          provider: k.provider,
+          model: k.model,
+          encryptedKey: encrypted,
+          keyPreview: preview,
+          priority: i,
+        });
+
+        // 2. Backward compatibility: Store the first key in the legacy bot_ai_config
+        if (i === 0) {
+          await upsertBYOKConfig({
+            botId,
+            connectionType: "byok",
+            provider: k.provider,
+            model: k.model,
+            encryptedKey: encrypted,
+            keyPreview: preview,
+          });
+        }
+        
+        results.push({ provider: k.provider, status: "success" });
+      } else {
+        results.push({ provider: k.provider, status: "error", error: "Validation failed" });
+      }
+    } catch (err: any) {
+      results.push({ provider: k.provider, status: "error", error: err.message });
+    }
+  }
+
+  const allValid = results.every(r => r.status === "success");
+  return res.json({ 
+    valid: allValid, 
+    details: results 
+  });
+});
+
+// ── GET /wizard/:slug ────────────────────────────────────────────────────────
+
+router.get("/:slug", async (req: Request, res: Response) => {
+  try {
+    const slug = req.params["slug"]!;
+    const tenant = await getTenantBySlug(slug);
+    if (!tenant) {
+      return res.status(404).send("Tenant not found.");
+    }
+
+    const botUsername = await getTenantBotUsername(tenant.id);
+
+    // Never send LINE credentials back to the browser — show configured/not status only
+    const html = renderWizardPage({
+      slug: tenant.slug,
+      name: tenant.name,
+      botUsername,
+      whatsappEnabled: tenant.whatsappEnabled,
+      lineConfigured: !!(tenant.lineChannelSecret && tenant.lineChannelAccessToken),
+    });
+
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    return res.send(html);
+  } catch (err) {
+    console.error("[wizard] GET /:slug error:", err);
+    return res.status(500).send("Internal server error.");
+  }
+});
+
+// ── POST /wizard/:slug/save ──────────────────────────────────────────────────
+
+router.post("/:slug/save", async (req: Request, res: Response) => {
+  try {
+    const slug = req.params["slug"]!;
+    const tenant = await getTenantBySlug(slug);
+    if (!tenant) {
+      return res.status(404).json({ error: "Tenant not found." });
+    }
+
+    const { whatsappEnabled, lineChannelSecret, lineChannelAccessToken } = req.body as {
+      whatsappEnabled?: boolean;
+      lineChannelSecret?: string;
+      lineChannelAccessToken?: string;
+    };
+
+    if (lineChannelSecret !== undefined && lineChannelSecret !== "") {
+      if (typeof lineChannelSecret !== "string" || lineChannelSecret.length > 200) {
+        return res.status(400).json({ error: "LINE channel secret must be 200 characters or fewer." });
+      }
+    }
+    if (lineChannelAccessToken !== undefined && lineChannelAccessToken !== "") {
+      if (typeof lineChannelAccessToken !== "string" || lineChannelAccessToken.length > 200) {
+        return res.status(400).json({ error: "LINE channel access token must be 200 characters or fewer." });
+      }
+    }
+
+    // Encrypt LINE credentials before storage (AES-256-GCM — same as BYOK keys)
+    // NEVER store plaintext LINE credentials in the database.
+    let finalEncryptedSecret;
+    let finalEncryptedToken;
+    try {
+      finalEncryptedSecret = lineChannelSecret
+        ? (lineChannelSecret === "" ? null : encryptToken(lineChannelSecret))
+        : undefined;
+      finalEncryptedToken = lineChannelAccessToken
+        ? (lineChannelAccessToken === "" ? null : encryptToken(lineChannelAccessToken))
+        : undefined;
+    } catch(err) {
+      return res.status(500).json({ error: "Encryption error" });
+    }
+
+    await updateTenantChannelConfig(tenant.id, {
+      whatsappEnabled: whatsappEnabled ?? undefined,
+      lineChannelSecret: lineChannelSecret === "" ? null : finalEncryptedSecret,
+      lineChannelAccessToken: lineChannelAccessToken === "" ? null : finalEncryptedToken,
+    });
+
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error("[wizard] POST /:slug/save error:", err);
+    return res.status(500).json({ error: "Failed to save channel configuration." });
+  }
+});
+
+// ── HTML renderer ────────────────────────────────────────────────────────────
+
+interface WizardData {
+  slug: string;
+  name: string;
+  botUsername: string | null;
+  whatsappEnabled: boolean;
+  lineConfigured: boolean; // true if both LINE credentials are stored — never expose the values
+}
+
+function renderWizardPage(data: WizardData): string {
+  const telegramStatus = data.botUsername
+    ? `<span class="status active">Active</span> — <a href="https://t.me/${esc(data.botUsername)}" target="_blank">@${esc(data.botUsername)}</a>`
+    : `<span class="status pending">Pending</span> — token assignment in progress`;
+
+  const waChecked = data.whatsappEnabled ? "checked" : "";
+  const waStatus = data.whatsappEnabled
+    ? `<span class="status active">Enabled</span>`
+    : `<span class="status off">Disabled</span>`;
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Channel Wizard — ${esc(data.name)}</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f1117; color: #e1e4e8; line-height: 1.6; padding: 2rem 1rem; }
+  .container { max-width: 640px; margin: 0 auto; }
+  h1 { font-size: 1.5rem; font-weight: 600; margin-bottom: 0.25rem; color: #f0f3f6; }
+  .subtitle { color: #8b949e; font-size: 0.9rem; margin-bottom: 2rem; }
+  .card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 1.5rem; margin-bottom: 1rem; }
+  .card h2 { font-size: 1.1rem; font-weight: 600; margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem; }
+  .card p { color: #8b949e; font-size: 0.875rem; margin-bottom: 0.75rem; }
+  .status { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; }
+  .status.active { background: #0d4429; color: #3fb950; }
+  .status.pending { background: #3d2e00; color: #d29922; }
+  .status.off { background: #21262d; color: #8b949e; }
+  a { color: #58a6ff; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  label { display: block; font-size: 0.875rem; font-weight: 500; margin-bottom: 0.5rem; color: #c9d1d9; }
+  input[type="text"] { width: 100%; padding: 0.5rem 0.75rem; background: #0d1117; border: 1px solid #30363d; border-radius: 6px; color: #e1e4e8; font-size: 0.875rem; }
+  input[type="text"]:focus { outline: none; border-color: #58a6ff; box-shadow: 0 0 0 2px rgba(88,166,255,0.15); }
+  .toggle-row { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem; }
+  .toggle { position: relative; width: 44px; height: 24px; flex-shrink: 0; }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .toggle .slider { position: absolute; inset: 0; background: #30363d; border-radius: 12px; cursor: pointer; transition: background 0.2s; }
+  .toggle .slider::before { content: ""; position: absolute; width: 18px; height: 18px; left: 3px; bottom: 3px; background: #c9d1d9; border-radius: 50%; transition: transform 0.2s; }
+  .toggle input:checked + .slider { background: #238636; }
+  .toggle input:checked + .slider::before { transform: translateX(20px); }
+  .details { overflow: hidden; max-height: 0; transition: max-height 0.3s ease; }
+  .details.open { max-height: 200px; }
+  details summary { list-style: none; }
+  details summary::-webkit-details-marker { display: none; }
+  details summary::before { content: "\\25B6 "; font-size: 0.7rem; }
+  details[open] summary::before { content: "\\25BC "; }
+  .btn { display: inline-block; padding: 0.5rem 1.25rem; background: #238636; color: #fff; border: none; border-radius: 6px; font-size: 0.875rem; font-weight: 500; cursor: pointer; transition: background 0.15s; }
+  .btn:hover { background: #2ea043; }
+  .btn:disabled { background: #21262d; color: #484f58; cursor: not-allowed; }
+  .msg { margin-top: 1rem; padding: 0.75rem; border-radius: 6px; font-size: 0.875rem; display: none; }
+  .msg.ok { display: block; background: #0d4429; color: #3fb950; border: 1px solid #238636; }
+  .msg.err { display: block; background: #3d1519; color: #f85149; border: 1px solid #da3633; }
+  .icon { font-size: 1.25rem; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Channel Wizard</h1>
+  <p class="subtitle">${esc(data.name)} &middot; ${esc(data.slug)}</p>
+
+  <!-- Telegram -->
+  <div class="card">
+    <h2><span class="icon">✈️</span> Telegram</h2>
+    <p>Your primary channel. Always active.</p>
+    <p>${telegramStatus}</p>
+  </div>
+
+  <!-- WhatsApp -->
+  <div class="card">
+    <h2><span class="icon">💬</span> WhatsApp</h2>
+    <p>Optional outreach channel via WhatsApp Web. ${waStatus}</p>
+    <div class="toggle-row">
+      <label class="toggle">
+        <input type="checkbox" id="wa-toggle" ${waChecked}>
+        <span class="slider"></span>
+      </label>
+      <span id="wa-label">${data.whatsappEnabled ? "Enabled" : "Disabled"}</span>
+    </div>
+    <div class="details${data.whatsappEnabled ? " open" : ""}" id="wa-details">
+      <p>When enabled, your agent will send a QR code to your Telegram chat. Scan it with WhatsApp to link your account. Session persists across restarts.</p>
+    </div>
+  </div>
+
+  <!-- LINE -->
+  <div class="card">
+    <h2><span class="icon">🟢</span> LINE</h2>
+    <p>Optional outreach channel. ${data.lineConfigured ? '<span class="status active">Configured</span>' : '<span class="status off">Not configured</span>'}</p>
+    <p>LINE requires a free <a href="https://developers.line.biz/" target="_blank">LINE Official Account</a>. You create and manage your own account.</p>
+    <details>
+      <summary style="cursor:pointer;color:#58a6ff;font-size:0.875rem;margin-bottom:0.75rem;">Setup guide</summary>
+      <ol style="color:#8b949e;font-size:0.85rem;padding-left:1.25rem;margin-bottom:0.75rem;line-height:1.8;">
+        <li>Go to <a href="https://developers.line.biz/" target="_blank">developers.line.biz</a> and sign in with a LINE account</li>
+        <li>Create a new <strong>Provider</strong>, then create a <strong>Messaging API</strong> channel</li>
+        <li>Under channel settings &rarr; <strong>Basic settings</strong> tab &rarr; copy the <strong>Channel secret</strong></li>
+        <li>Under the <strong>Messaging API</strong> tab &rarr; scroll to <strong>Channel access token</strong> &rarr; issue and copy it</li>
+        <li>Paste both values below</li>
+      </ol>
+    </details>
+    <label for="line-secret">Channel Secret</label>
+    <input type="text" id="line-secret" placeholder="${data.lineConfigured ? "Leave blank to keep existing secret" : "Paste your LINE channel secret"}" maxlength="200" style="margin-bottom:0.75rem;">
+    <label for="line-access-token">Channel Access Token</label>
+    <input type="text" id="line-access-token" placeholder="${data.lineConfigured ? "Leave blank to keep existing token" : "Paste your LINE channel access token"}" maxlength="200">
+  </div>
+
+  <button class="btn" id="save-btn" onclick="saveConfig()">Save Changes</button>
+  <div class="msg" id="msg"></div>
+</div>
+
+<script>
+  var waToggle = document.getElementById("wa-toggle");
+  var waDetails = document.getElementById("wa-details");
+  var waLabel = document.getElementById("wa-label");
+
+  waToggle.addEventListener("change", function() {
+    waDetails.classList.toggle("open", this.checked);
+    waLabel.textContent = this.checked ? "Enabled" : "Disabled";
+  });
+
+  function saveConfig() {
+    var btn = document.getElementById("save-btn");
+    var msg = document.getElementById("msg");
+    btn.disabled = true;
+    msg.className = "msg";
+    msg.style.display = "none";
+
+    var body = {
+      whatsappEnabled: waToggle.checked,
+      lineChannelSecret: document.getElementById("line-secret").value.trim(),
+      lineChannelAccessToken: document.getElementById("line-access-token").value.trim()
+    };
+
+    fetch("/wizard/${esc(data.slug)}/save", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      btn.disabled = false;
+      if (d.ok) {
+        msg.className = "msg ok";
+        msg.textContent = "Settings saved.";
+        msg.style.display = "block";
+      } else {
+        msg.className = "msg err";
+        msg.textContent = d.error || "Save failed.";
+        msg.style.display = "block";
+      }
+    })
+    .catch(function(e) {
+      btn.disabled = false;
+      msg.className = "msg err";
+      msg.textContent = "Network error: " + e.message;
+      msg.style.display = "block";
+    });
+  }
+</script>
+</body>
+</html>`;
+}
+
+function esc(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+export default router;

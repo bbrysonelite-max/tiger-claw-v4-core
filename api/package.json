@@ -1,0 +1,44 @@
+{
+  "name": "tiger-claw-api",
+  "version": "2.0.0",
+  "description": "Tiger Claw TenantOrchestrator — port 4000",
+  "main": "dist/index.js",
+  "scripts": {
+    "prebuild": "node scripts/architecture-guard.js",
+    "build": "tsc",
+    "postbuild": "mkdir -p dist/config/flavors && cp src/config/flavors/*.json dist/config/flavors/",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts",
+    "test": "TIGER_CLAW_API_URL=http://localhost:4000 REDIS_URL=redis://localhost:6379 DATABASE_URL=postgres://localhost:5432/db vitest run",
+    "test:watch": "TIGER_CLAW_API_URL=http://localhost:4000 REDIS_URL=redis://localhost:6379 DATABASE_URL=postgres://localhost:5432/db vitest"
+  },
+  "dependencies": {
+    "@agent-relay/sdk": "^3.2.6",
+    "@google/generative-ai": "^0.24.1",
+    "@prisma/client": "^7.5.0",
+    "agent-browser": "^0.20.14",
+    "bullmq": "^5.70.2",
+    "cors": "^2.8.6",
+    "dotenv": "^16.4.1",
+    "express": "^4.18.2",
+    "googleapis": "^171.4.0",
+    "ioredis": "^5.10.0",
+    "node-telegram-bot-api": "^0.66.0",
+    "pg": "^8.11.3",
+    "redis": "^5.11.0",
+    "resend": "^6.9.3",
+    "stripe": "^14.14.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.11.5",
+    "@types/node-telegram-bot-api": "^0.64.7",
+    "@types/pg": "^8.11.0",
+    "@types/supertest": "^7.2.0",
+    "supertest": "^7.2.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3",
+    "vitest": "^4.0.18"
+  }
+}
