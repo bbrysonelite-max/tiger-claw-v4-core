@@ -1,0 +1,109 @@
+name: Test
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test-api:
+    name: API Tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: tiger
+          POSTGRES_PASSWORD: tiger
+          POSTGRES_DB: tiger_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgres://tiger:tiger@localhost:5432/tiger_test
+      DATABASE_READ_URL: postgres://tiger:tiger@localhost:5432/tiger_test
+      REDIS_URL: redis://localhost:6379
+      TIGER_CLAW_API_URL: http://localhost:4000
+      ADMIN_TOKEN: test-admin-token-ci
+      ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY || 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' }}
+      STRIPE_SECRET_KEY: sk_test_placeholder
+      STRIPE_WEBHOOK_SECRET: whsec_placeholder
+      STRIPE_PRICE_ID: price_placeholder
+      APP_URL: http://localhost:3000
+      FROM_EMAIL: test@example.com
+      RESEND_API_KEY: re_test_placeholder
+      NODE_ENV: test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+          cache-dependency-path: api/pnpm-lock.yaml
+
+      - name: Install dependencies
+        working-directory: api
+        run: pnpm install --frozen-lockfile
+
+      - name: Type check
+        working-directory: api
+        run: pnpm exec tsc --noEmit
+
+      - name: Run tests
+        working-directory: api
+        run: pnpm test
+
+  test-skill:
+    name: Skill Tests
+    runs-on: ubuntu-latest
+
+    env:
+      NODE_ENV: test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+          cache-dependency-path: skill/pnpm-lock.yaml
+
+      - name: Install dependencies
+        working-directory: skill
+        run: pnpm install --frozen-lockfile
+
+      - name: Type check
+        working-directory: skill
+        run: pnpm exec tsc --noEmit
+
+      - name: Run tests
+        working-directory: skill
+        run: pnpm test

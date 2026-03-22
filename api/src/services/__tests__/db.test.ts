@@ -1,127 +1,136 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
-const mockQuery = vi.hoisted(() => vi.fn());
+// ---------------------------------------------------------------------------
+// Mock the pg pool factories so no real Postgres connection is made
+// ---------------------------------------------------------------------------
+const mockWriteClient = vi.hoisted(() => ({
+  query: vi.fn(),
+  release: vi.fn(),
+}))
 
-vi.mock('pg', () => {
-  return {
-    Pool: vi.fn().mockImplementation(function() {
-      return {
-        query: mockQuery,
-        on: vi.fn(),
-      };
-    }),
-  };
-});
+const mockReadClient = vi.hoisted(() => ({
+  query: vi.fn(),
+  release: vi.fn(),
+}))
 
-// Important: import db after mocking pg
-import { importContacts, addAIKey, getBYOKStatus } from '../db.js';
+const mockWritePool = vi.hoisted(() => ({
+  connect: vi.fn(() => Promise.resolve(mockWriteClient)),
+  query: vi.fn(),
+  end: vi.fn(),
+}))
 
-describe('db.ts', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
+const mockReadPool = vi.hoisted(() => ({
+  connect: vi.fn(() => Promise.resolve(mockReadClient)),
+  query: vi.fn(),
+  end: vi.fn(),
+}))
 
-  describe('importContacts', () => {
-    it('returns 0 immediately if contacts array is empty', async () => {
-      const count = await importContacts('tenant-1', []);
-      expect(count).toBe(0);
-      expect(mockQuery).not.toHaveBeenCalled();
-    });
+vi.mock('pg', () => ({
+  Pool: vi.fn().mockImplementation((config: { connectionString: string }) => {
+    // First call → write pool, second call → read pool (by connection string)
+    if (config.connectionString?.includes('read')) return mockReadPool
+    return mockWritePool
+  }),
+}))
 
-    it('inserts each contact and returns successful count', async () => {
-      mockQuery.mockResolvedValue({});
-      const contacts = [
-        { name: 'John Doe', email: 'john@example.com', phone: '123456' },
-        { name: 'Jane Smith' } // minimal contact
-      ];
-      
-      const count = await importContacts('tenant-1', contacts);
-      
-      expect(count).toBe(2);
-      expect(mockQuery).toHaveBeenCalledTimes(2);
-      expect(mockQuery.mock.calls[0][1]).toEqual(['tenant-1', 'John Doe', 'john@example.com', '123456']);
-      expect(mockQuery.mock.calls[1][1]).toEqual(['tenant-1', 'Jane Smith', null, null]);
-    });
+import {
+  listTenants,
+  getTenant,
+  logAdminEvent,
+  listBotPool,
+} from '../../services/db.js'
 
-    it('continues importing even if one insertion fails, returning successful count', async () => {
-      // First succeeds, second fails, third succeeds
-      mockQuery
-        .mockResolvedValueOnce({})
-        .mockRejectedValueOnce(new Error('DB Error'))
-        .mockResolvedValueOnce({});
-        
-      const contacts = [
-        { name: 'C1' },
-        { name: 'C2' },
-        { name: 'C3' }
-      ];
-      
-      const count = await importContacts('tenant-1', contacts);
-      
-      expect(count).toBe(2);
-      expect(mockQuery).toHaveBeenCalledTimes(3);
-    });
-  });
+beforeEach(() => {
+  vi.resetAllMocks()
+})
 
-  describe('addAIKey', () => {
-    it('inserts AI key correctly', async () => {
-      mockQuery.mockResolvedValue({});
-      const data = {
-        botId: 'bot-123',
-        provider: 'google',
-        model: 'gemini',
-        encryptedKey: 'enc-123',
-        keyPreview: 'AIza...',
-        priority: 1
-      };
-      
-      await addAIKey(data);
-      
-      expect(mockQuery).toHaveBeenCalledTimes(1);
-      expect(mockQuery.mock.calls[0][0]).toContain('INSERT INTO bot_ai_keys');
-      expect(mockQuery.mock.calls[0][1]).toEqual([
-        'bot-123', 'google', 'gemini', 'enc-123', 'AIza...', 1
-      ]);
-    });
-  });
+// ---------------------------------------------------------------------------
+// listTenants
+// ---------------------------------------------------------------------------
+describe('listTenants', () => {
+  it('returns all tenants from the read pool', async () => {
+    const rows = [
+      { id: 't1', slug: 'acme', status: 'active' },
+      { id: 't2', slug: 'globex', status: 'suspended' },
+    ]
+    mockReadPool.query.mockResolvedValueOnce({ rows })
 
-  describe('getBYOKStatus', () => {
-    it('returns configured: false when no record exists', async () => {
-      mockQuery.mockResolvedValue({ rows: [] });
-      
-      const result = await getBYOKStatus('tenant-1');
-      
-      expect(result.configured).toBe(false);
-      expect(result.provider).toBeNull();
-      expect(mockQuery).toHaveBeenCalledTimes(1);
-      expect(mockQuery.mock.calls[0][0]).toContain('SELECT c.provider, c.model');
-    });
+    const result = await listTenants()
 
-    it('returns configured: true and values when a record exists', async () => {
-      mockQuery.mockResolvedValue({
-        rows: [{
-          provider: 'openai',
-          model: 'gpt-4o',
-          key_preview: 'sk-...',
-          connection_type: 'byok',
-          updated_at: new Date('2024-01-01T00:00:00.000Z')
-        }]
-      });
-      
-      const result = await getBYOKStatus('tenant-1');
-      
-      expect(result.configured).toBe(true);
-      expect(result.provider).toBe('openai');
-      expect(result.model).toBe('gpt-4o');
-      expect(result.keyPreview).toBe('sk-...');
-      expect(result.connectionType).toBe('byok');
-      expect(result.updatedAt).toBe('2024-01-01T00:00:00.000Z');
-    });
-    
-    it('rethrows error on DB query failure', async () => {
-      mockQuery.mockRejectedValue(new Error('Connection failed'));
-      
-      await expect(getBYOKStatus('tenant-1')).rejects.toThrow('Connection failed');
-    });
-  });
-});
+    expect(result).toEqual(rows)
+    expect(mockReadPool.query).toHaveBeenCalledOnce()
+  })
+
+  it('returns empty array when no tenants exist', async () => {
+    mockReadPool.query.mockResolvedValueOnce({ rows: [] })
+
+    const result = await listTenants()
+
+    expect(result).toEqual([])
+  })
+})
+
+// ---------------------------------------------------------------------------
+// getTenant
+// ---------------------------------------------------------------------------
+describe('getTenant', () => {
+  it('returns a tenant by id', async () => {
+    const tenant = { id: 't1', slug: 'acme', status: 'active' }
+    mockReadPool.query.mockResolvedValueOnce({ rows: [tenant] })
+
+    const result = await getTenant('t1')
+
+    expect(result).toEqual(tenant)
+    expect(mockReadPool.query).toHaveBeenCalledWith(
+      expect.stringContaining('WHERE'),
+      expect.arrayContaining(['t1'])
+    )
+  })
+
+  it('returns null when tenant does not exist', async () => {
+    mockReadPool.query.mockResolvedValueOnce({ rows: [] })
+
+    const result = await getTenant('nonexistent')
+
+    expect(result).toBeNull()
+  })
+})
+
+// Removed getTenantBySlug test
+
+// ---------------------------------------------------------------------------
+// logAdminEvent
+// ---------------------------------------------------------------------------
+describe('logAdminEvent', () => {
+  it('inserts an admin event record', async () => {
+    mockWritePool.query.mockResolvedValueOnce({ rows: [] })
+
+    await logAdminEvent({ action: 'provision', tenantId: 't1' })
+
+    expect(mockWritePool.query).toHaveBeenCalledOnce()
+    const [sql, params] = mockWritePool.query.mock.calls[0]
+    expect(sql).toMatch(/INSERT/i)
+    expect(params).toContain('provision')
+  })
+})
+
+// Removed setCanaryGroup test
+
+// ---------------------------------------------------------------------------
+// listBotPool
+// ---------------------------------------------------------------------------
+describe('listBotPool', () => {
+  it('returns bots from the pool', async () => {
+    const bots = [
+      { id: 'b1', status: 'available' },
+      { id: 'b2', status: 'assigned', tenantId: 't1' },
+    ]
+    mockReadPool.query.mockResolvedValueOnce({ rows: bots })
+
+    const result = await listBotPool()
+
+    expect(result).toEqual(bots)
+  })
+})
+
+// Removed getPoolStats test

@@ -53,3 +53,43 @@ Command failures, exceptions, and unexpected behaviors.
 }
 - **Status:** Logged
 ---
+
+## [ERR-PROV-TG-1774166391600] ERROR - 2026-03-22T07:59:51.601Z
+- **Description:** Telegram Webhook failed: Bad webhook url
+- **Context:** {
+  "slug": "test-tenant",
+  "botToken": "********",
+  "description": "Bad webhook url"
+}
+- **Status:** Logged
+---
+
+## [ERR-PROV-TG-1774166419493] ERROR - 2026-03-22T08:00:19.493Z
+- **Description:** Telegram Webhook failed: Bad webhook url
+- **Context:** {
+  "slug": "test-tenant",
+  "botToken": "********",
+  "description": "Bad webhook url"
+}
+- **Status:** Logged
+---
+
+## [ERR-PROV-TG-1774166547837] ERROR - 2026-03-22T08:02:27.837Z
+- **Description:** Telegram Webhook failed: Bad webhook url
+- **Context:** {
+  "slug": "test-tenant",
+  "botToken": "********",
+  "description": "Bad webhook url"
+}
+- **Status:** Logged
+---
+
+## [ERR-PROV-TG-1774166701672] ERROR - 2026-03-22T08:05:01.672Z
+- **Description:** Telegram Webhook failed: Bad webhook url
+- **Context:** {
+  "slug": "test-tenant",
+  "botToken": "********",
+  "description": "Bad webhook url"
+}
+- **Status:** Logged
+---
