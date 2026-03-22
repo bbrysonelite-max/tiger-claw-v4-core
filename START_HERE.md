@@ -13,19 +13,17 @@
 ## 2. What We Accomplished Last Session
 1. **The Great Tool Salvage:** We completely refactored the 19 core intelligence tools (`api/src/tools/tiger_*.ts`) that were historically tied to OpenClaw. They now perfectly utilize a stateless `ToolContext` object and compile via `tsc` with precisely 0 errors.
 2. **Purged Legacy Constraints:** Ran a sanitization script dropping old foreign key obligations (`bot_ai_keys_bot_id_fkey`) directly from the PostgreSQL deployment, un-bricking the Telegram Provisioning flow.
-3. **Removed UI Friction:** We fixed the onboarding UI (`web-onboarding/`). Customers only need to provide ONE API key (their primary) or select the "Managed Free Brain" toggle. 
-4. **Restored 4-Layer Key Fallback:** The backend natively handles the fallback using the 4-layer system (`api/src/services/ai.ts`). The platform silently injects the Onboarding Key (Layer 1) or Emergency Key (Layer 4) if needed.
-5. **Deployed the MTProto Provisioner:** Using physical SIM sessions to mint fresh Telegram bots straight into the Postgres `bot_pool`.
+3. **Verified E2E Provisioning Webhook:** Successfully seeded a live dummy `john@agent.test` tenant into Postgres and executed the Next.js `/wizard/hatch` Cloud Run webhook. It correctly assigned `bot_pool` entries without failing constraints.
+4. **Architectural Locks & CI:** Addressed the Claude Code external audit. Removed hardcoded admin bypasses (`s3825`), solved `006`/`007` SQL migration sequence collisions, and installed a GitHub Actions CI pipeline (`.github/workflows/ci.yml`).
+5. **Restored 4-Layer Key Fallback:** The backend natively handles the fallback using the 4-layer system (`api/src/services/ai.ts`).
 
 ## 3. Your Immediate Directives
 You have two strict priorities to execute the exact second you boot up. Do not do anything else until these are finished:
 
-### [ ] Priority 1: End-to-End System Testing
-The platform is live and compiling perfectly. You must physically test the entire lifecycle:
-- Validate the webhook (`https://api.tigerclaw.io`).
-- Walk through the exact onboarding flow.
-- Verify that a fresh bot is correctly pulled from the `bot_pool` without tripping former DB constraints.
-- Verify the autonomous agent properly fires via stateless execution inside `ai.ts`.
+### [ ] Priority 1: Verify the Agent Runtime Spool-Up
+The `/wizard/hatch` webhook successfully fires the `provisionQueue`. You must verify that the `tenant-provisioning` BullMQ worker actually spins up the Gemini instance perfectly without crashing, and that the agent correctly responds on Telegram.
+### [ ] Priority 2: Finalize Next.js Stripe Linkage
+The `StepReviewPayment.tsx` component needs the final Stripe Checkout payment logic so that customers who buy via Stan Store or Stripe are securely validated.
 
 ## FINAL REMINDER
 Everything you need is in `ARCHITECTURE.md`, `specs/`, and `Rules.md`. Trust the GitHub spec, not your LLM memory. Now get to work on Priority 1.

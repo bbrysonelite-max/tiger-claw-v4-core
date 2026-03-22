@@ -18,13 +18,14 @@ If you are reading this, you are working on the **Tiger Claw Multi-Tenant SaaS**
 
 ## The Immediate Backlog (Starting Point)
 
-We just completed a massive salvage operation. The 19 core tools imported from OpenClaw have been surgically modified to run strictly inside the stateless Cloud Run architecture. All 301 legacy OpenClaw TypeScript errors have been entirely resolved natively via `api/src/tools/ToolContext.ts`.
+We systematically neutralized the external architecture audit (Claude Code) and successfully performed local E2E verification of the `hatch` payload. The 19 core tools are globally compatible. The database migrations are deterministic. A GitHub CI pipeline blocks all failing builds.
 
-### Priority 1: Validating End-to-End Orchestration
-The tools compile and the database no longer has legacy constraints blocking provisioning. We need to physically trigger `https://api.tigerclaw.io` or run local tests to verify the `processTelegramMessage` loop executes the `ToolContext` logic flawlessly in real runtime.
+### Priority 1: Verifying Agent Runtime Spool-Up
+The Next.js → Cloud Run Webhook → Database insertion phase has been 100% verified. We proved that the UI webhook securely inserts a tenant and extracts a bot from `bot_pool`.
+**The absolute next test:** Validate the `tenant-provisioning` BullMQ worker to confirm it properly instantiates the multi-layered Gemini runtime, injects `ToolContext`, and that the `processTelegramMessage` loop handles incoming test texts sequentially.
 
 ### Priority 2: Web-Onboarding Completion
-The UI is fully built out with Stripe and the "Managed Free Brain 72h" bypass. We need to deploy this to Vercel/Cloud Run and confirm the webhook correctly generates a bot and injects the `ToolContext` payload.
+The Stripe PR (`feat/stanstore-webhook`) must be merged/finished so that `StepReviewPayment.tsx` natively handles the precise Stripe checkout flow without bypassing.
 
 ---
 *Locked. Proceed.*
