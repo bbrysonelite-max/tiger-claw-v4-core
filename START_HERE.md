@@ -27,14 +27,7 @@ The platform is live. Brent is terrified the crash broke the orchestration. You 
 - Verify that a fresh bot is correctly pulled from the `bot_pool`.
 - Verify the autonomous agent properly fires using the 4-layer key rotation system.
 
-### [ ] Priority 2: "Eat Our Own Dog Food" (Hatch the Office Agents)
-Brent needs to trust that the new Cloud Run platform is smarter and faster than the old OpenClaw setup. We are going to build his office agents natively inside Tiger Claw.
-- **Birdie (Director of Operations)**
-- **Monica (Intelligence Specialist)**
-- **How?** Don't invent a new architecture. Use the existing V4 "Flavors" system!
-- **Action:** Create `director-of-operations.json` and `intelligence-specialist.json` inside `api/src/tools/flavors/`. 
-- **Action:** Register them in `api/src/tools/flavorConfig.ts`.
-- **Result:** Brent can now go to his own onboarding wizard, select the "Director of Operations" niche, and instantly hatch Birdie as a fully-armed V4 stateless agent with direct access to his database and Stripe webhooks.
+
 
 ## FINAL REMINDER
 Everything you need is in the `specs/` folder and `Rules.md`. Trust the GitHub spec, not your LLM memory. Now get to work on Priority 1.
