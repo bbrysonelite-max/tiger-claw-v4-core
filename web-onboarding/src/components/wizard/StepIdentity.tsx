@@ -107,7 +107,9 @@ export default function StepIdentity({ state, updateState, onNext }: IdentityPro
                                 type="text"
                                 value={localState.yourName}
                                 onChange={(e) => setLocalState({ ...localState, yourName: e.target.value })}
-                                className="w-full bg-black/40 border border-white/10 rounded-xl p-3 pl-10 text-sm focus:border-primary outline-none text-white"
+                                style={{ WebkitUserSelect: 'text', userSelect: 'text' }}
+                                tabIndex={1}
+                                className="w-full bg-black/40 border border-white/10 rounded-xl p-3 pl-10 text-sm focus:border-primary outline-none text-white select-text cursor-text"
                                 placeholder="e.g. Brent Bryson"
                             />
                         </div>
@@ -120,7 +122,9 @@ export default function StepIdentity({ state, updateState, onNext }: IdentityPro
                                 type="email"
                                 value={localState.email}
                                 onChange={(e) => setLocalState({ ...localState, email: e.target.value })}
-                                className="w-full bg-black/40 border border-white/10 rounded-xl p-3 pl-10 text-sm focus:border-primary outline-none text-white"
+                                style={{ WebkitUserSelect: 'text', userSelect: 'text' }}
+                                tabIndex={2}
+                                className="w-full bg-black/40 border border-white/10 rounded-xl p-3 pl-10 text-sm focus:border-primary outline-none text-white select-text cursor-text"
                                 placeholder="you@example.com"
                             />
                         </div>
@@ -137,7 +141,9 @@ export default function StepIdentity({ state, updateState, onNext }: IdentityPro
                             type="text"
                             value={localState.botName}
                             onChange={(e) => setLocalState({ ...localState, botName: e.target.value })}
-                            className="w-full bg-black/40 border border-white/10 rounded-xl p-3 pl-10 text-sm focus:border-primary outline-none text-white font-bold"
+                            style={{ WebkitUserSelect: 'text', userSelect: 'text' }}
+                            tabIndex={3}
+                            className="w-full bg-black/40 border border-white/10 rounded-xl p-3 pl-10 text-sm focus:border-primary outline-none text-white font-bold select-text cursor-text"
                             placeholder="e.g. Prospect Scout"
                         />
                     </div>
