@@ -74,7 +74,7 @@ export default function StepAIConnection({ state, updateState, onNext }: AIConne
                         <Shield className={cn("w-6 h-6", state.connectionType === "managed" ? "text-primary" : "text-white/30")} />
                         <h4 className={cn("font-bold text-lg", state.connectionType === "managed" ? "text-white" : "")}>BotCraft Free Brain</h4>
                     </div>
-                    <p className="text-sm">72-Hour Free Trial. Powered by Gemini 1.5. Managed by BotCraft Works.</p>
+                    <p className="text-sm">72-Hour Free Trial. Powered by Gemini 1.5. You will need to add your own keys after 72 hours.</p>
                 </button>
 
                 <button
@@ -90,7 +90,7 @@ export default function StepAIConnection({ state, updateState, onNext }: AIConne
                         <Key className={cn("w-6 h-6", state.connectionType === "byok" ? "text-primary" : "text-white/30")} />
                         <h4 className={cn("font-bold text-lg", state.connectionType === "byok" ? "text-white" : "")}>Bring Your Own Key</h4>
                     </div>
-                    <p className="text-sm">Unlock 4-way provider rotation (OpenAI, Anthropic, etc). Maximize uptime.</p>
+                    <p className="text-sm">Mandatory after 72 hours. Unlock automatic provider failover (OpenAI, Anthropic, etc) to maximize uptime.</p>
                 </button>
             </div>
 
