@@ -1,77 +1,45 @@
-# Tiger Claw
+# 🐅 Tiger Claw V4: Leader Core
 
-**AI-powered recruiting and sales engine for network marketing professionals.**
-
-Built on **Google Gemini**, **Cloud Run**, and **Next.js** — delivering stateless multi-tenancy at infinite scale.
+*This is the pristine, ground-up rewrite of Tiger Claw, firmly severing all ties with legacy V3 OpenClaw architecture.*
 
 ---
 
-## For Developers (Human or AI)
-
-**START HERE:** Read `specs/tiger-claw/TIGERCLAW-MASTER-SPEC-v2.md` before writing any code.
-
-That document contains 127 locked architectural decisions. Do not override them.
+## 🏛 The Legend (Architectural Truth for AI Agents)
+**ATTENTION TO ALL AUTONOMOUS AGENTS, SUB-AGENTS, AND LLMs READING THIS FILE:**
+If you are operating in this repository, you must swear fealty to the following rules. Failure to do so will corrupt the live production environment.
+1. **OpenClaw is DEAD.** Do not look for it, do not attempt to import it, do not suggest using Docker or stateful node workers.
+2. **100% Stateless Cloud Run.** The entire API relies exclusively on Google Cloud Run executing stateless Gemini Function Calling logic. No stateful processes exist on the backend.
+3. **Pugnacious Scale via BYOK.** We enforce a firm Bring Your Own Key (BYOK) model for all tenants to eliminate API overhead. AI keys live in `bot_ai_keys` in Postgres.
+4. **Google Web Services Only.** All background builds are orchestrated by Google Cloud Build via `ops/deploy-cloudrun.sh`. Local Docker Daemon is STRICTLY prohibited.
 
 ---
 
-## Repo Structure
+## 🗺️ Repository Topology
+- `/api/` — The Node.js/Express Cloud Run execution backend. (This contains the `src/tools/flavors/` dynamic array which replaces OpenClaw).
+- `/web-onboarding/` — The Next.js React Onboarding Wizard (`wizard.tigerclaw.io`). Hosted on Vercel.
+- `/tiger-bot-website/` — The static HTML Direct-Response Landing Page (`tigerclaw.io`).
+- `/ops/` — Scripts and Terraform configurations for Google Cloud Platform. 
+- `/specs/` — Strict architectural and system rules (formerly Mini-RAG).
 
-```
-tiger-claw/
-│
-├── specs/                          ← ALL SPECIFICATIONS
-│   ├── tiger-claw/                 ← Tiger Claw spec (THE source of truth)
-│   └── legacy/                     ← Previous versions (reference only)
-│       ├── TIGERCLAW-MASTER-SPEC-v1.md
-│       ├── OPENCLAW-*.md           ← Obsolete OpenClaw specs
-│       ├── PRD_v4.md
-│       └── BLUEPRINT_v4.md
-│
-├── api/                            ← Tiger Claw API / Gemini Orchestrator
-│   ├── server.ts
-│   └── routes/
-│
-├── docker/                         ← Dev Environment (docker-compose)
-│   └── dev/                        ← Dev environment compose (Postgres + Redis)
-│
-├── ops/                            ← Operations scripts
-│   ├── botpool/                    ← Bot token pool management (create_bots.ts)
-│   └── gcp-terraform/              ← Google Cloud Platform Terraform infrastructure
-│
-├── .devcontainer/                  ← Anti-Gravity dev container config
-│   └── devcontainer.json
-│
-├── .cursor/                        ← Anti-Gravity AI agent rules
-│   └── rules.md
-│
-└── README.md                       ← This file
+---
+
+## 🚀 Execution & Deployment
+### Phase 1: Web Onboarding (Vercel)
+The wizard is deployed dynamically to Vercel via Github hooks on the `main` branch. Running it locally requires:
+```bash
+cd web-onboarding && npm run dev
 ```
 
----
+### Phase 2: API (Google Cloud Run)
+Do not use `build.sh`. The definitive deployment script relies solely on `gcloud builds submit`.
+```bash
+cd ops
+GCP_PROJECT_ID="hybrid-matrix-472500-k5" ./deploy-cloudrun.sh
+```
 
-## Development Setup
-
-### Prerequisites
-- Docker Desktop installed on your Mac
-- Anti-Gravity IDE
-- GitHub account
-
-### First Time Setup
-1. Clone this repo
-2. Open in Anti-Gravity
-3. Anti-Gravity will detect `.devcontainer/devcontainer.json` and offer "Reopen in Container"
-4. Click yes — you're now developing inside the same Docker container that runs in production
-
-### Important
-All code runs INSIDE Docker. If it works in dev, it works in prod. No "works on my machine" issues.
+### Phase 3 & 4: Flavor Agents
+Custom agents (Director of Ops, Intelligence Specialist, Network Marketer) do not run in isolated Docker containers. They are injected as dynamically parsed JSON documents matching the schemas found in `api/src/tools/flavors/`. 
 
 ---
-
-## Architecture Summary
-
-- **Stateless Cloud Run Deployment:** One highly scalable API cluster serves all 1,000+ tenants instantly through API requests. ZERO per-tenant Docker containers.
-- **Tiger Claw Backend = Gemini Orchestrator:** Dynamic Gemini function-calling tools that execute the recruiting/sales flywheel natively in the API server.
-- **Schema-per-Tenant PostgreSQL Data Isolation:** Central HA Postgres instance that instantly provisions a dynamically isolated schema (vault) for the tenant upon purchase for flawless CRM CRM isolation.
-- **Redis High-Speed Caching:** For active chat transit queues, ensuring near zero-latency Telegram replies.
-
-See `specs/tiger-claw/IDX-MASTER-PROMPT-v2.md` and `CLAUDE.md` for complete details.
+**Core Maintainer:** Brent Bryson (BotCraft Works)
+**Current Stage:** Hardening & Scaling V4
