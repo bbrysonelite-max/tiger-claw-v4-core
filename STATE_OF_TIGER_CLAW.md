@@ -14,6 +14,27 @@ If you are reading this, you are working on the **Tiger Claw Multi-Tenant SaaS**
 4. **NO REWRITES:** Any agent that attempts to rewrite the architecture or reintroduce generic context objects because it thinks the code is "broken" will immediately fail. The 19 core tools compile flawlessly and are backed by a robust test suite.
 5. **PROTOCOL:** Read `ARCHITECTURE.md` before making any assumptions or answering any prompt. Any deviation from this exact structure is a failure.
 
+## 🛑 GIT PROTOCOL — NON-NEGOTIABLE 🛑
+
+- NEVER push directly to main. main is branch-protected and your push will be rejected.
+- ALL work goes on a feature branch.
+- Branch naming: feat/description, fix/description, chore/description
+- When work is complete and tests pass: open a PR against main.
+- Do NOT merge the PR. Brent reviews and merges.
+- PR title must be clear and descriptive — Brent reads these on his phone.
+- PR body must include: what changed, why, and what tests cover it.
+
+**Branch creation:**
+```bash
+git checkout -b feat/your-description
+git push origin feat/your-description
+```
+
+**Opening a PR (use GitHub CLI):**
+```bash
+gh pr create --title "feat: your description" --body "What changed and why"
+```
+
 ---
 
 ## What We Just Accomplished
