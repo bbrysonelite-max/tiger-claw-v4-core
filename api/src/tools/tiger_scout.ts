@@ -1027,19 +1027,20 @@ async function runHunt(
   // Pre-fetch ICP bias signal
   const icpSignal = await getHiveSignalWithFallback('ideal_customer_profile', flavor, region).catch(() => null);
 
-  // Load ICP
+  // Load ICP — fall back to flavor defaults if onboarding not yet complete
+  // (admin-provisioned tenants may not have completed the Telegram interview)
   const onboardState = await loadOnboardState(tenantId);
-  if (!onboardState || onboardState.phase !== "complete") {
-    throw new Error("Onboarding not complete. Complete the onboarding interview before running discovery.");
-  }
+  const hasCompleteOnboard = onboardState && onboardState.phase === "complete";
 
   // Extract keywords from appropriate ICP(s)
-  const builderKeywords = flavor === "network-marketer"
-    ? extractICPKeywords(onboardState.icpBuilder)
+  const builderKeywords = (hasCompleteOnboard && flavor === "network-marketer")
+    ? extractICPKeywords(onboardState!.icpBuilder)
     : { positive: [], negative: [] };
-  const customerKeywords = flavor !== "network-marketer"
-    ? extractICPKeywords(onboardState.icpSingle)
-    : extractICPKeywords(onboardState.icpCustomer);
+  const customerKeywords = hasCompleteOnboard
+    ? (flavor !== "network-marketer"
+        ? extractICPKeywords(onboardState!.icpSingle)
+        : extractICPKeywords(onboardState!.icpCustomer))
+    : { positive: [], negative: [] };
 
   // Merge keywords (for search query — we search broadly and score precisely)
   const allPositive = [...new Set([...builderKeywords.positive, ...customerKeywords.positive])];
