@@ -454,7 +454,7 @@ export async function processSystemRoutine(tenantId: string, routineType: string
         // (from the previous run's tool responses), which Gemini rejects.
         const genAI = new GoogleGenerativeAI(googleKey);
         const model = genAI.getGenerativeModel({
-            model: 'gemini-2.5-flash',
+            model: 'gemini-2.0-flash',
             systemInstruction: buildSystemPrompt(tenant),
             tools: geminiTools as any,
         });
@@ -558,7 +558,7 @@ export async function processLINEMessage(
         const history = await getChatHistory(tenantId, chatId);
         const genAI = new GoogleGenerativeAI(googleKey);
         const model = genAI.getGenerativeModel({
-            model: 'gemini-2.5-flash',
+            model: 'gemini-2.0-flash',
             systemInstruction: buildSystemPrompt(tenant),
             tools: geminiTools as any,
         });

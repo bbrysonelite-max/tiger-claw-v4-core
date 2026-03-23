@@ -165,7 +165,7 @@ router.post("/stripe", async (req: Request, res: Response) => {
           botId,
           connectionType: "byok",
           provider: meta["aiProvider"] ?? "google",
-          model: meta["aiModel"] ?? "gemini-2.5-flash",
+          model: meta["aiModel"] ?? "gemini-2.0-flash",
           encryptedKey: undefined,
           keyPreview: undefined,
         });

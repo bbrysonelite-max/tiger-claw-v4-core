@@ -104,7 +104,7 @@ router.post("/checkout", async (req: Request, res: Response) => {
                 botName: botName ?? name,
                 connectionType: "byok",         // LOCKED — never accept from client
                 aiProvider: aiProvider ?? "google",
-                aiModel: aiModel ?? "gemini-2.5-flash",
+                aiModel: aiModel ?? "gemini-2.0-flash",
                 // Pass only the botId — key was already encrypted and stored
                 // in Step 3 via POST /wizard/validate-key (GAP 7).
                 // Raw API key is NEVER passed through Stripe metadata.
