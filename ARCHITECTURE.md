@@ -9,7 +9,7 @@ The entire platform operates as a shared-nothing Node.js Google Cloud Run API (`
 - **Compute:** Google Cloud Run (Node.js/Express)
 - **Database:** Google Cloud SQL (PostgreSQL HA) - `tiger_claw_shared` 
 - **Caching & Queues:** Google Cloud Redis HA (BullMQ orchestrating background tasks)
-- **AI Provider:** Google Gemini 2.5 Flash (`@google/generative-ai`) natively. No third-party SDKs.
+- **AI Provider:** Google Gemini 2.0 Flash (`@google/generative-ai`) natively. No third-party SDKs.
 - **Frontend:** Next.js React Web Wizard (`web-onboarding/` and `tiger-bot-website/`)
 
 ## 3. Core Intelligence (The "Brain")

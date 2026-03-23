@@ -3,6 +3,9 @@ description: How to ship a Tiger Claw feature securely and autonomously without 
 ---
 
 # Ship Feature Workflow
+**Local Context:** `/Users/brentbryson/Tigerclaw-Anti_Gravity/tiger-claw/`
+**Target Remote:** `https://github.com/bbrysonelite-max/tiger-claw-v4-core`
+
 This workflow guarantees that code is tested, merged, and automatically deployed without ever touching `main` locally.
 
 1. Ensure you are on your `feat/*` or `fix/*` branch and all code is committed.
