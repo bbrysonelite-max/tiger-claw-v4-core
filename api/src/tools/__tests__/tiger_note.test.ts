@@ -9,7 +9,7 @@ const mockSaveLeads = vi.fn(async (tenantId, leads) => {
 
 vi.mock('../../services/tenant_data.js', () => ({
   getLeads: vi.fn(async () => mockLeads),
-  saveLeads: (...args: any[]) => mockSaveLeads(...args),
+  saveLeads: (tenantId: string, leads: any) => mockSaveLeads(tenantId, leads),
   getTenantState: vi.fn(async () => ({ language: 'en' })),
 }))
 
