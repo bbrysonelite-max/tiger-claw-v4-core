@@ -13,7 +13,7 @@ router.post("/validate", async (req: Request, res: Response) => {
         if (provider === "google") {
             const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`);
             if (resp.ok) {
-                return res.json({ valid: true, model: "gemini-2.5-flash" });
+                return res.json({ valid: true, model: "gemini-2.0-flash" });
             } else if (resp.status === 400 || resp.status === 403) {
                 return res.json({ valid: false, reason: "invalid_api_key" });
             } else if (resp.status === 429) {

@@ -862,7 +862,7 @@ export async function getBYOKStatus(tenantId: string) {
     const result = await getPool().query(
       `SELECT c.provider, c.model, c.key_preview, c.connection_type, c.updated_at
        FROM bot_ai_config c
-       JOIN bots b ON b.id = c.bot_id
+       JOIN bots b ON b.id = c.tenant_id
        JOIN users u ON u.id = b.user_id
        WHERE u.email = (SELECT email FROM tenants WHERE id = $1)
        ORDER BY c.updated_at DESC
