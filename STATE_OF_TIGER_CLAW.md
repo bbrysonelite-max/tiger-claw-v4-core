@@ -34,9 +34,7 @@ gh pr merge --auto --squash   # fires immediately when CI passes — no human ne
 ```
 
 **After any merge to main — deploy to Cloud Run:**
-```bash
-GCP_PROJECT_ID=hybrid-matrix-472500-k5 bash ops/deploy-cloudrun.sh
-```
+**Agent constraint:** NEVER checkout the main branch locally. All deployments are handled exclusively by GitHub Actions upon PR merge. The human operator must set GCP_CREDENTIALS in GitHub Secrets for this to work. Do not run ops/deploy-cloudrun.sh locally.
 
 ---
 
@@ -71,7 +69,7 @@ Each canary must message their Telegram bot and complete the onboarding intervie
 
 3. **Wizard Flow** — "Launch My Agent" on tigerclaw.io hits `/wizard/auth` which requires an existing Stan Store purchase. New users are blocked before they can try the 72-hour free trial. Deprioritized per Brent — address after canary situation is resolved.
 
-4. **No Auto-Deploy in CI** — GitHub Actions runs tests only. Cloud Run deploy is manual (`ops/deploy-cloudrun.sh`). This means code changes don't ship until someone runs the deploy script.
+4. **Auto-Deploy in CI** — GitHub Actions runs tests and automatically deploys to Cloud Run upon merge to main. Agents are strictly forbidden from checking out `main` to deploy manually.
 
 5. **Facebook/LINE/WhatsApp** — All stubbed. Not functional.
 
