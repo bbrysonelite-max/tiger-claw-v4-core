@@ -27,10 +27,10 @@ This is the canonical architecture. It has been approved and locked. Do not chan
 
 | Component | Decision | LOCKED |
 |-----------|----------|--------|
-| AI Provider | **Google Gemini (`gemini-2.5-flash`)** via `@google/generative-ai` | ✅ |
+| AI Provider | **Google Gemini (`gemini-2.0-flash`)** via `@google/generative-ai` | ✅ |
 | Multi-tenancy | **Stateless** — one API process, all tenants, context resolved per-request | ✅ |
 | Infrastructure | **Cloud Run** (not GKE, not Docker Compose, not Kubernetes) | ✅ |
-| Tenant data | **Per-tenant `workdir`** (SQLite or files) — NOT shared PostgreSQL | ✅ |
+| Tenant data | **PostgreSQL Tenant Schemas** (`t_uuid` isolation) — NOT SQLite or containers | ✅ |
 | Platform data | **Shared PostgreSQL** (Cloud SQL) — tenants, bots, subscriptions, pool | ✅ |
 | Job queuing | **BullMQ + Redis** (Memorystore) | ✅ |
 | Tools | **19 Gemini function-calling tools** in `api/src/tools/` | ✅ |
@@ -77,7 +77,8 @@ by the v4 stateless Gemini architecture. References to it exist only in:
 
 - Do NOT install `@anthropic-ai/sdk` — the AI engine is Google Gemini
 - Do NOT create per-tenant Docker containers or Kubernetes deployments
-- Do NOT put tenant prospect/lead data in PostgreSQL — use per-tenant `workdir`
+- Do NOT use SQLite or per-tenant workdirs — all data is in Postgres under `t_uuid` schemas
+- Do NOT checkout `main` locally or attempt manual deploys. Deploys are handled automatically by GitHub Actions on PR merge.
 - Do NOT use a single shared API key — 4-layer key system always
 - Do NOT restore OpenClaw or reference `specs/openclaw/` as active guidance
 - Do NOT use BullMQ alternatives — BullMQ + Redis is the locked queue system
