@@ -27,8 +27,7 @@ export default function StepReviewPayment({ state, isDeploying, setIsDeploying, 
 
     useEffect(() => {
         if (trialExpired && slug && !hasSuccess) {
-            const apiUrl = "https://api.tigerclaw.io";
-            fetch(`${apiUrl}/subscriptions/trial-checkout?slug=${slug}`)
+            fetch(`${API_BASE}/subscriptions/trial-checkout?slug=${slug}`)
                 .then(res => res.json())
                 .then(data => {
                     if (data.url) setStanStoreUrl(data.url);
@@ -47,12 +46,9 @@ export default function StepReviewPayment({ state, isDeploying, setIsDeploying, 
         setIsDeploying(true);
 
         try {
-            const apiUrl = "https://api.tigerclaw.io";
-            const base = apiUrl.endsWith('/') ? apiUrl.slice(0, -1) : apiUrl;
-
             // 1. Validate & Store AI Keys (ONLY if BYOK)
             if (state.connectionType === "byok" && state.aiKeys.length > 0) {
-                const keyResponse = await fetch(`${base}/wizard/validate-key`, {
+                const keyResponse = await fetch(`${API_BASE}/wizard/validate-key`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
@@ -73,7 +69,7 @@ export default function StepReviewPayment({ state, isDeploying, setIsDeploying, 
             }
 
             // 2. Transmit final wizard settings & Hatch Target
-            const hatchResponse = await fetch(`${base}/wizard/hatch`, {
+            const hatchResponse = await fetch(`${API_BASE}/wizard/hatch`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
