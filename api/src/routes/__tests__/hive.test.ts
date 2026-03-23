@@ -3,10 +3,8 @@ import request from 'supertest'
 import express from 'express'
 
 const mockDb = vi.hoisted(() => ({
-  getTenant: vi.fn(),
-  getHiveData: vi.fn(),
-  setHiveData: vi.fn(),
-  listTenants: vi.fn(),
+  queryHivePatterns: vi.fn(),
+  insertHivePattern: vi.fn(),
 }))
 
 vi.mock('../../services/db.js', () => mockDb)
@@ -21,78 +19,76 @@ async function buildApp() {
 
 beforeEach(() => {
   vi.resetAllMocks()
+  process.env['TIGER_CLAW_HIVE_TOKEN'] = 'test-hive-token'
 })
 
 // ---------------------------------------------------------------------------
-// GET /hive/:key
+// GET /hive/patterns
 // ---------------------------------------------------------------------------
-describe('GET /hive/:key', () => {
-  it('returns hive value for a known key', async () => {
+describe('GET /hive/patterns', () => {
+  it('returns patterns matching query', async () => {
     const app = await buildApp()
-    mockDb.getHiveData.mockResolvedValue({ value: 'shared-data', updatedAt: '2026-01-01' })
+    mockDb.queryHivePatterns.mockResolvedValue([
+      { id: 1, flavor: 'test', region: 'us', category: 'objection', observation: 'They said no', dataPoints: 1, confidence: 50, submittedAt: new Date() }
+    ])
 
-    const res = await request(app).get('/hive/shared-config')
+    const res = await request(app)
+      .get('/hive/patterns?flavor=test')
+      .set('x-hive-token', 'test-hive-token')
 
     expect(res.status).toBe(200)
-    expect(res.body.value).toBe('shared-data')
+    expect(res.body.count).toBe(1)
+    expect(res.body.patterns[0].observation).toBe('They said no')
   })
 
-  it('returns 404 for an unknown hive key', async () => {
+  it('returns 400 if flavor is missing', async () => {
     const app = await buildApp()
-    mockDb.getHiveData.mockResolvedValue(null)
 
-    const res = await request(app).get('/hive/nonexistent-key')
+    const res = await request(app)
+      .get('/hive/patterns')
+      .set('x-hive-token', 'test-hive-token')
 
-    expect(res.status).toBe(404)
-  })
-
-  it('returns 500 when db throws', async () => {
-    const app = await buildApp()
-    mockDb.getHiveData.mockRejectedValue(new Error('DB error'))
-
-    const res = await request(app).get('/hive/some-key')
-
-    expect(res.status).toBe(500)
+    expect(res.status).toBe(400)
   })
 })
 
 // ---------------------------------------------------------------------------
-// POST /hive/:key
+// POST /hive/patterns
 // ---------------------------------------------------------------------------
-describe('POST /hive/:key', () => {
-  it('stores a value under a hive key', async () => {
+describe('POST /hive/patterns', () => {
+  it('stores a pattern', async () => {
     const app = await buildApp()
-    mockDb.setHiveData.mockResolvedValue(undefined)
+    mockDb.insertHivePattern.mockResolvedValue({ id: 123, submittedAt: new Date() })
 
     const res = await request(app)
-      .post('/hive/shared-config')
-      .send({ value: 'new-shared-value', tenantId: 't1' })
+      .post('/hive/patterns')
+      .set('x-hive-token', 'test-hive-token')
+      .send({ flavor: 'test', region: 'us', category: 'objection', observation: 'They said perhaps' })
 
-    expect(res.status).toBe(200)
-    expect(mockDb.setHiveData).toHaveBeenCalledWith(
-      'shared-config',
-      expect.objectContaining({ value: 'new-shared-value' })
-    )
+    expect(res.status).toBe(201)
+    expect(res.body.id).toBe(123)
   })
 
-  it('returns 400 when value is missing from body', async () => {
+  it('returns 400 when missing fields', async () => {
     const app = await buildApp()
 
     const res = await request(app)
-      .post('/hive/shared-config')
-      .send({ tenantId: 't1' }) // no value
+      .post('/hive/patterns')
+      .set('x-hive-token', 'test-hive-token')
+      .send({ flavor: 'test' }) // missing others
 
     expect(res.status).toBe(400)
   })
 
-  it('returns 500 when db write fails', async () => {
+  it('rejects PII with 422', async () => {
     const app = await buildApp()
-    mockDb.setHiveData.mockRejectedValue(new Error('Write failed'))
 
     const res = await request(app)
-      .post('/hive/shared-config')
-      .send({ value: 'data', tenantId: 't1' })
+      .post('/hive/patterns')
+      .set('x-hive-token', 'test-hive-token')
+      .send({ flavor: 'test', region: 'us', category: 'obj', observation: 'Call John Doe at 555-123-4567' })
 
-    expect(res.status).toBe(500)
+    expect(res.status).toBe(422)
+    expect(res.body.piiDetected).toContain('phone number')
   })
 })

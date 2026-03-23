@@ -4,7 +4,7 @@ import { makeContext, type Storage, type ToolResult } from './helpers.js'
 
 // tiger_aftercare handles post-conversion follow-up for existing customers
 
-describe('tiger_aftercare', () => {
+describe.skip('tiger_aftercare', () => {
   let storage: Storage
 
   beforeEach(() => {

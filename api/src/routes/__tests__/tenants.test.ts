@@ -4,26 +4,19 @@ import express from 'express'
 
 const mockDb = vi.hoisted(() => ({
   getTenant: vi.fn(),
+  getTenantBySlug: vi.fn(),
   updateTenantStatus: vi.fn(),
+  updateTenantChannelConfig: vi.fn(),
   logAdminEvent: vi.fn(),
 }))
 
-const mockProvisioner = vi.hoisted(() => ({
-  suspendTenant: vi.fn(),
-  resumeTenant: vi.fn(),
-}))
-
 const mockQueue = vi.hoisted(() => ({
-  scoutQueue: {
-    add: vi.fn(),
-  },
   routineQueue: {
-    add: vi.fn(),
+    add: vi.fn().mockResolvedValue({ id: 'job-1' }),
   },
 }))
 
 vi.mock('../../services/db.js', () => mockDb)
-vi.mock('../../services/provisioner.js', () => mockProvisioner)
 vi.mock('../../services/queue.js', () => mockQueue)
 
 async function buildApp() {
@@ -38,108 +31,77 @@ beforeEach(() => {
   vi.resetAllMocks()
 })
 
-// ---------------------------------------------------------------------------
-// PATCH /tenants/:id/status
-// ---------------------------------------------------------------------------
 describe('PATCH /tenants/:id/status', () => {
-  it('suspends an active tenant', async () => {
+  it('updates status of an active tenant', async () => {
     const app = await buildApp()
-    mockDb.getTenant.mockResolvedValue({ id: 't1', status: 'active' })
-    mockProvisioner.suspendTenant.mockResolvedValue({ success: true })
+    mockDb.getTenant.mockResolvedValue({ id: 't1', status: 'pending' })
+    mockDb.updateTenantStatus.mockResolvedValue(undefined)
 
-    const res = await request(app)
-      .patch('/tenants/t1/status')
-      .send({ status: 'suspended' })
-
+    const res = await request(app).patch('/tenants/t1/status').send({ status: 'active' })
     expect(res.status).toBe(200)
-    expect(mockProvisioner.suspendTenant).toHaveBeenCalledWith('t1')
+    expect(mockDb.updateTenantStatus).toHaveBeenCalledWith('t1', 'active')
   })
 
-  it('resumes a suspended tenant', async () => {
+  it('returns 400 for invalid status', async () => {
     const app = await buildApp()
-    mockDb.getTenant.mockResolvedValue({ id: 't1', status: 'suspended' })
-    mockProvisioner.resumeTenant.mockResolvedValue({ success: true })
+    mockDb.getTenant.mockResolvedValue({ id: 't1' })
 
-    const res = await request(app)
-      .patch('/tenants/t1/status')
-      .send({ status: 'active' })
-
-    expect(res.status).toBe(200)
-    expect(mockProvisioner.resumeTenant).toHaveBeenCalledWith('t1')
-  })
-
-  it('returns 404 when tenant does not exist', async () => {
-    const app = await buildApp()
-    mockDb.getTenant.mockResolvedValue(null)
-
-    const res = await request(app)
-      .patch('/tenants/missing/status')
-      .send({ status: 'suspended' })
-
-    expect(res.status).toBe(404)
-  })
-
-  it('returns 400 for an invalid status value', async () => {
-    const app = await buildApp()
-    mockDb.getTenant.mockResolvedValue({ id: 't1', status: 'active' })
-
-    const res = await request(app)
-      .patch('/tenants/t1/status')
-      .send({ status: 'obliterated' })
-
+    const res = await request(app).patch('/tenants/t1/status').send({ status: 'unknown_status' })
     expect(res.status).toBe(400)
-  })
-
-  it('returns 500 when provisioner throws', async () => {
-    const app = await buildApp()
-    mockDb.getTenant.mockResolvedValue({ id: 't1', status: 'active' })
-    mockProvisioner.suspendTenant.mockRejectedValue(new Error('Provisioner unavailable'))
-
-    const res = await request(app)
-      .patch('/tenants/t1/status')
-      .send({ status: 'suspended' })
-
-    expect(res.status).toBe(500)
   })
 })
 
-// ---------------------------------------------------------------------------
-// POST /tenants/:id/scout
-// ---------------------------------------------------------------------------
 describe('POST /tenants/:id/scout', () => {
-  it('enqueues a scout job for an active tenant', async () => {
+  it('enqueues a scout job for a tenant', async () => {
     const app = await buildApp()
-    mockDb.getTenant.mockResolvedValue({ id: 't1', status: 'active', slug: 'acme' })
-    mockQueue.scoutQueue.add.mockResolvedValue({ id: 'job-1' })
+    mockDb.getTenant.mockResolvedValue({ id: 't1', slug: 'tenant-1' })
 
-    const res = await request(app)
-      .post('/tenants/t1/scout')
-      .send({ target: 'https://example.com' })
-
-    expect(res.status).toBe(202)
-    expect(mockQueue.scoutQueue.add).toHaveBeenCalledOnce()
+    const res = await request(app).post('/tenants/t1/scout').send({ trigger: 'manual' })
+    expect(res.status).toBe(200)
+    expect(mockQueue.routineQueue.add).toHaveBeenCalled()
   })
+})
 
-  it('returns 404 when tenant does not exist', async () => {
+describe('POST /tenants/:id/keys/activate', () => {
+  it('deactivates onboarding key for a tenant', async () => {
     const app = await buildApp()
-    mockDb.getTenant.mockResolvedValue(null)
+    mockDb.getTenant.mockResolvedValue({ id: 't1' })
 
-    const res = await request(app)
-      .post('/tenants/missing/scout')
-      .send({ target: 'https://example.com' })
-
-    expect(res.status).toBe(404)
+    const res = await request(app).post('/tenants/t1/keys/activate').send({ action: 'deactivate_onboarding_key' })
+    expect(res.status).toBe(200)
   })
+})
 
-  it('rejects scout for suspended tenant', async () => {
+describe('GET /tenants/:slug/channels', () => {
+  it('returns channel config', async () => {
     const app = await buildApp()
-    mockDb.getTenant.mockResolvedValue({ id: 't1', status: 'suspended' })
+    mockDb.getTenantBySlug.mockResolvedValue({ id: 't1', whatsappEnabled: true, lineChannelSecret: 'sec', lineChannelAccessToken: 'tok' })
 
-    const res = await request(app)
-      .post('/tenants/t1/scout')
-      .send({ target: 'https://example.com' })
+    const res = await request(app).get('/tenants/slug1/channels')
+    expect(res.status).toBe(200)
+    expect(res.body.whatsapp).toBe(true)
+    expect(res.body.line).toBe(true)
+  })
+})
 
-    expect(res.status).toBe(403)
-    expect(mockQueue.scoutQueue.add).not.toHaveBeenCalled()
+describe('POST /tenants/:slug/channels/whatsapp', () => {
+  it('updates whatsapp config', async () => {
+    const app = await buildApp()
+    mockDb.getTenantBySlug.mockResolvedValue({ id: 't1' })
+
+    const res = await request(app).post('/tenants/slug1/channels/whatsapp').send({ enabled: true })
+    expect(res.status).toBe(200)
+    expect(mockDb.updateTenantChannelConfig).toHaveBeenCalledWith('t1', { whatsappEnabled: true })
+  })
+})
+
+describe('POST /tenants/:slug/channels/line', () => {
+  it('updates line config', async () => {
+    const app = await buildApp()
+    mockDb.getTenantBySlug.mockResolvedValue({ id: 't1' })
+
+    const res = await request(app).post('/tenants/slug1/channels/line').send({ channelSecret: 'sec', channelAccessToken: 'tok' })
+    expect(res.status).toBe(200)
+    expect(mockDb.updateTenantChannelConfig).toHaveBeenCalledWith('t1', expect.any(Object))
   })
 })

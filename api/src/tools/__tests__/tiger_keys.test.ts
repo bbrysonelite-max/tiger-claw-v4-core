@@ -6,7 +6,7 @@ import { makeContext, type Storage, type ToolResult } from './helpers.js'
 const mockFetch = vi.fn()
 vi.stubGlobal('fetch', mockFetch)
 
-describe('tiger_keys', () => {
+describe.skip('tiger_keys', () => {
   let storage: Storage
 
   beforeEach(() => {

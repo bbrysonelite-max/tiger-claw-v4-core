@@ -13,8 +13,8 @@ describe('encryptToken / decryptToken', () => {
       delete process.env['ENCRYPTION_KEY'];
     });
 
-    it('encryptToken returns plaintext unchanged (dev passthrough)', () => {
-      expect(encryptToken(PLAINTEXT)).toBe(PLAINTEXT);
+    it('encryptToken throws an error', () => {
+      expect(() => encryptToken(PLAINTEXT)).toThrow('[FATAL] ENCRYPTION_KEY is required but not set in the environment.');
     });
 
     it('decryptToken returns non-enc: strings unchanged (plaintext passthrough)', () => {
@@ -72,7 +72,7 @@ describe('encryptToken / decryptToken', () => {
     it('decryptToken throws when ENCRYPTION_KEY is not set but token is encrypted', () => {
       const encrypted = encryptToken(PLAINTEXT);
       delete process.env['ENCRYPTION_KEY'];
-      expect(() => decryptToken(encrypted)).toThrow('ENCRYPTION_KEY not set but token is encrypted');
+      expect(() => decryptToken(encrypted)).toThrow('[FATAL] ENCRYPTION_KEY is required but not set in the environment.');
     });
   });
 

@@ -33,6 +33,7 @@ vi.mock('../db.js', () => ({
   assignBotToken: mockAssignBotToken,
   getBotState: mockGetBotState,
   getPool: vi.fn(() => ({ query: mockGetPoolQuery })),
+  checkAndGrantFoundingMember: vi.fn().mockResolvedValue(true),
 }));
 
 vi.mock('../pool.js', () => ({
@@ -108,14 +109,17 @@ describe('provisionTenant', () => {
     vi.stubGlobal('fetch', mockFetch);
   });
 
-  it('returns error when slug is already in use', async () => {
+  it('updates existing tenant when slug is already in use (Stan Store presale)', async () => {
     mockGetTenantBySlug.mockResolvedValue(MOCK_TENANT);
 
     const result = await provisionTenant(BASE_INPUT);
 
-    expect(result.success).toBe(false);
-    expect(result.error).toContain("already in use");
-    expect(result.error).toContain(BASE_INPUT.slug);
+    expect(result.success).toBe(true);
+    expect(mockGetPoolQuery).toHaveBeenCalledWith(
+      expect.stringContaining('UPDATE tenants SET'),
+      expect.arrayContaining([BASE_INPUT.flavor, BASE_INPUT.region, BASE_INPUT.language, BASE_INPUT.preferredChannel])
+    );
+    expect(result.steps.some(s => s.includes('Found pre-existing tenant record'))).toBe(true);
   });
 
   it('waitlists tenant when bot pool is empty (success=true, waitlisted=true)', async () => {
@@ -146,7 +150,7 @@ describe('provisionTenant', () => {
     const result = await provisionTenant({ ...BASE_INPUT, botToken: 'direct-token' });
 
     expect(result.success).toBe(true);
-    expect(mockFetch).toHaveBeenCalledWith(expect.stringContaining('setWebhook'));
+    expect(mockFetch).toHaveBeenCalledWith(expect.stringContaining('setWebhook'), expect.anything());
     expect(mockUpdateTenantStatus).toHaveBeenCalledWith(MOCK_TENANT.id, 'onboarding');
     expect(result.steps.some((s) => s.includes('onboarding'))).toBe(true);
     expect(mockLogAdminEvent).toHaveBeenCalledWith('provision', MOCK_TENANT.id, expect.any(Object));
@@ -243,7 +247,7 @@ describe('resumeTenant', () => {
   it('re-registers Telegram webhook on resume', async () => {
     await resumeTenant(MOCK_TENANT as any);
 
-    expect(mockFetch).toHaveBeenCalledWith(expect.stringContaining('setWebhook'));
+    expect(mockFetch).toHaveBeenCalledWith(expect.stringContaining('setWebhook'), expect.anything());
   });
 
   it('restores to onboarding when onboarding phase is not complete', async () => {

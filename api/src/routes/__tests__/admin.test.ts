@@ -13,6 +13,8 @@ const mockDb = vi.hoisted(() => ({
   setCanaryGroup: vi.fn(),
   listTenants: vi.fn(),
   getTenant: vi.fn(),
+  getTenantBySlug: vi.fn(),
+  getPool: vi.fn(),
 }))
 
 const mockProvisioner = vi.hoisted(() => ({
@@ -26,6 +28,8 @@ const mockProvisioner = vi.hoisted(() => ({
 vi.mock('../../services/db.js', () => mockDb)
 vi.mock('../../services/provisioner.js', () => mockProvisioner)
 
+const VALID_TOKEN = 'test-admin-token'
+
 // ---------------------------------------------------------------------------
 // Build a minimal Express app with the admin router
 // ---------------------------------------------------------------------------
@@ -36,8 +40,6 @@ async function buildApp() {
   app.use('/admin', adminRouter)
   return app
 }
-
-const VALID_TOKEN = 'test-admin-token'
 
 beforeEach(() => {
   vi.resetAllMocks()
@@ -80,8 +82,8 @@ describe('GET /admin/fleet', () => {
   it('returns list of tenants', async () => {
     const app = await buildApp()
     const tenants = [
-      { id: 't1', slug: 'acme', status: 'active' },
-      { id: 't2', slug: 'globex', status: 'suspended' },
+      { id: 't1', slug: 'acme', status: 'active', createdAt: new Date() },
+      { id: 't2', slug: 'globex', status: 'suspended', createdAt: new Date() },
     ]
     mockDb.listTenants.mockResolvedValue(tenants)
 
@@ -90,7 +92,8 @@ describe('GET /admin/fleet', () => {
       .set('Authorization', `Bearer ${VALID_TOKEN}`)
 
     expect(res.status).toBe(200)
-    expect(res.body).toEqual(tenants)
+    expect(res.body.count).toBe(2)
+    expect(res.body.tenants[0].slug).toBe('acme')
   })
 
   it('returns empty array when no tenants exist', async () => {
@@ -102,7 +105,8 @@ describe('GET /admin/fleet', () => {
       .set('Authorization', `Bearer ${VALID_TOKEN}`)
 
     expect(res.status).toBe(200)
-    expect(res.body).toEqual([])
+    expect(res.body.count).toBe(0)
+    expect(res.body.tenants).toEqual([])
   })
 })
 
@@ -112,14 +116,14 @@ describe('GET /admin/fleet', () => {
 describe('POST /admin/provision', () => {
   it('provisions a tenant and returns result', async () => {
     const app = await buildApp()
-    mockProvisioner.provisionTenant.mockResolvedValue({ success: true, tenantId: 't1' })
+    mockProvisioner.provisionTenant.mockResolvedValue({ success: true, tenant: { id: 't1' } })
 
     const res = await request(app)
       .post('/admin/provision')
       .set('Authorization', `Bearer ${VALID_TOKEN}`)
-      .send({ slug: 'acme', email: 'admin@acme.com' })
+      .send({ slug: 'acme', name: 'Acme Corp', email: 'admin@acme.com', flavor: 'default', region: 'us', language: 'en', preferredChannel: 'telegram' })
 
-    expect(res.status).toBe(200)
+    expect(res.status).toBe(201)
     expect(res.body.success).toBe(true)
     expect(mockProvisioner.provisionTenant).toHaveBeenCalledOnce()
   })
@@ -131,35 +135,37 @@ describe('POST /admin/provision', () => {
     const res = await request(app)
       .post('/admin/provision')
       .set('Authorization', `Bearer ${VALID_TOKEN}`)
-      .send({ slug: 'acme', email: 'admin@acme.com' })
+      .send({ slug: 'acme', name: 'Acme Corp', flavor: 'default', region: 'us', language: 'en', preferredChannel: 'telegram' })
 
-    expect(res.status).toBe(200)
+    expect(res.status).toBe(201)
     expect(res.body.waitlisted).toBe(true)
   })
 })
 
 // ---------------------------------------------------------------------------
-// POST /admin/fleet/:id/terminate
+// DELETE /admin/fleet/:tenantId
 // ---------------------------------------------------------------------------
-describe('POST /admin/fleet/:id/terminate', () => {
+describe('DELETE /admin/fleet/:tenantId', () => {
   it('terminates the specified tenant', async () => {
     const app = await buildApp()
+    mockDb.getTenantBySlug.mockResolvedValue({ id: 't1', slug: 'tenant-1' })
     mockProvisioner.terminateTenant.mockResolvedValue({ success: true })
 
     const res = await request(app)
-      .post('/admin/fleet/t1/terminate')
+      .delete('/admin/fleet/t1')
       .set('Authorization', `Bearer ${VALID_TOKEN}`)
 
     expect(res.status).toBe(200)
-    expect(mockProvisioner.terminateTenant).toHaveBeenCalledWith('t1')
+    expect(mockProvisioner.terminateTenant).toHaveBeenCalledWith({ id: 't1', slug: 'tenant-1' })
   })
 
   it('returns 500 when termination fails', async () => {
     const app = await buildApp()
+    mockDb.getTenantBySlug.mockResolvedValue({ id: 't1', slug: 'tenant-1' })
     mockProvisioner.terminateTenant.mockRejectedValue(new Error('Termination failed'))
 
     const res = await request(app)
-      .post('/admin/fleet/t1/terminate')
+      .delete('/admin/fleet/t1')
       .set('Authorization', `Bearer ${VALID_TOKEN}`)
 
     expect(res.status).toBe(500)
@@ -167,40 +173,37 @@ describe('POST /admin/fleet/:id/terminate', () => {
 })
 
 // ---------------------------------------------------------------------------
-// GET /admin/pool
+// GET /admin/pool/status
 // ---------------------------------------------------------------------------
-describe('GET /admin/pool', () => {
-  it('returns pool stats and bot list', async () => {
+describe('GET /admin/pool/status', () => {
+  it('returns pool stats', async () => {
     const app = await buildApp()
-    mockDb.getPoolStats.mockResolvedValue({ total: 5, available: 3, assigned: 2 })
-    mockDb.listBotPool.mockResolvedValue([
-      { id: 'b1', status: 'available' },
-      { id: 'b2', status: 'assigned', tenantId: 't1' },
-    ])
+    mockDb.getPoolStats.mockResolvedValue({ total: 5, unassigned: 3, assigned: 2 })
 
     const res = await request(app)
-      .get('/admin/pool')
+      .get('/admin/pool/status')
       .set('Authorization', `Bearer ${VALID_TOKEN}`)
 
     expect(res.status).toBe(200)
-    expect(res.body.stats.total).toBe(5)
+    expect(res.body.total).toBe(5)
   })
 })
 
 // ---------------------------------------------------------------------------
-// Canary group
+// POST /admin/fleet/:tenantId/canary
 // ---------------------------------------------------------------------------
-describe('POST /admin/canary', () => {
+describe('POST /admin/fleet/:tenantId/canary', () => {
   it('sets canary group for a tenant', async () => {
     const app = await buildApp()
+    mockDb.getTenantBySlug.mockResolvedValue({ id: 't1', slug: 'tenant-1' })
     mockDb.setCanaryGroup.mockResolvedValue(undefined)
 
     const res = await request(app)
-      .post('/admin/canary')
+      .post('/admin/fleet/t1/canary')
       .set('Authorization', `Bearer ${VALID_TOKEN}`)
-      .send({ tenantId: 't1', group: 'beta' })
 
     expect(res.status).toBe(200)
-    expect(mockDb.setCanaryGroup).toHaveBeenCalledWith('t1', 'beta')
+    expect(mockDb.setCanaryGroup).toHaveBeenCalledWith('t1', true)
   })
 })
+
