@@ -16,23 +16,21 @@ If you are reading this, you are working on the **Tiger Claw Multi-Tenant SaaS**
 
 ## 🛑 GIT PROTOCOL — NON-NEGOTIABLE 🛑
 
-- NEVER push directly to main. main is branch-protected and your push will be rejected.
+- NEVER push directly to main. main is branch-protected.
 - ALL work goes on a feature branch.
 - Branch naming: feat/description, fix/description, chore/description
-- When work is complete and tests pass: open a PR against main.
-- Do NOT merge the PR. Brent reviews and merges.
-- PR title must be clear and descriptive — Brent reads these on his phone.
+- When work is complete and tests pass: open a PR and IMMEDIATELY enable auto-merge.
+- Brent does NOT review or merge PRs. CI green = ships. That is the policy.
+- PR title must be clear and descriptive.
 - PR body must include: what changed, why, and what tests cover it.
 
-**Branch creation:**
+**Full autonomous deploy sequence (agents must follow this exactly):**
 ```bash
 git checkout -b feat/your-description
+# make changes, run tests
 git push origin feat/your-description
-```
-
-**Opening a PR (use GitHub CLI):**
-```bash
 gh pr create --title "feat: your description" --body "What changed and why"
+gh pr merge --auto --squash   # fires immediately when CI passes — no human needed
 ```
 
 ---

@@ -1,2 +1,2 @@
-# All files require review from Brent before merging
-* @bbrysonelite-max
+# No required human reviewers.
+# CI must pass (API Tests + build_and_test). Auto-merge fires when green.
