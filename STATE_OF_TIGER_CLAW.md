@@ -1,6 +1,6 @@
 # STATE OF TIGER CLAW — HARD CONTEXT LOCK
-**Timestamp Generated:** 2026-03-22T14:52:00-07:00
-**Infrastructure Status:** BATTLE-HARDENED AND LIVE (SWOP Audit Security holes patched, Zod APIs strictly typed, 108/108 Unit Tests Passing via Vitest, and Production Cloud Run deployed successfully on hybrid-matrix-472500-k5).
+**Timestamp Generated:** 2026-03-22T17:35:00-07:00
+**Infrastructure Status:** BATTLE-HARDENED AND LIVE (133/133 tests green, CI pipeline green, branch protection enforced, trial-to-revenue loop closed and verified).
 
 ---
 
@@ -38,7 +38,8 @@ gh pr create --title "feat: your description" --body "What changed and why"
 ---
 
 ## What We Just Accomplished
-We executed a monumental sweep of the conversational AI Engine and 72-Hour Trial architecture, followed by the complete Hive Analytics rollout, and the final Trial-to-Revenue loop closure:
+We executed a monumental sweep of the conversational AI Engine and 72-Hour Trial architecture, followed by the complete Hive Analytics rollout, trial-to-revenue loop closure, and CI pipeline hardening:
+- **Phase 8 (CI Pipeline + Cleanup):** Fixed pnpm lockfile sync, removed dead Skill Tests CI job, fixed TS2556 spread type error in test suite. All hardcoded `https://api.tigerclaw.io` URLs in `StepReviewPayment.tsx` replaced with `API_BASE` env-aware constant. 133/133 tests green. CI pipeline fully green on GitHub Actions. Both PRs merged to main via reviewed PR workflow.
 - **Phase 7 (GitHub Repo Lockdown):** Enforced branch protection on `main` via the GitHub API. Pushes are rejected without a Pull Request, tests, and human approval via `.github/CODEOWNERS`. All subsequent agents must use `gh pr create` after isolated feature branch work.
 - **Phase 6 (Admin Operations Flavor):** Implemented the internal 'Admin' persona as a private operations co-pilot. Created a dedicated 'tiger-admin' tenant with exclusive reporting capabilities via Telegram, executing deep queries into the Fleet Status and Hive Intelligence pools. Constructed strict guards inside the emission engine to isolate admin activity, ensuring internal metrics never pollute the multi-tenant community Hive signals.
 - **Phase 5 (The Trial-to-Revenue Loop):** Wired the Stan Store checkout endpoint directly into the expired 72-hour trial state. The conversational agent now explicitly delivers the secure transaction link via Telegram, while the Stripe webhook intercepts the post-purchase ping to instantly drop the `tenantPaused` lock without corrupting existing configuration data. The React wizard UI flawlessly bypasses standard setup routing to accommodate the direct payment-only resolution path for expired accounts.
