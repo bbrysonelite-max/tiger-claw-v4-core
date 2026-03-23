@@ -22,6 +22,7 @@ import { GIG_ECONOMY_FLAVOR } from "./flavors/gig-economy.js";
 import { LAWYER_FLAVOR } from "./flavors/lawyer.js";
 import { PLUMBER_FLAVOR } from "./flavors/plumber.js";
 import { SALES_TIGER_FLAVOR } from "./flavors/sales-tiger.js";
+import { ADMIN_FLAVOR } from "./flavors/admin.js";
 
 // ---------------------------------------------------------------------------
 // Registries
@@ -33,6 +34,7 @@ const REGIONS: Record<string, RegionalConfig> = {
 };
 
 const FLAVORS: Record<string, FlavorConfig> = {
+  "admin": ADMIN_FLAVOR,
   "network-marketer": NETWORK_MARKETER_FLAVOR,
   "real-estate": REAL_ESTATE_FLAVOR,
   "health-wellness": HEALTH_WELLNESS_FLAVOR,
