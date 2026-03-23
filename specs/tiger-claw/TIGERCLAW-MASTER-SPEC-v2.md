@@ -250,7 +250,7 @@ Error rate >5% = automatic disable across all tenants + admin Telegram alert.
 Current conversation context only. Cleaned after every conversation ends.
 
 ### Layer 2: Structured Memory (the filing cabinet)
-Important facts stored permanently as structured data in the tenant's SQLite database. NOT in the context window. Agent queries on demand.
+Important facts stored permanently as structured data in the tenant's `t_uuid` PostgreSQL schema. NOT in the context window. Agent queries on demand.
 
 ### Layer 3: Long-Term Learning (the archive)
 Aggregate patterns and insights. Feeds scoring model optimization and flavor improvement.
@@ -596,7 +596,7 @@ CSV import for existing contacts. Individual messages, NOT bulk email.
 |---|----------|--------|
 | 1-48 | All v1 Block 3 decisions | LOCKED |
 | CORRECTION | Scoring threshold is 80, not 70 | LOCKED |
-| CORRECTION | Per-tenant SQLite for lead data, not shared PostgreSQL | LOCKED |
+| CORRECTION | PostgreSQL isolated schemas for lead data, not SQLite | LOCKED |
 
 ---
 
@@ -762,7 +762,7 @@ Questions (adapted to flavor):
 - What's your biggest win? (for edification data)
 - What makes you different from others in your field? (for edification data)
 
-Bot extracts structured data and stores in tenant's SQLite as structured memory.
+Bot extracts structured data and stores in tenant's PostgreSQL schema as structured memory.
 
 ### Phase 2 — ICP Interview: "Who are you looking for?"
 
@@ -883,7 +883,7 @@ The following v4 infrastructure is KEPT and adapted:
 ### provision-customer.sh (adapted)
 
 The existing shell script (SSH → create compose file → start container) works and is kept as the manual provisioning path. It is adapted to:
-- Inject per-tenant SQLite instead of shared PostgreSQL connection
+- Use standard shared Postgres connection with schema isolation
 - Use the four-layer key system instead of a single shared key
 - Include regional config and flavor selection
 - Set timezone-aware cron schedules
@@ -902,7 +902,7 @@ The Express API from v4 is kept as the TenantOrchestrator. Endpoints:
 ### Docker Infrastructure
 
 The v4 Docker setup (per-customer compose files, infrastructure compose for PostgreSQL + Redis + Nginx) is kept with these corrections:
-- Per-tenant SQLite inside container (not shared PostgreSQL for tenant data)
+- PostgreSQL schema isolation (not SQLite)
 - Four-layer key injection instead of single ANTHROPIC_API_KEY
 - Regional config and flavor config added to container environment
 
@@ -913,7 +913,7 @@ The v4 Docker setup (per-customer compose files, infrastructure compose for Post
 | 1 | 60-second payment to live bot target | LOCKED |
 | 2 | Stripe/Stan Store webhook triggers provisioning | LOCKED |
 | 3 | Tiger Claw API (port 4000) as TenantOrchestrator | LOCKED |
-| 4 | Platform PostgreSQL for tenant registry, per-tenant SQLite in container | LOCKED |
+| 4 | Platform PostgreSQL for all data using schema-per-tenant isolation | LOCKED |
 | 5 | Platform onboarding key active during entire onboarding | LOCKED |
 | 6 | Onboarding: Identity → ICP → Primary Key → Fallback Key → Name Bot → Start | LOCKED |
 | 7 | Fallback key required, cannot skip | LOCKED |
@@ -1058,7 +1058,7 @@ Health response includes:
 | 2 | Daily admin briefing at 7:30 AM Phoenix time | LOCKED |
 | 3 | Health check every 30 seconds per container | LOCKED |
 | 4 | Alert thresholds defined for memory, health, keys, activity, disk | LOCKED |
-| 5 | Automated backups: PostgreSQL 6-hourly, SQLite daily, configs on-change | LOCKED |
+| 5 | Automated backups: PostgreSQL 6-hourly, configs on-change | LOCKED |
 | 6 | Offsite backup storage (S3/Backblaze) | LOCKED |
 | 7 | Documented restore procedures for single tenant and full platform | LOCKED |
 | 8 | 30-60 minute target recovery time | LOCKED |
