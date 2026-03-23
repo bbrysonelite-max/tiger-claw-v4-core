@@ -575,52 +575,36 @@ function checkRateLimit(
 // HTTP helper
 // ---------------------------------------------------------------------------
 
-function httpsGet(
+async function httpsGet(
   url: string,
   headers: Record<string, string> = {}
 ): Promise<{ statusCode: number; body: string }> {
-  return new Promise((resolve, reject) => {
-    const req = https.get(url, { headers }, (res) => {
-      let body = "";
-      res.on("data", (chunk) => (body += chunk));
-      res.on("end", () => resolve({ statusCode: res.statusCode ?? 0, body }));
-    });
-    req.on("error", reject);
-    req.setTimeout(20000, () => {
-      req.destroy();
-      reject(new Error("Request timed out"));
-    });
-  });
+  try {
+    const res = await fetch(url, { headers, signal: AbortSignal.timeout(20000) });
+    return { statusCode: res.status, body: await res.text() };
+  } catch (err: any) {
+    if (err.name === 'TimeoutError' || err.message?.includes('timeout')) throw new Error('Request timed out');
+    throw err;
+  }
 }
 
-function httpsPost(
+async function httpsPost(
   url: string,
   body: string,
   headers: Record<string, string> = {}
 ): Promise<{ statusCode: number; body: string }> {
-  return new Promise((resolve, reject) => {
-    const parsed = new URL(url);
-    const req = https.request(
-      {
-        hostname: parsed.hostname,
-        path: parsed.pathname + parsed.search,
-        method: "POST",
-        headers: { ...headers, "Content-Length": Buffer.byteLength(body).toString() },
-      },
-      (res) => {
-        let respBody = "";
-        res.on("data", (chunk) => (respBody += chunk));
-        res.on("end", () => resolve({ statusCode: res.statusCode ?? 0, body: respBody }));
-      }
-    );
-    req.on("error", reject);
-    req.setTimeout(20000, () => {
-      req.destroy();
-      reject(new Error("Request timed out"));
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { ...headers, "Content-Length": Buffer.byteLength(body).toString() },
+      body,
+      signal: AbortSignal.timeout(20000)
     });
-    req.write(body);
-    req.end();
-  });
+    return { statusCode: res.status, body: await res.text() };
+  } catch (err: any) {
+    if (err.name === 'TimeoutError' || err.message?.includes('timeout')) throw new Error('Request timed out');
+    throw err;
+  }
 }
 
 // ---------------------------------------------------------------------------

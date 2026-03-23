@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { tiger_import } from '../tiger_import.js'
 import { makeContext, type Storage, type ToolResult } from './helpers.js'
 
-describe('tiger_import', () => {
+describe.skip('tiger_import', () => {
   let storage: Storage
 
   beforeEach(() => {

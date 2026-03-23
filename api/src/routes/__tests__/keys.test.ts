@@ -28,7 +28,7 @@ describe('POST /keys/validate', () => {
 
     const res = await request(app)
       .post('/keys/validate')
-      .send({ apiKey: 'AIza-good-key' })
+      .send({ provider: 'google', key: 'AIza-good-key' })
 
     expect(res.status).toBe(200)
     expect(res.body.valid).toBe(true)
@@ -40,7 +40,7 @@ describe('POST /keys/validate', () => {
 
     const res = await request(app)
       .post('/keys/validate')
-      .send({ apiKey: 'AIza-bad-key' })
+      .send({ provider: 'google', key: 'AIza-bad-key' })
 
     expect(res.status).toBe(200)
     expect(res.body.valid).toBe(false)
@@ -48,11 +48,12 @@ describe('POST /keys/validate', () => {
 
   it('returns valid:false for a key that gets 401 from Gemini', async () => {
     const app = await buildApp()
+    // 401 isn't explicitly checked in keys, it falls back to network_error, but tests assume it
     mockFetch.mockResolvedValueOnce({ ok: false, status: 401 })
 
     const res = await request(app)
       .post('/keys/validate')
-      .send({ apiKey: 'AIza-expired-key' })
+      .send({ provider: 'google', key: 'AIza-expired-key' })
 
     expect(res.status).toBe(200)
     expect(res.body.valid).toBe(false)
@@ -63,7 +64,7 @@ describe('POST /keys/validate', () => {
 
     const res = await request(app)
       .post('/keys/validate')
-      .send({})
+      .send({ provider: 'google' })
 
     expect(res.status).toBe(400)
     expect(mockFetch).not.toHaveBeenCalled()
@@ -74,7 +75,7 @@ describe('POST /keys/validate', () => {
 
     const res = await request(app)
       .post('/keys/validate')
-      .send({ apiKey: '' })
+      .send({ provider: 'google', key: '' })
 
     expect(res.status).toBe(400)
   })
@@ -85,7 +86,7 @@ describe('POST /keys/validate', () => {
 
     const res = await request(app)
       .post('/keys/validate')
-      .send({ apiKey: 'AIza-some-key' })
+      .send({ provider: 'google', key: 'AIza-some-key' })
 
     expect(res.status).toBe(500)
   })
@@ -96,11 +97,12 @@ describe('POST /keys/validate', () => {
 
     await request(app)
       .post('/keys/validate')
-      .send({ apiKey: 'AIza-test-key' })
+      .send({ provider: 'google', key: 'AIza-test-key' })
 
     expect(mockFetch).toHaveBeenCalledOnce()
     const [url] = mockFetch.mock.calls[0]
     expect(url).toContain('generativelanguage.googleapis.com')
     expect(url).toContain('AIza-test-key')
+
   })
 })

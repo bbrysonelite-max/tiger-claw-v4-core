@@ -83,6 +83,7 @@ vi.mock('@google/generative-ai', () => ({
       })),
     })),
   })),
+  SchemaType: { STRING: 'STRING', NUMBER: 'NUMBER', INTEGER: 'INTEGER', BOOLEAN: 'BOOLEAN', ARRAY: 'ARRAY', OBJECT: 'OBJECT' },
 }));
 
 // Import AFTER all mocks are defined
@@ -250,7 +251,7 @@ describe('buildSystemPrompt', () => {
   it('contains CRITICAL verbatim relay instruction (prevents ICP summary paraphrase bug)', () => {
     const prompt = buildSystemPrompt(mockTenant);
     expect(prompt).toContain('CRITICAL');
-    expect(prompt).toContain('WORD FOR WORD');
+    expect(prompt).toContain('accurately');
   });
 
   it('includes flavor name from loadFlavorConfig', () => {

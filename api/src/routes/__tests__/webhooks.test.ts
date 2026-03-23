@@ -65,6 +65,7 @@ vi.mock('stripe', () => ({
 // ─── Test app factory ─────────────────────────────────────────────────────────
 
 async function buildTestApp(): Promise<Express> {
+  vi.resetModules();
   const app = express();
   // Stripe requires raw body for signature verification
   app.use('/webhooks/stripe', express.raw({ type: '*/*' }));

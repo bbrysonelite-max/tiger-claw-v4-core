@@ -7,6 +7,12 @@ const mockDb = vi.hoisted(() => ({
   addAIKey: vi.fn(),
   upsertBYOKConfig: vi.fn(),
   getSession: vi.fn(),
+  getTenantBySlug: vi.fn(),
+  getTenantByEmail: vi.fn(),
+  getTenantBotUsername: vi.fn(),
+  updateTenantChannelConfig: vi.fn(),
+  importContacts: vi.fn(),
+  getFoundingMemberDisplay: vi.fn(),
 }))
 
 const mockStripe = vi.hoisted(() => ({
