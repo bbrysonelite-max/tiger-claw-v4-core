@@ -81,7 +81,7 @@ test.describe('BYOK Onboarding Flow', () => {
 
         // Enter Google API key (must be > 5 chars to show validate button)
         const keyInput = page.getByPlaceholder('AIza...');
-        await keyInput.fill('AIzaTestKeyMockedForE2ETesting', { force: true });
+        await keyInput.fill('GAPI-test-key-mocked-for-e2e', { force: true });
 
         // Validate button appears after key is entered
         await page.getByRole('button', { name: 'Validate Key →' }).click();
@@ -141,7 +141,7 @@ test.describe('BYOK Onboarding Flow', () => {
         await page.getByRole('button', { name: 'Continue' }).click();
 
         // Step 3: enter key and attempt validation
-        await page.getByPlaceholder('AIza...').fill('AIzaBadKeyForTesting', { force: true });
+        await page.getByPlaceholder('AIza...').fill('GAPI-bad-key-for-testing', { force: true });
         await page.getByRole('button', { name: 'Validate Key →' }).click();
 
         // Error message shown, Continue stays disabled
@@ -175,7 +175,7 @@ test.describe('BYOK Onboarding Flow', () => {
         await page.getByRole('button', { name: 'Continue' }).click();
 
         // Step 3: validate key
-        await page.getByPlaceholder('AIza...').fill('AIzaValidKeyForTesting', { force: true });
+        await page.getByPlaceholder('AIza...').fill('GAPI-valid-key-for-testing', { force: true });
         await page.getByRole('button', { name: 'Validate Key →' }).click();
         await expect(page.getByText('Key validated — encrypted and stored securely')).toBeVisible();
         await page.getByRole('button', { name: 'Continue' }).click();

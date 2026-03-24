@@ -5,8 +5,8 @@ import { resolveGoogleKey, buildSystemPrompt } from './src/services/ai.js';
 import * as fs from 'fs';
 
 async function run() {
-    process.env.GOOGLE_API_KEY = "AIzaSyAq3KzzX1aE3wtjy39j6yDQ2e3dWcb-af0";
-    process.env.PLATFORM_ONBOARDING_KEY = "AIzaSyAq3KzzX1aE3wtjy39j6yDQ2e3dWcb-af0";
+    process.env.GOOGLE_API_KEY = process.env.GOOGLE_API_KEY ?? (()=>{throw new Error("Set GOOGLE_API_KEY env var")})();
+    process.env.PLATFORM_ONBOARDING_KEY = process.env.GOOGLE_API_KEY ?? (()=>{throw new Error("Set GOOGLE_API_KEY env var")})();
     
     // load db mock
     const tenantId = "59edee05-6494-43b4-9b98-9b91d77608c7";
