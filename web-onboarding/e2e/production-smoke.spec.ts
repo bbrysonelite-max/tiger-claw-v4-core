@@ -29,9 +29,11 @@ test('Complete production onboarding smoke test', async ({ page }) => {
     // 5. Step 3: AI Connection (BYOK)
     await expect(page.getByText('Connect Your AI Engine')).toBeVisible();
     
-    // Real API key validation test
+    // API key from environment — never commit real keys to source control
+    const smokeKey = process.env['SMOKE_TEST_GOOGLE_KEY'];
+    if (!smokeKey) test.skip();
     const keyInput = page.getByPlaceholder('AIza...');
-    await keyInput.fill('AIzaSyB-V0qIAxg9bY2szwqdkIyjzqC-S-rwsUo');
+    await keyInput.fill(smokeKey!);
 
     // Validate button
     const validateBtn = page.getByRole('button', { name: 'Validate Key →' });
