@@ -22,7 +22,7 @@ export async function sendProvisioningReceipt(email: string, botUsername: string
         <p><strong>Next steps:</strong></p>
         <ol>
           <li><a href="https://t.me/${botUsername}">Click here to message your bot on Telegram</a></li>
-          <li>Log into your <a href="${process.env["FRONTEND_URL"] ?? "https://app.tigerclaw.io"}">Customer Dashboard</a> to configure LINE or WhatsApp.</li>
+          <li>Log into your <a href="${process.env["FRONTEND_URL"] ?? "https://wizard.tigerclaw.io"}">Customer Dashboard</a> to configure LINE or WhatsApp.</li>
         </ol>
         <p>Happy hunting,<br>Tiger Claw Team</p>
       `,
@@ -65,7 +65,7 @@ export async function sendKeyAbuseWarning(email: string, strike: number, limit: 
         <p><strong>How to fix this:</strong></p>
         <ul>
           <li>Go to <a href="https://aistudio.google.com/apikey">Google AI Studio</a> and get an API key.</li>
-          <li>Log into your <a href="${process.env["FRONTEND_URL"] ?? "https://app.tigerclaw.io"}">Tiger Claw dashboard</a> and securely save it.</li>
+          <li>Log into your <a href="${process.env["FRONTEND_URL"] ?? "https://wizard.tigerclaw.io"}">Tiger Claw dashboard</a> and securely save it.</li>
         </ul>
         <p>Need help? Reply to this email.</p>
       `,
@@ -114,7 +114,7 @@ export async function sendTrialReminderEmail(
 
 export async function sendStanStoreWelcome(email: string, name: string, productName: string = "Tiger Claw"): Promise<void> {
   const isMock = process.env["RESEND_API_KEY"] === undefined;
-  const frontendUrl = process.env["FRONTEND_URL"] ?? "https://app.tigerclaw.io";
+  const frontendUrl = process.env["FRONTEND_URL"] ?? "https://wizard.tigerclaw.io";
   const claimUrl = `${frontendUrl}/wizard?email=${encodeURIComponent(email)}`;
   
   if (isMock) {
