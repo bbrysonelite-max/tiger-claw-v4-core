@@ -1,48 +1,96 @@
 # START HERE — THE MASTER RESURRECTION BRIEFING
 
 **CRITICAL INSTRUCTION TO ANY AI READING THIS FILE:**
-**Stop what you are doing. Read this entire document and read `ARCHITECTURE.md`. This is your injected context. Do not ask Brent to repeat himself. Do not rely on hallucinated history.**
+Stop what you are doing. Read this entire document and `CLAUDE.md`. These are your injected directives. Do not ask Brent to repeat himself. Do not rely on hallucinated history.
+
+---
 
 ## 1. The Current State of the Universe
-**Tiger Claw is LIVE and COMPILATION GREEN.** 
-- **Architecture:** V4 Stateless Serverless on Google Cloud Run (`https://api.tigerclaw.io`).
-- **Database:** Postgres HA via Cloud SQL Proxy.
-- **Cache:** Redis HA.
-- **Strict Rule 1:** OpenClaw, Mini-RAG, and per-tenant Docker containers ARE DEAD. I physically eradicated their folders `skills/`, `.agents/`, `docker/`, and `Mini-RAG/` from this repo permanently. 
-- **Strict Rule 2:** `main` is branch-protected. DO NOT attempt to push directly. Every agent must check out a `feat/` branch and use `gh pr create` to submit changes.
 
-## 2. What We Accomplished Last Session
-1. **GitHub Repository Lockdown:** Deployed strict branch protection via the active REST API. Established `.github/CODEOWNERS` mandating Brent's approval, required tests, and completely shut out direct raw-pushes.
-2. **The Hive Intelligence Rollout (V4 Analytics):** Deployed the Universal Prior, Founding Member Program, and autonomous ICP signal mapping engine across the database layer (Migrations 005a-009) and the native agent loop (`tiger_scout`, `tiger_convert`). Successfully wired the nightly aggregation engine to power the front-end dashboard, completely decoupled from PII hazards.
-2. **The Great Google Schema Hunt:** Successfully patched a horrific blind-bug in Google's `gemini-2.5-flash-preview` GCP instances where lowercase JSON tool parameters were aggressively suppressed, silently throwing empty `parts:[]` responses. We downgraded globally to the bulletproof `gemini-2.0-flash` layer and heavily hardened `mapToGoogleSchema` with explicit strict `SchemaType.OBJECT` compiler exports.
-3. **Onboarding Flow Streamlining:** Axed the entire API key interrogation phase from the native Telegram Onboarding flow, letting tenants instantly spin up their flywheel without provisioning delays.
-4. **The 72-Hour Cron Pulse Engine:** Activated a native conversational trial engine running exclusively in the stateless `global-cron`. The engine natively scans the timestamp differentials across active tenants and intercepts their Webhooks to deploy extremely flavorful, dynamically generated 24h, 48h, and 72h free-trial depletion warnings securely into their operator chat window utilizing native Telegram payloads.
-5. **The Great Google Key Disaster & Architecture Hardening:** Safely navigated a catastrophic 403 Google API key deprecation/leak event. We vaulted brand new, explicitly tested Google keys into Cloud Secret Manager and established a zero-downtime deployment flow for the master API router. Re-verified `gemini-2.0-flash` as the absolute core engine. Cleaned out duplicate `Rules.md` files causing terminal loop hallucinations.
-6. **Web Wizard Subagent QA:** Deployed an autonomous browser subagent against the production Next.js onboarding bridge. Discovered a fatal `Failed to fetch` (CORS missing `Access-Control-Allow-Origin`) block explicitly preventing users from advancing past Step 1 (Identity & Niche) to contact the `api.tigerclaw.io/wizard/auth` endpoint.
+**Tiger Claw is LIVE on Google Cloud Run (`https://api.tigerclaw.io`).**
 
-## 3. Memory Architecture (V4.1 — Active)
+- **Architecture:** V4 Stateless Serverless — one API process, all tenants, context resolved per-request
+- **Database:** PostgreSQL HA via Cloud SQL Proxy (`tiger_claw_shared`)
+- **Cache/Queue:** Redis HA + BullMQ (5 queues: provision, telegram, line, fact-extraction, ai-routines, global-cron)
+- **AI Engine:** Gemini 2.0 Flash (LOCKED — `gemini-2.5-flash` has a GCP function-calling bug, do not use it)
+- **Tests:** 155/155 passing
 
-`buildSystemPrompt()` is now **async**. On every request it injects three live signals:
+**Strict Rule 1:** OpenClaw, Mini-RAG, and per-tenant Docker containers are DEAD. Their folders have been physically eradicated. Do not reference or restore them.
+
+**Strict Rule 2:** `main` is branch-protected. NEVER push directly. Always use `feat/` branches and `gh pr create`.
+
+**Strict Rule 3:** Read `CLAUDE.md` before writing any code. It contains non-negotiable product and engineering directives.
+
+---
+
+## 2. What Has Been Accomplished
+
+1. **V4 Stateless Architecture** — Cloud Run API, shared PostgreSQL, Redis, BullMQ. No Docker containers per tenant.
+2. **19 Native Function Calling Tools** — All in `api/src/tools/`. Backed by 155 passing tests.
+3. **4-Layer Key Protection** — Platform Onboarding → Tenant Primary → Tenant Fallback → Platform Emergency. Graceful degradation, never goes dark.
+4. **Hive Intelligence (V4 Analytics)** — Universal Prior, Founding Member Program, ICP signal mapping. Migrations 005a-009.
+5. **Gemini 2.0 Flash Lock + Schema Hardening** — Fixed silent GCP JSON parameter suppression bug.
+6. **72-Hour Trial Cron Engine** — Native trial depletion warnings (24h, 48h, 72h) via global-cron heartbeat.
+7. **Key Rotation to Secret Manager** — All Google AI keys vaulted in Cloud Secret Manager.
+8. **CORS Fixed** — `wizard/auth` API call works cleanly from `wizard.tigerclaw.io`.
+9. **Memory Architecture V4.1** — All 4 phases shipped (see below).
+10. **Integrity First Product Philosophy** — Baked into `CLAUDE.md`. Non-negotiable for all future code.
+11. **Website Fixed** — Industry Agent naming, Stan Store deep links, Pre-Flavored label on Tiger-Claw Pro.
+
+---
+
+## 3. Memory Architecture (V4.1 — Fully Shipped)
+
+`buildSystemPrompt()` is **async**. On every request it injects three live signals:
 - **Operator profile** — from `onboard_state.json` (name, product, ICP, top result)
 - **Network intelligence** — top 3 `hive_signals` rows for this tenant's vertical/region
 - **Pipeline stats** — live lead counts from `tenant_leads`
+- **Fact anchors** — extracted business facts from `tenant_states.fact_anchors`
 
-All three are loaded in `Promise.all()` and fail silently — DB unreachable = static prompt, no crash.
+All loaded in `Promise.all()` — DB unreachable = static prompt, no crash.
 
 **Redis key inventory:**
 | Key | Purpose | TTL |
 |---|---|---|
 | `chat_history:{tenantId}:{chatId}` | Raw turn history | 7 days |
-| `chat_memory:{tenantId}:{chatId}` | Sawtooth compressed summaries *(Phase 2)* | 30 days |
-| `focus_state:{tenantId}:{chatId}` | Session bookending *(Phase 4)* | 24 hours |
+| `chat_memory:{tenantId}:{chatId}` | Sawtooth compressed summaries | 30 days |
+| `focus_state:{tenantId}:{chatId}` | Session bookending | 24 hours |
+
+**Memory phases — all complete:**
+- [x] Phase 1: Dynamic prompt enrichment (ICP + hive + pipeline) — shipped
+- [x] Phase 2: Sawtooth context compression (`chat_memory`) — shipped
+- [x] Phase 3: Fact anchor extraction (`tenant_states.fact_anchors`) — shipped
+- [x] Phase 4: `startFocus` / `completeFocus` primitives — shipped (PR #23 pending merge)
 
 **Mac cluster (192.168.0.2) is an OFFLINE ops tool.** It reads Cloud SQL via Auth Proxy for Reflexion Loop analysis. It is NOT called by Cloud Run and cannot break production.
 
-**Memory phases:**
-- [x] Phase 1: Dynamic prompt enrichment (ICP + hive + pipeline) — shipped
-- [ ] Phase 2: Sawtooth context compression (`chat_memory`)
-- [ ] Phase 3: Fact anchor extraction (`tenant_states.fact_anchors`)
-- [ ] Phase 4: `startFocus` / `completeFocus` primitives
+---
+
+## 4. Product (as of 2026-03-24)
+
+| Product | Price | Stan Store URL |
+|---|---|---|
+| Tiger-Claw Pro (Pre-Flavored) | $147/mo | `stan.store/brentbryson/p/tired-of-manually-searching-for-leads-` |
+| Industry Agent | $197/mo | `stan.store/brentbryson/p/custom-agent-flavor` |
+
+- Tiger-Claw Pro = pre-trained for sales and network marketing. Ships ready. No configuration.
+- Industry Agent = domain pre-trained for a specific vertical. Custom flavor injection.
+- "Standard Agent" is a dead name. It is "Industry Agent."
+
+---
+
+## 5. Open Issues (Priority Order)
+
+1. **Value-gap detection** — 7-day lead check cron → Value Check-in message to operator. Required by CLAUDE.md.
+2. **Wizard deploy stale** — PRs #23/#24 must merge to trigger fresh Vercel build (kills stale `[Mockup]` artifact).
+3. **OG/social meta tags** — `tigerclaw.io` missing `og:title`, `og:image`, `twitter:card`.
+4. **Wizard auth error has no purchase link** — Dead end for new customers who haven't bought yet.
+5. **Mac cluster Reflexion Loop tooling** — Offline batch job for fact_anchors / chat_memory analysis not built yet.
+
+---
 
 ## FINAL REMINDER
-Everything you need is in `ARCHITECTURE.md`, `specs/`, and `Rules.md`. Trust the GitHub spec, not your LLM memory.
+
+`CLAUDE.md` contains the non-negotiable product philosophy and engineering constraints. Read it before writing any code.
+
+Everything else you need is in `ARCHITECTURE.md`, `STATE_OF_TIGER_CLAW.md`, `specs/`, and `docs/`. Trust the repo, not your base-model memory.

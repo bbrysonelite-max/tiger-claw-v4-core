@@ -19,9 +19,8 @@ import {
   addAIKey,
   importContacts,
   getFoundingMemberDisplay,
-  getBotState,
-  setBotState,
-  getPool,
+  createBYOKUser,
+  createBYOKBot,
 } from "../services/db.js";
 import { encryptToken } from "../services/pool.js";
 import { provisionQueue } from "../services/queue.js";
@@ -106,6 +105,45 @@ router.get("/auth", async (req: Request, res: Response) => {
   } catch (err: any) {
     console.error("[wizard] Auth error:", err);
     return res.status(500).json({ error: "Authentication failed." });
+  }
+});
+
+// ── POST /wizard/trial ───────────────────────────────────────────────────────
+// Self-serve 72-hour free trial entry point.
+// Creates a user + tenant record (no bot token assigned — provisioner handles
+// that at hatch time, so the bot pool is never drained by abandoned wizards).
+// If the email already has a tenant, returns the existing record.
+router.post("/trial", async (req: Request, res: Response) => {
+  const schema = z.object({
+    email: z.string().email(),
+    name: z.string().min(1),
+    botName: z.string().min(1),
+    nicheId: z.string().min(1),
+  });
+
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: "Invalid payload.", details: parsed.error.format() });
+  }
+
+  const { email, name, botName, nicheId } = parsed.data;
+
+  try {
+    // Return existing tenant if already registered — idempotent
+    const existing = await getTenantByEmail(email);
+    if (existing) {
+      return res.json({ ok: true, botId: existing.id, existing: true });
+    }
+
+    // Create user + tenant record (status: pending, no bot token yet)
+    const userId = await createBYOKUser(email, name);
+    const tenantId = await createBYOKBot(userId, botName, nicheId, "pending", email);
+
+    console.log(`[wizard] Trial registered: ${email} → tenant ${tenantId}`);
+    return res.json({ ok: true, botId: tenantId, existing: false });
+  } catch (err: any) {
+    console.error("[wizard] Trial registration error:", err);
+    return res.status(500).json({ error: "Failed to start trial." });
   }
 });
 
@@ -268,36 +306,6 @@ router.post("/validate-key", async (req: Request, res: Response) => {
   }
 
   const allValid = results.every(r => r.status === "success");
-
-  // Layer 4 auto-resume: if any Google key was successfully stored, activate L2 and un-pause
-  // This covers the case where a tenant's trial expired (tenantPaused=true) and they're now
-  // adding their BYOK key — the bot should immediately resume without manual intervention.
-  if (allValid) {
-    try {
-      const keyState = (await getBotState<Record<string, any>>(botId, "key_state.json")) ?? {};
-      if (keyState["tenantPaused"] === true || (keyState["activeLayer"] ?? 1) >= 3) {
-        // Find the first valid Google key to store as layer2Key
-        const firstGoogleKey = keys.find(k => k.provider === "google");
-        if (firstGoogleKey) {
-          const { encryptToken } = await import("../services/pool.js");
-          keyState["layer2Key"] = encryptToken(firstGoogleKey.key);
-          keyState["activeLayer"] = 2;
-          keyState["tenantPaused"] = false;
-          await setBotState(botId, "key_state.json", keyState);
-          // Restore tenant to active if it was suspended from trial expiry
-          await getPool().query(
-            `UPDATE tenants SET status = 'active' WHERE id = $1 AND status IN ('suspended', 'onboarding')`,
-            [botId]
-          );
-          console.log(`[wizard] 🔓 Layer 4 auto-resume: bot ${botId} restored to Layer 2 (BYOK active)`);
-        }
-      }
-    } catch (resumeErr: any) {
-      // Non-fatal — key is stored, bot resume is best-effort (admin can manually fix key_state)
-      console.warn(`[wizard] Layer 4 auto-resume failed for bot ${botId} (non-fatal):`, resumeErr.message);
-    }
-  }
-
   return res.json({
     valid: allValid,
     details: results

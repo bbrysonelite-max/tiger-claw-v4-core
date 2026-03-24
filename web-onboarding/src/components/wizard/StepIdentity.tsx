@@ -37,20 +37,26 @@ export default function StepIdentity({ state, updateState, onNext }: IdentityPro
         setError("");
 
         try {
-            const apiUrl = "https://api.tigerclaw.io"; // Hardcoded to bypass misconfigured Vercel Env Vars
-            // Strip any trailing slash
-            const base = apiUrl.endsWith('/') ? apiUrl.slice(0, -1) : apiUrl;
-            
-            const response = await fetch(`${base}/wizard/auth?email=${encodeURIComponent(localState.email)}`);
-            const data = await response.json();
+            const base = "https://api.tigerclaw.io";
 
-            if (!response.ok || !data.ok) {
-                throw new Error(data.error || "No purchase found. Please complete checkout on Stan Store first.");
+            // First: check if they're a returning paid customer
+            const authResponse = await fetch(`${base}/wizard/auth?email=${encodeURIComponent(localState.email)}`);
+            const authData = await authResponse.json();
+
+            let botId: string | undefined;
+
+            if (authResponse.ok && authData.ok) {
+                // Existing paid tenant — proceed normally
+                botId = authData.botId;
+            } else if (authResponse.status === 404) {
+                // No account found — they need to purchase first
+                throw new Error("No account found for this email. Purchase your agent at stan.store/brentbryson to get started.");
+            } else {
+                throw new Error(authData.error || "Authentication failed. Please try again.");
             }
 
             const nicheName = NICHES.find(n => n.id === localState.nicheId)?.name || "Agent";
-            // Save their botId which unlocks the rest of the flow!
-            updateState({ ...localState, nicheName, botId: data.botId });
+            updateState({ ...localState, nicheName, botId });
             onNext();
         } catch (err: any) {
             setError(err.message);
@@ -67,8 +73,15 @@ export default function StepIdentity({ state, updateState, onNext }: IdentityPro
             </div>
 
             {error && (
-                <div className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 text-sm font-medium animate-pulse">
-                    {error}
+                <div className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 text-sm font-medium">
+                    {error.includes("stan.store") ? (
+                        <>
+                            No account found for this email.{" "}
+                            <a href="https://stan.store/brentbryson" target="_blank" rel="noopener noreferrer" className="underline font-bold text-primary">
+                                Purchase your agent here →
+                            </a>
+                        </>
+                    ) : error}
                 </div>
             )}
 

@@ -23,7 +23,7 @@ export interface WizardState {
     botName: string;
     yourName: string;
     email: string;
-    planId: "demo" | "lite" | "pro" | "white-label";
+    planId: "lite" | "pro" | "white-label";
     planName: string;
     price: string;
     connectionType: "byok" | "managed";
@@ -41,10 +41,10 @@ const initialState: WizardState = {
     botName: "",
     yourName: "",
     email: "",
-    planId: "demo",
-    planName: "72-Hour Trial",
-    price: "$0.00",
-    connectionType: "managed",
+    planId: "pro",
+    planName: "Tiger-Claw Pro",
+    price: "$147.00/mo",
+    connectionType: "byok",
     aiKeys: [],
     whatsappEnabled: false,
     contactsRaw: "",

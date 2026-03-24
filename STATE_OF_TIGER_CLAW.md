@@ -1,297 +1,126 @@
 # STATE OF TIGER CLAW — HARD CONTEXT LOCK
-**Timestamp Generated:** 2026-03-24T01:15:00-07:00
-**Infrastructure Status:** LIVE (379 tests green, CI auto-merge active, 10 canary tenants provisioned)
-**Last Session:** GitGuardian full clean — 18 tracked files scrubbed, secrets replaced with env vars. Commit: 67f82b9
+**Timestamp:** 2026-03-24
+**Infrastructure Status:** LIVE. 155/155 tests green. Memory Architecture V4.1 fully shipped.
 
 ---
 
-## 🛑 MANDATORY DIRECTIVE TO ALL AI AGENTS 🛑
-This document is the absolute, most recent source of truth for this repository.
+## MANDATORY DIRECTIVE TO ALL AI AGENTS
 
-1. **NO RAG.** No Mini-RAG pipelines here.
-2. **NO OPENCLAW.** No per-tenant Docker containers.
-3. **ARCHITECTURE:** Stateless Cloud Run API, Gemini 2.0 Flash (LOCKED — 2.5 Flash silently strips JSON params), 19 Native Function Calling Tools, Schema-per-tenant Postgres.
-4. **NO REWRITES:** 19 core tools compile and are backed by 379 passing tests. Do not rewrite architecture.
-5. **FITFO.md:** Agent operating protocol at `/tiger-claw/FITFO.md`. All agents must internalize it.
+This is the single source of truth for the Tiger Claw repository.
 
-## 🛑 GIT PROTOCOL — NON-NEGOTIABLE 🛑
+1. **NO RAG.** Mini-RAG has been physically removed. It does not exist.
+2. **NO OPENCLAW.** No per-tenant Docker containers. OpenClaw is dead.
+3. **NO CANARIES.** The canary group concept is deprecated. All tenants are treated equally until scale justifies it.
+4. **ARCHITECTURE:** Stateless Google Cloud Run API, Gemini 2.0 Flash (locked — 2.5 Flash has a GCP function-calling bug), 19 Native Function Calling Tools (`api/src/tools/`), shared PostgreSQL.
+5. **NO REWRITES:** The 19 core tools compile cleanly and are backed by 155 passing tests. Do not rewrite architecture.
+6. **PROTOCOL:** Read `CLAUDE.md` before writing any code.
 
-- NEVER push to main. Branch-protected.
-- ALL work: feature branch → PR → CI green → auto-merge → auto-deploy.
-- Brent does NOT review PRs. CI green = ships.
+---
+
+## GIT PROTOCOL — NON-NEGOTIABLE
+
+- NEVER push directly to main. main is branch-protected.
+- ALL work goes on a feature branch: `feat/`, `fix/`, `chore/`
+- When work is complete and tests pass: open a PR.
+- PRs #23 and #24 are pending merge (memory Phase 4 + CLAUDE.md product philosophy).
+
+**Deploy sequence:**
 ```bash
 git checkout -b feat/your-description
-cd api && npx vitest run   # must run from api/ directory, must pass before PR
+# make changes, run tests
 git push origin feat/your-description
-gh pr create --title "feat: description" --body "What changed and why"
+gh pr create --title "feat: your description" --body "What changed and why"
 gh pr merge --auto --squash
 ```
-- NEVER checkout main locally. GitHub Actions deploys on merge.
-- NEVER run `npx vitest run` from repo root — it picks up web-onboarding tests and produces wrong counts. Always `cd api && npx vitest run`.
+
+Deployments to Cloud Run are handled by GitHub Actions on merge to main. Do not run deploy scripts locally.
 
 ---
 
-## Current State (2026-03-24 ~01:15 PST)
+## Current State (2026-03-24)
 
-### What Was Done This Session
-
-**Branch: feat/skills-admin-email-hardening (PR #16)**
-**Final commit: 67f82b9**
-
-#### 1. Skills Admin Routes (earlier this session)
-- `GET /admin/skills` — list all skills with filter by status/scope
-- `POST /admin/skills/:id/approve` — approve a draft skill
-- `POST /admin/skills/:id/reject` — reject with reason
-- `POST /admin/skills/:id/promote` — elevate tenant→flavor→platform scope
-- `DELETE /admin/skills/:id` — hard delete
-- logAdminEvent on every transition
-- 11 new tests in admin.test.ts (27 total in file)
-
-#### 2. Migration 014: Duplicate Draft Skills Fix
-- `ON CONFLICT DO NOTHING` in draftSkillFromFailure() had no matching unique index for status='draft'
-- Migration 014 adds: `CREATE UNIQUE INDEX skills_tenant_name_draft_idx ON skills (tenant_id, name) WHERE status = 'draft'`
-
-#### 3. Email Trial Reminders
-- `sendTrialReminderEmail(email, hoursRemaining)` implemented in email.ts
-- Trial BullMQ jobs (24h/48h/72h) now fire both Telegram message AND email
-- Mock-safe: no-ops when `RESEND_API_KEY` is not set
-
-#### 4. Hardcoded URL Fixes
-- `app.tigerclaw.io` → `process.env['FRONTEND_URL'] ?? 'https://wizard.tigerclaw.io'` throughout ai.ts
-- All trial reminder prompts, paused-bot messages now use env var
-
-#### 5. suspendTenant / resumeTenant Fixed
-- suspendTenant now writes `tenantPaused: true` to `key_state.json` — LINE channel stops consuming API keys
-- resumeTenant now deletes `tenantPaused` from `key_state.json` — LINE resumes
-- Previously, suspending a tenant only killed the Telegram webhook; LINE was still live and burning keys
-
-#### 6. Canary Reset Route
-- `POST /admin/fleet/:id/reset-conversation` — clears all Redis `chat_history:{tenantId}:*` keys
-- Uses `clearTenantChatHistory()` exported from ai.ts
-- 3 new tests in admin.test.ts
-
-#### 7. GitGuardian Full Clean (67f82b9) — THIS SESSION'S FINAL COMMIT
-All tracked ops/test files with hardcoded secrets scrubbed. Zero secrets remain in any git-tracked file.
-
-**Files fixed:**
-- `api/test_gemini.js`, `api/test_gemini2.js`, `api/test_gemini3.js`, `api/test_gemini_full.ts` — `[REDACTED-ROTATED-KEY]` → `process.env.GOOGLE_API_KEY`
-- `api/test_all_tools.ts`, `api/test_ai_full.js`, `api/test_19.js` — same Google key → env var
-- `api/drop_keys.js`, `api/clear_tenant_keys.js` — `TigerClaw2026MasterKey` DB string → `process.env.DATABASE_URL`
-- `api/get_cols.js`, `api/set_webhook.ts`, `api/check_bot.js`, `api/query_db.js` — same DB string → env var
-- `api/check_agents.js`, `api/clean_db.js`, `api/insert_raw.js`, `api/create_sandbox.js`, `api/check_webhook.js` — same DB string → env var
-
-**Secrets remaining in repo:** NONE (`.env` is gitignored; `specs/legacy/BLUEPRINT_v4.md` has `sk_live_...` placeholder only — not a real key)
-
-### Test Count
-**379 passing, 0 TypeScript errors, 33 test files, 0 skipped.**
-(Up from 254 → 365 → 376 → 379 across sessions)
-
-### Architectural Decisions Locked (all prior + carried forward)
-
-| Decision | Status | Detail |
-|----------|--------|--------|
-| 5-layer intelligence architecture | APPROVED | Core 19 tools → dynamic skills → curation → self-improvement → multi-provider BYOK |
-| Skills system | APPROVED | Prompt (A) + template (B) now; code (C) future |
-| Self-improvement threshold | LOCKED | **1 failure** — immediate draft |
-| FITFO protocol | LOCKED | /tiger-claw/FITFO.md governs all agent behavior |
-| Provider expansion | APPROVED | Add OpenAI; resolveGoogleKey → resolveAIProvider returning { key, provider, model } |
-| Skill scope | LOCKED | tenant → flavor → platform |
-| Skill status flow | LOCKED | draft → submitted → approved / rejected / platform |
-| Hive benchmark injection | APPROVED | Top 3 signals per flavor/region into system prompt |
-| Tool test priority | COMPLETE | All 19 tool tests passing ✅ — 379/379 tests, 0 skipped |
-| Skills curation access | PENDING BRENT | Admin-only or tenant UI? |
-| Auto-drafted skill status | PENDING BRENT | draft (admin review) or auto-approved (tenant-scoped)? |
-
-### The 10 Canaries
-All admin-provisioned. All have empty `onboard_state.json`. First-message nudge is live (fires on first inbound message to a bot with empty state). Reset route available: `POST /admin/fleet/:id/reset-conversation`.
-
----
-
-## Open Issues — Ranked by Damage
-
-### ✅ RESOLVED — GitGuardian Fully Clean
-18 tracked files scrubbed. Zero secrets in git-tracked files. PR #16 at commit 67f82b9.
-
-### 🔴 P0 — All 10 Canaries Have No Personality Data
-Empty `onboard_state.json`. First-message nudge fires but there's nothing to build on.
-**Fix:** `POST /admin/fleet/:id/reset-conversation` then tell each canary to message their bot.
-
-### 🔴 P0 — Intelligence Fix Untested in Production
-TOOL JUDGMENT + FITFO pending PR merge. Never observed in real canary conversation.
-**Fix:** After PR merges — test each canary bot manually. Monitor Cloud Run logs ([AI] prefix).
-
-### ✅ RESOLVED — Email Is No Longer a Stub
-sendTrialReminderEmail, sendProvisioningReceipt, sendKeyAbuseWarning, sendStanStoreWelcome — all live.
-
-### ✅ RESOLVED — suspendTenant LEFT LINE ACTIVE
-Fixed. Both suspend and resume now write to key_state.json.
-
-### ✅ RESOLVED — Skills Curation Has No Admin Routes
-Done. GET/approve/reject/promote/DELETE. 11 tests.
-
-### 🟠 P1 — Single AI Provider
-Hard-locked to Gemini 2.0 Flash. Item 3 of 6-item plan. Not started.
-
-### 🟠 P1 — Hive Benchmarks Not in System Prompt
-Hive data not in agent context. Item 4 of 6-item plan. Not started.
-
-### 🟠 P1 — LINE/Facebook Scouting Incomplete
-Facebook: silently returns empty if SERPER_KEY_* missing. LINE: reads local file, not real LINE API.
-
-### 🟡 P2 — OpenAI Tool Declaration Mapper
-19 tools in Gemini format. Needed before multi-provider BYOK goes live.
-
-### 🟡 P2 — analyzePatterns() Defined But Never Called
-In self-improvement.ts. Wire into admin fleet or weekly events.
-
-### 🟡 P2 — SMOKE_TEST_GOOGLE_KEY Not Set in GitHub Actions
-web-onboarding/e2e/production-smoke.spec.ts skips if env var absent. Add to repo secrets for CI to exercise it.
-
----
-
-## 6-Item Intelligence Plan Status
-
-| # | Item | Status |
-|---|------|--------|
-| 1 | Remove routing table; add TOOL JUDGMENT | ✅ Done |
-| 2 | First-message onboarding nudge | ✅ Done |
-| 3 | Multi-provider BYOK — resolveAIProvider | ⬜ Not started |
-| 4 | Hive benchmark injection | ⬜ Not started |
-| 5 | self-improvement.ts — real 1-fail threshold | ✅ Done |
-| 6 | OpenAI tool declaration mapper | ⬜ Not started |
-
----
-
-## Architecture Reference
-
-- **API:** Cloud Run, Node.js/Express, port 4000
-- **DB:** Cloud SQL PostgreSQL HA, schema-per-tenant isolation
+### Architecture
+- **API:** Cloud Run, Node.js/Express, port 4000, `https://api.tigerclaw.io`
+- **DB:** Cloud SQL PostgreSQL HA (`tiger_claw_shared`)
 - **Cache/Queue:** Cloud Redis HA + BullMQ (5 queues)
-- **AI:** Gemini 2.0 Flash — LOCKED
-- **Skills:** Dynamic via skills table (migration 013), loaded at runtime into system prompt
-- **Self-improvement:** api/src/services/self-improvement.ts — 1-fail threshold, auto-drafts skills
-- **Frontend:** Next.js on Vercel (wizard.tigerclaw.io)
-- **Admin Dashboard:** wizard.tigerclaw.io/admin/canary (live after PR #15 merges)
-- **Payments:** Stan Store + Stripe
-- **Email:** Resend — fully implemented (4 functions in email.ts)
-- **Bot Pool:** 42+ Telegram tokens, AES-256-GCM encrypted
-- **GCP Project:** hybrid-matrix-472500-k5, region us-central1
-- **Key Layers:** L1 platform onboarding (72h), L2 tenant primary BYOK, L3 tenant fallback BYOK, L4 platform emergency
+- **AI:** Gemini 2.0 Flash via `@google/generative-ai` SDK (locked — do not change)
+- **Frontend (wizard):** Next.js on Vercel (`wizard.tigerclaw.io`) — part of `tiger-claw-v4-core` repo, `web-onboarding/` subdirectory
+- **Frontend (website):** Static HTML on Vercel (`tigerclaw.io`) — separate repo `tiger-bot-website`
+- **Payments:** Stan Store (purchase gating) + Stripe (subscription checkout)
+- **Email:** Resend
+- **Bot Pool:** 42 available Telegram bot tokens, AES-256-GCM encrypted
+- **GCP Project:** `hybrid-matrix-472500-k5`
+- **Cloud Run Service:** `tiger-claw-api`, region `us-central1`
 
-## Punch List
-Full weakness detail + plans: /Users/brentbryson/Desktop/TIGERCLAW_PUNCH_LIST.md
+### Product (as of 2026-03-24)
+- **Tiger-Claw Pro (Pre-Flavored):** $147/mo — Telegram + LINE, pre-trained for sales and network marketing. Stan Store: `stan.store/brentbryson/p/tired-of-manually-searching-for-leads-`
+- **Industry Agent:** $197/mo — domain pre-trained for a specific vertical. Stan Store: `stan.store/brentbryson/p/custom-agent-flavor`
+- "Standard Agent" naming is DEAD. It is now "Industry Agent."
+
+### Recent Work Completed
+- **Memory Architecture V4.1** — All 4 phases shipped:
+  - Phase 1: `buildSystemPrompt()` async, injects ICP + hive signals + pipeline stats
+  - Phase 2: Sawtooth context compression (`chat_memory` Redis key, 30d TTL)
+  - Phase 3: Fact anchor extraction (async BullMQ job → `tenant_states.fact_anchors`)
+  - Phase 4: `startFocus` / `completeFocus` / `incrementFocusToolCalls` session primitives
+- **CLAUDE.md:** Product philosophy baked in — Integrity First, Radical Value Delivery, Zero Complexity
+- **Website fixes:** Industry Agent naming, Stan Store deep links wired, Pre-Flavored label on Tiger-Claw Pro
+- **CORS fixed:** `wizard/auth` API call works cleanly from wizard.tigerclaw.io
+- **john-thailand:** Fresh tenant provisioned for John (Thailand). `john-noon` left as suspended tombstone.
+- **pat-sullivan:** Removed (never activated).
+
+### Open Issues
+
+1. **Value-gap detection** — No cron logic yet to detect paying tenants with zero leads in 7 days and send a diagnostic message. Required by CLAUDE.md product philosophy.
+
+2. **`[Mockup] Skip AI` button** — Not in source code. Was in a stale compiled build. Will be eliminated on next wizard deploy (when PRs #23/#24 merge to main).
+
+3. **OG/social meta tags** — `tigerclaw.io` has no `og:title`, `og:image`, `twitter:card`. Every shared link renders as a bare URL. Low effort, high impact fix.
+
+4. **Wizard auth error has no purchase CTA** — When a user enters an email with no purchase, the error message tells them to go to Stan Store but provides no link.
+
+5. **Wizard deployed build is stale** — PRs #23/#24 need to merge to main to trigger a fresh Vercel deploy and kill the stale build artifacts.
+
+6. **Mac cluster Reflexion Loop tooling** — The offline batch job that reads `fact_anchors` / `chat_memory` and proposes system prompt improvements has not been built yet.
 
 ---
 
-## Memory Architecture (V4.1)
+## Memory Architecture (V4.1 — FULLY SHIPPED)
 
-**Design:** Hybrid Cognitive Architecture — Cloud Run executes stateless, Redis/PostgreSQL hold all persistent memory. Mac cluster (192.168.0.2) is an OFFLINE Reflexion Loop tool that reads Cloud SQL via Auth Proxy. It is NOT a live Cloud Run dependency.
+**Design:** Hybrid Cognitive Architecture — Cloud Run executes stateless, Redis/PostgreSQL hold all persistent memory.
 
-### New Redis Keys
+### Redis Keys
 | Key | Purpose | TTL |
 |---|---|---|
-| `chat_history:{tenantId}:{chatId}` | Raw turn history (existing) | 7 days |
+| `chat_history:{tenantId}:{chatId}` | Raw turn history | 7 days |
 | `chat_memory:{tenantId}:{chatId}` | Sawtooth compressed summaries | 30 days |
 | `focus_state:{tenantId}:{chatId}` | Session bookending | 24 hours |
 
-### New `tenant_states` Keys
+### `tenant_states` Keys
 | `state_key` | Purpose |
 |---|---|
-| `onboard_state` *(existing via `bot_states`)* | Onboarding interview answers |
-| `fact_anchors` | Extracted facts from live conversations (Phase 3) |
+| `onboard_state` | Onboarding interview answers |
+| `fact_anchors` | Extracted business facts from live conversations |
 
 ### Phase Status
-- [x] Phase 1: Dynamic prompt enrichment — `buildSystemPrompt()` is async, injects ICP + hive + pipeline on every request
-- [ ] Phase 2: Sawtooth context compression — replaces hard trim with rolling `chat_memory` summaries
-- [ ] Phase 3: Fact anchor extraction — async BullMQ job extracts and persists ICP signals post-conversation
-- [ ] Phase 4: `startFocus` / `completeFocus` primitives — Sawtooth session bookending in Redis
+- [x] Phase 1: Dynamic prompt enrichment — shipped
+- [x] Phase 2: Sawtooth context compression — shipped
+- [x] Phase 3: Fact anchor extraction — shipped
+- [x] Phase 4: `startFocus` / `completeFocus` primitives — shipped (PR #23 pending merge)
 
-### Architecture Decision Record
-**Why not Mac cluster as live endpoint:** Cloud Run is stateless and ephemeral. A live dependency on a local Mac cluster creates a single point of failure invisible to GCP monitoring. All intelligence state lives in Cloud SQL + Redis (already HA). The Mac cluster runs Reflexion Loops offline and proposes system prompt improvements for human review — preserving Gemini's Sovereign Vault intent without breaking production.
+### Mac Cluster (192.168.0.2) — OFFLINE ONLY
+The Cheese Grater is an **offline Reflexion Loop tool**. It reads Cloud SQL via Auth Proxy, analyzes `fact_anchors` and `chat_memory` across tenants, and proposes system prompt improvements for Brent to review. It is **NOT** called by Cloud Run and cannot break production if offline.
 
 ---
 
-## Memory Architecture (V4.1)
+## Tenant Roster (Notable)
 
-**Design:** Hybrid Cognitive Architecture — Cloud Run executes stateless, Redis/PostgreSQL hold all persistent memory. Mac cluster (192.168.0.2) is an OFFLINE Reflexion Loop tool that reads Cloud SQL via Auth Proxy. It is NOT a live Cloud Run dependency.
-
-### New Redis Keys
-| Key | Purpose | TTL |
+| Slug | Status | Notes |
 |---|---|---|
-| `chat_history:{tenantId}:{chatId}` | Raw turn history (existing) | 7 days |
-| `chat_memory:{tenantId}:{chatId}` | Sawtooth compressed summaries | 30 days |
-| `focus_state:{tenantId}:{chatId}` | Session bookending | 24 hours |
-
-### New `tenant_states` Keys
-| `state_key` | Purpose |
-|---|---|
-| `onboard_state` *(existing via `bot_states`)* | Onboarding interview answers |
-| `fact_anchors` | Extracted facts from live conversations (Phase 3) |
-
-### Phase Status
-- [x] Phase 1: Dynamic prompt enrichment — `buildSystemPrompt()` is async, injects ICP + hive + pipeline on every request
-- [ ] Phase 2: Sawtooth context compression — replaces hard trim with rolling `chat_memory` summaries
-- [ ] Phase 3: Fact anchor extraction — async BullMQ job extracts and persists ICP signals post-conversation
-- [ ] Phase 4: `startFocus` / `completeFocus` primitives — Sawtooth session bookending in Redis
-
-### Architecture Decision Record
-**Why not Mac cluster as live endpoint:** Cloud Run is stateless and ephemeral. A live dependency on a local Mac cluster creates a single point of failure invisible to GCP monitoring. All intelligence state lives in Cloud SQL + Redis (already HA). The Mac cluster runs Reflexion Loops offline and proposes system prompt improvements for human review — preserving Gemini's Sovereign Vault intent without breaking production.
+| `john-thailand` | onboarding | Fresh provision 2026-03-24. Bot: @tc_62g6al77_bot |
+| `john-noon` | suspended | Webhook conflict. Left as tombstone. Superseded by john-thailand |
+| `pat-sullivan` | terminated | Never activated. Removed 2026-03-24 |
 
 ---
 
-## Memory Architecture (V4.1)
-
-**Design:** Hybrid Cognitive Architecture — Cloud Run executes stateless, Redis/PostgreSQL hold all persistent memory. Mac cluster (192.168.0.2) is an OFFLINE Reflexion Loop tool that reads Cloud SQL via Auth Proxy. It is NOT a live Cloud Run dependency.
-
-### New Redis Keys
-| Key | Purpose | TTL |
-|---|---|---|
-| `chat_history:{tenantId}:{chatId}` | Raw turn history (existing) | 7 days |
-| `chat_memory:{tenantId}:{chatId}` | Sawtooth compressed summaries | 30 days |
-| `focus_state:{tenantId}:{chatId}` | Session bookending | 24 hours |
-
-### New `tenant_states` Keys
-| `state_key` | Purpose |
-|---|---|
-| `onboard_state` *(existing via `bot_states`)* | Onboarding interview answers |
-| `fact_anchors` | Extracted facts from live conversations (Phase 3) |
-
-### Phase Status
-- [x] Phase 1: Dynamic prompt enrichment — `buildSystemPrompt()` is async, injects ICP + hive + pipeline on every request
-- [ ] Phase 2: Sawtooth context compression — replaces hard trim with rolling `chat_memory` summaries
-- [ ] Phase 3: Fact anchor extraction — async BullMQ job extracts and persists ICP signals post-conversation
-- [ ] Phase 4: `startFocus` / `completeFocus` primitives — Sawtooth session bookending in Redis
-
-### Architecture Decision Record
-**Why not Mac cluster as live endpoint:** Cloud Run is stateless and ephemeral. A live dependency on a local Mac cluster creates a single point of failure invisible to GCP monitoring. All intelligence state lives in Cloud SQL + Redis (already HA). The Mac cluster runs Reflexion Loops offline and proposes system prompt improvements for human review — preserving Gemini's Sovereign Vault intent without breaking production.
-
----
-
-## Memory Architecture (V4.1)
-
-**Design:** Hybrid Cognitive Architecture — Cloud Run executes stateless, Redis/PostgreSQL hold all persistent memory. Mac cluster (192.168.0.2) is an OFFLINE Reflexion Loop tool that reads Cloud SQL via Auth Proxy. It is NOT a live Cloud Run dependency.
-
-### New Redis Keys
-| Key | Purpose | TTL |
-|---|---|---|
-| `chat_history:{tenantId}:{chatId}` | Raw turn history (existing) | 7 days |
-| `chat_memory:{tenantId}:{chatId}` | Sawtooth compressed summaries | 30 days |
-| `focus_state:{tenantId}:{chatId}` | Session bookending | 24 hours |
-
-### New `tenant_states` Keys
-| `state_key` | Purpose |
-|---|---|
-| `onboard_state` *(existing via `bot_states`)* | Onboarding interview answers |
-| `fact_anchors` | Extracted facts from live conversations (Phase 3) |
-
-### Phase Status
-- [x] Phase 1: Dynamic prompt enrichment — `buildSystemPrompt()` is async, injects ICP + hive + pipeline on every request
-- [ ] Phase 2: Sawtooth context compression — replaces hard trim with rolling `chat_memory` summaries
-- [ ] Phase 3: Fact anchor extraction — async BullMQ job extracts and persists ICP signals post-conversation
-- [ ] Phase 4: `startFocus` / `completeFocus` primitives — Sawtooth session bookending in Redis
-
-### Architecture Decision Record
-**Why not Mac cluster as live endpoint:** Cloud Run is stateless and ephemeral. A live dependency on a local Mac cluster creates a single point of failure invisible to GCP monitoring. All intelligence state lives in Cloud SQL + Redis (already HA). The Mac cluster runs Reflexion Loops offline and proposes system prompt improvements for human review — preserving Gemini's Sovereign Vault intent without breaking production.
-
----
 *Locked. Proceed.*
