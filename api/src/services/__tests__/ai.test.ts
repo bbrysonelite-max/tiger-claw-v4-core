@@ -225,49 +225,49 @@ describe('buildSystemPrompt', () => {
     language: 'English',
   };
 
-  it('includes the tenant name', () => {
-    const prompt = buildSystemPrompt(mockTenant);
+  it('includes the tenant name', async () => {
+    const prompt = await buildSystemPrompt(mockTenant);
     expect(prompt).toContain('Brent Bryson');
   });
 
-  it('includes the LOCKED lead scoring threshold of 80', () => {
-    const prompt = buildSystemPrompt(mockTenant);
+  it('includes the LOCKED lead scoring threshold of 80', async () => {
+    const prompt = await buildSystemPrompt(mockTenant);
     expect(prompt).toContain('80');
     expect(prompt).toContain('LOCKED');
   });
 
-  it('includes the ONBOARDING RULE section', () => {
-    const prompt = buildSystemPrompt(mockTenant);
-    expect(prompt).toContain('ONBOARDING RULE');
-  });
-
-  it('requires tiger_onboard action=status on EVERY message', () => {
-    const prompt = buildSystemPrompt(mockTenant);
+  it('includes the HANDLING ONBOARDING section', async () => {
+    const prompt = await buildSystemPrompt(mockTenant);
+    expect(prompt).toContain('HANDLING ONBOARDING');
     expect(prompt).toContain('tiger_onboard');
-    expect(prompt).toContain('status');
-    expect(prompt).toContain('EVERY incoming user message');
   });
 
-  it('contains CRITICAL verbatim relay instruction (prevents ICP summary paraphrase bug)', () => {
-    const prompt = buildSystemPrompt(mockTenant);
+  it('allows organic conversation — does not force tiger_onboard on every message', async () => {
+    const prompt = await buildSystemPrompt(mockTenant);
+    expect(prompt).toContain('tiger_onboard');
+    expect(prompt).toContain('ALLOW ORGANIC CONVERSATION');
+  });
+
+  it('contains CRITICAL telemetry instruction', async () => {
+    const prompt = await buildSystemPrompt(mockTenant);
     expect(prompt).toContain('CRITICAL');
-    expect(prompt).toContain('accurately');
+    expect(prompt).toContain('tiger_keys');
   });
 
-  it('includes flavor name from loadFlavorConfig', () => {
-    const prompt = buildSystemPrompt(mockTenant);
+  it('includes flavor name from loadFlavorConfig', async () => {
+    const prompt = await buildSystemPrompt(mockTenant);
     expect(prompt).toContain('Network Marketer');
   });
 
-  it('includes the tenant language', () => {
-    const prompt = buildSystemPrompt(mockTenant);
+  it('includes the tenant language', async () => {
+    const prompt = await buildSystemPrompt(mockTenant);
     expect(prompt).toContain('English');
   });
 
-  it('blocks switching to normal operation before onboarding is complete', () => {
-    const prompt = buildSystemPrompt(mockTenant);
-    expect(prompt).toContain('Do NOT switch to prospecting');
-    expect(prompt).toContain('isComplete=true');
+  it('instructs bot to allow free conversation when onboarding is not active', async () => {
+    const prompt = await buildSystemPrompt(mockTenant);
+    expect(prompt).toContain('ALLOW ORGANIC CONVERSATION');
+    expect(prompt).toContain('GLOBAL DIRECTIVE');
   });
 });
 

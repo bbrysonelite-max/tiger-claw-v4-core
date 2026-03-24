@@ -336,6 +336,69 @@ router.get("/flavors", requireAdmin, async (_req: Request, res: Response) => {
 });
 
 // ---------------------------------------------------------------------------
+// GET /admin/dashboard/tenants — Priority 1: Visual Canary Dashboard
+// Returns all tenants with their bot username, last activity, and exact onboarding phase.
+// ---------------------------------------------------------------------------
+
+router.get("/dashboard/tenants", requireAdmin, async (_req: Request, res: Response) => {
+  try {
+    const { getPool, getBotState } = await import("../services/db.js");
+    const pool = getPool();
+    
+    const result = await pool.query(`
+      SELECT 
+        t.id,
+        t.name,
+        t.slug,
+        t.status,
+        t.canary_group,
+        t.last_activity_at,
+        b.bot_username
+      FROM tenants t
+      LEFT JOIN bot_pool b ON b.tenant_id = t.id AND b.status = 'assigned'
+      ORDER BY t.created_at DESC
+    `);
+    
+    // Resolve dynamic onboarding state per tenant schema mapping
+    const dashboardData = await Promise.all(result.rows.map(async (row) => {
+      let onboardingComplete = (row.status === 'active' || row.status === 'live');
+      let onboardingPhase = 'incomplete';
+      
+      if (!onboardingComplete) {
+        try {
+          const state = await getBotState<any>(row.id, "onboard_state.json");
+          if (state && state.phase === 'complete') {
+             onboardingComplete = true;
+             onboardingPhase = 'complete';
+          } else if (state && state.phase) {
+             onboardingPhase = state.phase;
+          }
+        } catch(e) { /* schema likely not fully populated */ }
+      } else {
+        onboardingPhase = 'complete';
+      }
+
+      return {
+        id: row.id,
+        name: row.name,
+        slug: row.slug,
+        isCanary: row.canary_group,
+        botUsername: row.bot_username ? `@${row.bot_username}` : 'Unassigned',
+        status: row.status,
+        onboardingComplete,
+        onboardingPhase,
+        lastActive: row.last_activity_at ? new Date(row.last_activity_at).toISOString() : 'Never',
+      };
+    }));
+
+    return res.json({ tenants: dashboardData });
+  } catch (err) {
+    console.error("[admin] Dashboard tenants error:", err);
+    return res.status(500).json({ error: String(err) });
+  }
+});
+
+// ---------------------------------------------------------------------------
 // GET /admin/fleet — list all tenants
 // ---------------------------------------------------------------------------
 

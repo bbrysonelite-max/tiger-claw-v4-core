@@ -57,6 +57,7 @@ const PLANS = [
 ] as const;
 
 export default function StepPlanSelection({ state, updateState, onNext }: PlanSelectionProps) {
+    const planSelected = PLANS.some((p) => p.id === state.planId);
     return (
         <div className="flex flex-col h-full animate-fade-in">
             <div className="mb-6 text-center">
@@ -117,7 +118,8 @@ export default function StepPlanSelection({ state, updateState, onNext }: PlanSe
             <div className="mt-8 flex justify-end">
                 <button
                     onClick={onNext}
-                    className="group relative inline-flex h-12 items-center justify-center overflow-hidden rounded-full font-bold px-8 bg-primary text-black transition-all hover:scale-105 active:scale-95"
+                    disabled={!planSelected}
+                    className="group relative inline-flex h-12 items-center justify-center overflow-hidden rounded-full font-bold px-8 bg-primary text-black transition-all hover:scale-105 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100"
                 >
                     <span className="relative z-10 flex items-center gap-2">
                         Continue <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />

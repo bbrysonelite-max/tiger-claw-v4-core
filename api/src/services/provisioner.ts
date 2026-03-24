@@ -18,6 +18,7 @@ import {
 import { releaseBot, decryptToken } from "./pool.js";
 import { sendAdminAlert } from "../routes/admin.js";
 import { logLearning } from "./self-improvement.js";
+import { VALID_FLAVOR_KEYS } from "../tools/flavorConfig.js";
 // Proactive initiation disabled temporarily during CORS testing
 
 // ---------------------------------------------------------------------------
@@ -52,6 +53,13 @@ export interface ProvisionResult {
 
 export async function provisionTenant(input: ProvisionInput): Promise<ProvisionResult> {
   const steps: string[] = [];
+
+  // Guard: reject unknown flavor keys before touching the DB
+  if (!(VALID_FLAVOR_KEYS as readonly string[]).includes(input.flavor)) {
+    const msg = `Invalid flavor key: "${input.flavor}". Valid keys: ${VALID_FLAVOR_KEYS.join(", ")}`;
+    console.error(`[provisioner] ${msg}`);
+    return { success: false, error: msg, steps };
+  }
 
   // 1. Lookup existing tenant (Stan Store hook creates them via createBYOKBot -> tenants insert)
   let tenant = await getTenantBySlug(input.slug);
@@ -227,12 +235,37 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
     }
 
   } catch (err) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    steps.push(`Webhook attachment FAILED: ${errMsg}`);
+
     await updateTenantStatus(tenant.id, "suspended", {
-      suspendedReason: `Webhook attachment failed: ${err instanceof Error ? err.message : String(err)}`,
+      suspendedReason: `Webhook attachment failed: ${errMsg}`,
     });
+
+    // Release the pool bot back to available so it isn't leaked on BullMQ retry.
+    // On retry, provisionTenant() will assign a fresh bot from the pool.
+    // Only release if the bot was drawn from the pool (not a direct admin override).
+    if (!input.botToken) {
+      try {
+        const poolBots = await listBotPool("assigned");
+        const assignedBot = poolBots.find((b) => b.tenantId === tenant.id);
+        if (assignedBot) {
+          await releaseBot(assignedBot.id);
+          // Clear bot_token on tenant record so retry gets a clean pool assignment
+          await getPool().query(
+            `UPDATE tenants SET bot_token = NULL WHERE id = $1`,
+            [tenant.id]
+          );
+          steps.push(`Pool bot @${assignedBot.botUsername} released for retry`);
+        }
+      } catch (releaseErr) {
+        console.warn(`[provisioner] Failed to release pool bot after webhook failure for ${tenant.id}:`, releaseErr);
+      }
+    }
+
     return {
       success: false,
-      error: `Webhook attach failed: ${err instanceof Error ? err.message : String(err)}`,
+      error: `Webhook attach failed: ${errMsg}`,
       steps,
       tenant,
     };
