@@ -25,6 +25,7 @@
     "googleapis": "^171.4.0",
     "ioredis": "^5.10.0",
     "node-telegram-bot-api": "^0.66.0",
+    "openai": "^6.32.0",
     "pg": "^8.20.0",
     "redis": "^5.11.0",
     "resend": "^6.9.3",

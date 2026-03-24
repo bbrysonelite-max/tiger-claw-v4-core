@@ -937,6 +937,55 @@ router.post("/fleet/:tenantId/reset-conversation", async (req: Request, res: Res
   }
 });
 
+// ── POST /admin/fleet/:tenantId/founding-member ───────────────────────────────
+// Mark a tenant as a founding member and enable their feedback loop.
+router.post("/fleet/:tenantId/founding-member", async (req: Request, res: Response) => {
+  try {
+    const tenant = await resolveTenant(req.params["tenantId"]!);
+    if (!tenant) return res.status(404).json({ error: "Tenant not found" });
+    const pool = getPool();
+    await pool.query(
+      `UPDATE tenants
+       SET is_founding_member = true,
+           founding_member_since = COALESCE(founding_member_since, now()),
+           feedback_loop_enabled = true
+       WHERE id = $1`,
+      [tenant.id],
+    );
+    await logAdminEvent("founding_member_granted", tenant.id, {});
+    return res.json({ ok: true, tenantId: tenant.id, slug: tenant.slug });
+  } catch (err) {
+    return res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+// ── POST /admin/founding-members/bulk ─────────────────────────────────────────
+// Mark multiple tenants as founding members in one call.
+// Body: { tenantIds: string[] }
+router.post("/founding-members/bulk", async (req: Request, res: Response) => {
+  try {
+    const { tenantIds } = req.body as { tenantIds?: string[] };
+    if (!Array.isArray(tenantIds) || tenantIds.length === 0) {
+      return res.status(400).json({ error: "tenantIds array required" });
+    }
+    const pool = getPool();
+    await pool.query(
+      `UPDATE tenants
+       SET is_founding_member = true,
+           founding_member_since = COALESCE(founding_member_since, now()),
+           feedback_loop_enabled = true
+       WHERE id = ANY($1::uuid[])`,
+      [tenantIds],
+    );
+    for (const id of tenantIds) {
+      await logAdminEvent("founding_member_granted", id, { bulk: true }).catch(() => {});
+    }
+    return res.json({ ok: true, updated: tenantIds.length });
+  } catch (err) {
+    return res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
 // ── Skills Curation Routes ────────────────────────────────────────────────────
 // Skills are auto-drafted by the self-improvement engine on every tool failure.
 // Admin reviews them here: list → approve/reject → optionally promote to platform.

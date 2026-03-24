@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI, Content, Part } from '@google/generative-ai';
+import OpenAI from 'openai';
 import { getTenant, getPool, getBotState, setBotState, getTenantBotToken, getHiveSignalWithFallback, queryHivePatterns } from './db.js';
 import TelegramBot from 'node-telegram-bot-api';
 import IORedis from 'ioredis';
@@ -240,6 +241,183 @@ export async function resolveGoogleKey(tenantId: string): Promise<string | undef
 
     // Step 3 — Platform Layer 1 fallback (onboarding / new tenant)
     return process.env.PLATFORM_ONBOARDING_KEY ?? process.env.GOOGLE_API_KEY;
+}
+
+// ─── Multi-provider resolution ────────────────────────────────────────────────
+
+export type AIProvider = {
+    key: string;
+    provider: 'google' | 'openai';
+    model: string;
+};
+
+function detectProvider(key: string): 'google' | 'openai' | null {
+    if (key.startsWith('AIza')) return 'google';
+    if (key.startsWith('sk-')) return 'openai';
+    return null;
+}
+
+function defaultModel(provider: 'google' | 'openai'): string {
+    return provider === 'openai' ? 'gpt-4o-mini' : 'gemini-2.0-flash';
+}
+
+/**
+ * Resolves the active AI provider + key for a tenant.
+ * Returns { key, provider, model } or undefined if tenant is paused / no key available.
+ *
+ * Resolution order mirrors resolveGoogleKey but is provider-agnostic:
+ *   1. key_state.json (layer 1-4, Google platform keys)
+ *   2. bot_ai_config DB (BYOK — any provider)
+ *   3. Platform fallback (Google)
+ */
+export async function resolveAIProvider(tenantId: string): Promise<AIProvider | undefined> {
+    // Step 1 — key_state.json (Google platform keys, 4-layer system)
+    try {
+        const state = await getBotState<any>(tenantId, 'key_state.json');
+        if (state) {
+            if (state.tenantPaused) {
+                console.warn(`[AI] [ALERT] Tenant ${tenantId} is paused. No key issued.`);
+                return undefined;
+            }
+            const activeLayer: number = state.activeLayer ?? 1;
+            let rawKey: string | undefined;
+            switch (activeLayer) {
+                case 1: rawKey = process.env.PLATFORM_ONBOARDING_KEY ?? process.env.GOOGLE_API_KEY; break;
+                case 2: rawKey = state.layer2Key ? decryptToken(state.layer2Key) : undefined; break;
+                case 3: rawKey = state.layer3Key ? decryptToken(state.layer3Key) : undefined; break;
+                case 4: rawKey = process.env.PLATFORM_EMERGENCY_KEY ?? process.env.GOOGLE_API_KEY; break;
+            }
+            if (rawKey) {
+                const provider = detectProvider(rawKey) ?? 'google';
+                return { key: rawKey, provider, model: state.layer2Model ?? defaultModel(provider) };
+            }
+        }
+    } catch (err: any) {
+        console.error(`[AI] [ALERT] resolveAIProvider key_state read failed for ${tenantId}:`, err.message);
+    }
+
+    // Step 2 — bot_ai_config DB (BYOK, any provider)
+    try {
+        const pool = getPool();
+        const res = await pool.query(
+            `SELECT provider, model, encrypted_key FROM bot_ai_config WHERE tenant_id = $1`,
+            [tenantId],
+        );
+        if (res.rows.length > 0) {
+            const { provider, model, encrypted_key } = res.rows[0];
+            if (encrypted_key) {
+                const key = decryptToken(encrypted_key);
+                const resolvedProvider = (provider as 'google' | 'openai') ?? detectProvider(key) ?? 'google';
+                return { key, provider: resolvedProvider, model: model ?? defaultModel(resolvedProvider) };
+            }
+        }
+    } catch (err: any) {
+        console.error(`[AI] [ALERT] resolveAIProvider DB lookup failed for ${tenantId}:`, err.message);
+    }
+
+    // Step 3 — Platform fallback
+    const fallbackKey = process.env.PLATFORM_ONBOARDING_KEY ?? process.env.GOOGLE_API_KEY;
+    if (fallbackKey) return { key: fallbackKey, provider: 'google', model: 'gemini-2.0-flash' };
+    return undefined;
+}
+
+// ─── OpenAI tool mapper ───────────────────────────────────────────────────────
+// Maps geminiTools (Google FunctionDeclaration format) → OpenAI ChatCompletionTool format.
+
+function schemaToOpenAI(schema: any): any {
+    if (!schema) return { type: 'object', properties: {} };
+    const out: any = { type: (schema.type ?? 'OBJECT').toLowerCase() };
+    if (schema.description) out.description = schema.description;
+    if (schema.enum) out.enum = schema.enum;
+    if (schema.properties) {
+        out.properties = Object.fromEntries(
+            Object.entries(schema.properties).map(([k, v]) => [k, schemaToOpenAI(v)])
+        );
+    }
+    if (schema.items) out.items = schemaToOpenAI(schema.items);
+    if (schema.required) out.required = schema.required;
+    return out;
+}
+
+const openAITools: OpenAI.ChatCompletionTool[] = Object.values(toolsMap).map((tool: any) => ({
+    type: 'function' as const,
+    function: {
+        name: tool.name,
+        description: tool.description,
+        parameters: schemaToOpenAI(tool.parameters),
+    },
+}));
+
+// ─── OpenAI tool loop ─────────────────────────────────────────────────────────
+async function runToolLoopOpenAI(
+    openai: OpenAI,
+    model: string,
+    systemPrompt: string,
+    userText: string,
+    history: OpenAI.ChatCompletionMessageParam[],
+    toolContext: any,
+    logPrefix: string,
+): Promise<{ reply: string; updatedHistory: OpenAI.ChatCompletionMessageParam[] }> {
+    const messages: OpenAI.ChatCompletionMessageParam[] = [
+        { role: 'system', content: systemPrompt },
+        ...history,
+        { role: 'user', content: userText },
+    ];
+
+    let iterations = 0;
+    const MAX_ITERATIONS = 10;
+
+    while (iterations < MAX_ITERATIONS) {
+        iterations++;
+        const response = await openai.chat.completions.create({
+            model,
+            messages,
+            tools: openAITools,
+            tool_choice: 'auto',
+        });
+
+        const msg = response.choices[0].message;
+        messages.push(msg);
+
+        if (!msg.tool_calls || msg.tool_calls.length === 0) {
+            // No more tool calls — final text response
+            const updatedHistory = messages.slice(1); // drop system prompt
+            return { reply: msg.content ?? '', updatedHistory };
+        }
+
+        // Execute each tool call
+        for (const toolCall of msg.tool_calls) {
+            const fn = (toolCall as any).function as { name: string; arguments: string };
+            const toolName = fn.name;
+            const tool = (toolsMap as any)[toolName];
+            let result: string;
+            if (!tool) {
+                result = JSON.stringify({ error: `Unknown tool: ${toolName}` });
+            } else {
+                try {
+                    const params = JSON.parse(fn.arguments);
+                    const toolResult = await tool.execute(params, toolContext);
+                    result = JSON.stringify(toolResult);
+                    if (toolResult?.success === false || toolResult?.ok === false) {
+                        const errMsg = toolResult?.error ?? toolResult?.message ?? 'unknown error';
+                        await draftSkillFromFailure({ tenantId: tenantId(toolContext), toolName, args: params, error: String(errMsg) }).catch(() => {});
+                    }
+                } catch (err: any) {
+                    result = JSON.stringify({ error: err.message });
+                    await draftSkillFromFailure({ tenantId: tenantId(toolContext), toolName, args: {}, error: err.message }).catch(() => {});
+                }
+            }
+            console.log(`[${logPrefix}] Tool ${toolName} result:`, result.slice(0, 120));
+            messages.push({ role: 'tool', tool_call_id: toolCall.id, content: result });
+        }
+    }
+
+    console.warn(`[${logPrefix}] Max tool iterations reached for OpenAI loop.`);
+    return { reply: 'I hit my reasoning limit. Please try again.', updatedHistory: messages.slice(1) };
+}
+
+function tenantId(toolContext: any): string {
+    return toolContext?.sessionKey ?? toolContext?.agentId ?? 'unknown';
 }
 
 // ─── Tool context ─────────────────────────────────────────────────────────────
@@ -579,10 +757,10 @@ export async function processTelegramMessage(
 
     try {
         const toolContext = buildToolContext(tenantId, tenant);
-        const googleKey = await resolveGoogleKey(tenantId);
+        const aiProvider = await resolveAIProvider(tenantId);
 
-        if (!googleKey) {
-            console.warn(`[AI] No Google key resolved for tenant ${tenantId} — sending paused message.`);
+        if (!aiProvider) {
+            console.warn(`[AI] No key resolved for tenant ${tenantId} — sending paused message.`);
             const wizardUrl = process.env['FRONTEND_URL'] ?? 'https://wizard.tigerclaw.io';
             await bot.sendMessage(
                 chatId,
@@ -591,25 +769,38 @@ export async function processTelegramMessage(
             return;
         }
 
-        console.log(`[AI] Key resolved for tenant ${tenantId}. Entering Gemini pipeline for chat ${chatId}.`);
+        console.log(`[AI] Key resolved for tenant ${tenantId} (provider=${aiProvider.provider}, model=${aiProvider.model}).`);
 
         await bot.sendChatAction(chatId, 'typing');
-        console.log(`[AI] sendChatAction OK for chat ${chatId}`);
 
+        const onboardState = await getBotState<any>(tenantId, 'onboard_state.json').catch(() => null);
+        const onboardingComplete = onboardState?.phase === 'complete';
+        const isFirstMessage = (await getChatHistory(tenantId, chatId)).length === 0;
+        const effectiveText = buildFirstMessageText(text, onboardingComplete, isFirstMessage);
+
+        // ── Check feedback loop: is this message a feedback response? ──────────
+        await maybeLogFeedback(tenantId, chatId, text, bot, tenant, aiProvider, toolContext);
+
+        if (aiProvider.provider === 'openai') {
+            const openai = new OpenAI({ apiKey: aiProvider.key });
+            const history = await getOpenAIChatHistory(tenantId, chatId);
+            const systemPrompt = await buildSystemPrompt(tenant);
+            const { reply, updatedHistory } = await runToolLoopOpenAI(
+                openai, aiProvider.model, systemPrompt, effectiveText, history, toolContext, 'AI',
+            );
+            await saveOpenAIChatHistory(tenantId, chatId, updatedHistory);
+            if (reply.trim()) await bot.sendMessage(chatId, reply);
+            else console.warn(`[AI] [ALERT] OpenAI returned empty reply for tenant ${tenantId}`);
+            return;
+        }
+
+        // ── Gemini path ────────────────────────────────────────────────────────
         const history = await getChatHistory(tenantId, chatId);
         console.log(`[AI] History loaded: ${history.length} entries`);
 
-        // First-message onboarding nudge: if no history and onboarding not complete,
-        // prepend a hidden SYSTEM directive so the model's first action is to
-        // introduce itself and start onboarding — regardless of what the operator typed.
-        const onboardState = await getBotState<any>(tenantId, 'onboard_state.json').catch(() => null);
-        const onboardingComplete = onboardState?.phase === 'complete';
-        const isFirstMessage = history.length === 0;
-        const effectiveText = buildFirstMessageText(text, onboardingComplete, isFirstMessage);
-
-        const genAI = new GoogleGenerativeAI(googleKey);
+        const genAI = new GoogleGenerativeAI(aiProvider.key);
         const model = genAI.getGenerativeModel({
-            model: 'gemini-2.0-flash',
+            model: aiProvider.model,
             systemInstruction: await buildSystemPrompt(tenant),
             tools: geminiTools as any,
         });
@@ -653,9 +844,9 @@ export async function processSystemRoutine(tenantId: string, routineType: string
 
     try {
         const toolContext = buildToolContext(tenantId, tenant);
-        const googleKey = await resolveGoogleKey(tenantId);
+        const aiProvider = await resolveAIProvider(tenantId);
 
-        if (!googleKey) {
+        if (!aiProvider) {
             console.warn(`[AI Routine] [ALERT] No API key for tenant ${tenantId}. Aborting ${routineType}.`);
             return;
         }
@@ -663,12 +854,12 @@ export async function processSystemRoutine(tenantId: string, routineType: string
         // System routines always start with a clean history. Persisting routine
         // chat history causes the next run to start with a 'function' role message
         // (from the previous run's tool responses), which Gemini rejects.
-        const genAI = new GoogleGenerativeAI(googleKey);
-        const model = genAI.getGenerativeModel({
-            model: 'gemini-2.0-flash',
+        const genAI = new GoogleGenerativeAI(aiProvider.provider === 'google' ? aiProvider.key : '');
+        const model = aiProvider.provider === 'google' ? genAI.getGenerativeModel({
+            model: aiProvider.model,
             systemInstruction: await buildSystemPrompt(tenant),
             tools: geminiTools as any,
-        });
+        }) : null;
 
         const wizardUrl = process.env['FRONTEND_URL'] ?? 'https://wizard.tigerclaw.io';
         const systemPrompts: Record<string, string> = {
@@ -677,30 +868,79 @@ export async function processSystemRoutine(tenantId: string, routineType: string
             trial_reminder_24h: `SYSTEM: Write a 1-sentence, highly conversational Telegram message to your operator reminding them they have 48 hours left on their free trial. Tell them to securely plug in their API key at ${wizardUrl} so you don't have to stop working for them. Use your exact flavor and personality. NEVER use placeholders. Do NOT execute any tools.`,
             trial_reminder_48h: `SYSTEM: Write a 1-sentence, highly conversational Telegram message to your operator reminding them they have 24 hours left on their free trial. Tell them to securely plug in their API key at ${wizardUrl} so you don't have to stop working for them. Use your exact flavor and personality. NEVER use placeholders. Do NOT execute any tools.`,
             trial_reminder_72h: `SYSTEM: Write a 1-sentence, highly conversational Telegram message to your operator telling them their 72-hour free trial is officially complete, and you have paused your operations so their flywheel has stopped. Tell them to unlock their bot to resume scouting at ${wizardUrl}. Use your exact flavor and personality. NEVER use placeholders. Do NOT execute any tools.`,
+            weekly_checkin: `SYSTEM: You are checking in with your operator as a coach and strategic partner. Write a warm, brief Telegram message asking them to share one win and one challenge from this week. Keep it conversational, not formal. Sign off with your name. Do NOT execute any tools.`,
+            feedback_reminder: `SYSTEM: Your operator hasn't responded to your weekly check-in yet. Send a short, friendly nudge — one sentence. Remind them you're waiting to hear how things are going. Use your personality. Do NOT execute any tools.`,
+            feedback_pause: `SYSTEM: Your operator has not responded to your weekly check-in or reminder. Write a very brief message telling them you're pausing your operations until they check in with you. Keep it warm, not punitive. Tell them to just reply to this message to resume. Do NOT execute any tools.`,
         };
         const prompt = systemPrompts[routineType] ?? `SYSTEM: Execute routine: ${routineType}`;
 
-        const chat = model.startChat({ history: [] });
-        const initial = await chat.sendMessage(prompt);
-        
-        // Trial Reminder Handling — broadcast via Telegram AND email fallback
-        if (routineType.startsWith('trial_reminder_')) {
+        // Helper: get text from either provider
+        const getRoutineText = async (): Promise<string> => {
+            if (aiProvider.provider === 'openai') {
+                const openai = new OpenAI({ apiKey: aiProvider.key });
+                const res = await openai.chat.completions.create({
+                    model: aiProvider.model,
+                    messages: [
+                        { role: 'system', content: await buildSystemPrompt(tenant) },
+                        { role: 'user', content: prompt },
+                    ],
+                });
+                return res.choices[0].message.content ?? '';
+            }
+            if (!model) return '';
+            const chat = model.startChat({ history: [] });
+            const initial = await chat.sendMessage(prompt);
+            // For tool-loop routines, run the loop
+            if (routineType === 'daily_scout' || routineType === 'nurture_check') {
+                await runToolLoop(chat, initial.response, toolContext, `AI Routine:${routineType}`);
+                return '';
+            }
+            return initial.response.text?.() ?? '';
+        };
+
+        // ── Feedback loop routines ─────────────────────────────────────────────
+        if (routineType === 'weekly_checkin' || routineType === 'feedback_reminder' || routineType === 'feedback_pause') {
+            const message = await getRoutineText();
+            if (message) {
+                const botToken = await getTenantBotToken(tenantId);
+                if (botToken) {
+                    const chatIds = await getTenantChatIds(tenantId);
+                    const bot = new TelegramBot(botToken);
+                    for (const cid of chatIds) {
+                        await bot.sendMessage(cid, message).catch(err =>
+                            console.error(`[AI Routine] Failed to send ${routineType} to ${cid}:`, err.message)
+                        );
+                    }
+                }
+                if (routineType === 'feedback_pause') {
+                    // Pause the tenant until they respond
+                    const pool = getPool();
+                    await pool.query(
+                        `UPDATE tenants SET feedback_paused = true, feedback_pause_sent_at = now() WHERE id = $1`,
+                        [tenantId],
+                    );
+                } else if (routineType === 'feedback_reminder') {
+                    const pool = getPool();
+                    await pool.query(
+                        `UPDATE tenants SET feedback_reminder_sent_at = now() WHERE id = $1`,
+                        [tenantId],
+                    );
+                }
+            }
+        // ── Trial reminders ────────────────────────────────────────────────────
+        } else if (routineType.startsWith('trial_reminder_')) {
             const hoursRemainingMap: Record<string, number> = {
                 trial_reminder_24h: 48,
                 trial_reminder_48h: 24,
                 trial_reminder_72h: 0,
             };
             const hoursRemaining = hoursRemainingMap[routineType] ?? 0;
-
-            let finalResponse = initial.response.text?.() ?? '';
+            let finalResponse = await getRoutineText();
             if (finalResponse) {
                 if (routineType === 'trial_reminder_72h') {
                     const stanStoreUrl = process.env['STAN_STORE_URL'];
-                    if (stanStoreUrl) {
-                        finalResponse += `\n\nTo unlock your bot and resume operations: ${stanStoreUrl}`;
-                    }
+                    if (stanStoreUrl) finalResponse += `\n\nTo unlock your bot and resume operations: ${stanStoreUrl}`;
                 }
-                // Telegram
                 const botToken = await getTenantBotToken(tenantId);
                 if (botToken) {
                     const chatIds = await getTenantChatIds(tenantId);
@@ -711,7 +951,6 @@ export async function processSystemRoutine(tenantId: string, routineType: string
                         );
                     }
                 }
-                // Email fallback — always send regardless of Telegram success
                 if (tenant.email) {
                     await sendTrialReminderEmail(tenant.email, hoursRemaining).catch(err =>
                         console.error(`[AI Routine] Failed to send trial reminder email to ${tenant.email}:`, err.message)
@@ -724,14 +963,119 @@ export async function processSystemRoutine(tenantId: string, routineType: string
                 }
             }
         } else {
-            // Standard tool loop for Nurture/Scouting
-            await runToolLoop(chat, initial.response, toolContext, `AI Routine:${routineType}`);
+            // Standard tool loop (daily_scout, nurture_check)
+            await getRoutineText();
         }
 
         console.log(`[AI Routine] ${routineType} complete for tenant ${tenantId}.`);
     } catch (err: any) {
         console.error(`[AI Routine] [ALERT] ${routineType} failed for tenant ${tenantId}:`, err.message);
     }
+}
+
+// ─── OpenAI chat history (stored separately from Gemini history) ─────────────
+// Gemini history uses Content[] format; OpenAI uses ChatCompletionMessageParam[].
+// We keep them in separate Redis keys to avoid format conflicts.
+
+async function getOpenAIChatHistory(tenantId: string, chatId: number): Promise<OpenAI.ChatCompletionMessageParam[]> {
+    try {
+        const raw = await redis.get(`oai_history:${tenantId}:${chatId}`);
+        if (!raw) return [];
+        return JSON.parse(raw);
+    } catch { return []; }
+}
+
+async function saveOpenAIChatHistory(tenantId: string, chatId: number, history: OpenAI.ChatCompletionMessageParam[]): Promise<void> {
+    const trimmed = history.slice(-40); // keep last 40 messages (~20 turns)
+    await redis.set(`oai_history:${tenantId}:${chatId}`, JSON.stringify(trimmed), 'EX', 60 * 60 * 24 * 30);
+}
+
+// ─── Feedback loop detection ──────────────────────────────────────────────────
+// Called on every inbound Telegram message. If the tenant has feedback_loop_enabled
+// and hasn't checked in this week, this message IS their check-in response.
+// We log it, generate a coaching reply, and clear the feedback_paused flag.
+
+async function maybeLogFeedback(
+    tenantId: string,
+    chatId: number,
+    text: string,
+    bot: TelegramBot,
+    tenant: any,
+    aiProvider: AIProvider,
+    toolContext: any,
+): Promise<void> {
+    const pool = getPool();
+    const res = await pool.query(
+        `SELECT feedback_loop_enabled, feedback_paused, last_feedback_at
+         FROM tenants WHERE id = $1`,
+        [tenantId],
+    );
+    if (!res.rows.length) return;
+    const { feedback_loop_enabled, feedback_paused, last_feedback_at } = res.rows[0];
+    if (!feedback_loop_enabled) return;
+
+    // Is this within the weekly feedback window? (Monday 8am → Sunday midnight)
+    const now = new Date();
+    const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const alreadyCheckedInThisWeek = last_feedback_at && new Date(last_feedback_at) > weekAgo;
+    if (alreadyCheckedInThisWeek && !feedback_paused) return;
+
+    // This message is a feedback response — log it and generate coaching reply
+    const coachingPrompt = `SYSTEM: Your operator just responded to your weekly check-in with: "${text}"
+
+Respond as their strategic coach and partner. In 2-4 sentences:
+1. Acknowledge their specific win or challenge
+2. Give ONE concrete, actionable suggestion based on what they shared
+3. End with energy and encouragement
+
+Use your exact personality. Be specific to what they said, not generic. Do NOT execute any tools.`;
+
+    let coachingReply = '';
+    try {
+        if (aiProvider.provider === 'openai') {
+            const openai = new OpenAI({ apiKey: aiProvider.key });
+            const res2 = await openai.chat.completions.create({
+                model: aiProvider.model,
+                messages: [
+                    { role: 'system', content: await buildSystemPrompt(tenant) },
+                    { role: 'user', content: coachingPrompt },
+                ],
+            });
+            coachingReply = res2.choices[0].message.content ?? '';
+        } else {
+            const genAI = new GoogleGenerativeAI(aiProvider.key);
+            const model = genAI.getGenerativeModel({
+                model: aiProvider.model,
+                systemInstruction: await buildSystemPrompt(tenant),
+            });
+            const result = await model.generateContent(coachingPrompt);
+            coachingReply = result.response.text() ?? '';
+        }
+    } catch (err: any) {
+        console.error(`[Feedback] Coaching reply generation failed for ${tenantId}:`, err.message);
+    }
+
+    // Log feedback to DB
+    await pool.query(
+        `INSERT INTO tenant_feedback (tenant_id, content, coaching_reply) VALUES ($1, $2, $3)`,
+        [tenantId, text, coachingReply || null],
+    );
+
+    // Clear paused state, update last_feedback_at
+    await pool.query(
+        `UPDATE tenants SET last_feedback_at = now(), feedback_paused = false,
+         feedback_pause_sent_at = null, feedback_reminder_sent_at = null WHERE id = $1`,
+        [tenantId],
+    );
+
+    // Send coaching reply if we got one (separate from the normal AI response)
+    if (coachingReply.trim()) {
+        await bot.sendMessage(chatId, `💬 ${coachingReply}`).catch(err =>
+            console.error(`[Feedback] Failed to send coaching reply to ${chatId}:`, err.message)
+        );
+    }
+
+    console.log(`[Feedback] Logged feedback for tenant ${tenantId}. Paused cleared: ${feedback_paused}`);
 }
 
 // ─── Public: process a LINE user message ─────────────────────────────────────
@@ -770,9 +1114,9 @@ export async function processLINEMessage(
     if (!tenant) throw new Error(`Tenant not found: ${tenantId}`);
 
     const toolContext = buildToolContext(tenantId, tenant);
-    const googleKey = await resolveGoogleKey(tenantId);
+    const aiProvider = await resolveAIProvider(tenantId);
 
-    if (!googleKey) {
+    if (!aiProvider) {
         await sendLineMessage('⚠️ Your bot is paused. Please contact support or add your API key to reactivate.');
         return;
     }
@@ -782,21 +1126,31 @@ export async function processLINEMessage(
 
     try {
         const history = await getChatHistory(tenantId, chatId);
-        const genAI = new GoogleGenerativeAI(googleKey);
-        const model = genAI.getGenerativeModel({
-            model: 'gemini-2.0-flash',
+        const genAI = new GoogleGenerativeAI(aiProvider.provider === 'google' ? aiProvider.key : '');
+        const model = aiProvider.provider === 'google' ? genAI.getGenerativeModel({
+            model: aiProvider.model,
             systemInstruction: await buildSystemPrompt(tenant),
             tools: geminiTools as any,
-        });
+        }) : null;
 
-        const chat = model.startChat({ history });
-        const initial = await chat.sendMessage(text);
-        const finalResponse = await runToolLoop(chat, initial.response, toolContext, 'AI');
+        let replyText = '';
+        if (aiProvider.provider === 'openai') {
+            const openai = new OpenAI({ apiKey: aiProvider.key });
+            const oaiHistory = await getOpenAIChatHistory(tenantId, chatId);
+            const { reply, updatedHistory: newHist } = await runToolLoopOpenAI(
+                openai, aiProvider.model, await buildSystemPrompt(tenant), text, oaiHistory, toolContext, 'AI LINE',
+            );
+            await saveOpenAIChatHistory(tenantId, chatId, newHist);
+            replyText = reply;
+        } else {
+            const chat = model!.startChat({ history });
+            const initial = await chat.sendMessage(text);
+            const finalResponse = await runToolLoop(chat, initial.response, toolContext, 'AI');
+            const updatedHistory = await chat.getHistory();
+            await saveChatHistory(tenantId, chatId, updatedHistory);
+            replyText = finalResponse.text?.() ?? '';
+        }
 
-        const updatedHistory = await chat.getHistory();
-        await saveChatHistory(tenantId, chatId, updatedHistory);
-
-        const replyText = finalResponse.text?.() ?? '';
         if (replyText.trim().length > 0) {
             await sendLineMessage(replyText);
         }

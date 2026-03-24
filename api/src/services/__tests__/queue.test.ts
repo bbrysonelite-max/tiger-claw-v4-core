@@ -112,7 +112,7 @@ describe('queue.ts workers', () => {
             await processors.cron();
 
             // Should have queried active tenants
-            expect(mockQuery).toHaveBeenCalledWith("SELECT id, created_at FROM tenants WHERE status = 'active'");
+            expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining("SELECT id, created_at"));
             
             expect(routineQueue.add).toHaveBeenCalledTimes(2);
             expect(routineQueue.add).toHaveBeenCalledWith('nurture_check', expect.objectContaining({ tenantId: 'tenant-1' }), expect.any(Object));

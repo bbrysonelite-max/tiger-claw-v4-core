@@ -290,7 +290,11 @@ export const cronWorker = SHOULD_RUN_WORKERS ? new Worker(
         try {
             const pool = getPool();
             // Fetch all active tenants and check hours since creation for Trial Engine
-            const { rows: tenants } = await pool.query("SELECT id, created_at FROM tenants WHERE status = 'active'");
+            const { rows: tenants } = await pool.query(`
+                SELECT id, created_at, feedback_loop_enabled, feedback_paused,
+                       last_feedback_at, feedback_reminder_sent_at, feedback_pause_sent_at
+                FROM tenants WHERE status = 'active'
+            `);
 
             const nowHour = new Date().getUTCHours();
             const today = new Date().toISOString().split('T')[0];
@@ -348,6 +352,37 @@ export const cronWorker = SHOULD_RUN_WORKERS ? new Worker(
                             tenantId: tenant.id,
                             routineType: 'daily_scout',
                         }, { jobId: `scout_${tenant.id}_${today}`, removeOnComplete: true, removeOnFail: true });
+                    }
+
+                    // ── Feedback loop enforcement ──────────────────────────────────────
+                    // Monday 8 AM UTC: weekly check-in
+                    // Wednesday 8 AM UTC: reminder if no feedback since Monday
+                    // Friday 8 AM UTC: pause if still no feedback
+                    if (tenant.feedback_loop_enabled) {
+                        const dayOfWeek = new Date().getUTCDay(); // 0=Sun, 1=Mon, ..., 5=Fri
+                        const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+                        const hasCheckedInThisWeek = tenant.last_feedback_at &&
+                            new Date(tenant.last_feedback_at) > weekAgo;
+
+                        if (!hasCheckedInThisWeek) {
+                            if (dayOfWeek === 1 && nowHour === 8 && !tenant.feedback_reminder_sent_at) {
+                                // Monday 8am — initial check-in
+                                await routineQueue.add('weekly_checkin', {
+                                    tenantId: tenant.id, routineType: 'weekly_checkin',
+                                }, { jobId: `checkin_${tenant.id}_${today}`, removeOnComplete: true });
+                            } else if (dayOfWeek === 3 && nowHour === 8 &&
+                                tenant.feedback_reminder_sent_at === null && !tenant.feedback_paused) {
+                                // Wednesday 8am — reminder
+                                await routineQueue.add('feedback_reminder', {
+                                    tenantId: tenant.id, routineType: 'feedback_reminder',
+                                }, { jobId: `reminder_${tenant.id}_${today}`, removeOnComplete: true });
+                            } else if (dayOfWeek === 5 && nowHour === 8 && !tenant.feedback_paused) {
+                                // Friday 8am — pause
+                                await routineQueue.add('feedback_pause', {
+                                    tenantId: tenant.id, routineType: 'feedback_pause',
+                                }, { jobId: `pause_${tenant.id}_${today}`, removeOnComplete: true });
+                            }
+                        }
                     }
                 } catch (tenantErr) {
                     // Isolate per-tenant failures — other tenants continue processing
