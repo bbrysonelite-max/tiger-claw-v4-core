@@ -18,6 +18,7 @@ import { tiger_briefing }    from '../tools/tiger_briefing.js';
 import { tiger_convert }     from '../tools/tiger_convert.js';
 import { tiger_export }      from '../tools/tiger_export.js';
 import { tiger_email }       from '../tools/tiger_email.js';
+import { sendTrialReminderEmail } from './email.js';
 import { tiger_hive }        from '../tools/tiger_hive.js';
 import { tiger_knowledge }   from '../tools/tiger_knowledge.js';
 import { tiger_import }      from '../tools/tiger_import.js';
@@ -574,9 +575,10 @@ export async function processTelegramMessage(
 
         if (!googleKey) {
             console.warn(`[AI] No Google key resolved for tenant ${tenantId} — sending paused message.`);
+            const wizardUrl = process.env['FRONTEND_URL'] ?? 'https://wizard.tigerclaw.io';
             await bot.sendMessage(
                 chatId,
-                '⚠️ Your bot is paused. Please contact support or add your API key to reactivate.',
+                `⚠️ Your bot is paused. Add your API key at ${wizardUrl} to reactivate.`,
             );
             return;
         }
@@ -660,37 +662,52 @@ export async function processSystemRoutine(tenantId: string, routineType: string
             tools: geminiTools as any,
         });
 
+        const wizardUrl = process.env['FRONTEND_URL'] ?? 'https://wizard.tigerclaw.io';
         const systemPrompts: Record<string, string> = {
             daily_scout:   'SYSTEM: Run your Daily Scout routine. Find new leads to contact.',
             nurture_check: 'SYSTEM: Run your Nurture Check. Review follow-ups and reach out where due.',
-            trial_reminder_24h: `SYSTEM: Write a 1-sentence, highly conversational Telegram message to your operator reminding them they have 48 hours left on their free trial. Tell them to securely plug in their API key at https://app.tigerclaw.io so you don't have to stop working for them. Use your exact flavor and personality. NEVER use placeholders. Do NOT execute any tools.`,
-            trial_reminder_48h: `SYSTEM: Write a 1-sentence, highly conversational Telegram message to your operator reminding them they have 24 hours left on their free trial. Tell them to securely plug in their API key at https://app.tigerclaw.io so you don't have to stop working for them. Use your exact flavor and personality. NEVER use placeholders. Do NOT execute any tools.`,
-            trial_reminder_72h: `SYSTEM: Write a 1-sentence, highly conversational Telegram message to your operator telling them their 72-hour free trial is officially complete, and you have paused your operations so their flywheel has stopped. Tell them to unlock their bot to resume scouting. Use your exact flavor and personality. NEVER use placeholders. Do NOT execute any tools.`,
+            trial_reminder_24h: `SYSTEM: Write a 1-sentence, highly conversational Telegram message to your operator reminding them they have 48 hours left on their free trial. Tell them to securely plug in their API key at ${wizardUrl} so you don't have to stop working for them. Use your exact flavor and personality. NEVER use placeholders. Do NOT execute any tools.`,
+            trial_reminder_48h: `SYSTEM: Write a 1-sentence, highly conversational Telegram message to your operator reminding them they have 24 hours left on their free trial. Tell them to securely plug in their API key at ${wizardUrl} so you don't have to stop working for them. Use your exact flavor and personality. NEVER use placeholders. Do NOT execute any tools.`,
+            trial_reminder_72h: `SYSTEM: Write a 1-sentence, highly conversational Telegram message to your operator telling them their 72-hour free trial is officially complete, and you have paused your operations so their flywheel has stopped. Tell them to unlock their bot to resume scouting at ${wizardUrl}. Use your exact flavor and personality. NEVER use placeholders. Do NOT execute any tools.`,
         };
         const prompt = systemPrompts[routineType] ?? `SYSTEM: Execute routine: ${routineType}`;
 
         const chat = model.startChat({ history: [] });
         const initial = await chat.sendMessage(prompt);
         
-        // Trial Reminder Handling — extract text and broadcast entirely securely
+        // Trial Reminder Handling — broadcast via Telegram AND email fallback
         if (routineType.startsWith('trial_reminder_')) {
+            const hoursRemainingMap: Record<string, number> = {
+                trial_reminder_24h: 48,
+                trial_reminder_48h: 24,
+                trial_reminder_72h: 0,
+            };
+            const hoursRemaining = hoursRemainingMap[routineType] ?? 0;
+
             let finalResponse = initial.response.text?.() ?? '';
             if (finalResponse) {
                 if (routineType === 'trial_reminder_72h') {
-                    const stanStoreUrl = process.env.STAN_STORE_URL;
+                    const stanStoreUrl = process.env['STAN_STORE_URL'];
                     if (stanStoreUrl) {
-                        finalResponse += `\n\nTo unlock your bot and resume operations, complete your registration here: ${stanStoreUrl}`;
+                        finalResponse += `\n\nTo unlock your bot and resume operations: ${stanStoreUrl}`;
                     }
                 }
+                // Telegram
                 const botToken = await getTenantBotToken(tenantId);
                 if (botToken) {
                     const chatIds = await getTenantChatIds(tenantId);
                     const bot = new TelegramBot(botToken);
                     for (const cid of chatIds) {
-                        await bot.sendMessage(cid, finalResponse).catch(err => 
+                        await bot.sendMessage(cid, finalResponse).catch(err =>
                             console.error(`[AI Routine] Failed to send reminder to ${cid}:`, err.message)
                         );
                     }
+                }
+                // Email fallback — always send regardless of Telegram success
+                if (tenant.email) {
+                    await sendTrialReminderEmail(tenant.email, hoursRemaining).catch(err =>
+                        console.error(`[AI Routine] Failed to send trial reminder email to ${tenant.email}:`, err.message)
+                    );
                 }
                 if (routineType === 'trial_reminder_72h') {
                     const botState = JSON.parse(await getBotState(tenantId, 'key_state.json') || '{}');

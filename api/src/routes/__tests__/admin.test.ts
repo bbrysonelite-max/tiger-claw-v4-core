@@ -295,3 +295,162 @@ describe('GET /admin/dashboard/tenants', () => {
   })
 })
 
+// ---------------------------------------------------------------------------
+// Skills curation routes
+// ---------------------------------------------------------------------------
+describe('Skills curation routes', () => {
+  const mockPool = { query: vi.fn() }
+
+  beforeEach(() => {
+    mockDb.getPool.mockReturnValue(mockPool)
+    mockDb.logAdminEvent.mockResolvedValue(undefined)
+  })
+
+  describe('GET /admin/skills', () => {
+    it('returns skills list with total count', async () => {
+      const app = await buildApp()
+      const fakeSkill = { id: 'uuid-1', name: 'recover_tiger_scout_failure', status: 'draft' }
+      mockPool.query
+        .mockResolvedValueOnce({ rows: [fakeSkill] })
+        .mockResolvedValueOnce({ rows: [{ count: '1' }] })
+
+      const res = await request(app)
+        .get('/admin/skills')
+        .set('Authorization', `Bearer ${VALID_TOKEN}`)
+
+      expect(res.status).toBe(200)
+      expect(res.body.skills).toHaveLength(1)
+      expect(res.body.total).toBe(1)
+    })
+
+    it('filters by tenantId when provided', async () => {
+      const app = await buildApp()
+      mockPool.query
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [{ count: '0' }] })
+
+      const res = await request(app)
+        .get('/admin/skills?tenantId=abc-123')
+        .set('Authorization', `Bearer ${VALID_TOKEN}`)
+
+      expect(res.status).toBe(200)
+      expect(res.body.total).toBe(0)
+    })
+
+    it('returns 401 without auth', async () => {
+      const app = await buildApp()
+      const res = await request(app).get('/admin/skills')
+      expect(res.status).toBe(401)
+    })
+  })
+
+  describe('POST /admin/skills/:id/approve', () => {
+    it('approves a draft skill', async () => {
+      const app = await buildApp()
+      mockPool.query.mockResolvedValue({
+        rows: [{ id: 'uuid-1', name: 'recover_tiger_scout_failure', status: 'approved', scope: 'tenant' }],
+      })
+
+      const res = await request(app)
+        .post('/admin/skills/uuid-1/approve')
+        .set('Authorization', `Bearer ${VALID_TOKEN}`)
+        .send({})
+
+      expect(res.status).toBe(200)
+      expect(res.body.ok).toBe(true)
+      expect(res.body.skill.status).toBe('approved')
+    })
+
+    it('returns 404 when skill not found or not draft', async () => {
+      const app = await buildApp()
+      mockPool.query.mockResolvedValue({ rows: [] })
+
+      const res = await request(app)
+        .post('/admin/skills/no-such-id/approve')
+        .set('Authorization', `Bearer ${VALID_TOKEN}`)
+        .send({})
+
+      expect(res.status).toBe(404)
+    })
+  })
+
+  describe('POST /admin/skills/:id/reject', () => {
+    it('rejects a draft skill', async () => {
+      const app = await buildApp()
+      mockPool.query.mockResolvedValue({
+        rows: [{ id: 'uuid-1', name: 'recover_tiger_scout_failure', status: 'rejected' }],
+      })
+
+      const res = await request(app)
+        .post('/admin/skills/uuid-1/reject')
+        .set('Authorization', `Bearer ${VALID_TOKEN}`)
+
+      expect(res.status).toBe(200)
+      expect(res.body.skill.status).toBe('rejected')
+    })
+
+    it('returns 404 when skill already finalized', async () => {
+      const app = await buildApp()
+      mockPool.query.mockResolvedValue({ rows: [] })
+
+      const res = await request(app)
+        .post('/admin/skills/no-such-id/reject')
+        .set('Authorization', `Bearer ${VALID_TOKEN}`)
+
+      expect(res.status).toBe(404)
+    })
+  })
+
+  describe('POST /admin/skills/:id/promote', () => {
+    it('promotes an approved skill to platform scope', async () => {
+      const app = await buildApp()
+      mockPool.query.mockResolvedValue({
+        rows: [{ id: 'uuid-1', name: 'recover_tiger_scout_failure', status: 'platform', scope: 'platform' }],
+      })
+
+      const res = await request(app)
+        .post('/admin/skills/uuid-1/promote')
+        .set('Authorization', `Bearer ${VALID_TOKEN}`)
+
+      expect(res.status).toBe(200)
+      expect(res.body.skill.scope).toBe('platform')
+    })
+
+    it('returns 404 when skill not in approved status', async () => {
+      const app = await buildApp()
+      mockPool.query.mockResolvedValue({ rows: [] })
+
+      const res = await request(app)
+        .post('/admin/skills/draft-id/promote')
+        .set('Authorization', `Bearer ${VALID_TOKEN}`)
+
+      expect(res.status).toBe(404)
+    })
+  })
+
+  describe('DELETE /admin/skills/:id', () => {
+    it('deletes a skill by id', async () => {
+      const app = await buildApp()
+      mockPool.query.mockResolvedValue({ rowCount: 1 })
+
+      const res = await request(app)
+        .delete('/admin/skills/uuid-1')
+        .set('Authorization', `Bearer ${VALID_TOKEN}`)
+
+      expect(res.status).toBe(200)
+      expect(res.body.ok).toBe(true)
+    })
+
+    it('returns 404 when skill does not exist', async () => {
+      const app = await buildApp()
+      mockPool.query.mockResolvedValue({ rowCount: 0 })
+
+      const res = await request(app)
+        .delete('/admin/skills/no-such-id')
+        .set('Authorization', `Bearer ${VALID_TOKEN}`)
+
+      expect(res.status).toBe(404)
+    })
+  })
+})
+

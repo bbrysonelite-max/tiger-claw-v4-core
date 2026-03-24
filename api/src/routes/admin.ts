@@ -921,4 +921,122 @@ router.post("/fleet/:tenantId/deprovision", async (req: Request, res: Response) 
   }
 });
 
+// ── Skills Curation Routes ────────────────────────────────────────────────────
+// Skills are auto-drafted by the self-improvement engine on every tool failure.
+// Admin reviews them here: list → approve/reject → optionally promote to platform.
+//
+// GET  /admin/skills              — list draft skills (paginated, filterable)
+// POST /admin/skills/:id/approve  — approve a draft skill (tenant/flavor scope)
+// POST /admin/skills/:id/reject   — reject a draft skill
+// POST /admin/skills/:id/promote  — promote an approved skill to platform scope
+// DELETE /admin/skills/:id        — hard delete a skill
+
+router.get("/skills", async (req: Request, res: Response) => {
+  try {
+    const pool = getPool();
+    const status = (req.query["status"] as string) ?? "draft";
+    const scope = req.query["scope"] as string | undefined;
+    const tenantId = req.query["tenantId"] as string | undefined;
+    const limit = Math.min(parseInt(req.query["limit"] as string ?? "50", 10), 200);
+    const offset = parseInt(req.query["offset"] as string ?? "0", 10);
+
+    const conditions: string[] = ["status = $1"];
+    const params: unknown[] = [status];
+    let idx = 2;
+
+    if (scope) { conditions.push(`scope = $${idx++}`); params.push(scope); }
+    if (tenantId) { conditions.push(`tenant_id = $${idx++}`); params.push(tenantId); }
+
+    const where = conditions.join(" AND ");
+    const { rows } = await pool.query(
+      `SELECT id, name, description, type, scope, tenant_id, flavor, status,
+              trigger_tool, trigger_error, usage_count, success_count,
+              created_by, created_at, updated_at
+       FROM skills WHERE ${where}
+       ORDER BY created_at DESC LIMIT $${idx++} OFFSET $${idx}`,
+      [...params, limit, offset],
+    );
+
+    const { rows: [{ count }] } = await pool.query(
+      `SELECT COUNT(*) FROM skills WHERE ${where}`,
+      params,
+    );
+
+    return res.json({ skills: rows, total: parseInt(count, 10), limit, offset });
+  } catch (err) {
+    return res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+router.post("/skills/:id/approve", async (req: Request, res: Response) => {
+  try {
+    const pool = getPool();
+    const { id } = req.params;
+    const { scope } = req.body as { scope?: string };
+    const newScope = scope && ["tenant", "flavor", "platform"].includes(scope) ? scope : undefined;
+
+    const { rows } = await pool.query(
+      `UPDATE skills
+       SET status = 'approved'${newScope ? ", scope = $2" : ""}
+       WHERE id = $1 AND status = 'draft'
+       RETURNING id, name, status, scope`,
+      newScope ? [id, newScope] : [id],
+    );
+    if (rows.length === 0) return res.status(404).json({ error: "Skill not found or not in draft status" });
+    await logAdminEvent("skill_approved", undefined, { skill_id: id, scope: rows[0].scope });
+    return res.json({ ok: true, skill: rows[0] });
+  } catch (err) {
+    return res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+router.post("/skills/:id/reject", async (req: Request, res: Response) => {
+  try {
+    const pool = getPool();
+    const { id } = req.params;
+    const { rows } = await pool.query(
+      `UPDATE skills SET status = 'rejected'
+       WHERE id = $1 AND status IN ('draft', 'submitted')
+       RETURNING id, name, status`,
+      [id],
+    );
+    if (rows.length === 0) return res.status(404).json({ error: "Skill not found or already finalized" });
+    await logAdminEvent("skill_rejected", undefined, { skill_id: id });
+    return res.json({ ok: true, skill: rows[0] });
+  } catch (err) {
+    return res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+router.post("/skills/:id/promote", async (req: Request, res: Response) => {
+  try {
+    const pool = getPool();
+    const { id } = req.params;
+    const { rows } = await pool.query(
+      `UPDATE skills SET status = 'platform', scope = 'platform', tenant_id = NULL
+       WHERE id = $1 AND status = 'approved'
+       RETURNING id, name, status, scope`,
+      [id],
+    );
+    if (rows.length === 0) return res.status(404).json({ error: "Skill not found or not in approved status" });
+    await logAdminEvent("skill_promoted", undefined, { skill_id: id });
+    return res.json({ ok: true, skill: rows[0] });
+  } catch (err) {
+    return res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+router.delete("/skills/:id", async (req: Request, res: Response) => {
+  try {
+    const pool = getPool();
+    const { id } = req.params;
+    const { rowCount } = await pool.query("DELETE FROM skills WHERE id = $1", [id]);
+    if (!rowCount) return res.status(404).json({ error: "Skill not found" });
+    await logAdminEvent("skill_deleted", undefined, { skill_id: id });
+    return res.json({ ok: true });
+  } catch (err) {
+    return res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
 export default router;
