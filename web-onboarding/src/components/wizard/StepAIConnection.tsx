@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check, X, Shield, ExternalLink, ArrowRight, Loader2, Plus, Trash2, Key, Info } from "lucide-react";
+import { ExternalLink, ArrowRight, Trash2, Key, Info, Shield } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { WizardState, AIKeyConfig } from "../OnboardingModal";
 import { cn } from "@/lib/utils";
@@ -24,10 +24,8 @@ const PROVIDERS = [
 export default function StepAIConnection({ state, updateState, onNext }: AIConnectionProps) {
     const [selectedProvider, setSelectedProvider] = useState<typeof PROVIDERS[number]["id"]>("google");
     const [tempKey, setTempKey] = useState("");
-    const [isValidating, setIsValidating] = useState(false);
 
-    const isPro = state.planId === "pro" || state.planId === "white-label";
-    const maxKeys = 4; // Unlocked 4-way rotation for all BYOK users
+    const maxKeys = 4;
 
     const currentProvider = PROVIDERS.find(p => p.id === selectedProvider)!;
 
@@ -55,65 +53,11 @@ export default function StepAIConnection({ state, updateState, onNext }: AIConne
             <div className="mb-6">
                 <h3 className="text-2xl font-bold mb-2 text-white">AI Power Core</h3>
                 <p className="text-white/50 text-base leading-relaxed">
-                    Select your AI Brain. You can use our free 72-hour trial brain, or bring your own keys for unlimited 4-way rotation.
+                    Add your AI key. Gemini is free — get one in 30 seconds. Supports 4-way automatic failover across providers.
                 </p>
             </div>
 
-            {/* Brain Selection Toggle */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-                <button
-                    onClick={() => updateState({ connectionType: "managed" })}
-                    className={cn(
-                        "p-6 rounded-2xl border text-left transition-all",
-                        state.connectionType === "managed"
-                            ? "bg-primary/20 border-primary"
-                            : "bg-white/5 border-white/10 hover:bg-white/10 text-white/50"
-                    )}
-                >
-                    <div className="flex items-center gap-3 mb-2">
-                        <Shield className={cn("w-6 h-6", state.connectionType === "managed" ? "text-primary" : "text-white/30")} />
-                        <h4 className={cn("font-bold text-lg", state.connectionType === "managed" ? "text-white" : "")}>Tiger-Claw Free Trial Brain</h4>
-                    </div>
-                    <p className="text-sm">72-Hour Free Trial. Powered by Gemini 2.0 Flash. You will need to add your own keys after 72 hours.</p>
-                </button>
-
-                <button
-                    onClick={() => updateState({ connectionType: "byok" })}
-                    className={cn(
-                        "p-6 rounded-2xl border text-left transition-all",
-                        state.connectionType === "byok"
-                            ? "bg-primary/20 border-primary"
-                            : "bg-white/5 border-white/10 hover:bg-white/10 text-white/50"
-                    )}
-                >
-                    <div className="flex items-center gap-3 mb-2">
-                        <Key className={cn("w-6 h-6", state.connectionType === "byok" ? "text-primary" : "text-white/30")} />
-                        <h4 className={cn("font-bold text-lg", state.connectionType === "byok" ? "text-white" : "")}>Bring Your Own Key</h4>
-                    </div>
-                    <p className="text-sm">Mandatory after 72 hours. Unlock automatic provider failover (OpenAI, Anthropic, etc) to maximize uptime.</p>
-                </button>
-            </div>
-
-            {state.connectionType === "managed" ? (
-                <div className="flex-1 flex flex-col items-center justify-center p-8 border border-white/10 rounded-3xl bg-white/5 text-center">
-                    <div className="w-16 h-16 bg-primary/20 rounded-full flex items-center justify-center mb-6">
-                        <Shield className="w-8 h-8 text-primary" />
-                    </div>
-                    <h3 className="text-2xl font-black text-white mb-2">Free Trial Active</h3>
-                    <p className="text-white/60 mb-8 max-w-md mx-auto">
-                        Your agent will use Tiger-Claw's enterprise Gemini 2.0 Flash accounts for the next 72 hours. Strict rate limits apply to prevent abuse. No setup required.
-                    </p>
-                    <div className="flex flex-wrap justify-center gap-4">
-                        <span className="px-4 py-2 bg-green-500/10 text-green-400 border border-green-500/20 rounded-full text-sm font-bold flex items-center gap-2">
-                            <Check className="w-4 h-4" /> 100% Free
-                        </span>
-                        <span className="px-4 py-2 bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded-full text-sm font-bold flex items-center gap-2">
-                            <Check className="w-4 h-4" /> Ready to Launch
-                        </span>
-                    </div>
-                </div>
-            ) : (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 flex-1">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 flex-1">
                     {/* Left: Provider Selection & Key Input */}
                     <div className="space-y-6">
                         <div className="grid grid-cols-3 gap-3">
@@ -234,13 +178,13 @@ export default function StepAIConnection({ state, updateState, onNext }: AIConne
                         )}
                     </div>
                 </div>
-            )}
+            </div>
 
             <div className="mt-8 flex justify-end items-center">
 
                 <button
                     onClick={onNext}
-                    disabled={state.connectionType === "byok" && state.aiKeys.length === 0}
+                    disabled={state.aiKeys.length === 0}
                     className="group relative inline-flex h-12 items-center justify-center overflow-hidden rounded-full font-bold px-8 bg-primary text-black transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105 active:scale-95"
                 >
                     <span className="relative z-10 flex items-center gap-2">
