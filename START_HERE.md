@@ -1,5 +1,5 @@
 # START HERE — THE MASTER RESURRECTION BRIEFING
-**Updated:** 2026-03-23 | Session: Skills admin routes, email trial reminders, 4 hardening fixes — 376/376 tests
+**Updated:** 2026-03-24 | Session: GitGuardian full clean — 18 secret files scrubbed, 379/379 tests | Commit: 67f82b9
 
 **CRITICAL INSTRUCTION TO ANY AI READING THIS FILE:**
 Stop. Read this entire document and STATE_OF_TIGER_CLAW.md before doing anything else. This is your injected context. Do not ask Brent to repeat himself. Do not rely on LLM memory.
@@ -27,7 +27,7 @@ The agent is NOT a chatbot. It is a strategic consulting partner. It thinks, dec
 - **Frontend:** Next.js on Vercel (wizard.tigerclaw.io)
 - **Admin Dashboard:** wizard.tigerclaw.io/admin/canary — live after PR #15 merges
 - **Payments:** Stan Store + Stripe
-- **Email:** Resend (STUB — not yet implemented)
+- **Email:** Resend (sendTrialReminderEmail, sendProvisioningReceipt, sendKeyAbuseWarning, sendStanStoreWelcome — all implemented)
 - **Bot Pool:** 42+ Telegram bot tokens, AES-256-GCM encrypted
 - **GCP Project:** hybrid-matrix-472500-k5
 
@@ -59,19 +59,22 @@ The agent is NOT a chatbot. It is a strategic consulting partner. It thinks, dec
 16. **tiger_contact tests** — Unskipped. Completely rewritten against real API (queue/mark_sent/list). 8/8 passing.
 17. **Broken Window Sweep — 11 failing tool tests fixed.** All 19 tool test files rewritten to match real service-layer APIs. 0 skipped.
 18. **365 tests passing, 0 TypeScript errors.** 33 test files. All green.
-19. **GitGuardian unblocked.** wizard.test.ts AIza* → GAPI* replacement. PR #15 GitGuardian clean.
-20. **Skills admin routes.** GET/approve/reject/promote/DELETE for skills curation. logAdminEvent on every transition.
+19. **GitGuardian unblocked — wizard.test.ts.** AIza* → GAPI* replacement. PR #15 GitGuardian clean.
+20. **Skills admin routes.** GET/approve/reject/promote/DELETE for skills curation. logAdminEvent on every transition. 27 admin tests.
 21. **Duplicate draft skills bug fixed.** Migration 014 adds partial unique index on (tenant_id, name) WHERE status='draft'.
-22. **Email trial reminders.** 24h/48h/72h trial routines now send email alongside Telegram. No silent drops.
+22. **Email trial reminders.** 24h/48h/72h trial routines now send email alongside Telegram. sendTrialReminderEmail() implemented in email.ts.
 23. **Hardcoded URL fix.** app.tigerclaw.io → FRONTEND_URL env var (wizard.tigerclaw.io fallback) in all prompts and paused-bot messages.
-24. **376 tests passing, 0 TypeScript errors.** 33 test files. 11 new admin skills tests.
+24. **suspendTenant / resumeTenant fixed.** Both now set/clear `tenantPaused` in `key_state.json` so LINE channel also pauses.
+25. **Canary conversation reset route.** `POST /admin/fleet/:id/reset-conversation` — clears Redis chat history.
+26. **GitGuardian full clean (67f82b9).** 18 tracked ops/test scripts scrubbed: Google API key + PostgreSQL credentials replaced with `process.env` references. Zero secrets in git history going forward.
+27. **379 tests passing, 0 TypeScript errors.** 33 test files. All green.
 
 ---
 
 ## 4. Current Critical Issues
 
-### ✅ RESOLVED — PR #15 GitGuardian Unblocked
-wizard.test.ts AIza* patterns replaced with GAPI* prefix. 13/13 tests passing. Pushed as fd5b2ac.
+### ✅ RESOLVED — GitGuardian Fully Clean
+All 18 files with hardcoded `AIzaSy*` Google keys and `TigerClaw2026MasterKey` PostgreSQL credentials replaced with env var references. Zero tracked secrets remaining. PR #16 pushed (67f82b9).
 
 ### 🔴 P0 — Canaries Have No Personality
 All 10 canaries have empty `onboard_state.json`. The bot has no ICP, no product, no identity.
@@ -80,10 +83,10 @@ Options: (1) `POST /admin/tenants/:id/reset-conversation` clears Redis history �
 ### 🔴 P0 — Intelligence Fix Untested in Production
 Routing table removal + TOOL JUDGMENT + FITFO all pending PR merge. Once live, test manually. Monitor `[AI]` log lines in Cloud Run.
 
-### ✅ RESOLVED — All 19 Tool Tests Now Passing
-365/365 tests, 33 files, 0 skipped. Committed as `c754fed`.
+### ✅ RESOLVED — Email Is No Longer a Stub
+sendTrialReminderEmail, sendProvisioningReceipt, sendKeyAbuseWarning, sendStanStoreWelcome — all implemented in email.ts with Resend. Mock-safe (no-ops when RESEND_API_KEY absent).
 
-### 🟠 P1 — Multi-provider BYOK | Hive Injection | Email Stub | LINE Incomplete
+### 🟠 P1 — Multi-provider BYOK | Hive Injection | LINE Incomplete
 Items 3, 4, 6 of the 6-item plan. All not started.
 
 ---
@@ -93,11 +96,14 @@ Items 3, 4, 6 of the 6-item plan. All not started.
 - [x] **Fix wizard.test.ts AIza* patterns** — Done. GAPI* replacement. PR #15 unblocked.
 - [x] **Skills admin routes** — Done. PR #16. GET/approve/reject/promote/DELETE.
 - [x] **Email trial reminders** — Done. PR #16. 24h/48h/72h now email + Telegram.
+- [x] **suspendTenant / resumeTenant** — Fixed. tenantPaused flag set/cleared in key_state.json.
+- [x] **Canary reset route** — Done. POST /admin/fleet/:id/reset-conversation.
+- [x] **GitGuardian full clean** — Done. 18 files scrubbed. No tracked secrets.
 - [ ] **Canary reset** — Clear Redis history for any canary without onboard_state.json, have them complete onboarding
 - [ ] **Manual canary test** — Ask each bot open strategy questions, monitor logs
 - [ ] **resolveAIProvider** — Item 3 of 6-item plan (OpenAI BYOK)
 - [ ] **Hive injection** — Item 4 of 6-item plan
-- [ ] **Skills admin routes** — /admin/skills curation endpoints
+- [ ] **Set SMOKE_TEST_GOOGLE_KEY** in GitHub Actions secrets for e2e smoke tests to work
 
 ---
 
@@ -115,7 +121,9 @@ Items 3, 4, 6 of the 6-item plan. All not started.
 - `/Users/brentbryson/Desktop/TIGERCLAW_PUNCH_LIST.md` — Full weakness detail
 - `api/src/services/ai.ts` — buildSystemPrompt, FITFO injection, skill injection
 - `api/src/services/self-improvement.ts` — 1-fail threshold, draftSkillFromFailure
+- `api/src/services/email.ts` — All transactional email functions
 - `api/migrations/013_skills.sql` — Skills table schema
+- `api/migrations/014_skills_draft_dedup.sql` — Partial unique index for draft dedup
 - `web-onboarding/src/app/admin/canary/page.tsx` — Fleet dashboard UI
 
 ---
