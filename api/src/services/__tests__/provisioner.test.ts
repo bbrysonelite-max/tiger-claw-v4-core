@@ -193,6 +193,82 @@ describe('provisionTenant', () => {
   });
 });
 
+// ─── provisionTenant — Phase 2: pool bot release on webhook failure ───────────
+
+describe('provisionTenant — pool bot release on Telegram webhook failure', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetTenantBySlug.mockResolvedValue(null);
+    mockGetPoolStats.mockResolvedValue({ total: 10, assigned: 0, unassigned: 10 });
+    mockCreateTenant.mockResolvedValue(MOCK_TENANT);
+    mockAssignBotToken.mockResolvedValue({ botToken: 'enc:pool-token', botUsername: 'PoolBot' });
+    mockGetPoolQuery.mockResolvedValue({ rows: [] });
+    vi.stubGlobal('fetch', mockFetch);
+  });
+
+  it('releases pool bot when Telegram setWebhook fails (prevents token leak on retry)', async () => {
+    // Telegram API rejects our webhook
+    mockFetch.mockResolvedValue({
+      json: () => Promise.resolve({ ok: false, description: 'Webhook URL is not allowed' }),
+    });
+    // Pool has the assigned bot available for release
+    mockListBotPool.mockResolvedValue([{
+      id: 'pool-bot-uuid',
+      botUsername: 'PoolBot',
+      tenantId: MOCK_TENANT.id,
+    }]);
+
+    const result = await provisionTenant(BASE_INPUT); // no botToken = pool assignment
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('Webhook attach failed');
+    // Pool bot must be released so the NEXT retry can get a fresh token
+    expect(mockReleaseBot).toHaveBeenCalledWith('pool-bot-uuid');
+  });
+
+  it('clears bot_token from tenant when pool bot is released after webhook failure', async () => {
+    mockFetch.mockResolvedValue({
+      json: () => Promise.resolve({ ok: false, description: 'Bad webhook url' }),
+    });
+    mockListBotPool.mockResolvedValue([{
+      id: 'pool-bot-uuid',
+      botUsername: 'PoolBot',
+      tenantId: MOCK_TENANT.id,
+    }]);
+
+    await provisionTenant(BASE_INPUT);
+
+    // Tenant bot_token must be cleared so retry gets a clean pool assignment
+    expect(mockGetPoolQuery).toHaveBeenCalledWith(
+      expect.stringContaining('UPDATE tenants SET bot_token = NULL'),
+      [MOCK_TENANT.id]
+    );
+  });
+
+  it('does NOT release pool bot when botToken was directly provided (admin override)', async () => {
+    mockFetch.mockResolvedValue({
+      json: () => Promise.resolve({ ok: false, description: 'Bad webhook url' }),
+    });
+
+    const result = await provisionTenant({ ...BASE_INPUT, botToken: 'admin-direct-token' });
+
+    expect(result.success).toBe(false);
+    // No pool bot to release — admin provided the token directly
+    expect(mockReleaseBot).not.toHaveBeenCalled();
+  });
+
+  it('includes webhook error in steps for diagnostics', async () => {
+    mockFetch.mockResolvedValue({
+      json: () => Promise.resolve({ ok: false, description: 'Webhook URL is not allowed' }),
+    });
+    mockListBotPool.mockResolvedValue([]);
+
+    const result = await provisionTenant(BASE_INPUT);
+
+    expect(result.steps.some(s => s.includes('Webhook attachment FAILED'))).toBe(true);
+  });
+});
+
 // ─── provisionTenant — flavor validation (Phase 1 hardening) ─────────────────
 
 describe('provisionTenant — flavor validation', () => {

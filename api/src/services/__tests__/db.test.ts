@@ -24,6 +24,8 @@ import {
   getTenant,
   logAdminEvent,
   listBotPool,
+  releaseBotToPool,
+  assignBotToken,
 } from '../../services/db.js'
 
 beforeEach(() => {
@@ -100,5 +102,79 @@ describe('listBotPool', () => {
     const result = await listBotPool()
 
     expect(result.length).toBe(2)
+  })
+})
+
+// Phase 2: bot pool release cool-down
+describe('releaseBotToPool', () => {
+  it('stamps released_at=NOW() when releasing bot back to pool', async () => {
+    mockQuery.mockResolvedValue({ rows: [] })
+
+    await releaseBotToPool('bot-uuid-1')
+
+    expect(mockQuery).toHaveBeenCalledWith(
+      expect.stringContaining('released_at=NOW()'),
+      ['bot-uuid-1']
+    )
+  })
+
+  it('clears tenant_id and assigned_at on release', async () => {
+    mockQuery.mockResolvedValue({ rows: [] })
+
+    await releaseBotToPool('bot-uuid-2')
+
+    const [sql] = mockQuery.mock.calls[0] as [string]
+    expect(sql).toContain('tenant_id=NULL')
+    expect(sql).toContain('assigned_at=NULL')
+  })
+})
+
+describe('assignBotToken — cool-down enforcement', () => {
+  it('excludes bots released within the last 30 minutes from pool selection', async () => {
+    // withClient uses pool.connect() → client
+    const mockClient = {
+      query: vi.fn()
+        .mockResolvedValueOnce(undefined) // BEGIN
+        .mockResolvedValueOnce({ rows: [] }) // SELECT (empty — no bots pass cool-down filter)
+        .mockResolvedValueOnce(undefined), // ROLLBACK
+      release: vi.fn(),
+    }
+    mockConnect.mockResolvedValueOnce(mockClient)
+
+    const result = await assignBotToken('tenant-uuid-1')
+
+    expect(result).toBeNull() // pool appears empty due to cool-down filter
+
+    // Verify the SELECT query contains the cool-down WHERE clause
+    const selectCall = mockClient.query.mock.calls.find(
+      ([sql]: [string]) => typeof sql === 'string' && sql.includes('SELECT')
+    )
+    expect(selectCall).toBeDefined()
+    const selectSql = selectCall![0] as string
+    expect(selectSql).toContain('released_at IS NULL OR released_at <')
+    expect(selectSql).toContain('30 minutes')
+  })
+
+  it('assigns the oldest available bot that passes the cool-down filter', async () => {
+    const mockBot = {
+      id: 'pool-bot-1',
+      bot_token: 'enc:valid-token',
+      bot_username: 'TestBot',
+    }
+    const mockClient = {
+      query: vi.fn()
+        .mockResolvedValueOnce(undefined) // BEGIN
+        .mockResolvedValueOnce({ rows: [mockBot] }) // SELECT returns one bot
+        .mockResolvedValueOnce(undefined) // UPDATE assigned
+        .mockResolvedValueOnce(undefined), // COMMIT
+      release: vi.fn(),
+    }
+    mockConnect.mockResolvedValueOnce(mockClient)
+
+    const result = await assignBotToken('tenant-xyz')
+
+    expect(result).not.toBeNull()
+    expect(result?.botToken).toBe('enc:valid-token')
+    expect(result?.botUsername).toBe('TestBot')
   })
 })

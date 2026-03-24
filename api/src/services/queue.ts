@@ -122,8 +122,13 @@ export const provisionWorker = SHOULD_RUN_WORKERS ? new Worker(
 ) : null;
 
 if (provisionWorker) {
+    // 'failed' fires only after ALL retries are exhausted — this is the terminal failure alert
     provisionWorker.on('failed', (job, err) => {
-        console.error(`[Worker] Provisioning Job ${job?.id} failed. Error:`, err);
+        console.error(`[Worker] Provisioning Job ${job?.id} TERMINAL FAILURE (all retries exhausted). Error:`, err);
+        sendAdminAlert(
+            `🚨 PROVISIONING TERMINAL FAILURE — all retries exhausted\n` +
+            `Job: ${job?.id}\nSlug: ${job?.data?.slug ?? 'unknown'}\nCustomer: ${job?.data?.name ?? 'unknown'} (${job?.data?.email ?? 'unknown'})\nError: ${err?.message ?? String(err)}`
+        ).catch(() => {});
     });
 }
 
@@ -183,8 +188,9 @@ export const telegramWorker = SHOULD_RUN_WORKERS ? new Worker(
 ) : null;
 
 if (telegramWorker) {
+    // Message failures are expected (user-side issues); only log, do not alert
     telegramWorker.on('failed', (job, err) => {
-        console.error(`[Worker] Telegram Job ${job?.id} failed. Error:`, err);
+        console.error(`[Worker] Telegram Job ${job?.id} failed (tenant: ${job?.data?.tenantId ?? 'unknown'}). Error:`, err?.message ?? err);
     });
 }
 
@@ -225,8 +231,9 @@ export const lineWorker = SHOULD_RUN_WORKERS ? new Worker(
 ) : null;
 
 if (lineWorker) {
+    // Message failures are expected (user-side issues); only log, do not alert
     lineWorker.on('failed', (job, err) => {
-        console.error(`[Worker] LINE Job ${job?.id} failed. Error:`, err);
+        console.error(`[Worker] LINE Job ${job?.id} failed (tenant: ${job?.data?.tenantId ?? 'unknown'}). Error:`, err?.message ?? err);
     });
 }
 
@@ -264,7 +271,11 @@ export const routineWorker = SHOULD_RUN_WORKERS ? new Worker(
 
 if (routineWorker) {
     routineWorker.on('failed', (job, err) => {
-        console.error(`[Worker] Routine Job ${job?.id} failed. Error:`, err);
+        console.error(`[Worker] Routine Job ${job?.id} TERMINAL FAILURE. Error:`, err?.message ?? err);
+        // Alert for routine failures — missed nurture/scout cycles degrade customer experience
+        sendAdminAlert(
+            `⚠️ AI Routine TERMINAL FAILURE\nJob: ${job?.id}\nType: ${job?.data?.routineType ?? 'unknown'}\nTenant: ${job?.data?.tenantId ?? 'unknown'}\nError: ${err?.message ?? String(err)}`
+        ).catch(() => {});
     });
 }
 
@@ -284,51 +295,63 @@ export const cronWorker = SHOULD_RUN_WORKERS ? new Worker(
             const nowHour = new Date().getUTCHours();
             const today = new Date().toISOString().split('T')[0];
 
+            // Dedup strategy for trial reminders:
+            //   - BullMQ jobId = unique per tenant per reminder type — queue deduplicates
+            //   - State (trialRemindersSent) is written BEFORE add() so crash-recovery is safe
+            //   - cronWorker concurrency=1 + singleton heartbeat jobId ensures single-writer
+            //   - Per-tenant try-catch below isolates failures: one bad tenant never kills the cycle
+
+            const { getBotState, setBotState } = await import('./db.js');
+
             for (const tenant of tenants) {
-                // Handle 72hr free trial engine natively using the bot memory states
-                const hoursElapsed = (Date.now() - new Date(tenant.created_at).getTime()) / (1000 * 60 * 60);
-                
-                // Read underlying Bot State explicitly to ensure idempotency so we do not spam messages
-                const { getBotState, setBotState } = await import('./db.js');
-                const botState = JSON.parse(await getBotState(tenant.id, 'key_state.json') || '{}');
-                
-                if (!botState.layer2Key) {
-                    botState.trialRemindersSent = botState.trialRemindersSent || {};
-                    const { h24, h48, h72 } = botState.trialRemindersSent;
+                try {
+                    // Handle 72hr free trial engine natively using the bot memory states
+                    const hoursElapsed = (Date.now() - new Date(tenant.created_at).getTime()) / (1000 * 60 * 60);
 
-                    let fireReminder: string | null = null;
-                    if (hoursElapsed >= 72 && !h72 && !botState.tenantPaused) {
-                        fireReminder = 'trial_reminder_72h';
-                        botState.trialRemindersSent.h72 = true;
-                    } else if (hoursElapsed >= 48 && hoursElapsed < 72 && !h48) {
-                        fireReminder = 'trial_reminder_48h';
-                        botState.trialRemindersSent.h48 = true;
-                    } else if (hoursElapsed >= 24 && hoursElapsed < 48 && !h24) {
-                        fireReminder = 'trial_reminder_24h';
-                        botState.trialRemindersSent.h24 = true;
+                    const botState = JSON.parse(await getBotState(tenant.id, 'key_state.json') || '{}');
+
+                    if (!botState.layer2Key) {
+                        botState.trialRemindersSent = botState.trialRemindersSent || {};
+                        const { h24, h48, h72 } = botState.trialRemindersSent;
+
+                        let fireReminder: string | null = null;
+                        if (hoursElapsed >= 72 && !h72 && !botState.tenantPaused) {
+                            fireReminder = 'trial_reminder_72h';
+                            botState.trialRemindersSent.h72 = true;
+                        } else if (hoursElapsed >= 48 && hoursElapsed < 72 && !h48) {
+                            fireReminder = 'trial_reminder_48h';
+                            botState.trialRemindersSent.h48 = true;
+                        } else if (hoursElapsed >= 24 && hoursElapsed < 48 && !h24) {
+                            fireReminder = 'trial_reminder_24h';
+                            botState.trialRemindersSent.h24 = true;
+                        }
+
+                        if (fireReminder) {
+                            // Write state first — if add() fails, next cycle re-adds (BullMQ jobId dedup prevents double-fire)
+                            await setBotState(tenant.id, 'key_state.json', botState);
+                            await routineQueue.add(fireReminder, {
+                                tenantId: tenant.id,
+                                routineType: fireReminder,
+                            }, { jobId: `${fireReminder}_${tenant.id}`, removeOnComplete: true });
+                        }
                     }
 
-                    if (fireReminder) {
-                        await setBotState(tenant.id, 'key_state.json', botState);
-                        await routineQueue.add(fireReminder, {
-                            tenantId: tenant.id,
-                            routineType: fireReminder,
-                        }, { jobId: `${fireReminder}_${tenant.id}`, removeOnComplete: true });
-                    }
-                }
-
-                // Nurture check — runs every cron cycle (dedup prevents parallel runs)
-                await routineQueue.add('nurture_check', {
-                    tenantId: tenant.id,
-                    routineType: 'nurture_check',
-                }, { jobId: `nurture_${tenant.id}`, removeOnComplete: true, removeOnFail: true });
-
-                // BUG FIX: daily_scout was never scheduled — runs once per day at 7 AM UTC
-                if (nowHour === 7) {
-                    await routineQueue.add('daily_scout', {
+                    // Nurture check — runs every cron cycle (jobId dedup prevents parallel runs)
+                    await routineQueue.add('nurture_check', {
                         tenantId: tenant.id,
-                        routineType: 'daily_scout',
-                    }, { jobId: `scout_${tenant.id}_${today}`, removeOnComplete: true, removeOnFail: true });
+                        routineType: 'nurture_check',
+                    }, { jobId: `nurture_${tenant.id}`, removeOnComplete: true, removeOnFail: true });
+
+                    // daily_scout runs once per day at 7 AM UTC (date-stamped jobId prevents re-add)
+                    if (nowHour === 7) {
+                        await routineQueue.add('daily_scout', {
+                            tenantId: tenant.id,
+                            routineType: 'daily_scout',
+                        }, { jobId: `scout_${tenant.id}_${today}`, removeOnComplete: true, removeOnFail: true });
+                    }
+                } catch (tenantErr) {
+                    // Isolate per-tenant failures — other tenants continue processing
+                    console.error(`[Cron] Failed to process tenant ${tenant.id}:`, tenantErr);
                 }
             }
 
@@ -346,7 +369,11 @@ export const cronWorker = SHOULD_RUN_WORKERS ? new Worker(
 
 if (cronWorker) {
     cronWorker.on('failed', (job, err) => {
-        console.error(`[Worker] Cron Job ${job?.id} failed. Global heartbeat may have missed a cycle. Error:`, err);
+        console.error(`[Worker] Cron Job ${job?.id} TERMINAL FAILURE. Global heartbeat missed a cycle. Error:`, err?.message ?? err);
+        // Cron failure = ALL tenants missed their routine cycle — this is critical
+        sendAdminAlert(
+            `🚨 GLOBAL HEARTBEAT TERMINAL FAILURE — entire routine cycle missed\nJob: ${job?.id}\nError: ${err?.message ?? String(err)}`
+        ).catch(() => {});
     });
 
     // Schedule the global cron to run every minute ONLY if worker is initialized
