@@ -1,6 +1,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-const key = "AIzaSyBSU_V4VjxjIlBIy_zzVs03ZKmXlX6SEZo";
+const key = process.env["GOOGLE_API_KEY"] ?? "";
+if (!key) { console.error("Set GOOGLE_API_KEY env var before running this script."); process.exit(1); }
 const genAI = new GoogleGenerativeAI(key);
 
 async function test() {
