@@ -1,5 +1,6 @@
 import { GoogleGenerativeAI, Content, Part } from '@google/generative-ai';
 import { getTenant, getPool, getBotState, setBotState, getTenantBotToken } from './db.js';
+import { getTenantState } from './tenant_data.js';
 import TelegramBot from 'node-telegram-bot-api';
 import IORedis from 'ioredis';
 import * as fs from 'fs';
@@ -356,7 +357,7 @@ async function buildMemoryContext(tenantId: string, flavor: string, region: stri
 }> {
     try {
         const pool = getPool();
-        const [onboardState, hiveResult, leadResult] = await Promise.all([
+        const [onboardState, hiveResult, leadResult, factAnchors] = await Promise.all([
             getBotState<any>(tenantId, 'onboard_state.json'),
             pool.query(
                 `SELECT signal_type, payload, sample_size FROM hive_signals
@@ -371,6 +372,7 @@ async function buildMemoryContext(tenantId: string, flavor: string, region: stri
                  FROM tenant_leads WHERE tenant_id = $1`,
                 [tenantId],
             ),
+            getTenantState<any>(tenantId, 'fact_anchors'),
         ]);
 
         // ICP summary — only if onboarding complete
@@ -390,6 +392,18 @@ async function buildMemoryContext(tenantId: string, flavor: string, region: stri
             if (icp?.problemFaced) parts.push(`Core problem they face: ${icp.problemFaced}.`);
             if (id.differentiator) parts.push(`Competitive edge: ${id.differentiator}.`);
             if (parts.length > 0) icpSummary = parts.join(' ');
+        }
+
+        // Augment ICP summary with live fact anchors from conversations
+        if (factAnchors) {
+            const anchorParts: string[] = [];
+            const latest = (arr: any[]) => arr?.slice(-1)[0]?.value;
+            if (latest(factAnchors.icpUpdates)) anchorParts.push(`Recent ICP signal: ${latest(factAnchors.icpUpdates)}.`);
+            if (latest(factAnchors.objectionsRaised)) anchorParts.push(`Last objection raised: ${latest(factAnchors.objectionsRaised)}.`);
+            if (latest(factAnchors.preferencesStated)) anchorParts.push(`Stated preference: ${latest(factAnchors.preferencesStated)}.`);
+            if (anchorParts.length > 0) {
+                icpSummary = [icpSummary, ...anchorParts].filter(Boolean).join(' ');
+            }
         }
 
         // Hive patterns — community intelligence

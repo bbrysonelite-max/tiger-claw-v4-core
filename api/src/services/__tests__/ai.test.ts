@@ -45,6 +45,12 @@ vi.mock('../pool.js', () => ({
   decryptToken: mockDecryptToken,
 }));
 
+const mockGetTenantState = vi.hoisted(() => vi.fn().mockResolvedValue(null));
+vi.mock('../tenant_data.js', () => ({
+  getTenantState: mockGetTenantState,
+  saveTenantState: vi.fn(),
+}));
+
 vi.mock('../../tools/flavorConfig.js', () => ({
   loadFlavorConfig: vi.fn(() => ({
     name: 'Network Marketer',
@@ -229,6 +235,7 @@ describe('buildSystemPrompt', () => {
   beforeEach(() => {
     mockGetBotState.mockReset().mockResolvedValue(null);
     mockDbQuery.mockReset().mockResolvedValue({ rows: [] });
+    mockGetTenantState.mockReset().mockResolvedValue(null);
   });
 
   it('includes the tenant name', async () => {
@@ -316,6 +323,24 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('PIPELINE');
     expect(prompt).toContain('47');
     expect(prompt).toContain('12');
+  });
+
+  it('includes recent fact anchors in the INTELLIGENCE BRIEFING', async () => {
+    mockGetTenantState.mockResolvedValue({
+      lastExtractedAt: new Date().toISOString(),
+      icpUpdates: [{ value: 'Prospect must be actively building a team', extractedAt: new Date().toISOString() }],
+      objectionsRaised: [{ value: 'Too expensive for Thailand market', extractedAt: new Date().toISOString() }],
+      preferencesStated: [{ value: 'Prefers shorter follow-up messages', extractedAt: new Date().toISOString() }],
+      productMentioned: [],
+      hotLeadsMentioned: [],
+    });
+    const prompt = await buildSystemPrompt(mockTenant);
+    expect(prompt).toContain('Recent ICP signal');
+    expect(prompt).toContain('actively building a team');
+    expect(prompt).toContain('Last objection raised');
+    expect(prompt).toContain('Too expensive');
+    expect(prompt).toContain('Stated preference');
+    expect(prompt).toContain('shorter follow-up');
   });
 
   it('omits INTELLIGENCE BRIEFING section entirely when DB is unreachable', async () => {
