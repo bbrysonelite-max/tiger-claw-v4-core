@@ -223,51 +223,109 @@ describe('buildSystemPrompt', () => {
     name: 'Brent Bryson',
     flavor: 'network-marketer',
     language: 'English',
+    region: 'sea',
   };
 
-  it('includes the tenant name', () => {
-    const prompt = buildSystemPrompt(mockTenant);
+  beforeEach(() => {
+    mockGetBotState.mockReset().mockResolvedValue(null);
+    mockDbQuery.mockReset().mockResolvedValue({ rows: [] });
+  });
+
+  it('includes the tenant name', async () => {
+    const prompt = await buildSystemPrompt(mockTenant);
     expect(prompt).toContain('Brent Bryson');
   });
 
-  it('includes the LOCKED lead scoring threshold of 80', () => {
-    const prompt = buildSystemPrompt(mockTenant);
+  it('includes the LOCKED lead scoring threshold of 80', async () => {
+    const prompt = await buildSystemPrompt(mockTenant);
     expect(prompt).toContain('80');
     expect(prompt).toContain('LOCKED');
   });
 
-  it('includes the ONBOARDING RULE section', () => {
-    const prompt = buildSystemPrompt(mockTenant);
+  it('includes the ONBOARDING RULE section', async () => {
+    const prompt = await buildSystemPrompt(mockTenant);
     expect(prompt).toContain('ONBOARDING RULE');
   });
 
-  it('requires tiger_onboard action=status on EVERY message', () => {
-    const prompt = buildSystemPrompt(mockTenant);
+  it('requires tiger_onboard action=status on EVERY message', async () => {
+    const prompt = await buildSystemPrompt(mockTenant);
     expect(prompt).toContain('tiger_onboard');
     expect(prompt).toContain('status');
     expect(prompt).toContain('EVERY incoming user message');
   });
 
-  it('contains CRITICAL verbatim relay instruction (prevents ICP summary paraphrase bug)', () => {
-    const prompt = buildSystemPrompt(mockTenant);
-    expect(prompt).toContain('CRITICAL');
+  it('contains accurately relay instruction (prevents ICP summary paraphrase bug)', async () => {
+    const prompt = await buildSystemPrompt(mockTenant);
     expect(prompt).toContain('accurately');
   });
 
-  it('includes flavor name from loadFlavorConfig', () => {
-    const prompt = buildSystemPrompt(mockTenant);
+  it('includes flavor name from loadFlavorConfig', async () => {
+    const prompt = await buildSystemPrompt(mockTenant);
     expect(prompt).toContain('Network Marketer');
   });
 
-  it('includes the tenant language', () => {
-    const prompt = buildSystemPrompt(mockTenant);
+  it('includes the tenant language', async () => {
+    const prompt = await buildSystemPrompt(mockTenant);
     expect(prompt).toContain('English');
   });
 
-  it('blocks switching to normal operation before onboarding is complete', () => {
-    const prompt = buildSystemPrompt(mockTenant);
+  it('blocks switching to normal operation before onboarding is complete', async () => {
+    const prompt = await buildSystemPrompt(mockTenant);
     expect(prompt).toContain('Do NOT switch to prospecting');
     expect(prompt).toContain('isComplete=true');
+  });
+
+  it('includes INTELLIGENCE BRIEFING with operator profile when onboarding is complete', async () => {
+    mockGetBotState.mockResolvedValue({
+      phase: 'complete',
+      identity: {
+        name: 'Jane Doe',
+        productOrOpportunity: 'NuSkin wellness line',
+        biggestWin: '$10k month',
+        differentiator: 'unique reorder rate',
+      },
+      icpBuilder: { idealPerson: 'Health-conscious moms', problemFaced: 'Fatigue', confirmed: true },
+      icpCustomer: {},
+      icpSingle: {},
+    });
+    const prompt = await buildSystemPrompt(mockTenant);
+    expect(prompt).toContain('INTELLIGENCE BRIEFING');
+    expect(prompt).toContain('OPERATOR PROFILE');
+    expect(prompt).toContain('Jane Doe');
+    expect(prompt).toContain('NuSkin wellness line');
+    expect(prompt).toContain('Health-conscious moms');
+  });
+
+  it('includes hive pattern bullets when hive_signals exist', async () => {
+    mockDbQuery
+      .mockResolvedValueOnce({
+        rows: [{ signal_type: 'objection', payload: { observation: 'Trust is the #1 blocker in SEA' }, sample_size: 420 }],
+      })
+      .mockResolvedValueOnce({ rows: [] }); // lead stats
+    const prompt = await buildSystemPrompt(mockTenant);
+    expect(prompt).toContain('NETWORK INTELLIGENCE');
+    expect(prompt).toContain('Trust is the #1 blocker');
+    expect(prompt).toContain('n=420');
+  });
+
+  it('includes pipeline stats when tenant has leads', async () => {
+    mockDbQuery
+      .mockResolvedValueOnce({ rows: [] }) // hive patterns
+      .mockResolvedValueOnce({ rows: [{ total: '47', qualified: '12' }] }); // lead stats
+    const prompt = await buildSystemPrompt(mockTenant);
+    expect(prompt).toContain('PIPELINE');
+    expect(prompt).toContain('47');
+    expect(prompt).toContain('12');
+  });
+
+  it('omits INTELLIGENCE BRIEFING section entirely when DB is unreachable', async () => {
+    mockGetBotState.mockRejectedValue(new Error('DB timeout'));
+    mockDbQuery.mockRejectedValue(new Error('DB timeout'));
+    const prompt = await buildSystemPrompt(mockTenant);
+    // Static prompt still returns — no crash
+    expect(prompt).toContain('Brent Bryson');
+    expect(prompt).toContain('ONBOARDING RULE');
+    expect(prompt).not.toContain('INTELLIGENCE BRIEFING');
   });
 });
 

@@ -97,4 +97,32 @@ Each canary must message their Telegram bot and complete the onboarding intervie
 - **Cloud Run Service:** `tiger-claw-api`, region `us-central1`
 
 ---
+
+## Memory Architecture (V4.1)
+
+**Design:** Hybrid Cognitive Architecture — Cloud Run executes stateless, Redis/PostgreSQL hold all persistent memory. Mac cluster (192.168.0.2) is an OFFLINE Reflexion Loop tool that reads Cloud SQL via Auth Proxy. It is NOT a live Cloud Run dependency.
+
+### New Redis Keys
+| Key | Purpose | TTL |
+|---|---|---|
+| `chat_history:{tenantId}:{chatId}` | Raw turn history (existing) | 7 days |
+| `chat_memory:{tenantId}:{chatId}` | Sawtooth compressed summaries | 30 days |
+| `focus_state:{tenantId}:{chatId}` | Session bookending | 24 hours |
+
+### New `tenant_states` Keys
+| `state_key` | Purpose |
+|---|---|
+| `onboard_state` *(existing via `bot_states`)* | Onboarding interview answers |
+| `fact_anchors` | Extracted facts from live conversations (Phase 3) |
+
+### Phase Status
+- [x] Phase 1: Dynamic prompt enrichment — `buildSystemPrompt()` is async, injects ICP + hive + pipeline on every request
+- [ ] Phase 2: Sawtooth context compression — replaces hard trim with rolling `chat_memory` summaries
+- [ ] Phase 3: Fact anchor extraction — async BullMQ job extracts and persists ICP signals post-conversation
+- [ ] Phase 4: `startFocus` / `completeFocus` primitives — Sawtooth session bookending in Redis
+
+### Architecture Decision Record
+**Why not Mac cluster as live endpoint:** Cloud Run is stateless and ephemeral. A live dependency on a local Mac cluster creates a single point of failure invisible to GCP monitoring. All intelligence state lives in Cloud SQL + Redis (already HA). The Mac cluster runs Reflexion Loops offline and proposes system prompt improvements for human review — preserving Gemini's Sovereign Vault intent without breaking production.
+
+---
 *Locked. Proceed.*

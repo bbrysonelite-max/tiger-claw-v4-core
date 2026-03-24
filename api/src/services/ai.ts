@@ -256,14 +256,89 @@ function buildToolContext(tenantId: string, tenant: any) {
     };
 }
 
+// ─── Memory context ───────────────────────────────────────────────────────────
+/**
+ * Loads tenant-specific intelligence for system prompt injection.
+ * Runs three parallel DB reads. Fails silently — static prompt is the fallback.
+ */
+async function buildMemoryContext(tenantId: string, flavor: string, region: string): Promise<{
+    icpSummary: string | null;
+    hivePatterns: string | null;
+    leadStats: string | null;
+}> {
+    try {
+        const pool = getPool();
+        const [onboardState, hiveResult, leadResult] = await Promise.all([
+            getBotState<any>(tenantId, 'onboard_state.json'),
+            pool.query(
+                `SELECT signal_type, payload, sample_size FROM hive_signals
+                 WHERE vertical = $1 AND region = ANY($2::text[])
+                 ORDER BY sample_size DESC LIMIT 3`,
+                [flavor, [region || 'universal', 'universal']],
+            ),
+            pool.query(
+                `SELECT
+                   COUNT(*) AS total,
+                   COUNT(*) FILTER (WHERE qualified = true AND opted_out = false) AS qualified
+                 FROM tenant_leads WHERE tenant_id = $1`,
+                [tenantId],
+            ),
+        ]);
+
+        // ICP summary — only if onboarding complete
+        let icpSummary: string | null = null;
+        if (onboardState && onboardState.phase === 'complete') {
+            const id = onboardState.identity ?? {};
+            const icp = onboardState.icpBuilder?.confirmed
+                ? onboardState.icpBuilder
+                : onboardState.icpCustomer?.confirmed
+                    ? onboardState.icpCustomer
+                    : onboardState.icpSingle;
+            const parts: string[] = [];
+            if (id.name) parts.push(`Operator: ${id.name}.`);
+            if (id.productOrOpportunity) parts.push(`Product: ${id.productOrOpportunity}.`);
+            if (id.biggestWin) parts.push(`Top result: ${id.biggestWin}.`);
+            if (icp?.idealPerson) parts.push(`Ideal prospect: ${icp.idealPerson}.`);
+            if (icp?.problemFaced) parts.push(`Core problem they face: ${icp.problemFaced}.`);
+            if (id.differentiator) parts.push(`Competitive edge: ${id.differentiator}.`);
+            if (parts.length > 0) icpSummary = parts.join(' ');
+        }
+
+        // Hive patterns — community intelligence
+        let hivePatterns: string | null = null;
+        if (hiveResult.rows.length > 0) {
+            const bullets = hiveResult.rows.map((row: any) => {
+                const obs = row.payload?.observation ?? row.payload?.insight ?? String(row.payload).slice(0, 120);
+                return `• ${row.signal_type} (n=${row.sample_size}): ${obs}`;
+            });
+            hivePatterns = bullets.join('\n');
+        }
+
+        // Lead pipeline stats
+        let leadStats: string | null = null;
+        const lr = leadResult.rows[0];
+        if (lr && parseInt(lr.total, 10) > 0) {
+            leadStats = `${lr.total} leads in pipeline, ${lr.qualified} qualified.`;
+        }
+
+        return { icpSummary, hivePatterns, leadStats };
+    } catch (err: any) {
+        console.warn(`[AI] buildMemoryContext failed for tenant ${tenantId} — using static prompt:`, err.message);
+        return { icpSummary: null, hivePatterns: null, leadStats: null };
+    }
+}
+
 // ─── System prompt ────────────────────────────────────────────────────────────
 /**
- * BUG 4 FIX: Injects flavor config into the system prompt.
- * Previously: 2-sentence generic prompt. Now: flavor persona, keywords, compliance.
+ * Builds the system prompt for a tenant.
+ * Async: injects live ICP summary, hive network patterns, and pipeline stats.
+ * Fails open — DB errors return the static prompt without crashing.
  */
-export function buildSystemPrompt(tenant: any): string {
+export async function buildSystemPrompt(tenant: any): Promise<string> {
     const flavor = loadFlavorConfig(tenant.flavor);
-    return [
+    const memory = await buildMemoryContext(tenant.id, tenant.flavor ?? '', tenant.region ?? 'universal');
+
+    const lines: string[] = [
         `You are Tiger Claw, an elite AI sales and recruiting agent operating for ${tenant.name}.`,
         `Industry flavor: ${flavor.name} (${flavor.professionLabel}).`,
         `Respond in: ${tenant.language ?? 'English'}.`,
@@ -278,6 +353,21 @@ export function buildSystemPrompt(tenant: any): string {
         `"your why", "what's the play", "what's the move", "let's get after it", "ready to get after it",`,
         `"manufacture some success", "let's manufacture", "hustle", "grind", "beast mode",`,
         `or any variation of classic network marketing hype scripts. These are permanently banned.`,
+    ];
+
+    // ── Intelligence briefing (dynamic) ────────────────────────────────────────
+    const briefingParts: string[] = [];
+    if (memory.icpSummary) briefingParts.push(`OPERATOR PROFILE: ${memory.icpSummary}`);
+    if (memory.hivePatterns) briefingParts.push(`NETWORK INTELLIGENCE (${flavor.name} community, platform-wide):\n${memory.hivePatterns}`);
+    if (memory.leadStats) briefingParts.push(`PIPELINE: ${memory.leadStats}`);
+
+    if (briefingParts.length > 0) {
+        lines.push(``);
+        lines.push(`INTELLIGENCE BRIEFING — personalize every response using this. Do not repeat it verbatim:`);
+        briefingParts.forEach(p => lines.push(p));
+    }
+
+    lines.push(
         ``,
         `ONBOARDING RULE — HIGHEST PRIORITY:`,
         `On EVERY incoming user message, your FIRST action must be to call tiger_onboard with action="status".`,
@@ -306,8 +396,10 @@ export function buildSystemPrompt(tenant: any): string {
         ``,
         `ANTI-CHURN CRITICAL RULE:`,
         `If the scout reports 0 leads or an empty pipeline, NEVER tell the user to "work their warm market", "talk to friends/family", or make "three-way calls". That defeats the purpose of this software.`,
-        `Instead, assure them that you (Tiger Claw) are actively expanding search parameters, scanning new networks, and adjusting algorithms to find them qualified leads. Keep them excited about what the software is doing automatically for them.`
-    ].join('\n');
+        `Instead, assure them that you (Tiger Claw) are actively expanding search parameters, scanning new networks, and adjusting algorithms to find them qualified leads. Keep them excited about what the software is doing automatically for them.`,
+    );
+
+    return lines.join('\n');
 }
 
 // ─── Tool execution loop ─────────────────────────────────────────────────────
@@ -399,7 +491,7 @@ export async function processTelegramMessage(
         const genAI = new GoogleGenerativeAI(googleKey);
         const model = genAI.getGenerativeModel({
             model: 'gemini-2.0-flash',
-            systemInstruction: buildSystemPrompt(tenant),
+            systemInstruction: await buildSystemPrompt(tenant),
             tools: geminiTools as any,
         });
 
@@ -455,7 +547,7 @@ export async function processSystemRoutine(tenantId: string, routineType: string
         const genAI = new GoogleGenerativeAI(googleKey);
         const model = genAI.getGenerativeModel({
             model: 'gemini-2.0-flash',
-            systemInstruction: buildSystemPrompt(tenant),
+            systemInstruction: await buildSystemPrompt(tenant),
             tools: geminiTools as any,
         });
 
@@ -559,7 +651,7 @@ export async function processLINEMessage(
         const genAI = new GoogleGenerativeAI(googleKey);
         const model = genAI.getGenerativeModel({
             model: 'gemini-2.0-flash',
-            systemInstruction: buildSystemPrompt(tenant),
+            systemInstruction: await buildSystemPrompt(tenant),
             tools: geminiTools as any,
         });
 

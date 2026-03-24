@@ -20,11 +20,29 @@
 5. **The Great Google Key Disaster & Architecture Hardening:** Safely navigated a catastrophic 403 Google API key deprecation/leak event. We vaulted brand new, explicitly tested Google keys into Cloud Secret Manager and established a zero-downtime deployment flow for the master API router. Re-verified `gemini-2.0-flash` as the absolute core engine. Cleaned out duplicate `Rules.md` files causing terminal loop hallucinations.
 6. **Web Wizard Subagent QA:** Deployed an autonomous browser subagent against the production Next.js onboarding bridge. Discovered a fatal `Failed to fetch` (CORS missing `Access-Control-Allow-Origin`) block explicitly preventing users from advancing past Step 1 (Identity & Niche) to contact the `api.tigerclaw.io/wizard/auth` endpoint.
 
-## 3. Your Immediate Directives
-You have one strict priority to execute the exact second you boot up. Do not do anything else until it is finished:
+## 3. Memory Architecture (V4.1 — Active)
 
-### [ ] Priority 1: Finalize Next.js Stripe Linkage & CORS Patch
-The Stripe PR (`feat/stanstore-webhook`) must be finalized, but FIRST, the local and production CORS constraints blocking the Next.js wizard from communicating with the V4 Cloud Run API (`/wizard/auth`) must be eliminated. We need the native Stripe Checkout payment processing integration to permanently replace any simulated API calls for standard web onboarding, completing the end-to-end revenue lifecycle architecture.
+`buildSystemPrompt()` is now **async**. On every request it injects three live signals:
+- **Operator profile** — from `onboard_state.json` (name, product, ICP, top result)
+- **Network intelligence** — top 3 `hive_signals` rows for this tenant's vertical/region
+- **Pipeline stats** — live lead counts from `tenant_leads`
+
+All three are loaded in `Promise.all()` and fail silently — DB unreachable = static prompt, no crash.
+
+**Redis key inventory:**
+| Key | Purpose | TTL |
+|---|---|---|
+| `chat_history:{tenantId}:{chatId}` | Raw turn history | 7 days |
+| `chat_memory:{tenantId}:{chatId}` | Sawtooth compressed summaries *(Phase 2)* | 30 days |
+| `focus_state:{tenantId}:{chatId}` | Session bookending *(Phase 4)* | 24 hours |
+
+**Mac cluster (192.168.0.2) is an OFFLINE ops tool.** It reads Cloud SQL via Auth Proxy for Reflexion Loop analysis. It is NOT called by Cloud Run and cannot break production.
+
+**Memory phases:**
+- [x] Phase 1: Dynamic prompt enrichment (ICP + hive + pipeline) — shipped
+- [ ] Phase 2: Sawtooth context compression (`chat_memory`)
+- [ ] Phase 3: Fact anchor extraction (`tenant_states.fact_anchors`)
+- [ ] Phase 4: `startFocus` / `completeFocus` primitives
 
 ## FINAL REMINDER
-Everything you need is in `ARCHITECTURE.md`, `specs/`, and `Rules.md`. Trust the GitHub spec, not your LLM memory. Now get to work on Priority 1.
+Everything you need is in `ARCHITECTURE.md`, `specs/`, and `Rules.md`. Trust the GitHub spec, not your LLM memory.
