@@ -19,6 +19,8 @@ import {
   addAIKey,
   importContacts,
   getFoundingMemberDisplay,
+  createBYOKUser,
+  createBYOKBot,
 } from "../services/db.js";
 import { encryptToken } from "../services/pool.js";
 import { provisionQueue } from "../services/queue.js";
@@ -103,6 +105,45 @@ router.get("/auth", async (req: Request, res: Response) => {
   } catch (err: any) {
     console.error("[wizard] Auth error:", err);
     return res.status(500).json({ error: "Authentication failed." });
+  }
+});
+
+// ── POST /wizard/trial ───────────────────────────────────────────────────────
+// Self-serve 72-hour free trial entry point.
+// Creates a user + tenant record (no bot token assigned — provisioner handles
+// that at hatch time, so the bot pool is never drained by abandoned wizards).
+// If the email already has a tenant, returns the existing record.
+router.post("/trial", async (req: Request, res: Response) => {
+  const schema = z.object({
+    email: z.string().email(),
+    name: z.string().min(1),
+    botName: z.string().min(1),
+    nicheId: z.string().min(1),
+  });
+
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: "Invalid payload.", details: parsed.error.format() });
+  }
+
+  const { email, name, botName, nicheId } = parsed.data;
+
+  try {
+    // Return existing tenant if already registered — idempotent
+    const existing = await getTenantByEmail(email);
+    if (existing) {
+      return res.json({ ok: true, botId: existing.id, existing: true });
+    }
+
+    // Create user + tenant record (status: pending, no bot token yet)
+    const userId = await createBYOKUser(email, name);
+    const tenantId = await createBYOKBot(userId, botName, nicheId, "pending", email);
+
+    console.log(`[wizard] Trial registered: ${email} → tenant ${tenantId}`);
+    return res.json({ ok: true, botId: tenantId, existing: false });
+  } catch (err: any) {
+    console.error("[wizard] Trial registration error:", err);
+    return res.status(500).json({ error: "Failed to start trial." });
   }
 });
 

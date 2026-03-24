@@ -38,20 +38,40 @@ export default function StepIdentity({ state, updateState, onNext }: IdentityPro
         setError("");
 
         try {
-            const apiUrl = "https://api.tigerclaw.io"; // Hardcoded to bypass misconfigured Vercel Env Vars
-            // Strip any trailing slash
-            const base = apiUrl.endsWith('/') ? apiUrl.slice(0, -1) : apiUrl;
-            
-            const response = await fetch(`${base}/wizard/auth?email=${encodeURIComponent(localState.email)}`);
-            const data = await response.json();
+            const base = "https://api.tigerclaw.io";
 
-            if (!response.ok || !data.ok) {
-                throw new Error(data.error || "No purchase found. Visit stan.store/brentbryson to get your agent, then return here.");
+            // First: check if they're a returning paid customer
+            const authResponse = await fetch(`${base}/wizard/auth?email=${encodeURIComponent(localState.email)}`);
+            const authData = await authResponse.json();
+
+            let botId: string | undefined;
+
+            if (authResponse.ok && authData.ok) {
+                // Existing paid tenant — proceed normally
+                botId = authData.botId;
+            } else if (authResponse.status === 404) {
+                // No existing account — auto-provision a 72-hour free trial
+                const trialResponse = await fetch(`${base}/wizard/trial`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        email: localState.email,
+                        name: localState.yourName,
+                        botName: localState.botName,
+                        nicheId: localState.nicheId || "network-marketer",
+                    }),
+                });
+                const trialData = await trialResponse.json();
+                if (!trialResponse.ok || !trialData.ok) {
+                    throw new Error(trialData.error || "Failed to start trial. Please try again.");
+                }
+                botId = trialData.botId;
+            } else {
+                throw new Error(authData.error || "Authentication failed. Please try again.");
             }
 
             const nicheName = NICHES.find(n => n.id === localState.nicheId)?.name || "Agent";
-            // Save their botId which unlocks the rest of the flow!
-            updateState({ ...localState, nicheName, botId: data.botId });
+            updateState({ ...localState, nicheName, botId });
             onNext();
         } catch (err: any) {
             setError(err.message);
