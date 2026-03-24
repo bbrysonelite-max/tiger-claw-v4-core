@@ -72,9 +72,9 @@ export default function StepAIConnection({ state, updateState, onNext }: AIConne
                 >
                     <div className="flex items-center gap-3 mb-2">
                         <Shield className={cn("w-6 h-6", state.connectionType === "managed" ? "text-primary" : "text-white/30")} />
-                        <h4 className={cn("font-bold text-lg", state.connectionType === "managed" ? "text-white" : "")}>BotCraft Free Brain</h4>
+                        <h4 className={cn("font-bold text-lg", state.connectionType === "managed" ? "text-white" : "")}>Tiger-Claw Free Trial Brain</h4>
                     </div>
-                    <p className="text-sm">72-Hour Free Trial. Powered by Gemini 1.5. You will need to add your own keys after 72 hours.</p>
+                    <p className="text-sm">72-Hour Free Trial. Powered by Gemini 2.0 Flash. You will need to add your own keys after 72 hours.</p>
                 </button>
 
                 <button
@@ -101,7 +101,7 @@ export default function StepAIConnection({ state, updateState, onNext }: AIConne
                     </div>
                     <h3 className="text-2xl font-black text-white mb-2">Free Trial Active</h3>
                     <p className="text-white/60 mb-8 max-w-md mx-auto">
-                        Your agent will use BotCraft Works' enterprise Gemini 1.5 accounts for the next 72 hours. Strict rate limits apply to prevent abuse. No setup required.
+                        Your agent will use Tiger-Claw's enterprise Gemini 2.0 Flash accounts for the next 72 hours. Strict rate limits apply to prevent abuse. No setup required.
                     </p>
                     <div className="flex flex-wrap justify-center gap-4">
                         <span className="px-4 py-2 bg-green-500/10 text-green-400 border border-green-500/20 rounded-full text-sm font-bold flex items-center gap-2">

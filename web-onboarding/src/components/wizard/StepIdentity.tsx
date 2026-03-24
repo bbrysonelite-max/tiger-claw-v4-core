@@ -46,7 +46,7 @@ export default function StepIdentity({ state, updateState, onNext }: IdentityPro
             const data = await response.json();
 
             if (!response.ok || !data.ok) {
-                throw new Error(data.error || "No purchase found. Please complete checkout on Stan Store first.");
+                throw new Error(data.error || "No purchase found. Visit stan.store/brentbryson to get your agent, then return here.");
             }
 
             const nicheName = NICHES.find(n => n.id === localState.nicheId)?.name || "Agent";

@@ -215,7 +215,7 @@ export default function StepReviewPayment({ state, isDeploying, setIsDeploying, 
                                 <><Loader2 className="w-6 h-6 animate-spin" /> {state.price !== "$0.00" ? "REDIRECTING..." : "HATCHING..."}</>
                             ) : (
                                 state.price !== "$0.00"
-                                    ? <>PROCEED TO SECURE CHECKOUT <ArrowRight className="w-6 h-6 group-hover:translate-x-1 transition-transform" /></>
+                                    ? <>LAUNCH MY TIGER <ArrowRight className="w-6 h-6 group-hover:translate-x-1 transition-transform" /></>
                                     : <>ACTIVATE AGENT NOW <ArrowRight className="w-6 h-6 group-hover:translate-x-1 transition-transform" /></>
                             )}
                         </span>
@@ -230,7 +230,7 @@ export default function StepReviewPayment({ state, isDeploying, setIsDeploying, 
             </div>
 
             <p className="mt-4 text-[10px] text-white/20 uppercase tracking-widest text-center">
-                {state.price !== "$0.00" ? "You will be redirected to Stan Store to finalize your secure transaction." : "Clicking activate will hatch your bot instantly. Watch the magic happen."}
+                {state.price !== "$0.00" ? "Your purchase is verified. Clicking launch will activate your bot instantly." : "Clicking activate will hatch your bot instantly. Watch the magic happen."}
             </p>
         </div>
     );
