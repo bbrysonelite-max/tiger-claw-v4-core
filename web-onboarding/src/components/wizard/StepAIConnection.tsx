@@ -12,17 +12,14 @@ interface AIConnectionProps {
     onNext: () => void;
 }
 
+// Tiger Claw runs exclusively on Google Gemini (locked decision #11).
+// Only one provider is supported.
 const PROVIDERS = [
-    { id: "google", name: "Gemini", icon: "💎", url: "https://aistudio.google.com/apikey", model: "gemini-2.0-flash", free: true, help: "Free tier available. Fastest hatching." },
-    { id: "openai", name: "OpenAI", icon: "🧠", url: "https://platform.openai.com/api-keys", model: "gpt-4o-mini", free: false, help: "Industry standard. Needs credits." },
-    { id: "anthropic", name: "Anthropic", icon: "🗿", url: "https://console.anthropic.com/settings/keys", model: "claude-3-5-haiku", free: false, help: "High intelligence. Great for niche tuning." },
-    { id: "grok", name: "Grok", icon: "✖️", url: "https://console.x.ai/", model: "grok-2-1212", free: false, help: "Real-time X data access." },
-    { id: "openrouter", name: "OpenRouter", icon: "🌐", url: "https://openrouter.ai/keys", model: "auto", free: true, help: "Access Llama & more via one key." },
-    { id: "kimi", name: "Kimi", icon: "🌙", url: "https://platform.moonshot.cn/", model: "kimi-latest", free: false, help: "Specialized for Asian markets." },
+    { id: "google", name: "Gemini", icon: "💎", url: "https://aistudio.google.com/apikey", model: "gemini-2.0-flash", free: true, help: "Free tier available at Google AI Studio. Get your key in under 60 seconds." },
 ] as const;
 
 export default function StepAIConnection({ state, updateState, onNext }: AIConnectionProps) {
-    const [selectedProvider, setSelectedProvider] = useState<typeof PROVIDERS[number]["id"]>("google");
+    const selectedProvider = "google" as const;
     const [tempKey, setTempKey] = useState("");
     const [isValidating, setIsValidating] = useState(false);
 
@@ -31,15 +28,21 @@ export default function StepAIConnection({ state, updateState, onNext }: AIConne
 
     const currentProvider = PROVIDERS.find(p => p.id === selectedProvider)!;
 
+    const [keyError, setKeyError] = useState("");
+
     const addKey = () => {
         if (!tempKey) return;
+        if (!tempKey.startsWith("AIza")) {
+            setKeyError("Invalid key format. Google Gemini keys start with 'AIza'. Get yours at Google AI Studio.");
+            return;
+        }
+        setKeyError("");
         const newKey: AIKeyConfig = {
-            provider: selectedProvider as any,
+            provider: "google",
             key: tempKey,
             model: currentProvider.model,
-            label: `${currentProvider.name} Core`
+            label: `Gemini Core${state.aiKeys.length > 0 ? ` (Fallback ${state.aiKeys.length})` : ""}`
         };
-        
         updateState({ aiKeys: [...state.aiKeys, newKey] });
         setTempKey("");
     };
@@ -90,7 +93,7 @@ export default function StepAIConnection({ state, updateState, onNext }: AIConne
                         <Key className={cn("w-6 h-6", state.connectionType === "byok" ? "text-primary" : "text-white/30")} />
                         <h4 className={cn("font-bold text-lg", state.connectionType === "byok" ? "text-white" : "")}>Bring Your Own Key</h4>
                     </div>
-                    <p className="text-sm">Mandatory after 72 hours. Unlock automatic provider failover (OpenAI, Anthropic, etc) to maximize uptime.</p>
+                    <p className="text-sm">Mandatory after 72 hours. Bring your own Google Gemini key for unlimited use and 4-layer failover protection.</p>
                 </button>
             </div>
 
@@ -114,27 +117,8 @@ export default function StepAIConnection({ state, updateState, onNext }: AIConne
                 </div>
             ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 flex-1">
-                    {/* Left: Provider Selection & Key Input */}
+                    {/* Left: Key Input */}
                     <div className="space-y-6">
-                        <div className="grid grid-cols-3 gap-3">
-                            {PROVIDERS.map((p) => (
-                                <button
-                                    key={p.id}
-                                    onClick={() => setSelectedProvider(p.id)}
-                                    className={cn(
-                                        "flex flex-col items-center justify-center p-3 rounded-xl border transition-all text-center",
-                                        selectedProvider === p.id 
-                                            ? "bg-primary/10 border-primary text-white" 
-                                            : "bg-black/20 border-white/5 text-white/40 hover:border-white/20"
-                                    )}
-                                >
-                                    <span className="text-2xl mb-1">{p.icon}</span>
-                                    <span className="text-[10px] font-bold uppercase tracking-tighter">{p.name}</span>
-                                    {p.free && <span className="text-[8px] bg-green-500/20 text-green-400 px-1 rounded mt-1">FREE OPTION</span>}
-                                </button>
-                            ))}
-                        </div>
-
                         <div className="space-y-4 bg-white/5 p-5 rounded-2xl border border-white/10">
                             <div className="flex flex-col gap-1 mb-2">
                                 <h4 className="text-sm font-bold text-white flex items-center gap-2">
@@ -175,6 +159,9 @@ export default function StepAIConnection({ state, updateState, onNext }: AIConne
                                 </div>
                             </div>
                             
+                            {keyError && (
+                                <p className="text-[11px] text-red-400 font-medium">{keyError}</p>
+                            )}
                             <p className="text-[10px] text-white/30 italic">
                                 Encryption: AES-256-GCM secured. Keys never leave the hardened environment.
                             </p>

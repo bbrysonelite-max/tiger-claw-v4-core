@@ -1,112 +1,172 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { tiger_contact } from '../tiger_contact.js'
-import { makeContext, type Storage, type ToolResult } from './helpers.js'
+import { makeContext, type ToolResult } from './helpers.js'
 
-describe.skip('tiger_contact', () => {
-  let storage: Storage
+// Mutable stores — mutate per-test to control returns
+let mockLeads: Record<string, any> = {}
+let mockContacts: Record<string, any> = {}
+let mockTenantState: Record<string, any> = {}
 
+vi.mock('../../services/tenant_data.js', () => ({
+  getLeads: vi.fn(async () => mockLeads),
+  saveLeads: vi.fn(),
+  getContacts: vi.fn(async () => mockContacts),
+  saveContacts: vi.fn(async (_tid: string, data: Record<string, any>) => { mockContacts = data }),
+  getTenantState: vi.fn(async (_tid: string, file: string) => mockTenantState[file] ?? null),
+  saveTenantState: vi.fn(),
+  importContacts: vi.fn(),
+}))
+
+const QUALIFIED_LEAD = {
+  id: 'lead-001',
+  displayName: 'Alice Johnson',
+  platform: 'telegram',
+  platformId: 'alice-tg',
+  profileFit: 85,
+  intentScore: 82,
+  oar: 'builder',
+  primaryOar: 'builder',
+  qualified: true,
+  optedOut: false,
+  intentSignalHistory: [{ type: 'career_transition', excerpt: 'looking for a side hustle' }],
+}
+
+const COMPLETE_ONBOARD = {
+  phase: 'complete',
+  identity: {
+    name: 'Brent',
+    productOrOpportunity: 'health supplements',
+    yearsInProfession: '5',
+    biggestWin: 'hit Diamond rank',
+    differentiator: 'real results',
+  },
+  icpBuilder: { idealPerson: 'side hustle seekers' },
+  icpCustomer: { idealPerson: 'health-conscious parents' },
+  icpSingle: { idealPerson: 'entrepreneurs' },
+  botName: 'Scout',
+  flavor: 'network-marketer',
+}
+
+describe('tiger_contact', () => {
   beforeEach(() => {
-    storage = new Map()
-    storage.set('contacts', [
-      {
-        id: 'c1',
-        name: 'Alice Johnson',
-        email: 'alice@example.com',
-        phone: '+1-555-0100',
-        status: 'lead',
-        tags: ['vip'],
+    vi.clearAllMocks()
+    mockLeads = {}
+    mockContacts = {}
+    mockTenantState = {
+      'onboard_state.json': COMPLETE_ONBOARD,
+      'settings.json': { manualApproval: false },
+    }
+  })
+
+  it('queues a contact for a qualified lead', async () => {
+    mockLeads = { 'lead-001': QUALIFIED_LEAD }
+
+    const ctx = makeContext()
+    const result: ToolResult = await tiger_contact.execute({ action: 'queue', leadId: 'lead-001' }, ctx)
+
+    expect(result.ok).toBe(true)
+    expect(result.output).toContain('Alice Johnson')
+    expect(Object.keys(mockContacts).length).toBe(1)
+  })
+
+  it('skips queue if lead already has an active contact', async () => {
+    mockLeads = { 'lead-001': QUALIFIED_LEAD }
+    mockContacts = {
+      'contact-existing': {
+        id: 'contact-existing',
+        leadId: 'lead-001',
+        leadDisplayName: 'Alice Johnson',
+        status: 'scheduled',
+        platform: 'telegram',
+        strategy: 'direct',
+        oar: 'builder',
+        messageText: 'Hi!',
+        scheduledFor: new Date().toISOString(),
+        queuedAt: new Date().toISOString(),
       },
-    ])
-  })
+    }
 
-  // ---------------------------------------------------------------------------
-  // Read / lookup
-  // ---------------------------------------------------------------------------
-  it('returns contact details for a known id', async () => {
-    const ctx = makeContext(storage)
-    const result: ToolResult = await tiger_contact.execute({ contactId: 'c1', action: 'get' }, ctx)
+    const ctx = makeContext()
+    const result: ToolResult = await tiger_contact.execute({ action: 'queue', leadId: 'lead-001' }, ctx)
 
     expect(result.ok).toBe(true)
-    expect(result.output).toContain('Alice')
+    expect(result.data).toMatchObject({ skipped: true })
   })
 
-  it('returns ok:false for an unknown contactId', async () => {
-    const ctx = makeContext(storage)
-    const result = await tiger_contact.execute({ contactId: 'ghost', action: 'get' }, ctx)
+  it('returns ok:false for unknown lead', async () => {
+    mockLeads = {}
+
+    const ctx = makeContext()
+    const result = await tiger_contact.execute({ action: 'queue', leadId: 'ghost-lead' }, ctx)
 
     expect(result.ok).toBe(false)
+    expect(result.error).toContain('not found')
   })
 
-  // ---------------------------------------------------------------------------
-  // Update
-  // ---------------------------------------------------------------------------
-  it('updates a contact field and persists the change', async () => {
-    const ctx = makeContext(storage)
-    const result = await tiger_contact.execute({
-      contactId: 'c1',
-      action: 'update',
-      fields: { phone: '+1-555-9999' },
-    }, ctx)
+  it('returns ok:false for opted-out lead', async () => {
+    mockLeads = { 'lead-001': { ...QUALIFIED_LEAD, optedOut: true } }
 
-    expect(result.ok).toBe(true)
-    const contacts = storage.get('contacts') as Array<{ id: string; phone: string }>
-    expect(contacts.find((c) => c.id === 'c1')?.phone).toBe('+1-555-9999')
-  })
-
-  it('does not overwrite unrelated fields during update', async () => {
-    const ctx = makeContext(storage)
-    await tiger_contact.execute({
-      contactId: 'c1',
-      action: 'update',
-      fields: { phone: '+1-555-0200' },
-    }, ctx)
-
-    const contacts = storage.get('contacts') as Array<{ id: string; email: string }>
-    expect(contacts.find((c) => c.id === 'c1')?.email).toBe('alice@example.com')
-  })
-
-  // ---------------------------------------------------------------------------
-  // Delete
-  // ---------------------------------------------------------------------------
-  it('removes a contact from storage when action is "delete"', async () => {
-    const ctx = makeContext(storage)
-    const result = await tiger_contact.execute({ contactId: 'c1', action: 'delete' }, ctx)
-
-    expect(result.ok).toBe(true)
-    const contacts = storage.get('contacts') as Array<{ id: string }>
-    expect(contacts.find((c) => c.id === 'c1')).toBeUndefined()
-  })
-
-  // ---------------------------------------------------------------------------
-  // Validation
-  // ---------------------------------------------------------------------------
-  it('returns ok:false when contactId is empty', async () => {
-    const ctx = makeContext(storage)
-    const result = await tiger_contact.execute({ contactId: '', action: 'get' }, ctx)
+    const ctx = makeContext()
+    const result = await tiger_contact.execute({ action: 'queue', leadId: 'lead-001' }, ctx)
 
     expect(result.ok).toBe(false)
+    expect(result.error).toContain('opted out')
+  })
+
+  it('returns ok:false for unqualified lead', async () => {
+    mockLeads = { 'lead-001': { ...QUALIFIED_LEAD, qualified: false } }
+
+    const ctx = makeContext()
+    const result = await tiger_contact.execute({ action: 'queue', leadId: 'lead-001' }, ctx)
+
+    expect(result.ok).toBe(false)
+    expect(result.error).toContain('qualified')
+  })
+
+  it('marks a contact as sent', async () => {
+    mockContacts = {
+      'contact-001': {
+        id: 'contact-001',
+        leadId: 'lead-001',
+        leadDisplayName: 'Alice Johnson',
+        status: 'scheduled',
+        platform: 'telegram',
+        strategy: 'direct',
+        oar: 'builder',
+        messageText: 'Hi Alice!',
+        scheduledFor: new Date().toISOString(),
+        queuedAt: new Date().toISOString(),
+      },
+    }
+
+    const ctx = makeContext()
+    const result = await tiger_contact.execute({ action: 'mark_sent', contactId: 'contact-001' }, ctx)
+
+    expect(result.ok).toBe(true)
+    expect(mockContacts['contact-001'].status).toBe('sent')
+  })
+
+  it('lists all contacts', async () => {
+    mockContacts = {
+      'c1': {
+        id: 'c1', leadId: 'l1', leadDisplayName: 'Bob', status: 'sent',
+        platform: 'telegram', strategy: 'direct', oar: 'builder',
+        messageText: 'Hi Bob', scheduledFor: new Date().toISOString(), queuedAt: new Date().toISOString(),
+      },
+    }
+
+    const ctx = makeContext()
+    const result = await tiger_contact.execute({ action: 'list' }, ctx)
+
+    expect(result.ok).toBe(true)
+    expect(result.output).toContain('Bob')
+    expect(result.output).toContain('1 total')
   })
 
   it('returns ok:false for an unknown action', async () => {
-    const ctx = makeContext(storage)
-    const result = await tiger_contact.execute({ contactId: 'c1', action: 'warp' as never }, ctx)
+    const ctx = makeContext()
+    const result = await tiger_contact.execute({ action: 'warp' as never }, ctx)
 
     expect(result.ok).toBe(false)
-  })
-
-  // ---------------------------------------------------------------------------
-  // Tags
-  // ---------------------------------------------------------------------------
-  it('adds a tag to a contact', async () => {
-    const ctx = makeContext(storage)
-    const result = await tiger_contact.execute({
-      contactId: 'c1',
-      action: 'update',
-      fields: { tags: ['vip', 'lead'] },
-    }, ctx)
-
-    expect(result.ok).toBe(true)
-    const contacts = storage.get('contacts') as Array<{ id: string; tags: string[] }>
-    expect(contacts.find((c) => c.id === 'c1')?.tags).toContain('lead')
   })
 })

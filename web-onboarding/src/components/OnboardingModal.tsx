@@ -11,7 +11,7 @@ import StepReviewPayment from "./wizard/StepReviewPayment";
 import PostPaymentSuccess from "./wizard/PostPaymentSuccess";
 
 export interface AIKeyConfig {
-    provider: "google" | "openai" | "anthropic" | "grok" | "kimi" | "openrouter";
+    provider: "google";
     key: string;
     model: string;
     label: string;
@@ -50,9 +50,19 @@ const initialState: WizardState = {
     contactsRaw: "",
 };
 
+const SESSION_KEY = "tiger_wizard_state";
+
+function loadPersistedState(): WizardState {
+    try {
+        const raw = sessionStorage.getItem(SESSION_KEY);
+        if (raw) return { ...initialState, ...JSON.parse(raw) };
+    } catch { /* ignore */ }
+    return initialState;
+}
+
 export default function OnboardingModal({ onClose }: { onClose: () => void }) {
     const [step, setStep] = useState(1);
-    const [state, setState] = useState<WizardState>(initialState);
+    const [state, setState] = useState<WizardState>(loadPersistedState);
     const [isDeploying, setIsDeploying] = useState(false);
     const [deploymentComplete, setDeploymentComplete] = useState(false);
 
@@ -68,7 +78,11 @@ export default function OnboardingModal({ onClose }: { onClose: () => void }) {
     };
 
     const updateState = (updates: Partial<WizardState>) => {
-        setState((prev) => ({ ...prev, ...updates }));
+        setState((prev) => {
+            const next = { ...prev, ...updates };
+            try { sessionStorage.setItem(SESSION_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+            return next;
+        });
     };
 
     const handleLaunch = async () => {
@@ -160,7 +174,10 @@ export default function OnboardingModal({ onClose }: { onClose: () => void }) {
                                     isDeploying={isDeploying}
                                     setIsDeploying={setIsDeploying}
                                     onLaunch={handleLaunch}
-                                    onNext={() => setDeploymentComplete(true)}
+                                    onNext={() => {
+                                        try { sessionStorage.removeItem(SESSION_KEY); } catch { /* ignore */ }
+                                        setDeploymentComplete(true);
+                                    }}
                                 />
                             )}
                         </motion.div>

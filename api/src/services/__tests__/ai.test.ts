@@ -45,18 +45,17 @@ vi.mock('../pool.js', () => ({
   decryptToken: mockDecryptToken,
 }));
 
-const mockGetTenantState = vi.hoisted(() => vi.fn().mockResolvedValue(null));
-vi.mock('../tenant_data.js', () => ({
-  getTenantState: mockGetTenantState,
-  saveTenantState: vi.fn(),
-}));
-
 vi.mock('../../tools/flavorConfig.js', () => ({
   loadFlavorConfig: vi.fn(() => ({
     name: 'Network Marketer',
     professionLabel: 'Independent Distributor',
     defaultKeywords: ['MLM', 'network', 'recruiter', 'business', 'opportunity', 'team', 'grow', 'leader'],
   })),
+}));
+
+vi.mock('../self-improvement.js', () => ({
+  loadApprovedSkills: vi.fn().mockResolvedValue([]),
+  draftSkillFromFailure: vi.fn().mockResolvedValue(null),
 }));
 
 // Mock all 19 tools so the module loads without error
@@ -93,7 +92,7 @@ vi.mock('@google/generative-ai', () => ({
 }));
 
 // Import AFTER all mocks are defined
-import { getChatHistory, saveChatHistory, buildSystemPrompt, resolveGoogleKey, startFocus, completeFocus, incrementFocusToolCalls } from '../ai.js';
+import { getChatHistory, saveChatHistory, buildSystemPrompt, resolveGoogleKey, buildFirstMessageText } from '../ai.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -229,14 +228,7 @@ describe('buildSystemPrompt', () => {
     name: 'Brent Bryson',
     flavor: 'network-marketer',
     language: 'English',
-    region: 'sea',
   };
-
-  beforeEach(() => {
-    mockGetBotState.mockReset().mockResolvedValue(null);
-    mockDbQuery.mockReset().mockResolvedValue({ rows: [] });
-    mockGetTenantState.mockReset().mockResolvedValue(null);
-  });
 
   it('includes the tenant name', async () => {
     const prompt = await buildSystemPrompt(mockTenant);
@@ -249,21 +241,22 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('LOCKED');
   });
 
-  it('includes the ONBOARDING RULE section', async () => {
+  it('includes the ONBOARDING section', async () => {
     const prompt = await buildSystemPrompt(mockTenant);
-    expect(prompt).toContain('ONBOARDING RULE');
+    expect(prompt).toContain('ONBOARDING');
+    expect(prompt).toContain('tiger_onboard');
   });
 
-  it('requires tiger_onboard action=status on EVERY message', async () => {
+  it('allows organic conversation — does not force tiger_onboard on every message', async () => {
     const prompt = await buildSystemPrompt(mockTenant);
     expect(prompt).toContain('tiger_onboard');
-    expect(prompt).toContain('status');
-    expect(prompt).toContain('EVERY incoming user message');
+    expect(prompt).toContain('organic conversation');
   });
 
-  it('contains accurately relay instruction (prevents ICP summary paraphrase bug)', async () => {
+  it('contains CRITICAL telemetry instruction', async () => {
     const prompt = await buildSystemPrompt(mockTenant);
-    expect(prompt).toContain('accurately');
+    expect(prompt).toContain('CRITICAL');
+    expect(prompt).toContain('tiger_keys');
   });
 
   it('includes flavor name from loadFlavorConfig', async () => {
@@ -276,221 +269,41 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('English');
   });
 
-  it('blocks switching to normal operation before onboarding is complete', async () => {
+  it('instructs bot to allow free conversation when onboarding is not active', async () => {
     const prompt = await buildSystemPrompt(mockTenant);
-    expect(prompt).toContain('Do NOT switch to prospecting');
-    expect(prompt).toContain('isComplete=true');
+    expect(prompt).toContain('organic conversation');
+    expect(prompt).toContain('GLOBAL DIRECTIVE');
   });
 
-  it('includes INTELLIGENCE BRIEFING with operator profile when onboarding is complete', async () => {
-    mockGetBotState.mockResolvedValue({
-      phase: 'complete',
-      identity: {
-        name: 'Jane Doe',
-        productOrOpportunity: 'NuSkin wellness line',
-        biggestWin: '$10k month',
-        differentiator: 'unique reorder rate',
-      },
-      icpBuilder: { idealPerson: 'Health-conscious moms', problemFaced: 'Fatigue', confirmed: true },
-      icpCustomer: {},
-      icpSingle: {},
-    });
+  // ── Item 1: routing table removed, judgment-based prompt ──────────────────
+
+  it('does NOT contain keyword→tool routing arrows (routing table removed)', async () => {
     const prompt = await buildSystemPrompt(mockTenant);
-    expect(prompt).toContain('INTELLIGENCE BRIEFING');
-    expect(prompt).toContain('OPERATOR PROFILE');
-    expect(prompt).toContain('Jane Doe');
-    expect(prompt).toContain('NuSkin wellness line');
-    expect(prompt).toContain('Health-conscious moms');
+    // The old routing table used " → call " patterns — these must be gone
+    expect(prompt).not.toContain('→ call tiger_scout');
+    expect(prompt).not.toContain('→ call tiger_briefing');
+    expect(prompt).not.toContain('→ call tiger_contact');
+    expect(prompt).not.toContain('→ call tiger_search');
   });
 
-  it('includes hive pattern bullets when hive_signals exist', async () => {
-    mockDbQuery
-      .mockResolvedValueOnce({
-        rows: [{ signal_type: 'objection', payload: { observation: 'Trust is the #1 blocker in SEA' }, sample_size: 420 }],
-      })
-      .mockResolvedValueOnce({ rows: [] }); // lead stats
+  it('contains judgment-based tool instruction (not a keyword dispatcher)', async () => {
     const prompt = await buildSystemPrompt(mockTenant);
-    expect(prompt).toContain('NETWORK INTELLIGENCE');
-    expect(prompt).toContain('Trust is the #1 blocker');
-    expect(prompt).toContain('n=420');
+    expect(prompt).toContain('TOOL JUDGMENT');
+    expect(prompt).toContain('instruments of your judgment');
   });
 
-  it('includes pipeline stats when tenant has leads', async () => {
-    mockDbQuery
-      .mockResolvedValueOnce({ rows: [] }) // hive patterns
-      .mockResolvedValueOnce({ rows: [{ total: '47', qualified: '12' }] }); // lead stats
+  it('contains proactive onboarding invitation for incomplete setup', async () => {
     const prompt = await buildSystemPrompt(mockTenant);
-    expect(prompt).toContain('PIPELINE');
-    expect(prompt).toContain('47');
-    expect(prompt).toContain('12');
+    // Bot must proactively invite operator to calibrate — not wait passively
+    expect(prompt).toContain('5 minutes');
+    expect(prompt).toContain('calibrate');
   });
 
-  it('includes recent fact anchors in the INTELLIGENCE BRIEFING', async () => {
-    mockGetTenantState.mockResolvedValue({
-      lastExtractedAt: new Date().toISOString(),
-      icpUpdates: [{ value: 'Prospect must be actively building a team', extractedAt: new Date().toISOString() }],
-      objectionsRaised: [{ value: 'Too expensive for Thailand market', extractedAt: new Date().toISOString() }],
-      preferencesStated: [{ value: 'Prefers shorter follow-up messages', extractedAt: new Date().toISOString() }],
-      productMentioned: [],
-      hotLeadsMentioned: [],
-    });
+  it('warm market phrase is banned in prompt', async () => {
     const prompt = await buildSystemPrompt(mockTenant);
-    expect(prompt).toContain('Recent ICP signal');
-    expect(prompt).toContain('actively building a team');
-    expect(prompt).toContain('Last objection raised');
-    expect(prompt).toContain('Too expensive');
-    expect(prompt).toContain('Stated preference');
-    expect(prompt).toContain('shorter follow-up');
-  });
-
-  it('omits INTELLIGENCE BRIEFING section entirely when DB is unreachable', async () => {
-    mockGetBotState.mockRejectedValue(new Error('DB timeout'));
-    mockDbQuery.mockRejectedValue(new Error('DB timeout'));
-    const prompt = await buildSystemPrompt(mockTenant);
-    // Static prompt still returns — no crash
-    expect(prompt).toContain('Brent Bryson');
-    expect(prompt).toContain('ONBOARDING RULE');
-    expect(prompt).not.toContain('INTELLIGENCE BRIEFING');
-  });
-});
-
-// ─── getChatHistory — memory blob injection ───────────────────────────────────
-
-describe('getChatHistory — Sawtooth memory injection', () => {
-  beforeEach(() => {
-    mockRedisGet.mockReset();
-    mockRedisSet.mockReset();
-  });
-
-  it('prepends synthetic memory pair when chat_memory blob exists', async () => {
-    const history = makeHistory(['user', 'model']);
-    // First get = chat_history, second get = chat_memory
-    mockRedisGet
-      .mockResolvedValueOnce(JSON.stringify(history))
-      .mockResolvedValueOnce(JSON.stringify({ summary: 'Operator sells NuSkin. ICP: health-conscious moms.', compressedAt: '2024-01-01T00:00:00Z', turnsCompressed: 10 }));
-
-    const result = await getChatHistory(TENANT_ID, CHAT_ID);
-    expect(result).toHaveLength(4); // 2 memory + 2 real
-    expect(result[0]!.role).toBe('user');
-    expect((result[0]!.parts[0] as any).text).toContain('[CONVERSATION MEMORY');
-    expect((result[1]!.parts[0] as any).text).toContain('NuSkin');
-    expect(result[2]!.role).toBe('user');
-  });
-
-  it('returns history without memory pair when no chat_memory key exists', async () => {
-    const history = makeHistory(['user', 'model']);
-    mockRedisGet
-      .mockResolvedValueOnce(JSON.stringify(history))
-      .mockResolvedValueOnce(null);
-
-    const result = await getChatHistory(TENANT_ID, CHAT_ID);
-    expect(result).toHaveLength(2);
-    expect((result[0]!.parts[0] as any).text).not.toContain('[CONVERSATION MEMORY');
-  });
-
-  it('ignores malformed chat_memory blob without crashing', async () => {
-    const history = makeHistory(['user', 'model']);
-    mockRedisGet
-      .mockResolvedValueOnce(JSON.stringify(history))
-      .mockResolvedValueOnce('NOT VALID JSON{{');
-
-    const result = await getChatHistory(TENANT_ID, CHAT_ID);
-    expect(result).toHaveLength(2);
-  });
-});
-
-// ─── saveChatHistory — Sawtooth compression trigger ──────────────────────────
-
-describe('saveChatHistory — Sawtooth compression', () => {
-  const MAX_TURNS = 20;
-
-  beforeEach(() => {
-    mockRedisGet.mockReset();
-    mockRedisSet.mockReset().mockResolvedValue('OK');
-  });
-
-  it('does NOT trigger compression when history is at or below the threshold', async () => {
-    // Exactly at threshold — no compression
-    const roles = Array.from({ length: MAX_TURNS * 2 }, (_, i) => (i % 2 === 0 ? 'user' : 'model'));
-    await saveChatHistory(TENANT_ID, CHAT_ID, makeHistory(roles));
-    // Only the chat_history set call — no extra Redis set for chat_memory yet
-    // (compression is async fire-and-forget; Gemini mock not called means no compression attempt)
-    expect(mockRedisSet).toHaveBeenCalledTimes(1);
-    const [key] = mockRedisSet.mock.calls[0]!;
-    expect(key).toBe(`chat_history:${TENANT_ID}:${CHAT_ID}`);
-  });
-
-  it('triggers compression when history exceeds threshold', async () => {
-    // 50 entries — 10 will be "dropped" (50 - 40 = 10)
-    const roles = Array.from({ length: 50 }, (_, i) => (i % 2 === 0 ? 'user' : 'model'));
-    await saveChatHistory(TENANT_ID, CHAT_ID, makeHistory(roles));
-    // The chat_history Redis set still happens synchronously
-    expect(mockRedisSet).toHaveBeenCalledWith(
-      `chat_history:${TENANT_ID}:${CHAT_ID}`,
-      expect.any(String),
-      'EX',
-      86400 * 7,
-    );
-    // Trimmed result starts at user boundary and is within limit
-    const saved = JSON.parse(mockRedisSet.mock.calls[0]![1] as string);
-    expect(saved.length).toBeLessThanOrEqual(MAX_TURNS * 2);
-    expect(saved[0].role).toBe('user');
-  });
-});
-
-// ─── Phase 4: Focus primitives ────────────────────────────────────────────────
-
-describe('focus primitives', () => {
-  beforeEach(() => {
-    mockRedisGet.mockReset();
-    mockRedisSet.mockReset().mockResolvedValue('OK');
-  });
-
-  it('startFocus writes focus_state to Redis with status=active', async () => {
-    await startFocus(TENANT_ID, CHAT_ID);
-    expect(mockRedisSet).toHaveBeenCalledWith(
-      `focus_state:${TENANT_ID}:${CHAT_ID}`,
-      expect.stringContaining('"status":"active"'),
-      'EX',
-      86400,
-    );
-  });
-
-  it('startFocus does not throw when Redis set fails', async () => {
-    mockRedisSet.mockRejectedValue(new Error('Redis timeout'));
-    await expect(startFocus(TENANT_ID, CHAT_ID)).resolves.toBeDefined();
-  });
-
-  it('incrementFocusToolCalls increments the counter', async () => {
-    mockRedisGet.mockResolvedValue(JSON.stringify({
-      focusId: 'f1', startedAt: new Date().toISOString(), toolCallsSinceStart: 3, status: 'active',
-    }));
-    await incrementFocusToolCalls(TENANT_ID, CHAT_ID);
-    const saved = JSON.parse(mockRedisSet.mock.calls[0]![1] as string);
-    expect(saved.toolCallsSinceStart).toBe(4);
-  });
-
-  it('incrementFocusToolCalls is a no-op when focus_state does not exist', async () => {
-    mockRedisGet.mockResolvedValue(null);
-    await expect(incrementFocusToolCalls(TENANT_ID, CHAT_ID)).resolves.toBeUndefined();
-    expect(mockRedisSet).not.toHaveBeenCalled();
-  });
-
-  it('completeFocus does NOT trigger compression below threshold', async () => {
-    mockRedisGet.mockResolvedValue(JSON.stringify({
-      focusId: 'f1', startedAt: new Date().toISOString(), toolCallsSinceStart: 5, status: 'active',
-    }));
-    const history = makeHistory(Array.from({ length: 10 }, (_, i) => (i % 2 === 0 ? 'user' : 'model')));
-    await completeFocus(TENANT_ID, CHAT_ID, history);
-    // Only one Redis set call — for writing status=complete (not compression)
-    const saved = JSON.parse(mockRedisSet.mock.calls[0]![1] as string);
-    expect(saved.status).toBe('complete');
-  });
-
-  it('completeFocus is a no-op when focus_state does not exist', async () => {
-    mockRedisGet.mockResolvedValue(null);
-    await expect(completeFocus(TENANT_ID, CHAT_ID, [])).resolves.toBeUndefined();
-    expect(mockRedisSet).not.toHaveBeenCalled();
+    // Anti-churn: warm market banned
+    expect(prompt).toContain('warm market');   // appears in banned list
+    expect(prompt).not.toContain('work their warm market'); // never as instruction
   });
 });
 
@@ -585,5 +398,39 @@ describe('resolveGoogleKey', () => {
     expect(key).toBe('platform-layer1-key');
     expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('[AI] [ALERT]'), expect.any(String));
     consoleSpy.mockRestore();
+  });
+});
+
+// ─── Item 2: buildFirstMessageText (first-message onboarding nudge) ──────────
+
+describe('buildFirstMessageText', () => {
+  it('injects SYSTEM nudge when onboarding incomplete and first message', () => {
+    const result = buildFirstMessageText('hello', false, true);
+    expect(result).toContain('[SYSTEM');
+    expect(result).toContain('calibrate');
+    expect(result).toContain('tiger_onboard');
+    expect(result).toContain('hello');
+  });
+
+  it('preserves the operator original message inside the nudge', () => {
+    const result = buildFirstMessageText('what can you do?', false, true);
+    expect(result).toContain('what can you do?');
+  });
+
+  it('returns plain text when onboarding is complete', () => {
+    const result = buildFirstMessageText('find me leads', true, true);
+    expect(result).toBe('find me leads');
+    expect(result).not.toContain('[SYSTEM');
+  });
+
+  it('returns plain text when not the first message (history exists)', () => {
+    const result = buildFirstMessageText('follow up', false, false);
+    expect(result).toBe('follow up');
+    expect(result).not.toContain('[SYSTEM');
+  });
+
+  it('returns plain text when both onboarding complete and not first message', () => {
+    const result = buildFirstMessageText('scan for leads', true, false);
+    expect(result).toBe('scan for leads');
   });
 });

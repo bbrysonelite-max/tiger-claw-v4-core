@@ -26,8 +26,9 @@ export interface FlavorConfig {
     };
 }
 
-// All 11 required flavors — adding a new flavor = add JSON file + add slug here
-const REQUIRED_FLAVORS = [
+// All valid customer-facing flavors — adding a new flavor = add JSON file + add slug here.
+// "admin" is intentionally excluded: it is internal-only and never provisioned for customers.
+export const VALID_FLAVOR_KEYS = [
     "network-marketer",
     "real-estate",
     "health-wellness",
@@ -39,9 +40,11 @@ const REQUIRED_FLAVORS = [
     "lawyer",
     "plumber",
     "sales-tiger",
-    "director-of-operations",
-    "intelligence-specialist"
 ] as const;
+
+export type ValidFlavorKey = typeof VALID_FLAVOR_KEYS[number];
+
+const REQUIRED_FLAVORS = VALID_FLAVOR_KEYS;
 
 // Resolve the flavors directory — check tools/flavors first (where they live), then config/flavors
 function resolveFlavorsDir(): string {

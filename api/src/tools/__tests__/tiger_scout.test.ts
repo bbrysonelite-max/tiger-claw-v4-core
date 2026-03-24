@@ -5,36 +5,43 @@ import { makeContext, type ToolResult } from './helpers.js'
 const mockFetch = vi.fn()
 vi.stubGlobal('fetch', mockFetch)
 
+// Mutable stores — mutate per-test to control getTenantState return values
+let mockTenantState: Record<string, any> = {}
+let mockLeads: Record<string, any> = {}
+
 vi.mock('../../services/tenant_data.js', () => ({
-  getLeads: vi.fn(async () => ({})),
-  saveLeads: vi.fn(),
-  getTenantState: vi.fn(async (tid, file) => {
-    if (file === 'onboard_state.json') {
-      return {
-        phase: 'complete',
-        icpBuilder: { idealPerson: 'entrepreneurs', problemFaced: 'need money' },
-        icpCustomer: { idealPerson: 'tired parents' },
-        icpSingle: {},
-        flavor: 'network-marketer',
-        language: 'en'
-      }
-    }
-    if (file === 'scout_state.json') {
-      return {
-        burstCountToday: 0,
-        burstCountDate: '2026-01-01',
-        totalLeadsDiscovered: 0,
-        totalLeadsQualified: 0
-      }
-    }
-    return null;
-  }),
+  getLeads: vi.fn(async () => mockLeads),
+  saveLeads: vi.fn(async (_tid: string, leads: Record<string, any>) => { mockLeads = leads }),
+  getTenantState: vi.fn(async (_tid: string, file: string) => mockTenantState[file] ?? null),
   saveTenantState: vi.fn(),
 }))
 
-describe.skip('tiger_scout', () => {
+const TODAY = new Date().toISOString().slice(0, 10)
+
+const BASE_ONBOARD = {
+  phase: 'complete',
+  icpBuilder: { idealPerson: 'entrepreneurs', problemFaced: 'need money' },
+  icpCustomer: { idealPerson: 'tired parents' },
+  icpSingle: {},
+  flavor: 'network-marketer',
+  language: 'en',
+}
+
+const FRESH_SCOUT_STATE = {
+  burstCountToday: 0,
+  burstCountDate: TODAY,
+  totalLeadsDiscovered: 0,
+  totalLeadsQualified: 0,
+}
+
+describe('tiger_scout', () => {
   beforeEach(() => {
-    vi.resetAllMocks()
+    vi.clearAllMocks()
+    mockLeads = {}
+    mockTenantState = {
+      'onboard_state.json': BASE_ONBOARD,
+      'scout_state.json': FRESH_SCOUT_STATE,
+    }
   })
 
   it('executes a scout hunt and discovers leads', async () => {
@@ -50,31 +57,27 @@ describe.skip('tiger_scout', () => {
       })
     })
 
-    const ctx = makeContext(new Map(), { config: { REGION: 'us-en' } }) // US enables Reddit
+    const ctx = makeContext(new Map(), { config: { REGION: 'us-en' } })
     const result: ToolResult = await tiger_scout.execute({ action: 'hunt', mode: 'burst' }, ctx)
 
     expect(result.ok).toBe(true)
-    expect(result.output).toContain('Scans Complete')
+    expect(result.output).toContain('Hunt complete')
     expect(mockFetch).toHaveBeenCalled()
   })
 
   it('abides by burst limits and returns gracefully', async () => {
-    // Override the mock for this specific test
-    vi.mocked(await import('../../services/tenant_data.js')).getTenantState.mockResolvedValueOnce({
-      phase: 'complete',
-      icpBuilder: {}, icpCustomer: {}, icpSingle: {}, flavor: 'network-marketer'
-    }).mockResolvedValueOnce({
-      burstCountToday: 3, // LIMIT EXCEEDED
-      burstCountDate: new Date().toISOString().slice(0, 10),
+    mockTenantState['scout_state.json'] = {
+      burstCountToday: 3,
+      burstCountDate: TODAY,
       totalLeadsDiscovered: 0,
-      totalLeadsQualified: 0
-    });
+      totalLeadsQualified: 0,
+    }
 
     const ctx = makeContext()
     const result = await tiger_scout.execute({ action: 'hunt', mode: 'burst' }, ctx)
 
-    expect(result.ok).toBe(false)
-    expect(result.error).toContain('Maximum 3 burst scans')
+    expect(result.ok).toBe(true)
+    expect(result.output).toContain('Maximum 3 burst scans')
   })
 
   it('rejects unknown actions', async () => {
