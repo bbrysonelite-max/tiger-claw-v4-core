@@ -1,119 +1,117 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { tiger_briefing } from '../tiger_briefing.js'
-import { makeContext, type Storage, type ToolResult } from './helpers.js'
+import { makeContext, type ToolResult } from './helpers.js'
 
-vi.mock('../../services/db.js', () => ({
-  getPool: vi.fn(() => ({
-    query: vi.fn().mockResolvedValue({ rows: [{ count: '0' }] })
-  })),
-  getHiveSignalWithFallback: vi.fn().mockRejectedValue(new Error("No DB config in test")),
-}))
-
-let mockStorageMap = new Map();
+// Mutable stores
+let mockLeads: Record<string, any> = {}
+let mockNurture: Record<string, any> = {}
+let mockContacts: Record<string, any> = {}
+let mockTenantState: Record<string, any> = {}
 
 vi.mock('../../services/tenant_data.js', () => ({
-  getTenantState: vi.fn(async () => {
-    const state: any = {};
-    for (const [key, val] of mockStorageMap.entries()) {
-      state[`${key}.json`] = val;
-    }
-    return state;
-  }),
-  saveTenantState: vi.fn(),
-  getLeads: vi.fn(async () => {
-    const contacts = mockStorageMap.get('contacts') || [];
-    const leads: Record<string, any> = {};
-    for (const c of contacts) {
-       leads[c.id] = c;
-    }
-    return leads;
+  getLeads: vi.fn(async () => mockLeads),
+  saveLeads: vi.fn(),
+  getNurture: vi.fn(async () => mockNurture),
+  saveNurture: vi.fn(),
+  getContacts: vi.fn(async () => mockContacts),
+  saveContacts: vi.fn(),
+  getTenantState: vi.fn(async (_tid: string, file: string) => mockTenantState[file] ?? null),
+  saveTenantState: vi.fn(async (_tid: string, file: string, data: unknown) => {
+    mockTenantState[file] = data
   }),
 }))
 
-describe.skip('tiger_briefing', () => {
-  let storage: Storage
+vi.mock('../../services/db.js', () => ({
+  getPool: vi.fn(() => ({ query: vi.fn().mockResolvedValue({ rows: [] }) })),
+  getHiveSignalWithFallback: vi.fn().mockRejectedValue(new Error('no db in test')),
+}))
 
+vi.mock('../../services/hiveEmitter.js', () => ({
+  hiveAttributionLabel: vi.fn(() => 'test'),
+  emitHiveEvent: vi.fn().mockResolvedValue(undefined),
+}))
+
+const COMPLETE_ONBOARD = {
+  phase: 'complete',
+  identity: { name: 'Brent', productOrOpportunity: 'supplements' },
+  icpBuilder: { idealPerson: 'entrepreneurs' },
+  icpCustomer: { idealPerson: 'parents' },
+  icpSingle: {},
+  flavor: 'network-marketer',
+  language: 'en',
+}
+
+describe('tiger_briefing', () => {
   beforeEach(() => {
-    storage = new Map()
-    mockStorageMap = storage
-    storage.set('contacts', [
-      { id: 'c1', name: 'Alice', status: 'customer', score: 90, lastContact: '2026-03-01' },
-      { id: 'c2', name: 'Bob', status: 'lead', score: 45, lastContact: '2026-02-15' },
-      { id: 'c3', name: 'Carol', status: 'lead', score: 70, lastContact: '2026-03-20' },
-    ])
-    storage.set('events', [
-      { type: 'note', contactId: 'c1', timestamp: '2026-03-20' },
-      { type: 'conversion', contactId: 'c1', timestamp: '2026-03-10' },
-    ])
-    storage.set('settings', { followUpDays: 7 })
+    vi.clearAllMocks()
+    mockLeads = {}
+    mockNurture = {}
+    mockContacts = {}
+    mockTenantState = {
+      'onboard_state.json': COMPLETE_ONBOARD,
+    }
   })
 
-  it('returns a briefing summary and ok:true', async () => {
-    const ctx = makeContext(storage)
+  it('generates a briefing with empty pipeline and returns ok:true', async () => {
+    const ctx = makeContext()
     const result: ToolResult = await tiger_briefing.execute({ action: 'generate' }, ctx)
 
-    if (!result.ok) console.error("TEST ERROR:", result.error)
     expect(result.ok).toBe(true)
     expect(result.output).toBeTruthy()
+    expect(result.output!.length).toBeGreaterThan(10)
   })
 
-  it('includes hot leads (high score) in the briefing', async () => {
-    const ctx = makeContext(storage)
-    const result = await tiger_briefing.execute({ action: 'generate' }, ctx)
+  it('generates a briefing that includes a newly qualified lead', async () => {
+    const yesterday = new Date()
+    yesterday.setDate(yesterday.getDate() - 1)
 
-    // Carol has score 70 and recent contact — should be highlighted
-    expect(result.output).toContain('Carol')
-  })
+    mockLeads = {
+      'lead-001': {
+        id: 'lead-001',
+        displayName: 'Alice',
+        platform: 'telegram',
+        qualified: true,
+        qualifiedAt: new Date().toISOString(), // qualified today
+        profileFit: 85,
+        intentScore: 82,
+        oar: 'builder',
+        optedOut: false,
+        intentSignalHistory: [],
+      },
+    }
 
-  it('includes recent activity count', async () => {
-    const ctx = makeContext(storage)
-    const result = await tiger_briefing.execute({ action: 'generate' }, ctx)
-
-    // Should mention recent events
-    expect(result.output).toBeTruthy()
-    expect(result.output!.length).toBeGreaterThan(50)
-  })
-
-  it('returns a scoped briefing when contactId is provided', async () => {
-    const ctx = makeContext(storage)
-    const result = await tiger_briefing.execute({ action: 'generate', contactId: 'c1' }, ctx)
+    const ctx = makeContext()
+    const result: ToolResult = await tiger_briefing.execute({ action: 'generate' }, ctx)
 
     expect(result.ok).toBe(true)
     expect(result.output).toContain('Alice')
-    // Should not show unrelated contacts
-    expect(result.output).not.toContain('Bob')
   })
 
-  it('returns ok:false for unknown contactId scope', async () => {
-    const ctx = makeContext(storage)
-    const result = await tiger_briefing.execute({ action: 'generate', contactId: 'ghost' }, ctx)
+  it('mark_sent records the send timestamp', async () => {
+    const today = new Date().toISOString().slice(0, 10)
+    mockTenantState['briefing.json'] = {
+      [today]: { date: today, generatedAt: new Date().toISOString(), output: 'Test briefing' },
+    }
+
+    const ctx = makeContext()
+    const result = await tiger_briefing.execute({ action: 'mark_sent' }, ctx)
+
+    expect(result.ok).toBe(true)
+    expect(result.output).toContain(today)
+  })
+
+  it('history returns ok:true', async () => {
+    const ctx = makeContext()
+    const result = await tiger_briefing.execute({ action: 'history', limit: 3 }, ctx)
+
+    expect(result.ok).toBe(true)
+  })
+
+  it('returns ok:false for unknown action', async () => {
+    const ctx = makeContext()
+    const result = await tiger_briefing.execute({ action: 'warp' }, ctx)
 
     expect(result.ok).toBe(false)
-  })
-
-  it('handles empty contact list gracefully', async () => {
-    const emptyStorage = new Map()
-    emptyStorage.set('contacts', [])
-    emptyStorage.set('settings', { followUpDays: 7 })
-    const ctx = makeContext(emptyStorage)
-
-    const result = await tiger_briefing.execute({ action: 'generate' }, ctx)
-
-    expect(result.ok).toBe(true)
-    // Should indicate no contacts, not crash
-    expect(result.output).toBeTruthy()
-  })
-
-  it('includes overdue follow-ups in the briefing', async () => {
-    // Bob's last contact was 35 days ago — well past followUpDays: 7
-    storage.set('contacts', [
-      { id: 'c2', name: 'Bob Overdue', status: 'lead', score: 45, lastContact: '2026-02-15' },
-    ])
-    const ctx = makeContext(storage)
-    const result = await tiger_briefing.execute({ action: 'generate' }, ctx)
-
-    expect(result.ok).toBe(true)
-    // Should mention overdue or Bob
-    expect(result.output).toBeTruthy()
+    expect(result.error).toContain('Unknown action')
   })
 })

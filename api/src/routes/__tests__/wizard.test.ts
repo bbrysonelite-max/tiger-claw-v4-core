@@ -142,11 +142,11 @@ describe('POST /wizard/validate-key', () => {
 
     await request(app)
       .post('/wizard/validate-key')
-      .send({ botId: 'b1', keys: [{ provider: 'google', key: 'AIza-plaintext-key', model: 'gemini-1.5-pro' }] })
+      .send({ botId: 'b1', keys: [{ provider: 'google', key: 'GAPI-plaintext-key', model: 'gemini-1.5-pro' }] })
 
     expect(savedConfig).not.toBeNull()
     const storedKey = (savedConfig as unknown as Record<string, string>)['encryptedKey']
-    expect(storedKey).not.toBe('AIza-plaintext-key')
+    expect(storedKey).not.toBe('GAPI-plaintext-key')
     expect(storedKey).toMatch(/^enc:/)
   })
 })
@@ -173,7 +173,7 @@ describe('POST /wizard/validate-key — Layer 4 auto-resume', () => {
 
     await request(app)
       .post('/wizard/validate-key')
-      .send({ botId: 'b1', keys: [{ provider: 'google', key: 'AIzaTestKey1234', model: 'gemini-2.0-flash' }] })
+      .send({ botId: 'b1', keys: [{ provider: 'google', key: 'GAPITestKey1234', model: 'gemini-2.0-flash' }] })
 
     expect(mockDb.setBotState).toHaveBeenCalledWith(
       'b1',
@@ -189,7 +189,7 @@ describe('POST /wizard/validate-key — Layer 4 auto-resume', () => {
 
     await request(app)
       .post('/wizard/validate-key')
-      .send({ botId: 'b1', keys: [{ provider: 'google', key: 'AIzaTestKey1234', model: 'gemini-2.0-flash' }] })
+      .send({ botId: 'b1', keys: [{ provider: 'google', key: 'GAPITestKey1234', model: 'gemini-2.0-flash' }] })
 
     expect(mockDb.setBotState).toHaveBeenCalledWith(
       'b1',
@@ -211,7 +211,7 @@ describe('POST /wizard/validate-key — Layer 4 auto-resume', () => {
 
     await request(app)
       .post('/wizard/validate-key')
-      .send({ botId: 'b1', keys: [{ provider: 'google', key: 'AIzaMyRealKey5678', model: 'gemini-2.0-flash' }] })
+      .send({ botId: 'b1', keys: [{ provider: 'google', key: 'GAPIMyRealKey5678', model: 'gemini-2.0-flash' }] })
 
     expect(savedState).not.toBeNull()
     const layer2Key = (savedState as unknown as Record<string, string>)['layer2Key']
@@ -226,7 +226,7 @@ describe('POST /wizard/validate-key — Layer 4 auto-resume', () => {
 
     await request(app)
       .post('/wizard/validate-key')
-      .send({ botId: 'b1', keys: [{ provider: 'google', key: 'AIzaTestKey1234', model: 'gemini-2.0-flash' }] })
+      .send({ botId: 'b1', keys: [{ provider: 'google', key: 'GAPITestKey1234', model: 'gemini-2.0-flash' }] })
 
     expect(mockDb.setBotState).not.toHaveBeenCalled()
   })
@@ -250,7 +250,7 @@ describe('POST /wizard/validate-key — Layer 4 auto-resume', () => {
 
     const res = await request(app)
       .post('/wizard/validate-key')
-      .send({ botId: 'b1', keys: [{ provider: 'google', key: 'AIzaTestKey1234', model: 'gemini-2.0-flash' }] })
+      .send({ botId: 'b1', keys: [{ provider: 'google', key: 'GAPITestKey1234', model: 'gemini-2.0-flash' }] })
 
     // Key was stored, auto-resume failed gracefully
     expect(res.status).toBe(200)

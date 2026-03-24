@@ -1,30 +1,130 @@
 # START HERE — THE MASTER RESURRECTION BRIEFING
+**Updated:** 2026-03-24 | Session: GitGuardian full clean — 18 secret files scrubbed, 379/379 tests | Commit: 67f82b9
 
 **CRITICAL INSTRUCTION TO ANY AI READING THIS FILE:**
-**Stop what you are doing. Read this entire document and read `ARCHITECTURE.md`. This is your injected context. Do not ask Brent to repeat himself. Do not rely on hallucinated history.**
+Stop. Read this entire document and STATE_OF_TIGER_CLAW.md before doing anything else. This is your injected context. Do not ask Brent to repeat himself. Do not rely on LLM memory.
 
-## 1. The Current State of the Universe
-**Tiger Claw is LIVE and COMPILATION GREEN.** 
-- **Architecture:** V4 Stateless Serverless on Google Cloud Run (`https://api.tigerclaw.io`).
-- **Database:** Postgres HA via Cloud SQL Proxy.
-- **Cache:** Redis HA.
-- **Strict Rule 1:** OpenClaw, Mini-RAG, and per-tenant Docker containers ARE DEAD. I physically eradicated their folders `skills/`, `.agents/`, `docker/`, and `Mini-RAG/` from this repo permanently. 
-- **Strict Rule 2:** `main` is branch-protected. DO NOT attempt to push directly. Every agent must check out a `feat/` branch and use `gh pr create` to submit changes.
+---
 
-## 2. What We Accomplished Last Session
-1. **GitHub Repository Lockdown:** Deployed strict branch protection via the active REST API. Established `.github/CODEOWNERS` mandating Brent's approval, required tests, and completely shut out direct raw-pushes.
-2. **The Hive Intelligence Rollout (V4 Analytics):** Deployed the Universal Prior, Founding Member Program, and autonomous ICP signal mapping engine across the database layer (Migrations 005a-009) and the native agent loop (`tiger_scout`, `tiger_convert`). Successfully wired the nightly aggregation engine to power the front-end dashboard, completely decoupled from PII hazards.
-2. **The Great Google Schema Hunt:** Successfully patched a horrific blind-bug in Google's `gemini-2.5-flash-preview` GCP instances where lowercase JSON tool parameters were aggressively suppressed, silently throwing empty `parts:[]` responses. We downgraded globally to the bulletproof `gemini-2.0-flash` layer and heavily hardened `mapToGoogleSchema` with explicit strict `SchemaType.OBJECT` compiler exports.
-3. **Onboarding Flow Streamlining:** Axed the entire API key interrogation phase from the native Telegram Onboarding flow, letting tenants instantly spin up their flywheel without provisioning delays.
-4. **The 72-Hour Cron Pulse Engine:** Activated a native conversational trial engine running exclusively in the stateless `global-cron`. The engine natively scans the timestamp differentials across active tenants and intercepts their Webhooks to deploy extremely flavorful, dynamically generated 24h, 48h, and 72h free-trial depletion warnings securely into their operator chat window utilizing native Telegram payloads.
-5. **The Great Google Key Disaster & Architecture Hardening:** Safely navigated a catastrophic 403 Google API key deprecation/leak event. We vaulted brand new, explicitly tested Google keys into Cloud Secret Manager and established a zero-downtime deployment flow for the master API router. Re-verified `gemini-2.0-flash` as the absolute core engine. Cleaned out duplicate `Rules.md` files causing terminal loop hallucinations.
-6. **Web Wizard Subagent QA:** Deployed an autonomous browser subagent against the production Next.js onboarding bridge. Discovered a fatal `Failed to fetch` (CORS missing `Access-Control-Allow-Origin`) block explicitly preventing users from advancing past Step 1 (Identity & Niche) to contact the `api.tigerclaw.io/wizard/auth` endpoint.
+## 1. What Tiger Claw Is
 
-## 3. Your Immediate Directives
-You have one strict priority to execute the exact second you boot up. Do not do anything else until it is finished:
+**Tiger Claw is an autonomous AI sales and recruiting agent platform.** Multi-tenant SaaS. Stateless Cloud Run API. One bot per tenant. 19 native Gemini function-calling tools: Discovery → First Contact → Nurture → Conversion → Retention.
 
-### [ ] Priority 1: Finalize Next.js Stripe Linkage & CORS Patch
-The Stripe PR (`feat/stanstore-webhook`) must be finalized, but FIRST, the local and production CORS constraints blocking the Next.js wizard from communicating with the V4 Cloud Run API (`/wizard/auth`) must be eliminated. We need the native Stripe Checkout payment processing integration to permanently replace any simulated API calls for standard web onboarding, completing the end-to-end revenue lifecycle architecture.
+The agent is NOT a chatbot. It is a strategic consulting partner. It thinks, decides, acts. It has persistent memory (Redis chat history), a self-improvement engine (skills table, 1-fail threshold), and cross-tenant learning (Hive).
 
-## FINAL REMINDER
-Everything you need is in `ARCHITECTURE.md`, `specs/`, and `Rules.md`. Trust the GitHub spec, not your LLM memory. Now get to work on Priority 1.
+**FITFO.md at repo root is the agent operating protocol.** Five rules: Ant (never stops), Resource (identify dependencies first), Failure (1 fail = skill draft), Exhaustion (ask for help only after exhausting all options), Growth (use what you learn to improve). Every agent runs under it.
+
+---
+
+## 2. The Architecture (Immutable)
+
+- **API:** Cloud Run, Node.js/Express, port 4000
+- **DB:** Cloud SQL PostgreSQL HA, schema-per-tenant
+- **Cache/Queue:** Cloud Redis HA + BullMQ (5 queues: telegram-webhooks, line-webhooks, ai-routines, global-cron, admin-events)
+- **AI:** Gemini 2.0 Flash — LOCKED. 2.5 Flash silently strips JSON function call parameters.
+- **Skills:** Dynamic prompt/template skills via `skills` table (migration 013). Loaded at runtime.
+- **Self-improvement:** 1-fail threshold. Any tool failure → immediate `draftSkillFromFailure()`.
+- **Frontend:** Next.js on Vercel (wizard.tigerclaw.io)
+- **Admin Dashboard:** wizard.tigerclaw.io/admin/canary — live after PR #15 merges
+- **Payments:** Stan Store + Stripe
+- **Email:** Resend (sendTrialReminderEmail, sendProvisioningReceipt, sendKeyAbuseWarning, sendStanStoreWelcome — all implemented)
+- **Bot Pool:** 42+ Telegram bot tokens, AES-256-GCM encrypted
+- **GCP Project:** hybrid-matrix-472500-k5
+
+**Hard rules:**
+- NO RAG. NO OpenClaw. NO per-tenant Docker containers.
+- NO rewrites of the 19 tools without full test coverage.
+- NEVER push to main. Feature branch → PR → CI green → auto-merge → deploy.
+- NEVER upgrade Gemini beyond 2.0 Flash without full regression cycle.
+
+---
+
+## 3. What Was Accomplished (Full Chronological History)
+
+1. **GitHub Lockdown** — Branch protection, CODEOWNERS, CI gate.
+2. **Hive Intelligence (V4)** — Universal Prior, Founding Member program, ICP signal mapping. Migrations 005a-011.
+3. **Gemini Schema Bug Fix** — Patched JSON stripping in 2.5 Flash. Downgraded to 2.0 Flash. Hardened mapToGoogleSchema.
+4. **72-Hour Trial Engine** — Cron: 24h/48h/72h trial warnings via Telegram. BullMQ jobId dedup.
+5. **Google Key Disaster Recovery** — Catastrophic 403 deprecation. New keys in Cloud Secret Manager.
+6. **Web Wizard QA** — CORS block on /wizard/auth investigated. **Confirmed: CORS is working correctly.** OPTIONS returns 204 with all required headers. This P0 was a false alarm.
+7. **PRs #5-#8** — NM clichés removed, banned phrases global, admin-provisioned tenant tool routing fixed, CI auto-merge enabled.
+8. **Intelligence Overhaul (ea92225)** — Routing table replaced with TOOL JUDGMENT. First-message nudge added.
+9. **Canary Dashboard (36f38c3)** — `wizard.tigerclaw.io/admin/canary` — full React fleet view with auth, tenant table, onboarding status. Live after PR #15 merges.
+10. **FITFO Protocol** — FITFO.md created. Injected into every agent system prompt.
+11. **Self-Improvement Engine** — self-improvement.ts rewritten. 1-fail threshold. Skills drafted on failure. Approved skills injected at runtime.
+12. **Migration 013: Skills Table** — Dynamic agent skills with full scope/status/trigger/metrics schema.
+13. **Stage 4 Tests (tiger_convert)** — 30 tests. All passing.
+14. **GitGuardian Unblock (partial)** — `sk_test_fake` Stripe key pattern in webhooks.test.ts replaced. PR #15 still blocked by `AIza*` patterns in wizard.test.ts.
+15. **tiger_scout tests** — Unskipped. Rewrote with mutable-object mock pattern. 3/3 passing.
+16. **tiger_contact tests** — Unskipped. Completely rewritten against real API (queue/mark_sent/list). 8/8 passing.
+17. **Broken Window Sweep — 11 failing tool tests fixed.** All 19 tool test files rewritten to match real service-layer APIs. 0 skipped.
+18. **365 tests passing, 0 TypeScript errors.** 33 test files. All green.
+19. **GitGuardian unblocked — wizard.test.ts.** AIza* → GAPI* replacement. PR #15 GitGuardian clean.
+20. **Skills admin routes.** GET/approve/reject/promote/DELETE for skills curation. logAdminEvent on every transition. 27 admin tests.
+21. **Duplicate draft skills bug fixed.** Migration 014 adds partial unique index on (tenant_id, name) WHERE status='draft'.
+22. **Email trial reminders.** 24h/48h/72h trial routines now send email alongside Telegram. sendTrialReminderEmail() implemented in email.ts.
+23. **Hardcoded URL fix.** app.tigerclaw.io → FRONTEND_URL env var (wizard.tigerclaw.io fallback) in all prompts and paused-bot messages.
+24. **suspendTenant / resumeTenant fixed.** Both now set/clear `tenantPaused` in `key_state.json` so LINE channel also pauses.
+25. **Canary conversation reset route.** `POST /admin/fleet/:id/reset-conversation` — clears Redis chat history.
+26. **GitGuardian full clean (67f82b9).** 18 tracked ops/test scripts scrubbed: Google API key + PostgreSQL credentials replaced with `process.env` references. Zero secrets in git history going forward.
+27. **379 tests passing, 0 TypeScript errors.** 33 test files. All green.
+
+---
+
+## 4. Current Critical Issues
+
+### ✅ RESOLVED — GitGuardian Fully Clean
+All 18 files with hardcoded `AIzaSy*` Google keys and `TigerClaw2026MasterKey` PostgreSQL credentials replaced with env var references. Zero tracked secrets remaining. PR #16 pushed (67f82b9).
+
+### 🔴 P0 — Canaries Have No Personality
+All 10 canaries have empty `onboard_state.json`. The bot has no ICP, no product, no identity.
+Options: (1) `POST /admin/tenants/:id/reset-conversation` clears Redis history → triggers first-message nudge. (2) Tell canaries to message their bot "let's start over."
+
+### 🔴 P0 — Intelligence Fix Untested in Production
+Routing table removal + TOOL JUDGMENT + FITFO all pending PR merge. Once live, test manually. Monitor `[AI]` log lines in Cloud Run.
+
+### ✅ RESOLVED — Email Is No Longer a Stub
+sendTrialReminderEmail, sendProvisioningReceipt, sendKeyAbuseWarning, sendStanStoreWelcome — all implemented in email.ts with Resend. Mock-safe (no-ops when RESEND_API_KEY absent).
+
+### 🟠 P1 — Multi-provider BYOK | Hive Injection | LINE Incomplete
+Items 3, 4, 6 of the 6-item plan. All not started.
+
+---
+
+## 5. Immediate Directives (Execute In Order)
+
+- [x] **Fix wizard.test.ts AIza* patterns** — Done. GAPI* replacement. PR #15 unblocked.
+- [x] **Skills admin routes** — Done. PR #16. GET/approve/reject/promote/DELETE.
+- [x] **Email trial reminders** — Done. PR #16. 24h/48h/72h now email + Telegram.
+- [x] **suspendTenant / resumeTenant** — Fixed. tenantPaused flag set/cleared in key_state.json.
+- [x] **Canary reset route** — Done. POST /admin/fleet/:id/reset-conversation.
+- [x] **GitGuardian full clean** — Done. 18 files scrubbed. No tracked secrets.
+- [ ] **Canary reset** — Clear Redis history for any canary without onboard_state.json, have them complete onboarding
+- [ ] **Manual canary test** — Ask each bot open strategy questions, monitor logs
+- [ ] **resolveAIProvider** — Item 3 of 6-item plan (OpenAI BYOK)
+- [ ] **Hive injection** — Item 4 of 6-item plan
+- [ ] **Set SMOKE_TEST_GOOGLE_KEY** in GitHub Actions secrets for e2e smoke tests to work
+
+---
+
+## 6. Questions Awaiting Brent's Answer
+
+1. **Skills curation:** Admin-only (ADMIN_TOKEN) or tenant UI?
+2. **Auto-drafted skill status:** `draft` (admin review required) or `auto-approved` (tenant-scoped immediate)?
+
+---
+
+## 7. Key File Locations
+
+- `/tiger-claw/FITFO.md` — Agent operating protocol
+- `/tiger-claw/STATE_OF_TIGER_CLAW.md` — This session's hard state
+- `/Users/brentbryson/Desktop/TIGERCLAW_PUNCH_LIST.md` — Full weakness detail
+- `api/src/services/ai.ts` — buildSystemPrompt, FITFO injection, skill injection
+- `api/src/services/self-improvement.ts` — 1-fail threshold, draftSkillFromFailure
+- `api/src/services/email.ts` — All transactional email functions
+- `api/migrations/013_skills.sql` — Skills table schema
+- `api/migrations/014_skills_draft_dedup.sql` — Partial unique index for draft dedup
+- `web-onboarding/src/app/admin/canary/page.tsx` — Fleet dashboard UI
+
+---
+*Trust the spec, not LLM memory. Read STATE_OF_TIGER_CLAW.md next. Execute.*

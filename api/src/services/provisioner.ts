@@ -12,6 +12,7 @@ import {
   getPoolStats,
   getPool,
   getBotState,
+  setBotState,
   checkAndGrantFoundingMember,
   type Tenant,
 } from "./db.js";
@@ -305,9 +306,17 @@ export async function suspendTenant(
   tenant: Tenant,
   reason = "Admin action"
 ): Promise<void> {
-  // To suspend a multi-tenant bot, we just drop its webhook so it stops listening
+  // Drop Telegram webhook so it stops receiving messages
   if (tenant.botToken) {
     await fetch(`https://api.telegram.org/bot${tenant.botToken}/deleteWebhook`);
+  }
+  // Set tenantPaused in key_state so LINE and any other channel also stop consuming API keys
+  try {
+    const botState = JSON.parse(await getBotState(tenant.id, "key_state.json") || "{}");
+    botState.tenantPaused = true;
+    await setBotState(tenant.id, "key_state.json", botState);
+  } catch (err: any) {
+    console.error(`[provisioner] Failed to set tenantPaused for ${tenant.id}:`, err.message);
   }
   await updateTenantStatus(tenant.id, "suspended", { suspendedReason: reason });
   await logAdminEvent("suspend", tenant.id, { reason });
@@ -328,6 +337,14 @@ export async function resumeTenant(tenant: Tenant): Promise<"active" | "onboardi
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ url: webhookUrl })
     });
+  }
+  // Clear tenantPaused so LINE and other channels resume consuming API keys
+  try {
+    const botState = JSON.parse(await getBotState(tenant.id, "key_state.json") || "{}");
+    delete botState.tenantPaused;
+    await setBotState(tenant.id, "key_state.json", botState);
+  } catch (err: any) {
+    console.error(`[provisioner] Failed to clear tenantPaused for ${tenant.id}:`, err.message);
   }
   // Determine correct status: check actual onboarding completion in bot_states.
   // onboardingKeyUsed is never incremented — use the onboarding phase state instead.

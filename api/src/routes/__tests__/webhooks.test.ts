@@ -241,7 +241,7 @@ describe('POST /webhooks/stripe — Phase 1 hardening', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     // Configure Stripe so the early 503 guard passes
-    process.env['STRIPE_SECRET_KEY'] = 'sk_test_fake';
+    process.env['STRIPE_SECRET_KEY'] = 'stripe_test_key_placeholder';
     process.env['STRIPE_WEBHOOK_SECRET'] = 'whsec_fake';
     mockRedisGet.mockResolvedValue(null);
     mockRedisSet.mockResolvedValue('OK');

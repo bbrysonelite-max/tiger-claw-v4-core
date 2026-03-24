@@ -1,11 +1,13 @@
 import { GoogleGenerativeAI, Content, Part } from '@google/generative-ai';
-import { getTenant, getPool, getBotState, setBotState, getTenantBotToken } from './db.js';
+import { getTenant, getPool, getBotState, setBotState, getTenantBotToken, getHiveSignalWithFallback, queryHivePatterns } from './db.js';
 import TelegramBot from 'node-telegram-bot-api';
 import IORedis from 'ioredis';
 import * as fs from 'fs';
 import * as path from 'path';
 import { loadFlavorConfig } from '../tools/flavorConfig.js';
 import { decryptToken } from './pool.js';
+import { draftSkillFromFailure, loadApprovedSkills } from './self-improvement.js';
+import { hiveAttributionLabel } from './hiveEmitter.js';
 
 // Load all 19 tools — ALL must remain registered. Missing tool = infinite loop.
 import { tiger_onboard }     from '../tools/tiger_onboard.js';
@@ -16,6 +18,7 @@ import { tiger_briefing }    from '../tools/tiger_briefing.js';
 import { tiger_convert }     from '../tools/tiger_convert.js';
 import { tiger_export }      from '../tools/tiger_export.js';
 import { tiger_email }       from '../tools/tiger_email.js';
+import { sendTrialReminderEmail } from './email.js';
 import { tiger_hive }        from '../tools/tiger_hive.js';
 import { tiger_knowledge }   from '../tools/tiger_knowledge.js';
 import { tiger_import }      from '../tools/tiger_import.js';
@@ -153,6 +156,14 @@ export async function saveChatHistory(tenantId: string, chatId: number, history:
     );
 }
 
+export async function clearTenantChatHistory(tenantId: string): Promise<number> {
+    const keys = await redis.keys(`chat_history:${tenantId}:*`);
+    if (keys.length === 0) return 0;
+    await redis.del(...keys);
+    console.log(`[AI] Cleared ${keys.length} chat history keys for tenant ${tenantId}.`);
+    return keys.length;
+}
+
 // ─── Key resolution ──────────────────────────────────────────────────────────
 /**
  * BUG 2 FIX: Resolves the active Google API key using the 4-layer system.
@@ -256,6 +267,73 @@ function buildToolContext(tenantId: string, tenant: any) {
     };
 }
 
+// ─── Hive benchmark loader ───────────────────────────────────────────────────
+/**
+ * Loads top hive signals and approved patterns for this tenant's flavor/region.
+ * Injected into buildSystemPrompt() so every conversation benefits from
+ * cross-tenant learning. Uses the Universal Prior fallback chain.
+ *
+ * HIVE_CHARTER.md governs data flow and privacy rules.
+ * SKILLS_PROTOCOL.md documents the self-improvement lifecycle.
+ */
+async function loadHiveBenchmarks(flavor: string, region: string): Promise<string[]> {
+    const lines: string[] = [];
+
+    // Query the key signal types that inform agent behavior
+    const signalTypes = [
+        { key: 'ideal_customer_profile', label: 'ICP Benchmark' },
+        { key: 'conversion_rate',        label: 'Conversion Intelligence' },
+        { key: 'objection_resolution',   label: 'Objection Handling' },
+        { key: 'scout_hit_rate',         label: 'Scouting Effectiveness' },
+    ];
+
+    for (const { key, label } of signalTypes) {
+        try {
+            const signal = await getHiveSignalWithFallback(key, flavor, region);
+            if (!signal) continue;
+
+            const attribution = hiveAttributionLabel(signal);
+            const payloadSummary = Object.entries(signal.payload)
+                .filter(([k]) => k !== 'userLabel') // strip internal metadata
+                .map(([k, v]) => `  ${k}: ${typeof v === 'object' ? JSON.stringify(v) : v}`)
+                .join('\n');
+
+            lines.push(`[${label}] ${attribution} (n=${signal.sampleSize})`);
+            if (payloadSummary) lines.push(payloadSummary);
+        } catch {
+            // Non-fatal — skip this signal type
+        }
+    }
+
+    // Also inject top 3 approved hive patterns for this flavor/region
+    try {
+        const patterns = await queryHivePatterns({ flavor, region, limit: 3 });
+        if (patterns.length > 0) {
+            lines.push('');
+            lines.push('Top community patterns:');
+            for (const p of patterns) {
+                lines.push(`- [${p.category}] ${p.observation} (confidence: ${Math.round(p.confidence * 100)}%, n=${p.dataPoints})`);
+            }
+        }
+    } catch {
+        // Non-fatal — patterns table may not exist yet
+    }
+
+    return lines;
+}
+
+// ─── FITFO loader ────────────────────────────────────────────────────────────
+function loadFitfao(): string {
+    try {
+        // __dirname = api/dist/services (at runtime) or api/src/services (ts-node)
+        // Walk up 3 levels to reach the repo root where FITFO.md lives
+        const fitfaoPath = path.resolve(__dirname, '..', '..', '..', 'FITFO.md');
+        return fs.readFileSync(fitfaoPath, 'utf-8');
+    } catch {
+        return ''; // Non-fatal — operate without it if file is missing
+    }
+}
+
 // ─── System prompt ────────────────────────────────────────────────────────────
 // Async version — reads onboard_state.json so the bot has full operator context.
 export async function buildSystemPrompt(tenant: any): Promise<string> {
@@ -277,6 +355,18 @@ export async function buildSystemPrompt(tenant: any): Promise<string> {
     const botName = onboardState?.botName ?? 'Tiger';
     const operatorName = identity.name ?? tenant.name ?? 'your operator';
     const hasOnboarding = onboardState?.phase === 'complete';
+
+    // Load dynamic approved skills for this tenant
+    const approvedSkills = await loadApprovedSkills(tenant.id, tenant.flavor).catch(() => []);
+
+    // Load hive benchmarks — cross-tenant intelligence for this flavor/region
+    const hiveBenchmarks = await loadHiveBenchmarks(
+        tenant.flavor ?? 'universal',
+        tenant.region ?? 'universal',
+    ).catch(() => []);
+
+    // Load FITFO operating protocol
+    const fitfao = loadFitfao();
 
     // Build operator context block — only injected when onboarding is complete
     const operatorBlock = hasOnboarding ? [
@@ -343,29 +433,53 @@ export async function buildSystemPrompt(tenant: any): Promise<string> {
         `"manufacture some success", "hustle", "grind", "beast mode",`,
         `or any variation of classic network marketing scripts. These are permanently banned.`,
         ``,
-        `HANDLING ONBOARDING ("tiger_onboard"):`,
-        `- If a user wants to set up their Ideal Customer Profile (ICP), establish their product, or define their search algorithms, ONLY THEN do you call tiger_onboard(action="start").`,
-        `- If the user is actively answering your onboarding questions, call tiger_onboard(action="respond", response=<user message>).`,
-        `- Otherwise, ALLOW ORGANIC CONVERSATION. Do not stall them. They can chat, ask questions, or command you freely.`,
+        `ONBOARDING:`,
+        `- If onboarding is NOT complete (no identity, no ICP data above), your VERY FIRST priority is to get it done.`,
+        `- On the operator's first message, proactively invite them: briefly introduce yourself, tell them you need 5 minutes to calibrate to their business, and ask if now is a good time. Then call tiger_onboard(action="start").`,
+        `- If the user is actively answering your onboarding questions, call tiger_onboard(action="respond", response=<their message>).`,
+        `- If onboarding IS complete, never mention it again. Treat the identity and ICP data as facts you simply know.`,
+        `- Allow organic conversation at any time — the operator can ask questions, vent, or request anything. Don't hold them hostage to onboarding flow. But always return to completing it if it's unfinished.`,
         ``,
-        `AUTONOMOUS TOOL EXECUTION (19 CAPABILITIES):`,
-        `- You possess 19 powerful tools. When the user's organic request matches a capability, execute it silently.`,
-        `- Build Pipeline / Find leads / Scan social networks / Hunt → call tiger_scout(action="hunt", mode="burst")`,
-        `- Daily Report / Morning Briefing / Who to contact → call tiger_briefing`,
-        `- Research a specific prospect/name / Look up someone → call tiger_search`,
-        `- Message a prospect / Reach out / Pitch → call tiger_contact`,
-        `- Follow-up on a response / Prospect replied → call tiger_aftercare`,
-        `- Add a note about a contact → call tiger_note`,
-        `- Report a win / Mark as Sign-up / Set as converted → call tiger_convert`,
-        `- Check pipeline status / Lead count → call tiger_scout(action="status")`,
+        `TOOL JUDGMENT — READ THIS CAREFULLY:`,
+        `You have 19 specialized tools. You are intelligent enough to know when to use them without being told.`,
+        `Use tools as instruments of your judgment — not because a user's words match a keyword.`,
+        `When a tool would serve the operator better than a direct answer, use it silently and report results.`,
+        `When you can reason, advise, coach, or respond directly with genuine insight, do that instead.`,
+        `Never explain which tools you have. Never ask the operator which tool to invoke. Think, decide, act.`,
         ``,
-        `CRITICAL TELEMETRY (ALWAYS EXECUTE WHEN APPROPRIATE):`,
-        `- After every outbound prospect message or significant AI tool result, call tiger_keys(action="record_message") to track token limits.`,
-        `- If an API errors out, call tiger_keys(action="report_error", error=status) so the DevOps layer is notified.`,
+        `JUDGMENT EXAMPLES (internalize these, don't recite them):`,
+        `- Operator vents about slow results → acknowledge first, then offer to scan for new leads. Don't jump to a tool call before they feel heard.`,
+        `- Operator asks a strategy question ("how should I handle a prospect who said maybe?") → answer it directly from your expertise. You are a consultant, not a dispatcher.`,
+        `- Operator says "find me leads" or "scan" or "hunt" → use tiger_scout immediately, no explanation.`,
+        `- Operator asks about their pipeline or who to contact today → use tiger_briefing, then interpret.`,
+        `- Operator says "reach out to [name]" → use tiger_contact. No preamble.`,
+        `- Operator reports a win or sign-up → use tiger_convert to log it, celebrate briefly, move forward.`,
+        `- Operator asks something you can answer from knowledge → answer it. Don't force a tool call.`,
         ``,
-        `ANTI-CHURN CRITICAL RULE:`,
-        `If tiger_scout returns 0 leads or an empty pipeline, NEVER tell the user to "work their warm market" or "talk to friends/family".`,
-        `Instead, assure them that you are actively recalibrating the search algorithms, scanning new channels, and dynamically adjusting to uncover hidden pockets of qualified leads. Reassure them of your autonomous persistence.`,
+        `WHEN PIPELINE IS EMPTY OR SLOW:`,
+        `Never tell the operator to talk to friends, family, or their "warm market". That is permanently banned.`,
+        `Instead: acknowledge the gap, tell them you are recalibrating search parameters and scanning new channels, then use tiger_scout to act on it immediately.`,
+        ``,
+        `CRITICAL TELEMETRY (silent, always):`,
+        `- After every outbound prospect message or significant tool result, call tiger_keys(action="record_message").`,
+        `- If an API errors out, call tiger_keys(action="report_error", error=status).`,
+        // Dynamic approved skills (injected at runtime, curated by platform/admin)
+        ...(approvedSkills.length > 0
+            ? [``, `━━━━ DYNAMIC SKILLS (PLATFORM-APPROVED) ━━━━`, ...approvedSkills]
+            : []
+        ),
+        // Hive benchmarks — cross-tenant intelligence (anonymized, PII-stripped)
+        ...(hiveBenchmarks.length > 0
+            ? [
+                ``,
+                `━━━━ HIVE INTELLIGENCE (CROSS-PLATFORM BENCHMARKS) ━━━━`,
+                `The following benchmarks are derived from anonymized, aggregated data across all Tiger Claw agents in your vertical and region. Use them to calibrate your strategies — but always prioritize your operator's specific context over general benchmarks.`,
+                ...hiveBenchmarks,
+            ]
+            : []
+        ),
+        // FITFO operating protocol (agent self-improvement and persistence rules)
+        ...(fitfao ? [``, `━━━━ OPERATING PROTOCOL ━━━━`, fitfao] : []),
     ].join('\n');
 }
 
@@ -405,9 +519,26 @@ async function runToolLoop(
             } else {
                 try {
                     toolResult = await tool.execute(fc.args, toolContext);
+                    // FITFO Failure Rule: if tool returns ok:false, draft a skill immediately
+                    if (toolResult?.ok === false || toolResult?.success === false) {
+                        const errMsg = toolResult?.error ?? toolResult?.message ?? 'unknown error';
+                        draftSkillFromFailure({
+                            tenantId: toolContext.agentId,
+                            toolName: fc.name,
+                            args: fc.args ?? {},
+                            error: String(errMsg),
+                        }).catch(e => console.error(`[${logPrefix}] draftSkillFromFailure failed:`, e.message));
+                    }
                 } catch (toolErr: any) {
                     console.error(`[${logPrefix}] Tool ${fc.name} threw:`, toolErr.message);
                     toolResult = { error: toolErr.message };
+                    // FITFO Failure Rule: exception = immediate skill draft
+                    draftSkillFromFailure({
+                        tenantId: toolContext.agentId,
+                        toolName: fc.name,
+                        args: fc.args ?? {},
+                        error: toolErr.message,
+                    }).catch(e => console.error(`[${logPrefix}] draftSkillFromFailure failed:`, e.message));
                 }
             }
 
@@ -421,6 +552,18 @@ async function runToolLoop(
     }
 
     return response;
+}
+
+// ─── Exported for testing ─────────────────────────────────────────────────────
+export function buildFirstMessageText(
+    operatorText: string,
+    onboardingComplete: boolean,
+    isFirstMessage: boolean,
+): string {
+    if (!onboardingComplete && isFirstMessage) {
+        return `[SYSTEM — NOT VISIBLE TO PROSPECT] This is the operator's first message. Onboarding is not complete. Introduce yourself warmly in one sentence, tell the operator you need 5 minutes to calibrate to their business, then immediately call tiger_onboard(action="start"). The operator's actual message was: "${operatorText}"`;
+    }
+    return operatorText;
 }
 
 // ─── Public: process a Telegram user message ─────────────────────────────────
@@ -440,9 +583,10 @@ export async function processTelegramMessage(
 
         if (!googleKey) {
             console.warn(`[AI] No Google key resolved for tenant ${tenantId} — sending paused message.`);
+            const wizardUrl = process.env['FRONTEND_URL'] ?? 'https://wizard.tigerclaw.io';
             await bot.sendMessage(
                 chatId,
-                '⚠️ Your bot is paused. Please contact support or add your API key to reactivate.',
+                `⚠️ Your bot is paused. Add your API key at ${wizardUrl} to reactivate.`,
             );
             return;
         }
@@ -455,6 +599,14 @@ export async function processTelegramMessage(
         const history = await getChatHistory(tenantId, chatId);
         console.log(`[AI] History loaded: ${history.length} entries`);
 
+        // First-message onboarding nudge: if no history and onboarding not complete,
+        // prepend a hidden SYSTEM directive so the model's first action is to
+        // introduce itself and start onboarding — regardless of what the operator typed.
+        const onboardState = await getBotState<any>(tenantId, 'onboard_state.json').catch(() => null);
+        const onboardingComplete = onboardState?.phase === 'complete';
+        const isFirstMessage = history.length === 0;
+        const effectiveText = buildFirstMessageText(text, onboardingComplete, isFirstMessage);
+
         const genAI = new GoogleGenerativeAI(googleKey);
         const model = genAI.getGenerativeModel({
             model: 'gemini-2.0-flash',
@@ -463,8 +615,8 @@ export async function processTelegramMessage(
         });
 
         const chat = model.startChat({ history });
-        console.log(`[AI] Sending message to Gemini: "${text.slice(0, 50)}"`);
-        const initial = await chat.sendMessage(text);
+        console.log(`[AI] Sending message to Gemini: "${effectiveText.slice(0, 80)}"`);
+        const initial = await chat.sendMessage(effectiveText);
         const initCandidates = (initial.response as any).candidates ?? [];
         const finishReason = initCandidates[0]?.finishReason ?? 'unknown';
         const promptBlocked = (initial.response as any).promptFeedback?.blockReason ?? null;
@@ -518,37 +670,52 @@ export async function processSystemRoutine(tenantId: string, routineType: string
             tools: geminiTools as any,
         });
 
+        const wizardUrl = process.env['FRONTEND_URL'] ?? 'https://wizard.tigerclaw.io';
         const systemPrompts: Record<string, string> = {
             daily_scout:   'SYSTEM: Run your Daily Scout routine. Find new leads to contact.',
             nurture_check: 'SYSTEM: Run your Nurture Check. Review follow-ups and reach out where due.',
-            trial_reminder_24h: `SYSTEM: Write a 1-sentence, highly conversational Telegram message to your operator reminding them they have 48 hours left on their free trial. Tell them to securely plug in their API key at https://app.tigerclaw.io so you don't have to stop working for them. Use your exact flavor and personality. NEVER use placeholders. Do NOT execute any tools.`,
-            trial_reminder_48h: `SYSTEM: Write a 1-sentence, highly conversational Telegram message to your operator reminding them they have 24 hours left on their free trial. Tell them to securely plug in their API key at https://app.tigerclaw.io so you don't have to stop working for them. Use your exact flavor and personality. NEVER use placeholders. Do NOT execute any tools.`,
-            trial_reminder_72h: `SYSTEM: Write a 1-sentence, highly conversational Telegram message to your operator telling them their 72-hour free trial is officially complete, and you have paused your operations so their flywheel has stopped. Tell them to unlock their bot to resume scouting. Use your exact flavor and personality. NEVER use placeholders. Do NOT execute any tools.`,
+            trial_reminder_24h: `SYSTEM: Write a 1-sentence, highly conversational Telegram message to your operator reminding them they have 48 hours left on their free trial. Tell them to securely plug in their API key at ${wizardUrl} so you don't have to stop working for them. Use your exact flavor and personality. NEVER use placeholders. Do NOT execute any tools.`,
+            trial_reminder_48h: `SYSTEM: Write a 1-sentence, highly conversational Telegram message to your operator reminding them they have 24 hours left on their free trial. Tell them to securely plug in their API key at ${wizardUrl} so you don't have to stop working for them. Use your exact flavor and personality. NEVER use placeholders. Do NOT execute any tools.`,
+            trial_reminder_72h: `SYSTEM: Write a 1-sentence, highly conversational Telegram message to your operator telling them their 72-hour free trial is officially complete, and you have paused your operations so their flywheel has stopped. Tell them to unlock their bot to resume scouting at ${wizardUrl}. Use your exact flavor and personality. NEVER use placeholders. Do NOT execute any tools.`,
         };
         const prompt = systemPrompts[routineType] ?? `SYSTEM: Execute routine: ${routineType}`;
 
         const chat = model.startChat({ history: [] });
         const initial = await chat.sendMessage(prompt);
         
-        // Trial Reminder Handling — extract text and broadcast entirely securely
+        // Trial Reminder Handling — broadcast via Telegram AND email fallback
         if (routineType.startsWith('trial_reminder_')) {
+            const hoursRemainingMap: Record<string, number> = {
+                trial_reminder_24h: 48,
+                trial_reminder_48h: 24,
+                trial_reminder_72h: 0,
+            };
+            const hoursRemaining = hoursRemainingMap[routineType] ?? 0;
+
             let finalResponse = initial.response.text?.() ?? '';
             if (finalResponse) {
                 if (routineType === 'trial_reminder_72h') {
-                    const stanStoreUrl = process.env.STAN_STORE_URL;
+                    const stanStoreUrl = process.env['STAN_STORE_URL'];
                     if (stanStoreUrl) {
-                        finalResponse += `\n\nTo unlock your bot and resume operations, complete your registration here: ${stanStoreUrl}`;
+                        finalResponse += `\n\nTo unlock your bot and resume operations: ${stanStoreUrl}`;
                     }
                 }
+                // Telegram
                 const botToken = await getTenantBotToken(tenantId);
                 if (botToken) {
                     const chatIds = await getTenantChatIds(tenantId);
                     const bot = new TelegramBot(botToken);
                     for (const cid of chatIds) {
-                        await bot.sendMessage(cid, finalResponse).catch(err => 
+                        await bot.sendMessage(cid, finalResponse).catch(err =>
                             console.error(`[AI Routine] Failed to send reminder to ${cid}:`, err.message)
                         );
                     }
+                }
+                // Email fallback — always send regardless of Telegram success
+                if (tenant.email) {
+                    await sendTrialReminderEmail(tenant.email, hoursRemaining).catch(err =>
+                        console.error(`[AI Routine] Failed to send trial reminder email to ${tenant.email}:`, err.message)
+                    );
                 }
                 if (routineType === 'trial_reminder_72h') {
                     const botState = JSON.parse(await getBotState(tenantId, 'key_state.json') || '{}');

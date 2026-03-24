@@ -53,6 +53,11 @@ vi.mock('../../tools/flavorConfig.js', () => ({
   })),
 }));
 
+vi.mock('../self-improvement.js', () => ({
+  loadApprovedSkills: vi.fn().mockResolvedValue([]),
+  draftSkillFromFailure: vi.fn().mockResolvedValue(null),
+}));
+
 // Mock all 19 tools so the module loads without error
 vi.mock('../../tools/tiger_onboard.js', () => ({ tiger_onboard: { name: 'tiger_onboard', description: '', parameters: {}, execute: vi.fn() } }));
 vi.mock('../../tools/tiger_scout.js', () => ({ tiger_scout: { name: 'tiger_scout', description: '', parameters: {}, execute: vi.fn() } }));
@@ -87,7 +92,7 @@ vi.mock('@google/generative-ai', () => ({
 }));
 
 // Import AFTER all mocks are defined
-import { getChatHistory, saveChatHistory, buildSystemPrompt, resolveGoogleKey } from '../ai.js';
+import { getChatHistory, saveChatHistory, buildSystemPrompt, resolveGoogleKey, buildFirstMessageText } from '../ai.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -236,16 +241,16 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('LOCKED');
   });
 
-  it('includes the HANDLING ONBOARDING section', async () => {
+  it('includes the ONBOARDING section', async () => {
     const prompt = await buildSystemPrompt(mockTenant);
-    expect(prompt).toContain('HANDLING ONBOARDING');
+    expect(prompt).toContain('ONBOARDING');
     expect(prompt).toContain('tiger_onboard');
   });
 
   it('allows organic conversation — does not force tiger_onboard on every message', async () => {
     const prompt = await buildSystemPrompt(mockTenant);
     expect(prompt).toContain('tiger_onboard');
-    expect(prompt).toContain('ALLOW ORGANIC CONVERSATION');
+    expect(prompt).toContain('organic conversation');
   });
 
   it('contains CRITICAL telemetry instruction', async () => {
@@ -266,8 +271,39 @@ describe('buildSystemPrompt', () => {
 
   it('instructs bot to allow free conversation when onboarding is not active', async () => {
     const prompt = await buildSystemPrompt(mockTenant);
-    expect(prompt).toContain('ALLOW ORGANIC CONVERSATION');
+    expect(prompt).toContain('organic conversation');
     expect(prompt).toContain('GLOBAL DIRECTIVE');
+  });
+
+  // ── Item 1: routing table removed, judgment-based prompt ──────────────────
+
+  it('does NOT contain keyword→tool routing arrows (routing table removed)', async () => {
+    const prompt = await buildSystemPrompt(mockTenant);
+    // The old routing table used " → call " patterns — these must be gone
+    expect(prompt).not.toContain('→ call tiger_scout');
+    expect(prompt).not.toContain('→ call tiger_briefing');
+    expect(prompt).not.toContain('→ call tiger_contact');
+    expect(prompt).not.toContain('→ call tiger_search');
+  });
+
+  it('contains judgment-based tool instruction (not a keyword dispatcher)', async () => {
+    const prompt = await buildSystemPrompt(mockTenant);
+    expect(prompt).toContain('TOOL JUDGMENT');
+    expect(prompt).toContain('instruments of your judgment');
+  });
+
+  it('contains proactive onboarding invitation for incomplete setup', async () => {
+    const prompt = await buildSystemPrompt(mockTenant);
+    // Bot must proactively invite operator to calibrate — not wait passively
+    expect(prompt).toContain('5 minutes');
+    expect(prompt).toContain('calibrate');
+  });
+
+  it('warm market phrase is banned in prompt', async () => {
+    const prompt = await buildSystemPrompt(mockTenant);
+    // Anti-churn: warm market banned
+    expect(prompt).toContain('warm market');   // appears in banned list
+    expect(prompt).not.toContain('work their warm market'); // never as instruction
   });
 });
 
@@ -362,5 +398,39 @@ describe('resolveGoogleKey', () => {
     expect(key).toBe('platform-layer1-key');
     expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('[AI] [ALERT]'), expect.any(String));
     consoleSpy.mockRestore();
+  });
+});
+
+// ─── Item 2: buildFirstMessageText (first-message onboarding nudge) ──────────
+
+describe('buildFirstMessageText', () => {
+  it('injects SYSTEM nudge when onboarding incomplete and first message', () => {
+    const result = buildFirstMessageText('hello', false, true);
+    expect(result).toContain('[SYSTEM');
+    expect(result).toContain('calibrate');
+    expect(result).toContain('tiger_onboard');
+    expect(result).toContain('hello');
+  });
+
+  it('preserves the operator original message inside the nudge', () => {
+    const result = buildFirstMessageText('what can you do?', false, true);
+    expect(result).toContain('what can you do?');
+  });
+
+  it('returns plain text when onboarding is complete', () => {
+    const result = buildFirstMessageText('find me leads', true, true);
+    expect(result).toBe('find me leads');
+    expect(result).not.toContain('[SYSTEM');
+  });
+
+  it('returns plain text when not the first message (history exists)', () => {
+    const result = buildFirstMessageText('follow up', false, false);
+    expect(result).toBe('follow up');
+    expect(result).not.toContain('[SYSTEM');
+  });
+
+  it('returns plain text when both onboarding complete and not first message', () => {
+    const result = buildFirstMessageText('scan for leads', true, false);
+    expect(result).toBe('scan for leads');
   });
 });
