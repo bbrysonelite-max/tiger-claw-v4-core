@@ -1,5 +1,5 @@
 # START HERE — THE MASTER RESURRECTION BRIEFING
-**Updated:** 2026-03-24 | Session: Broken Window Sweep — GitGuardian unblock, tool tests, CORS/dashboard audit
+**Updated:** 2026-03-23 | Session: Broken Window Sweep — All 19 tool tests passing, GitGuardian wizard.test.ts fix pending
 
 **CRITICAL INSTRUCTION TO ANY AI READING THIS FILE:**
 Stop. Read this entire document and STATE_OF_TIGER_CLAW.md before doing anything else. This is your injected context. Do not ask Brent to repeat himself. Do not rely on LLM memory.
@@ -54,17 +54,18 @@ The agent is NOT a chatbot. It is a strategic consulting partner. It thinks, dec
 11. **Self-Improvement Engine** — self-improvement.ts rewritten. 1-fail threshold. Skills drafted on failure. Approved skills injected at runtime.
 12. **Migration 013: Skills Table** — Dynamic agent skills with full scope/status/trigger/metrics schema.
 13. **Stage 4 Tests (tiger_convert)** — 30 tests. All passing.
-14. **GitGuardian Unblock** — `sk_test_fake` Stripe key pattern in webhooks.test.ts replaced with `stripe_test_key_placeholder`. PR #15 was blocked; this fixes it.
+14. **GitGuardian Unblock (partial)** — `sk_test_fake` Stripe key pattern in webhooks.test.ts replaced. PR #15 still blocked by `AIza*` patterns in wizard.test.ts.
 15. **tiger_scout tests** — Unskipped. Rewrote with mutable-object mock pattern. 3/3 passing.
 16. **tiger_contact tests** — Unskipped. Completely rewritten against real API (queue/mark_sent/list). 8/8 passing.
-17. **254 tests passing, 0 TypeScript errors.**
+17. **Broken Window Sweep — 11 failing tool tests fixed.** All 19 tool test files rewritten to match real service-layer APIs. 0 skipped.
+18. **365 tests passing, 0 TypeScript errors.** 33 test files. All green.
 
 ---
 
 ## 4. Current Critical Issues
 
-### 🔴 P0 — PR #15 Must Merge
-Everything from sessions 8-16 above is on branch `feat/intelligence-prompt-rewrite`. GitGuardian was blocking it. Fixed this session. Once merged: FITFO is live, self-improvement is live, canary dashboard is live.
+### 🔴 P0 — PR #15 Still Blocked by GitGuardian
+`wizard.test.ts` has `AIza*` patterns (Google AI key format) that trigger GitGuardian. Some occurrences are payload values, some are assertion values — blanket replacement broke 13 tests. Fix: manually replace payload occurrences with non-flagging placeholders, update assertions to match. The stash has a broken attempt. Start fresh on wizard.test.ts only.
 
 ### 🔴 P0 — Canaries Have No Personality
 All 10 canaries have empty `onboard_state.json`. The bot has no ICP, no product, no identity.
@@ -73,8 +74,8 @@ Options: (1) `POST /admin/tenants/:id/reset-conversation` clears Redis history �
 ### 🔴 P0 — Intelligence Fix Untested in Production
 Routing table removal + TOOL JUDGMENT + FITFO all pending PR merge. Once live, test manually. Monitor `[AI]` log lines in Cloud Run.
 
-### 🟠 P1 — 15 Tool Tests Still Skipped
-scout ✅ contact ✅ → nurture, briefing, onboard, then remaining 12.
+### ✅ RESOLVED — All 19 Tool Tests Now Passing
+365/365 tests, 33 files, 0 skipped. Committed as `c754fed`.
 
 ### 🟠 P1 — Multi-provider BYOK | Hive Injection | Email Stub | LINE Incomplete
 Items 3, 4, 6 of the 6-item plan. All not started.
@@ -83,12 +84,10 @@ Items 3, 4, 6 of the 6-item plan. All not started.
 
 ## 5. Immediate Directives (Execute In Order)
 
-- [ ] **Push and verify PR #15 merges** — GitGuardian fix is committed, CI should pass
+- [ ] **Fix wizard.test.ts AIza* patterns** — Read file carefully, replace ONLY payload values (not assertion values) with non-flagging placeholders. Update assertions to match. Do NOT use sed blanket replace.
+- [ ] **Verify PR #15 CI passes after wizard.test.ts fix** — GitGuardian must clear
 - [ ] **Canary reset** — Clear Redis history for John's bot, have him complete onboarding
 - [ ] **Manual canary test** — Ask each bot open strategy questions, monitor logs
-- [ ] **tiger_nurture tests** — next in priority order (describe.skip removal)
-- [ ] **tiger_briefing tests** — after nurture
-- [ ] **tiger_onboard tests** — after briefing
 - [ ] **resolveAIProvider** — Item 3 of 6-item plan (OpenAI BYOK)
 - [ ] **Hive injection** — Item 4 of 6-item plan
 - [ ] **Skills admin routes** — /admin/skills curation endpoints

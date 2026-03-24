@@ -1,7 +1,7 @@
 # STATE OF TIGER CLAW — HARD CONTEXT LOCK
-**Timestamp Generated:** 2026-03-24T22:30:00-07:00
-**Infrastructure Status:** LIVE (254 tests green, CI auto-merge active, 10 canary tenants provisioned)
-**Last Session:** Broken Window Sweep — GitGuardian unblock, tool test activation, CORS/dashboard audit
+**Timestamp Generated:** 2026-03-23T23:30:00-07:00
+**Infrastructure Status:** LIVE (365 tests green, CI auto-merge active, 10 canary tenants provisioned)
+**Last Session:** Broken Window Sweep — All 19 tool tests rewritten and passing, wizard.test.ts GitGuardian fix pending
 
 ---
 
@@ -30,38 +30,44 @@ gh pr merge --auto --squash
 
 ---
 
-## Current State (2026-03-24 Evening)
+## Current State (2026-03-23 Late Night)
 
 ### What Was Done This Session
 
-**Broken Window Sweep (branch: feat/intelligence-prompt-rewrite, PR #15):**
+**Broken Window Sweep — Phase 2 (branch: feat/intelligence-prompt-rewrite, commit: c754fed):**
 
-**1. GitGuardian PR Block — FIXED**
-- PR #15 was blocked by GitGuardian detecting `sk_test_fake` (Stripe key pattern) in `webhooks.test.ts`.
-- This was introduced in the Phase 1 hardening commit (`f812020`).
-- Fixed: replaced with `stripe_test_key_placeholder`.
-- PR #15 should now pass CI and auto-merge, deploying everything accumulated in this branch.
+**Summary: All 19 tool test files now have passing tests. 365/365 tests, 0 skipped, 0 TypeScript errors.**
 
-**2. CORS — Investigated, NOT broken**
-- `wizard.tigerclaw.io/wizard/auth` OPTIONS preflight returns 204 with correct `access-control-allow-origin`.
-- GET `/wizard/auth` includes CORS headers. Punch list P0 was a false alarm — already fixed in a prior session.
+**11 tool tests completely rewritten:**
 
-**3. Admin Fleet Dashboard — Exists, was blocked by PR gate**
-- Dashboard lives at `web-onboarding/src/app/admin/canary/page.tsx` (commit `36f38c3`).
-- URL: `wizard.tigerclaw.io/admin/canary` — returns 404 only because PR #15 hadn't merged yet.
-- Once PR #15 merges: dashboard is live. Full table: name, bot handle, onboarding status, last active, canary badge.
+**1. tiger_settings** — Switched from ctx.storage to tenant_data.js `getTenantState`/`saveTenantState`. Tests: get/set/reset actions with valid settings keys.
 
-**4. tiger_scout tests — UNSKIPPED, 3/3 passing**
-- Rewrote mocks with mutable-object pattern (same as tiger_convert).
-- Fixed assertion: output is `'Hunt complete. Sources: ...'` not `'Scans Complete'`.
-- Fixed burst-limit test: tool returns `ok: true` with `'Hunt skipped: Maximum 3 burst scans'` (not `ok: false`).
+**2. tiger_lead** — Switched from CRUD creation (`{name, email}`) to search-by-name detail view. Full LeadRecord shape in mocks.
 
-**5. tiger_contact tests — UNSKIPPED, 8/8 passing**
-- Original tests targeted `get` / `update` / `delete` actions — those actions do not exist in the tool.
-- Completely rewritten against real API: `queue`, `mark_sent`, `list`.
-- Added tests for: qualified lead queue, duplicate skip, opted-out rejection, unqualified rejection, mark_sent, list, unknown action.
+**3. tiger_score** — Switched from `{contactId, score:0-100}` to real API: `score`/`list`/`update_engagement` actions. Added `hiveEmitter.js` mock. Key insight: `builderScore = profileFit×0.30 + intentScore×0.45 + engagement×0.25` — 100+100+0 = 75, below 80 threshold.
 
-**Test count: 254 passing (up from 243), 0 TypeScript errors. 15 tool test files still skipped.**
+**4. tiger_move** — Switched from `{contactId, toStatus}` to `{name, status, confirm}`. Key insight: without `confirm:true` returns `awaitingConfirmation:true`; same-status move returns `ok:true, changed:false` (not ok:false).
+
+**5. tiger_aftercare** — Switched from `{contactId, type}` to `{action:'enroll', leadId, oar}`. Requires complete `onboard_state.json`. Full tenant_data stack mocked.
+
+**6. tiger_export** — Switched from `{format:'csv'}` checking `data.contacts` to `{filter?}` checking `data.rowCount` and `file.content`. Returns leads, not contacts.
+
+**7. tiger_hive** — Switched from global fetch mock to raw http module pattern. Must set `INTERNAL_API_URL=http://127.0.0.1:19999`. Actions: query/submit/generate/list. Falls back gracefully on ECONNREFUSED.
+
+**8. tiger_import** — Switched from `{contacts:[...]}` to `{action:'import'/'preview'/'status', csv:string}`. Dedup by `displayName`, not email.
+
+**9. tiger_keys** — Switched from `{apiKey, action:'activate'}` to `{action:'status'/'report_error'/'rotate'/'restore_key'}`. Mocks `db.js` (getBotState/setBotState/getTenant) and `email.js`. `INTERNAL_API_URL` required.
+
+**10. tiger_objection** — Fixed 1 test: empty `prospectText` returns `ok:true` (classifies to 'general' bucket), not `ok:false`.
+
+**11. tiger_search** — Switched from ctx.storage contact records to full LeadRecord mocks via tenant_data.js. Query syntax: plain text, `status:new`, `score:60+`, tag matching.
+
+**GitGuardian Status:** STILL BLOCKING PR #15
+- `wizard.test.ts` contains `AIza*` Google key patterns.
+- Blanket sed replacement attempted → broke 13 tests (assertion values matched payloads).
+- Stashed, not committed. Needs careful manual fix: read each `AIza*` occurrence, replace only in payload positions, update corresponding assertions.
+
+**Test count: 365 passing (up from 254), 0 TypeScript errors, 33 test files, 0 skipped.**
 
 ### Architectural Decisions Locked (all prior + carried forward)
 
@@ -75,7 +81,7 @@ gh pr merge --auto --squash
 | Skill scope | LOCKED | tenant → flavor → platform |
 | Skill status flow | LOCKED | draft → submitted → approved / rejected / platform |
 | Hive benchmark injection | APPROVED | Top 3 signals per flavor/region into system prompt |
-| Tool test priority | APPROVED | scout ✅ → contact ✅ → nurture → briefing → onboard → remaining 12 |
+| Tool test priority | COMPLETE | All 19 tool tests passing ✅ — 365/365 tests, 0 skipped |
 | Skills curation access | PENDING BRENT | Admin-only or tenant UI? |
 | Auto-drafted skill status | PENDING BRENT | draft (admin review) or auto-approved (tenant-scoped)? |
 
@@ -88,9 +94,10 @@ All admin-provisioned. All have empty `onboard_state.json`. First-message nudge 
 
 ## Open Issues — Ranked by Damage
 
-### 🔴 P0 — PR #15 Merge Pending
-GitGuardian blocker has been fixed. PR must merge to deploy: canary dashboard, FITFO, self-improvement engine, skills table, intelligence prompt overhaul.
-**Status:** Fixed this session. CI re-run should pass.
+### 🔴 P0 — PR #15 Blocked: wizard.test.ts AIza* Patterns
+GitGuardian flags Google AI key patterns (`AIza*`) in `wizard.test.ts`. The file has multiple occurrences — some are payload values being sent TO the API, some are assertion values checking what was STORED. Blanket replacement breaks assertions.
+**Fix Required:** Read `api/src/routes/__tests__/wizard.test.ts` carefully. Replace `AIza*` strings in request/payload positions with `GOOGLE_AI_TEST_KEY_PLACEHOLDER`. Update any assertions that check for the old value. Do not touch occurrences that test "was the correct key rejected/accepted".
+**Current state:** Broken attempt is stashed. 365/365 tests green without the stash applied.
 
 ### 🔴 P0 — All 10 Canaries Have No Personality Data
 Empty `onboard_state.json`. First-message nudge fires for new conversations only.
@@ -100,9 +107,8 @@ Empty `onboard_state.json`. First-message nudge fires for new conversations only
 Changes live (pending PR merge) but never observed in real canary conversation.
 **Fix:** After PR merges — test each canary bot manually. Monitor Cloud Run logs ([AI] prefix).
 
-### 🟠 P1 — 15 of 19 Tool Tests Still Skipped
-tiger_scout ✅ and tiger_contact ✅ done. Remaining priority order:
-tiger_nurture → tiger_briefing → tiger_onboard → remaining 12
+### ✅ RESOLVED — All 19 Tool Tests Passing
+365/365, 33 files, 0 skipped. All tool test files rewritten to match real service-layer APIs. Committed as `c754fed`.
 
 ### 🟠 P1 — Single AI Provider
 Hard-locked to Gemini 2.0 Flash. Item 3 of 6-item plan. Not started.

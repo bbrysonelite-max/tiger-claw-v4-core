@@ -1,5 +1,5 @@
 import { GoogleGenerativeAI, Content, Part } from '@google/generative-ai';
-import { getTenant, getPool, getBotState, setBotState, getTenantBotToken } from './db.js';
+import { getTenant, getPool, getBotState, setBotState, getTenantBotToken, getHiveSignalWithFallback, queryHivePatterns } from './db.js';
 import TelegramBot from 'node-telegram-bot-api';
 import IORedis from 'ioredis';
 import * as fs from 'fs';
@@ -7,6 +7,7 @@ import * as path from 'path';
 import { loadFlavorConfig } from '../tools/flavorConfig.js';
 import { decryptToken } from './pool.js';
 import { draftSkillFromFailure, loadApprovedSkills } from './self-improvement.js';
+import { hiveAttributionLabel } from './hiveEmitter.js';
 
 // Load all 19 tools — ALL must remain registered. Missing tool = infinite loop.
 import { tiger_onboard }     from '../tools/tiger_onboard.js';
@@ -257,6 +258,61 @@ function buildToolContext(tenantId: string, tenant: any) {
     };
 }
 
+// ─── Hive benchmark loader ───────────────────────────────────────────────────
+/**
+ * Loads top hive signals and approved patterns for this tenant's flavor/region.
+ * Injected into buildSystemPrompt() so every conversation benefits from
+ * cross-tenant learning. Uses the Universal Prior fallback chain.
+ *
+ * HIVE_CHARTER.md governs data flow and privacy rules.
+ * SKILLS_PROTOCOL.md documents the self-improvement lifecycle.
+ */
+async function loadHiveBenchmarks(flavor: string, region: string): Promise<string[]> {
+    const lines: string[] = [];
+
+    // Query the key signal types that inform agent behavior
+    const signalTypes = [
+        { key: 'ideal_customer_profile', label: 'ICP Benchmark' },
+        { key: 'conversion_rate',        label: 'Conversion Intelligence' },
+        { key: 'objection_resolution',   label: 'Objection Handling' },
+        { key: 'scout_hit_rate',         label: 'Scouting Effectiveness' },
+    ];
+
+    for (const { key, label } of signalTypes) {
+        try {
+            const signal = await getHiveSignalWithFallback(key, flavor, region);
+            if (!signal) continue;
+
+            const attribution = hiveAttributionLabel(signal);
+            const payloadSummary = Object.entries(signal.payload)
+                .filter(([k]) => k !== 'userLabel') // strip internal metadata
+                .map(([k, v]) => `  ${k}: ${typeof v === 'object' ? JSON.stringify(v) : v}`)
+                .join('\n');
+
+            lines.push(`[${label}] ${attribution} (n=${signal.sampleSize})`);
+            if (payloadSummary) lines.push(payloadSummary);
+        } catch {
+            // Non-fatal — skip this signal type
+        }
+    }
+
+    // Also inject top 3 approved hive patterns for this flavor/region
+    try {
+        const patterns = await queryHivePatterns({ flavor, region, limit: 3 });
+        if (patterns.length > 0) {
+            lines.push('');
+            lines.push('Top community patterns:');
+            for (const p of patterns) {
+                lines.push(`- [${p.category}] ${p.observation} (confidence: ${Math.round(p.confidence * 100)}%, n=${p.dataPoints})`);
+            }
+        }
+    } catch {
+        // Non-fatal — patterns table may not exist yet
+    }
+
+    return lines;
+}
+
 // ─── FITFO loader ────────────────────────────────────────────────────────────
 function loadFitfao(): string {
     try {
@@ -293,6 +349,12 @@ export async function buildSystemPrompt(tenant: any): Promise<string> {
 
     // Load dynamic approved skills for this tenant
     const approvedSkills = await loadApprovedSkills(tenant.id, tenant.flavor).catch(() => []);
+
+    // Load hive benchmarks — cross-tenant intelligence for this flavor/region
+    const hiveBenchmarks = await loadHiveBenchmarks(
+        tenant.flavor ?? 'universal',
+        tenant.region ?? 'universal',
+    ).catch(() => []);
 
     // Load FITFO operating protocol
     const fitfao = loadFitfao();
@@ -395,6 +457,16 @@ export async function buildSystemPrompt(tenant: any): Promise<string> {
         // Dynamic approved skills (injected at runtime, curated by platform/admin)
         ...(approvedSkills.length > 0
             ? [``, `━━━━ DYNAMIC SKILLS (PLATFORM-APPROVED) ━━━━`, ...approvedSkills]
+            : []
+        ),
+        // Hive benchmarks — cross-tenant intelligence (anonymized, PII-stripped)
+        ...(hiveBenchmarks.length > 0
+            ? [
+                ``,
+                `━━━━ HIVE INTELLIGENCE (CROSS-PLATFORM BENCHMARKS) ━━━━`,
+                `The following benchmarks are derived from anonymized, aggregated data across all Tiger Claw agents in your vertical and region. Use them to calibrate your strategies — but always prioritize your operator's specific context over general benchmarks.`,
+                ...hiveBenchmarks,
+            ]
             : []
         ),
         // FITFO operating protocol (agent self-improvement and persistence rules)
