@@ -93,7 +93,7 @@ Items 3, 4, 6 of the 6-item plan. All not started.
 - [x] **Fix wizard.test.ts AIza* patterns** — Done. GAPI* replacement. PR #15 unblocked.
 - [x] **Skills admin routes** — Done. PR #16. GET/approve/reject/promote/DELETE.
 - [x] **Email trial reminders** — Done. PR #16. 24h/48h/72h now email + Telegram.
-- [ ] **Canary reset** — Clear Redis history for John's bot, have him complete onboarding
+- [ ] **Canary reset** — Clear Redis history for any canary without onboard_state.json, have them complete onboarding
 - [ ] **Manual canary test** — Ask each bot open strategy questions, monitor logs
 - [ ] **resolveAIProvider** — Item 3 of 6-item plan (OpenAI BYOK)
 - [ ] **Hive injection** — Item 4 of 6-item plan

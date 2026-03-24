@@ -88,7 +88,7 @@ gh pr merge --auto --squash
 ### The 10 Canaries
 All admin-provisioned. All have empty `onboard_state.json`. First-message nudge is live.
 
-**Critical: John (Thailand)** — $20M of $25M revenue. "Dumber than hell." Intelligence fix live, untested in real conversation. Once PR #15 merges, the canary dashboard will show bot status in real time.
+All 10 canaries need onboarding reset. Once PR #15 merges, the canary dashboard will show each bot's status in real time.
 
 ---
 
@@ -120,7 +120,7 @@ Hive data not in agent context. Item 4 of 6-item plan. Not started.
 Resend not implemented. RESEND_API_KEY unused. No transactional email.
 
 ### 🟠 P1 — LINE/Facebook Scouting Incomplete
-Facebook: silently returns empty if SERPER_KEY_* missing. LINE: reads local file. John's Thai network uses LINE.
+Facebook: silently returns empty if SERPER_KEY_* missing. LINE: reads local file, not real LINE API.
 
 ### 🟡 P2 — Skills Curation Has No Admin Routes
 Migration 013 created. Skills being drafted. No view/approve/reject/promote routes.
