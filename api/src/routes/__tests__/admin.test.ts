@@ -15,6 +15,7 @@ const mockDb = vi.hoisted(() => ({
   getTenant: vi.fn(),
   getTenantBySlug: vi.fn(),
   getPool: vi.fn(),
+  getBotState: vi.fn(),
 }))
 
 const mockProvisioner = vi.hoisted(() => ({
@@ -204,6 +205,93 @@ describe('POST /admin/fleet/:tenantId/canary', () => {
 
     expect(res.status).toBe(200)
     expect(mockDb.setCanaryGroup).toHaveBeenCalledWith('t1', true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// GET /admin/dashboard/tenants
+// ---------------------------------------------------------------------------
+describe('GET /admin/dashboard/tenants', () => {
+  const mockPool = { query: vi.fn() }
+
+  beforeEach(() => {
+    mockDb.getPool.mockReturnValue(mockPool)
+  })
+
+  it('returns 401 without auth', async () => {
+    const app = await buildApp()
+    const res = await request(app).get('/admin/dashboard/tenants')
+    expect(res.status).toBe(401)
+  })
+
+  it('returns structured tenant list with onboarding complete for active tenants', async () => {
+    const app = await buildApp()
+    mockPool.query.mockResolvedValue({
+      rows: [{
+        id: 't1', name: 'Brent Bryson', slug: 'brent', status: 'active',
+        canary_group: true, last_activity_at: new Date('2026-03-20T10:00:00Z'),
+        bot_username: 'TigerTestBot',
+      }],
+    })
+
+    const res = await request(app)
+      .get('/admin/dashboard/tenants')
+      .set('Authorization', `Bearer ${VALID_TOKEN}`)
+
+    expect(res.status).toBe(200)
+    expect(res.body.tenants).toHaveLength(1)
+    const t = res.body.tenants[0]
+    expect(t.name).toBe('Brent Bryson')
+    expect(t.isCanary).toBe(true)
+    expect(t.botUsername).toBe('@TigerTestBot')
+    expect(t.onboardingComplete).toBe(true)
+    expect(t.onboardingPhase).toBe('complete')
+    expect(t.lastActive).toBe('2026-03-20T10:00:00.000Z')
+  })
+
+  it('reads onboard_state.json for incomplete tenants and returns the phase', async () => {
+    const app = await buildApp()
+    mockPool.query.mockResolvedValue({
+      rows: [{
+        id: 't2', name: 'New User', slug: 'new-user', status: 'onboarding',
+        canary_group: false, last_activity_at: null, bot_username: null,
+      }],
+    })
+    mockDb.getBotState.mockResolvedValue({ phase: 'identity' })
+
+    const res = await request(app)
+      .get('/admin/dashboard/tenants')
+      .set('Authorization', `Bearer ${VALID_TOKEN}`)
+
+    expect(res.status).toBe(200)
+    const t = res.body.tenants[0]
+    expect(t.onboardingComplete).toBe(false)
+    expect(t.onboardingPhase).toBe('identity')
+    expect(t.botUsername).toBe('Unassigned')
+    expect(t.lastActive).toBe('Never')
+  })
+
+  it('returns empty tenants array when fleet is empty', async () => {
+    const app = await buildApp()
+    mockPool.query.mockResolvedValue({ rows: [] })
+
+    const res = await request(app)
+      .get('/admin/dashboard/tenants')
+      .set('Authorization', `Bearer ${VALID_TOKEN}`)
+
+    expect(res.status).toBe(200)
+    expect(res.body.tenants).toEqual([])
+  })
+
+  it('returns 500 on DB error', async () => {
+    const app = await buildApp()
+    mockPool.query.mockRejectedValue(new Error('Connection refused'))
+
+    const res = await request(app)
+      .get('/admin/dashboard/tenants')
+      .set('Authorization', `Bearer ${VALID_TOKEN}`)
+
+    expect(res.status).toBe(500)
   })
 })
 
