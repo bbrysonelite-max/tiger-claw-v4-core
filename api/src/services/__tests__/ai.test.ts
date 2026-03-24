@@ -53,6 +53,11 @@ vi.mock('../../tools/flavorConfig.js', () => ({
   })),
 }));
 
+vi.mock('../self-improvement.js', () => ({
+  loadApprovedSkills: vi.fn().mockResolvedValue([]),
+  draftSkillFromFailure: vi.fn().mockResolvedValue(null),
+}));
+
 // Mock all 19 tools so the module loads without error
 vi.mock('../../tools/tiger_onboard.js', () => ({ tiger_onboard: { name: 'tiger_onboard', description: '', parameters: {}, execute: vi.fn() } }));
 vi.mock('../../tools/tiger_scout.js', () => ({ tiger_scout: { name: 'tiger_scout', description: '', parameters: {}, execute: vi.fn() } }));
@@ -87,7 +92,7 @@ vi.mock('@google/generative-ai', () => ({
 }));
 
 // Import AFTER all mocks are defined
-import { getChatHistory, saveChatHistory, buildSystemPrompt, resolveGoogleKey } from '../ai.js';
+import { getChatHistory, saveChatHistory, buildSystemPrompt, resolveGoogleKey, buildFirstMessageText } from '../ai.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -223,13 +228,7 @@ describe('buildSystemPrompt', () => {
     name: 'Brent Bryson',
     flavor: 'network-marketer',
     language: 'English',
-    region: 'sea',
   };
-
-  beforeEach(() => {
-    mockGetBotState.mockReset().mockResolvedValue(null);
-    mockDbQuery.mockReset().mockResolvedValue({ rows: [] });
-  });
 
   it('includes the tenant name', async () => {
     const prompt = await buildSystemPrompt(mockTenant);
@@ -242,21 +241,22 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('LOCKED');
   });
 
-  it('includes the ONBOARDING RULE section', async () => {
+  it('includes the ONBOARDING section', async () => {
     const prompt = await buildSystemPrompt(mockTenant);
-    expect(prompt).toContain('ONBOARDING RULE');
+    expect(prompt).toContain('ONBOARDING');
+    expect(prompt).toContain('tiger_onboard');
   });
 
-  it('requires tiger_onboard action=status on EVERY message', async () => {
+  it('allows organic conversation — does not force tiger_onboard on every message', async () => {
     const prompt = await buildSystemPrompt(mockTenant);
     expect(prompt).toContain('tiger_onboard');
-    expect(prompt).toContain('status');
-    expect(prompt).toContain('EVERY incoming user message');
+    expect(prompt).toContain('organic conversation');
   });
 
-  it('contains accurately relay instruction (prevents ICP summary paraphrase bug)', async () => {
+  it('contains CRITICAL telemetry instruction', async () => {
     const prompt = await buildSystemPrompt(mockTenant);
-    expect(prompt).toContain('accurately');
+    expect(prompt).toContain('CRITICAL');
+    expect(prompt).toContain('tiger_keys');
   });
 
   it('includes flavor name from loadFlavorConfig', async () => {
@@ -269,63 +269,41 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('English');
   });
 
-  it('blocks switching to normal operation before onboarding is complete', async () => {
+  it('instructs bot to allow free conversation when onboarding is not active', async () => {
     const prompt = await buildSystemPrompt(mockTenant);
-    expect(prompt).toContain('Do NOT switch to prospecting');
-    expect(prompt).toContain('isComplete=true');
+    expect(prompt).toContain('organic conversation');
+    expect(prompt).toContain('GLOBAL DIRECTIVE');
   });
 
-  it('includes INTELLIGENCE BRIEFING with operator profile when onboarding is complete', async () => {
-    mockGetBotState.mockResolvedValue({
-      phase: 'complete',
-      identity: {
-        name: 'Jane Doe',
-        productOrOpportunity: 'NuSkin wellness line',
-        biggestWin: '$10k month',
-        differentiator: 'unique reorder rate',
-      },
-      icpBuilder: { idealPerson: 'Health-conscious moms', problemFaced: 'Fatigue', confirmed: true },
-      icpCustomer: {},
-      icpSingle: {},
-    });
+  // ── Item 1: routing table removed, judgment-based prompt ──────────────────
+
+  it('does NOT contain keyword→tool routing arrows (routing table removed)', async () => {
     const prompt = await buildSystemPrompt(mockTenant);
-    expect(prompt).toContain('INTELLIGENCE BRIEFING');
-    expect(prompt).toContain('OPERATOR PROFILE');
-    expect(prompt).toContain('Jane Doe');
-    expect(prompt).toContain('NuSkin wellness line');
-    expect(prompt).toContain('Health-conscious moms');
+    // The old routing table used " → call " patterns — these must be gone
+    expect(prompt).not.toContain('→ call tiger_scout');
+    expect(prompt).not.toContain('→ call tiger_briefing');
+    expect(prompt).not.toContain('→ call tiger_contact');
+    expect(prompt).not.toContain('→ call tiger_search');
   });
 
-  it('includes hive pattern bullets when hive_signals exist', async () => {
-    mockDbQuery
-      .mockResolvedValueOnce({
-        rows: [{ signal_type: 'objection', payload: { observation: 'Trust is the #1 blocker in SEA' }, sample_size: 420 }],
-      })
-      .mockResolvedValueOnce({ rows: [] }); // lead stats
+  it('contains judgment-based tool instruction (not a keyword dispatcher)', async () => {
     const prompt = await buildSystemPrompt(mockTenant);
-    expect(prompt).toContain('NETWORK INTELLIGENCE');
-    expect(prompt).toContain('Trust is the #1 blocker');
-    expect(prompt).toContain('n=420');
+    expect(prompt).toContain('TOOL JUDGMENT');
+    expect(prompt).toContain('instruments of your judgment');
   });
 
-  it('includes pipeline stats when tenant has leads', async () => {
-    mockDbQuery
-      .mockResolvedValueOnce({ rows: [] }) // hive patterns
-      .mockResolvedValueOnce({ rows: [{ total: '47', qualified: '12' }] }); // lead stats
+  it('contains proactive onboarding invitation for incomplete setup', async () => {
     const prompt = await buildSystemPrompt(mockTenant);
-    expect(prompt).toContain('PIPELINE');
-    expect(prompt).toContain('47');
-    expect(prompt).toContain('12');
+    // Bot must proactively invite operator to calibrate — not wait passively
+    expect(prompt).toContain('5 minutes');
+    expect(prompt).toContain('calibrate');
   });
 
-  it('omits INTELLIGENCE BRIEFING section entirely when DB is unreachable', async () => {
-    mockGetBotState.mockRejectedValue(new Error('DB timeout'));
-    mockDbQuery.mockRejectedValue(new Error('DB timeout'));
+  it('warm market phrase is banned in prompt', async () => {
     const prompt = await buildSystemPrompt(mockTenant);
-    // Static prompt still returns — no crash
-    expect(prompt).toContain('Brent Bryson');
-    expect(prompt).toContain('ONBOARDING RULE');
-    expect(prompt).not.toContain('INTELLIGENCE BRIEFING');
+    // Anti-churn: warm market banned
+    expect(prompt).toContain('warm market');   // appears in banned list
+    expect(prompt).not.toContain('work their warm market'); // never as instruction
   });
 });
 
@@ -420,5 +398,39 @@ describe('resolveGoogleKey', () => {
     expect(key).toBe('platform-layer1-key');
     expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('[AI] [ALERT]'), expect.any(String));
     consoleSpy.mockRestore();
+  });
+});
+
+// ─── Item 2: buildFirstMessageText (first-message onboarding nudge) ──────────
+
+describe('buildFirstMessageText', () => {
+  it('injects SYSTEM nudge when onboarding incomplete and first message', () => {
+    const result = buildFirstMessageText('hello', false, true);
+    expect(result).toContain('[SYSTEM');
+    expect(result).toContain('calibrate');
+    expect(result).toContain('tiger_onboard');
+    expect(result).toContain('hello');
+  });
+
+  it('preserves the operator original message inside the nudge', () => {
+    const result = buildFirstMessageText('what can you do?', false, true);
+    expect(result).toContain('what can you do?');
+  });
+
+  it('returns plain text when onboarding is complete', () => {
+    const result = buildFirstMessageText('find me leads', true, true);
+    expect(result).toBe('find me leads');
+    expect(result).not.toContain('[SYSTEM');
+  });
+
+  it('returns plain text when not the first message (history exists)', () => {
+    const result = buildFirstMessageText('follow up', false, false);
+    expect(result).toBe('follow up');
+    expect(result).not.toContain('[SYSTEM');
+  });
+
+  it('returns plain text when both onboarding complete and not first message', () => {
+    const result = buildFirstMessageText('scan for leads', true, false);
+    expect(result).toBe('scan for leads');
   });
 });

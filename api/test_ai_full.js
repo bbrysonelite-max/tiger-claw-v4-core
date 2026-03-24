@@ -4,7 +4,7 @@ const fs = require('fs');
 require('dotenv').config();
 
 async function run() {
-    process.env.GOOGLE_API_KEY = "AIzaSyAq3KzzX1aE3wtjy39j6yDQ2e3dWcb-af0";
+    process.env.GOOGLE_API_KEY = process.env.GOOGLE_API_KEY ?? (()=>{throw new Error("Set GOOGLE_API_KEY env var")})();
     
     // Import ai.js to get buildSystemPrompt
     const aiService = require('./dist/services/ai.js');

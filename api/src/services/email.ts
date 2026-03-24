@@ -22,7 +22,7 @@ export async function sendProvisioningReceipt(email: string, botUsername: string
         <p><strong>Next steps:</strong></p>
         <ol>
           <li><a href="https://t.me/${botUsername}">Click here to message your bot on Telegram</a></li>
-          <li>Log into your <a href="${process.env["FRONTEND_URL"] ?? "https://app.tigerclaw.io"}">Customer Dashboard</a> to configure LINE or WhatsApp.</li>
+          <li>Log into your <a href="${process.env["FRONTEND_URL"] ?? "https://wizard.tigerclaw.io"}">Customer Dashboard</a> to configure LINE or WhatsApp.</li>
         </ol>
         <p>Happy hunting,<br>Tiger Claw Team</p>
       `,
@@ -65,7 +65,7 @@ export async function sendKeyAbuseWarning(email: string, strike: number, limit: 
         <p><strong>How to fix this:</strong></p>
         <ul>
           <li>Go to <a href="https://aistudio.google.com/apikey">Google AI Studio</a> and get an API key.</li>
-          <li>Log into your <a href="${process.env["FRONTEND_URL"] ?? "https://app.tigerclaw.io"}">Tiger Claw dashboard</a> and securely save it.</li>
+          <li>Log into your <a href="${process.env["FRONTEND_URL"] ?? "https://wizard.tigerclaw.io"}">Tiger Claw dashboard</a> and securely save it.</li>
         </ul>
         <p>Need help? Reply to this email.</p>
       `,
@@ -76,9 +76,45 @@ export async function sendKeyAbuseWarning(email: string, strike: number, limit: 
   }
 }
 
+export async function sendTrialReminderEmail(
+  email: string,
+  hoursRemaining: number,
+): Promise<void> {
+  const isMock = process.env["RESEND_API_KEY"] === undefined;
+  const wizardUrl = process.env["FRONTEND_URL"] ?? "https://wizard.tigerclaw.io";
+
+  if (isMock) {
+    console.log(`[Email] MOCK sendTrialReminderEmail to ${email} (${hoursRemaining}h remaining)`);
+    return;
+  }
+
+  const isExpired = hoursRemaining <= 0;
+  const subject = isExpired
+    ? "⚠️ Your Tiger Claw trial has ended — add your key to resume"
+    : `⏰ ${hoursRemaining} hours left on your Tiger Claw trial`;
+
+  const bodyText = isExpired
+    ? `<p>Your 72-hour free trial is complete and your bot has been paused.</p>
+       <p>To resume, add your Google Gemini API key at <a href="${wizardUrl}">${wizardUrl}</a>.</p>`
+    : `<p>You have <strong>${hoursRemaining} hours</strong> remaining on your free trial.</p>
+       <p>Add your Google Gemini API key now so your bot keeps working: <a href="${wizardUrl}">${wizardUrl}</a>.</p>`;
+
+  try {
+    await resend.emails.send({
+      from: FROM_EMAIL,
+      to: email,
+      subject,
+      html: `<h2>Tiger Claw Trial Update</h2>${bodyText}<p>Need help? Reply to this email.</p>`,
+    });
+    console.log(`[Email] sendTrialReminderEmail (${hoursRemaining}h) sent to ${email}`);
+  } catch (error) {
+    console.error(`[Email] sendTrialReminderEmail failed:`, error);
+  }
+}
+
 export async function sendStanStoreWelcome(email: string, name: string, productName: string = "Tiger Claw"): Promise<void> {
   const isMock = process.env["RESEND_API_KEY"] === undefined;
-  const frontendUrl = process.env["FRONTEND_URL"] ?? "https://app.tigerclaw.io";
+  const frontendUrl = process.env["FRONTEND_URL"] ?? "https://wizard.tigerclaw.io";
   const claimUrl = `${frontendUrl}/wizard?email=${encodeURIComponent(email)}`;
   
   if (isMock) {

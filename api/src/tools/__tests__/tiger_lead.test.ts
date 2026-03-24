@@ -1,90 +1,122 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { tiger_lead } from '../tiger_lead.js'
-import { makeContext, type Storage, type ToolResult } from './helpers.js'
+import { makeContext, type ToolResult } from './helpers.js'
 
-describe.skip('tiger_lead', () => {
-  let storage: Storage
+let mockLeads: Record<string, any> = {}
+let mockNurture: Record<string, any> = {}
+let mockContacts: Record<string, any> = {}
+let mockTenantState: Record<string, any> = {}
 
+vi.mock('../../services/tenant_data.js', () => ({
+  getLeads: vi.fn(async () => mockLeads),
+  getNurture: vi.fn(async () => mockNurture),
+  getContacts: vi.fn(async () => mockContacts),
+  getTenantState: vi.fn(async (_tid: string, file: string) => mockTenantState[file] ?? null),
+}))
+
+const ALICE_LEAD = {
+  id: 'lead-001',
+  platform: 'telegram',
+  platformId: 'alice123',
+  displayName: 'Alice Johnson',
+  profileFit: 75,
+  intentScore: 80,
+  engagement: 50,
+  rawIntentStrength: 80,
+  builderScore: 70,
+  customerScore: 68,
+  qualifyingScore: 80,
+  qualifyingOar: 'builder',
+  oar: 'builder',
+  primaryOar: 'builder',
+  isUnicorn: false,
+  unicornBonusApplied: false,
+  qualified: true,
+  qualifiedAt: '2026-03-01T00:00:00Z',
+  optedOut: false,
+  discoveredAt: '2026-02-01T00:00:00Z',
+  lastSignalAt: '2026-03-01T00:00:00Z',
+  lastScoredAt: '2026-03-01T00:00:00Z',
+  purgeAt: '2026-06-01T00:00:00Z',
+  intentSignalHistory: [],
+  engagementEvents: [],
+  involvementLevel: 1,
+}
+
+describe('tiger_lead', () => {
   beforeEach(() => {
-    storage = new Map()
+    vi.clearAllMocks()
+    mockLeads = { 'lead-001': { ...ALICE_LEAD } }
+    mockNurture = {}
+    mockContacts = {}
+    mockTenantState = {}
   })
 
-  it('creates a new lead and returns ok:true', async () => {
-    const ctx = makeContext(storage)
-    const result: ToolResult = await tiger_lead.execute(
-      { name: 'Dave Prospect', email: 'dave@example.com', source: 'telegram' },
-      ctx
-    )
+  it('returns detail view when contact is found by name', async () => {
+    const ctx = makeContext()
+    const result: ToolResult = await tiger_lead.execute({ name: 'Alice' }, ctx)
 
     expect(result.ok).toBe(true)
+    expect(result.output).toContain('Alice Johnson')
   })
 
-  it('persists the lead to storage', async () => {
-    const ctx = makeContext(storage)
-    await tiger_lead.execute({ name: 'Eve Lead', email: 'eve@example.com', source: 'manual' }, ctx)
-
-    const contacts = storage.get('contacts') as Array<{ name: string; email: string }>
-    expect(contacts).toBeTruthy()
-    expect(contacts.some((c) => c.email === 'eve@example.com')).toBe(true)
-  })
-
-  it('returns the new contact id in output or data', async () => {
-    const ctx = makeContext(storage)
-    const result = await tiger_lead.execute({ name: 'Frank New', email: 'frank@example.com' }, ctx)
-
-    expect(result.ok).toBe(true)
-    // id should appear somewhere — either output text or data object
-    const hasId =
-      (result.output && result.output.length > 0) ||
-      (result.data && typeof (result.data as Record<string, unknown>)['id'] === 'string')
-    expect(hasId).toBe(true)
-  })
-
-  it('returns ok:false when name is missing', async () => {
-    const ctx = makeContext(storage)
-    const result = await tiger_lead.execute({ name: '', email: 'noname@example.com' }, ctx)
+  it('returns ok:false when name param is empty', async () => {
+    const ctx = makeContext()
+    const result = await tiger_lead.execute({ name: '' }, ctx)
 
     expect(result.ok).toBe(false)
+    expect(result.error).toBeTruthy()
   })
 
-  it('returns ok:false when email is missing', async () => {
-    const ctx = makeContext(storage)
-    const result = await tiger_lead.execute({ name: 'No Email', email: '' }, ctx)
+  it('returns ok:true with found:false when contact not in leads', async () => {
+    const ctx = makeContext()
+    const result = await tiger_lead.execute({ name: 'Nonexistent Person' }, ctx)
 
-    expect(result.ok).toBe(false)
-  })
-
-  it('deduplicates contacts by email (does not create duplicate)', async () => {
-    storage.set('contacts', [
-      { id: 'c1', name: 'Existing Person', email: 'existing@example.com' },
-    ])
-    const ctx = makeContext(storage)
-
-    const result = await tiger_lead.execute({ name: 'Existing Person', email: 'existing@example.com' }, ctx)
-
-    const contacts = storage.get('contacts') as Array<{ email: string }>
-    const dupes = contacts.filter((c) => c.email === 'existing@example.com')
-    expect(dupes.length).toBe(1)
-    // Should either return existing or indicate duplicate — not error
     expect(result.ok).toBe(true)
+    expect((result.data as any)?.found).toBe(false)
   })
 
-  it('sets default status to lead on new contact', async () => {
-    const ctx = makeContext(storage)
-    await tiger_lead.execute({ name: 'Grace Lead', email: 'grace@example.com' }, ctx)
+  it('includes score breakdown in output', async () => {
+    const ctx = makeContext()
+    const result = await tiger_lead.execute({ name: 'Alice' }, ctx)
 
-    const contacts = storage.get('contacts') as Array<{ email: string; status?: string; tags?: string[] }>
-    const contact = contacts.find((c) => c.email === 'grace@example.com')
-    // Contact should be tagged or have status indicating lead
-    expect(contact?.status === 'lead' || contact?.tags?.includes('lead')).toBe(true)
+    expect(result.output).toContain('75') // profileFit value
   })
 
-  it('accepts optional phone and stores it', async () => {
-    const ctx = makeContext(storage)
-    await tiger_lead.execute({ name: 'Henry', email: 'henry@example.com', phone: '+1-555-0101' }, ctx)
+  it('returns data with leadId when found', async () => {
+    const ctx = makeContext()
+    const result = await tiger_lead.execute({ name: 'Alice Johnson' }, ctx)
 
-    const contacts = storage.get('contacts') as Array<{ email: string; phone?: string }>
-    const contact = contacts.find((c) => c.email === 'henry@example.com')
-    expect(contact?.phone).toBe('+1-555-0101')
+    expect(result.ok).toBe(true)
+    expect((result.data as any)?.leadId).toBe('lead-001')
+  })
+
+  it('partial name match works (case insensitive)', async () => {
+    const ctx = makeContext()
+    const result = await tiger_lead.execute({ name: 'johnson' }, ctx)
+
+    expect(result.ok).toBe(true)
+    expect(result.output).toContain('Alice Johnson')
+  })
+
+  it('returns disambiguation when multiple leads match the name', async () => {
+    mockLeads = {
+      'lead-001': { ...ALICE_LEAD },
+      'lead-002': { ...ALICE_LEAD, id: 'lead-002', displayName: 'Alice Smith' },
+    }
+    const ctx = makeContext()
+    const result = await tiger_lead.execute({ name: 'alice' }, ctx)
+
+    expect(result.ok).toBe(true)
+    expect((result.data as any)?.ambiguous).toBe(true)
+  })
+
+  it('shows do-not-contact status for opted-out lead', async () => {
+    mockLeads = { 'lead-001': { ...ALICE_LEAD, optedOut: true } }
+    const ctx = makeContext()
+    const result = await tiger_lead.execute({ name: 'Alice' }, ctx)
+
+    expect(result.ok).toBe(true)
+    expect(result.output).toContain('do-not-contact')
   })
 })

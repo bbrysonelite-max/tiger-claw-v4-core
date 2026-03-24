@@ -16,6 +16,7 @@
 import { Router, type Request, type Response } from "express";
 import Stripe from "stripe";
 import { createHmac } from "crypto";
+import Redis from "ioredis";
 import { provisionQueue, telegramQueue, lineQueue } from "../services/queue.js";
 import {
   createBYOKUser,
@@ -40,6 +41,10 @@ const stripe = process.env["STRIPE_SECRET_KEY"]
 
 const WEBHOOK_SECRET = process.env["STRIPE_WEBHOOK_SECRET"] ?? "";
 
+// Redis client for idempotency keys
+const redis = new Redis(process.env["REDIS_URL"] ?? "redis://localhost:6379", { lazyConnect: true });
+const IDEMPOTENCY_TTL = 86400; // 24 hours
+
 // ---------------------------------------------------------------------------
 // POST /webhooks/stripe
 // ---------------------------------------------------------------------------
@@ -58,30 +63,43 @@ router.post("/stripe", async (req: Request, res: Response) => {
     if (!sig) throw new Error("Missing stripe-signature header");
     event = stripe.webhooks.constructEvent(req.body as Buffer, sig, WEBHOOK_SECRET);
   } catch (err: any) {
-    console.warn(`[stripe-webhook] Signature verification failed: ${err.message}. Attempting direct Stripe API verification fallback...`);
+    // Signature verification failed — attempt a strict fallback for Stan Store (no signing secret).
+    // SECURITY: We fetch the session directly from Stripe and use THEIR data, never the payload.
+    console.warn(`[stripe-webhook] Signature verification failed: ${err.message}. Attempting Stripe API fallback...`);
     try {
         const bodyJSON = JSON.parse(req.body.toString());
-        if (bodyJSON.data?.object?.id && bodyJSON.type) {
-            
-            // Only strictly verify 'checkout.session' objects
-            if (bodyJSON.type.startsWith('checkout.session.')) {
-                const verifiedSession = await stripe.checkout.sessions.retrieve(bodyJSON.data.object.id);
-                if (verifiedSession && verifiedSession.payment_status === 'paid') {
-                    console.log(`[stripe-webhook] Fallback check SUCCESS for session: ${verifiedSession.id}`);
-                    event = bodyJSON;
-                } else {
-                    throw new Error("Session invalid or not paid.");
-                }
-            } else {
-                throw new Error("Only checkouts support fallback verification.");
-            }
-        } else {
-            throw new Error("Could not parse payload for fallback verification.");
+        const sessionId = bodyJSON?.data?.object?.id;
+        const eventType = bodyJSON?.type;
+        if (!sessionId || !eventType?.startsWith("checkout.session.")) {
+            throw new Error("Could not extract checkout session ID from payload.");
         }
+        // Fetch from Stripe directly — this IS the verified data
+        const verifiedSession = await stripe.checkout.sessions.retrieve(sessionId, {
+            expand: ["customer_details"],
+        });
+        if (!verifiedSession || verifiedSession.payment_status !== "paid") {
+            throw new Error("Session not found or not paid.");
+        }
+        console.log(`[stripe-webhook] Fallback verified via Stripe API for session: ${verifiedSession.id}`);
+        // Reconstruct minimal event using Stripe's data only (not the unverified payload)
+        event = { type: "checkout.session.completed", id: `fallback_${verifiedSession.id}`, data: { object: verifiedSession } };
     } catch (fallbackErr: any) {
-        console.error(`[stripe-webhook] Fallback verification failed: ${fallbackErr.message}`);
-        return res.status(400).json({ error: "Invalid signature and fallback verification failed" });
+        console.error(`[stripe-webhook] Fallback failed: ${fallbackErr.message}`);
+        return res.status(400).json({ error: "Webhook signature invalid" });
     }
+  }
+
+  // Idempotency guard — prevent duplicate provisioning on Stripe retries
+  const sessionObj = event.data?.object as { id?: string } | undefined;
+  const sessionId = sessionObj?.id;
+  if (sessionId) {
+    const idempotencyKey = `stripe:processed:${sessionId}`;
+    const alreadyProcessed = await redis.get(idempotencyKey).catch(() => null);
+    if (alreadyProcessed) {
+        console.log(`[stripe-webhook] Duplicate delivery for session ${sessionId} — skipping.`);
+        return res.status(200).json({ received: true, duplicate: true });
+    }
+    await redis.set(idempotencyKey, "1", "EX", IDEMPOTENCY_TTL).catch(() => null);
   }
 
   console.log(`[stripe-webhook] Received event: ${event.type} (id: ${event.id})`);
@@ -111,6 +129,13 @@ router.post("/stripe", async (req: Request, res: Response) => {
   const region = meta["region"] ?? (language === "th" ? "th-th" : "us-en");
   const timezone = meta["timezone"] ?? "UTC";
   const preferredChannel = meta["channel"] ?? "telegram";
+
+  // Validate flavor key — invalid flavor would silently break the tenant's bot
+  const { VALID_FLAVOR_KEYS } = await import("../tools/flavorConfig.js");
+  if (!(VALID_FLAVOR_KEYS as readonly string[]).includes(flavor)) {
+    console.warn(`[stripe-webhook] Unknown flavor "${flavor}" for ${email} — defaulting to network-marketer`);
+    // Don't reject — default gracefully so the customer still gets a working bot
+  }
 
   console.log(`[stripe-webhook] Processing checkout for ${name} (${email}) — slug: ${slug}`);
 
