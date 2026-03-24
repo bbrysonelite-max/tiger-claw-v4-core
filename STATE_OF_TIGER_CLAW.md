@@ -1,128 +1,126 @@
 # STATE OF TIGER CLAW — HARD CONTEXT LOCK
-**Timestamp Generated:** 2026-03-22T19:15:00-07:00
-**Infrastructure Status:** LIVE (133/133 tests green, CI auto-merge active, 10 canary tenants provisioned, PRs #6/#7/#8 merged and deployed).
+**Timestamp:** 2026-03-24
+**Infrastructure Status:** LIVE. 155/155 tests green. Memory Architecture V4.1 fully shipped.
 
 ---
 
-## 🛑 MANDATORY DIRECTIVE TO ALL AI AGENTS 🛑
-This document is the absolute, most recent source of truth for the Tiger Claw repository (`/Users/brentbryson/Tigerclaw-Anti_Gravity/tiger-claw/`).
+## MANDATORY DIRECTIVE TO ALL AI AGENTS
 
-If you are reading this, you are working on the **Tiger Claw Multi-Tenant SaaS**.
-1. **NO RAG.** The personal AI OS/Mini-RAG has been physically extracted to a separate workflow. You will not write, reference, or import RAG pipelines here.
-2. **NO OPENCLAW.** We do not spin up per-tenant Docker containers.
-3. **ARCHITECTURE:** Stateless Google Cloud Run API, Gemini 2.0 Flash (locked — 2.5 Flash has a GCP function-calling bug), 19 Native Function Calling Tools (`api/src/tools/`), Schema-per-tenant Postgres.
-4. **NO REWRITES:** The 19 core tools compile flawlessly and are backed by 133 passing tests. Do not rewrite architecture.
-5. **PROTOCOL:** Read this document fully before making any assumptions or taking any action.
+This is the single source of truth for the Tiger Claw repository.
 
-## 🛑 GIT PROTOCOL — NON-NEGOTIABLE 🛑
+1. **NO RAG.** Mini-RAG has been physically removed. It does not exist.
+2. **NO OPENCLAW.** No per-tenant Docker containers. OpenClaw is dead.
+3. **NO CANARIES.** The canary group concept is deprecated. All tenants are treated equally until scale justifies it.
+4. **ARCHITECTURE:** Stateless Google Cloud Run API, Gemini 2.0 Flash (locked — 2.5 Flash has a GCP function-calling bug), 19 Native Function Calling Tools (`api/src/tools/`), shared PostgreSQL.
+5. **NO REWRITES:** The 19 core tools compile cleanly and are backed by 155 passing tests. Do not rewrite architecture.
+6. **PROTOCOL:** Read `CLAUDE.md` before writing any code.
+
+---
+
+## GIT PROTOCOL — NON-NEGOTIABLE
 
 - NEVER push directly to main. main is branch-protected.
-- ALL work goes on a feature branch.
-- Branch naming: feat/description, fix/description, chore/description
-- When work is complete and tests pass: open a PR and IMMEDIATELY enable auto-merge.
-- Brent does NOT review or merge PRs. CI green = ships. That is the policy.
-- PR title must be clear and descriptive.
-- PR body must include: what changed, why, and what tests cover it.
+- ALL work goes on a feature branch: `feat/`, `fix/`, `chore/`
+- When work is complete and tests pass: open a PR.
+- PRs #23 and #24 are pending merge (memory Phase 4 + CLAUDE.md product philosophy).
 
-**Full autonomous deploy sequence (agents must follow this exactly):**
+**Deploy sequence:**
 ```bash
 git checkout -b feat/your-description
 # make changes, run tests
 git push origin feat/your-description
 gh pr create --title "feat: your description" --body "What changed and why"
-gh pr merge --auto --squash   # fires immediately when CI passes — no human needed
+gh pr merge --auto --squash
 ```
 
-**After any merge to main — deploy to Cloud Run:**
-**Agent constraint:** NEVER checkout the main branch locally. All deployments are handled exclusively by GitHub Actions upon PR merge. The human operator must set GCP_CREDENTIALS in GitHub Secrets for this to work. Do not run ops/deploy-cloudrun.sh locally.
+Deployments to Cloud Run are handled by GitHub Actions on merge to main. Do not run deploy scripts locally.
 
 ---
 
-## Current State (2026-03-22 Evening)
+## Current State (2026-03-24)
 
-### What Was Done This Session
-- **PR #5:** Removed NM clichés from onboarding system prompt (merged)
-- **PR #6:** Moved banned NM phrases to global voice rule — now applies in ALL modes, not just onboarding. Added exact variants: "mouth is closed your business is closed", "What's the move?", "manufacture some success", etc. (merged)
-- **PR #7:** Fixed tiger_scout throwing "Onboarding not complete" for admin-provisioned tenants. Added explicit tool routing to system prompt so Gemini knows which tool to call for which user request. (merged)
-- **PR #8:** Removed CODEOWNERS human review gate. CI green = auto-merge = ships. (merged)
-- **Cloud Run deploy:** Manually triggered after session — building from latest main.
-
-### The 10 Canaries
-All 10 early adopters (NM distributor network, mostly Thailand) were provisioned with `comped:true` via `/admin/provision`. Their bots were broken due to the OpenClaw infrastructure failure before Tiger Claw V4.
-
-**Critical canary: John (Thailand)** — Brent's top distributor, responsible for $20M of $25M total network revenue. John called this session to report his bot was "dumber than hell." He was told to check back in 30 minutes. Brent has a **Zoom call with John on Thursday 7 PM Scottsdale time.**
-
-**The core problem with canary bots:**
-1. Admin-provisioned tenants never completed the Telegram onboarding interview — `onboard_state.json` is empty. The bot has no ICP, no product, no identity data. It's a blank shell.
-2. Bots were giving generic NM cliché responses (fixed in PR #6)
-3. Bots were not calling tiger_scout when asked to find prospects (fixed in PR #7)
-4. **The bot needs to handle ANY request intelligently** — not just the 19 predefined tool scenarios. This is the core intelligence gap that remains open.
-
-**What canary users need to do:**
-Each canary must message their Telegram bot and complete the onboarding interview. The bot will ask about their product, their biggest result, their ideal prospect. Without this, the bot has no context and will underperform.
-
-### Open Issues (Not Yet Fixed)
-
-1. **Agent Intelligence Gap** — The bots behave like a tool router, not a general agent. When a user asks something outside the 19 tools, the bot fails or gives a canned response. The bar is: handle anything a business person throws at it. This is the #1 priority.
-
-2. **No Admin Dashboard** — There is no visual interface showing all tenants, their bot Telegram handles, onboarding completion status, and last activity. Brent cannot see who's who without a DB query. This is needed urgently — especially to manage the canary group before Thursday.
-
-3. **Wizard Flow** — "Launch My Agent" on tigerclaw.io hits `/wizard/auth` which requires an existing Stan Store purchase. New users are blocked before they can try the 72-hour free trial. Deprioritized per Brent — address after canary situation is resolved.
-
-4. **Auto-Deploy in CI** — GitHub Actions runs tests and automatically deploys to Cloud Run upon merge to main. Agents are strictly forbidden from checking out `main` to deploy manually.
-
-5. **Facebook/LINE/WhatsApp** — All stubbed. Not functional.
-
-### Immediate Priorities Before Thursday
-
-1. **Admin dashboard** — One page showing all tenants: name, Telegram bot handle, onboarding status (complete/incomplete), last active timestamp. Must be visual, not a terminal query.
-
-2. **Full click-through walkthrough** — Every screen, every command, every edge case on a real bot. This should have been done before canaries received their bots.
-
-3. **Agent intelligence** — Bots must handle any business question, not just tool-mapped requests. The system prompt currently treats Gemini as a switch statement. It needs to behave as a capable general agent that also has 19 specialized tools.
-
----
-
-## Architecture Reference
-
-- **API:** Cloud Run, Node.js/Express, port 4000
-- **DB:** Cloud SQL PostgreSQL HA, schema-per-tenant isolation
+### Architecture
+- **API:** Cloud Run, Node.js/Express, port 4000, `https://api.tigerclaw.io`
+- **DB:** Cloud SQL PostgreSQL HA (`tiger_claw_shared`)
 - **Cache/Queue:** Cloud Redis HA + BullMQ (5 queues)
-- **AI:** Gemini 2.0 Flash via `@google/generative-ai` SDK
-- **Frontend:** Next.js on Vercel (`wizard.tigerclaw.io`)
-- **Payments:** Stan Store + Stripe
+- **AI:** Gemini 2.0 Flash via `@google/generative-ai` SDK (locked — do not change)
+- **Frontend (wizard):** Next.js on Vercel (`wizard.tigerclaw.io`) — part of `tiger-claw-v4-core` repo, `web-onboarding/` subdirectory
+- **Frontend (website):** Static HTML on Vercel (`tigerclaw.io`) — separate repo `tiger-bot-website`
+- **Payments:** Stan Store (purchase gating) + Stripe (subscription checkout)
 - **Email:** Resend
-- **Bot Pool:** 42+ Telegram bot tokens, AES-256-GCM encrypted
+- **Bot Pool:** 42 available Telegram bot tokens, AES-256-GCM encrypted
 - **GCP Project:** `hybrid-matrix-472500-k5`
 - **Cloud Run Service:** `tiger-claw-api`, region `us-central1`
 
+### Product (as of 2026-03-24)
+- **Tiger-Claw Pro (Pre-Flavored):** $147/mo — Telegram + LINE, pre-trained for sales and network marketing. Stan Store: `stan.store/brentbryson/p/tired-of-manually-searching-for-leads-`
+- **Industry Agent:** $197/mo — domain pre-trained for a specific vertical. Stan Store: `stan.store/brentbryson/p/custom-agent-flavor`
+- "Standard Agent" naming is DEAD. It is now "Industry Agent."
+
+### Recent Work Completed
+- **Memory Architecture V4.1** — All 4 phases shipped:
+  - Phase 1: `buildSystemPrompt()` async, injects ICP + hive signals + pipeline stats
+  - Phase 2: Sawtooth context compression (`chat_memory` Redis key, 30d TTL)
+  - Phase 3: Fact anchor extraction (async BullMQ job → `tenant_states.fact_anchors`)
+  - Phase 4: `startFocus` / `completeFocus` / `incrementFocusToolCalls` session primitives
+- **CLAUDE.md:** Product philosophy baked in — Integrity First, Radical Value Delivery, Zero Complexity
+- **Website fixes:** Industry Agent naming, Stan Store deep links wired, Pre-Flavored label on Tiger-Claw Pro
+- **CORS fixed:** `wizard/auth` API call works cleanly from wizard.tigerclaw.io
+- **john-thailand:** Fresh tenant provisioned for John (Thailand). `john-noon` left as suspended tombstone.
+- **pat-sullivan:** Removed (never activated).
+
+### Open Issues
+
+1. **Value-gap detection** — No cron logic yet to detect paying tenants with zero leads in 7 days and send a diagnostic message. Required by CLAUDE.md product philosophy.
+
+2. **`[Mockup] Skip AI` button** — Not in source code. Was in a stale compiled build. Will be eliminated on next wizard deploy (when PRs #23/#24 merge to main).
+
+3. **OG/social meta tags** — `tigerclaw.io` has no `og:title`, `og:image`, `twitter:card`. Every shared link renders as a bare URL. Low effort, high impact fix.
+
+4. **Wizard auth error has no purchase CTA** — When a user enters an email with no purchase, the error message tells them to go to Stan Store but provides no link.
+
+5. **Wizard deployed build is stale** — PRs #23/#24 need to merge to main to trigger a fresh Vercel deploy and kill the stale build artifacts.
+
+6. **Mac cluster Reflexion Loop tooling** — The offline batch job that reads `fact_anchors` / `chat_memory` and proposes system prompt improvements has not been built yet.
+
 ---
 
-## Memory Architecture (V4.1)
+## Memory Architecture (V4.1 — FULLY SHIPPED)
 
-**Design:** Hybrid Cognitive Architecture — Cloud Run executes stateless, Redis/PostgreSQL hold all persistent memory. Mac cluster (192.168.0.2) is an OFFLINE Reflexion Loop tool that reads Cloud SQL via Auth Proxy. It is NOT a live Cloud Run dependency.
+**Design:** Hybrid Cognitive Architecture — Cloud Run executes stateless, Redis/PostgreSQL hold all persistent memory.
 
-### New Redis Keys
+### Redis Keys
 | Key | Purpose | TTL |
 |---|---|---|
-| `chat_history:{tenantId}:{chatId}` | Raw turn history (existing) | 7 days |
+| `chat_history:{tenantId}:{chatId}` | Raw turn history | 7 days |
 | `chat_memory:{tenantId}:{chatId}` | Sawtooth compressed summaries | 30 days |
 | `focus_state:{tenantId}:{chatId}` | Session bookending | 24 hours |
 
-### New `tenant_states` Keys
+### `tenant_states` Keys
 | `state_key` | Purpose |
 |---|---|
-| `onboard_state` *(existing via `bot_states`)* | Onboarding interview answers |
-| `fact_anchors` | Extracted facts from live conversations (Phase 3) |
+| `onboard_state` | Onboarding interview answers |
+| `fact_anchors` | Extracted business facts from live conversations |
 
 ### Phase Status
-- [x] Phase 1: Dynamic prompt enrichment — `buildSystemPrompt()` is async, injects ICP + hive + pipeline on every request
-- [ ] Phase 2: Sawtooth context compression — replaces hard trim with rolling `chat_memory` summaries
-- [ ] Phase 3: Fact anchor extraction — async BullMQ job extracts and persists ICP signals post-conversation
-- [ ] Phase 4: `startFocus` / `completeFocus` primitives — Sawtooth session bookending in Redis
+- [x] Phase 1: Dynamic prompt enrichment — shipped
+- [x] Phase 2: Sawtooth context compression — shipped
+- [x] Phase 3: Fact anchor extraction — shipped
+- [x] Phase 4: `startFocus` / `completeFocus` primitives — shipped (PR #23 pending merge)
 
-### Architecture Decision Record
-**Why not Mac cluster as live endpoint:** Cloud Run is stateless and ephemeral. A live dependency on a local Mac cluster creates a single point of failure invisible to GCP monitoring. All intelligence state lives in Cloud SQL + Redis (already HA). The Mac cluster runs Reflexion Loops offline and proposes system prompt improvements for human review — preserving Gemini's Sovereign Vault intent without breaking production.
+### Mac Cluster (192.168.0.2) — OFFLINE ONLY
+The Cheese Grater is an **offline Reflexion Loop tool**. It reads Cloud SQL via Auth Proxy, analyzes `fact_anchors` and `chat_memory` across tenants, and proposes system prompt improvements for Brent to review. It is **NOT** called by Cloud Run and cannot break production if offline.
 
 ---
+
+## Tenant Roster (Notable)
+
+| Slug | Status | Notes |
+|---|---|---|
+| `john-thailand` | onboarding | Fresh provision 2026-03-24. Bot: @tc_62g6al77_bot |
+| `john-noon` | suspended | Webhook conflict. Left as tombstone. Superseded by john-thailand |
+| `pat-sullivan` | terminated | Never activated. Removed 2026-03-24 |
+
+---
+
 *Locked. Proceed.*
