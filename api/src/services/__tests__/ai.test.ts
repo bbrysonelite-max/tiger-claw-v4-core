@@ -93,7 +93,7 @@ vi.mock('@google/generative-ai', () => ({
 }));
 
 // Import AFTER all mocks are defined
-import { getChatHistory, saveChatHistory, buildSystemPrompt, resolveGoogleKey } from '../ai.js';
+import { getChatHistory, saveChatHistory, buildSystemPrompt, resolveGoogleKey, startFocus, completeFocus, incrementFocusToolCalls } from '../ai.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -435,6 +435,62 @@ describe('saveChatHistory — Sawtooth compression', () => {
     const saved = JSON.parse(mockRedisSet.mock.calls[0]![1] as string);
     expect(saved.length).toBeLessThanOrEqual(MAX_TURNS * 2);
     expect(saved[0].role).toBe('user');
+  });
+});
+
+// ─── Phase 4: Focus primitives ────────────────────────────────────────────────
+
+describe('focus primitives', () => {
+  beforeEach(() => {
+    mockRedisGet.mockReset();
+    mockRedisSet.mockReset().mockResolvedValue('OK');
+  });
+
+  it('startFocus writes focus_state to Redis with status=active', async () => {
+    await startFocus(TENANT_ID, CHAT_ID);
+    expect(mockRedisSet).toHaveBeenCalledWith(
+      `focus_state:${TENANT_ID}:${CHAT_ID}`,
+      expect.stringContaining('"status":"active"'),
+      'EX',
+      86400,
+    );
+  });
+
+  it('startFocus does not throw when Redis set fails', async () => {
+    mockRedisSet.mockRejectedValue(new Error('Redis timeout'));
+    await expect(startFocus(TENANT_ID, CHAT_ID)).resolves.toBeDefined();
+  });
+
+  it('incrementFocusToolCalls increments the counter', async () => {
+    mockRedisGet.mockResolvedValue(JSON.stringify({
+      focusId: 'f1', startedAt: new Date().toISOString(), toolCallsSinceStart: 3, status: 'active',
+    }));
+    await incrementFocusToolCalls(TENANT_ID, CHAT_ID);
+    const saved = JSON.parse(mockRedisSet.mock.calls[0]![1] as string);
+    expect(saved.toolCallsSinceStart).toBe(4);
+  });
+
+  it('incrementFocusToolCalls is a no-op when focus_state does not exist', async () => {
+    mockRedisGet.mockResolvedValue(null);
+    await expect(incrementFocusToolCalls(TENANT_ID, CHAT_ID)).resolves.toBeUndefined();
+    expect(mockRedisSet).not.toHaveBeenCalled();
+  });
+
+  it('completeFocus does NOT trigger compression below threshold', async () => {
+    mockRedisGet.mockResolvedValue(JSON.stringify({
+      focusId: 'f1', startedAt: new Date().toISOString(), toolCallsSinceStart: 5, status: 'active',
+    }));
+    const history = makeHistory(Array.from({ length: 10 }, (_, i) => (i % 2 === 0 ? 'user' : 'model')));
+    await completeFocus(TENANT_ID, CHAT_ID, history);
+    // Only one Redis set call — for writing status=complete (not compression)
+    const saved = JSON.parse(mockRedisSet.mock.calls[0]![1] as string);
+    expect(saved.status).toBe('complete');
+  });
+
+  it('completeFocus is a no-op when focus_state does not exist', async () => {
+    mockRedisGet.mockResolvedValue(null);
+    await expect(completeFocus(TENANT_ID, CHAT_ID, [])).resolves.toBeUndefined();
+    expect(mockRedisSet).not.toHaveBeenCalled();
   });
 });
 

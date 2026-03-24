@@ -40,6 +40,10 @@ const MAX_TOOL_CALLS = 10;
 // Each turn = 2 entries (user + model). 20 turns = 40 entries.
 const MAX_HISTORY_TURNS = 20;
 
+// Sawtooth threshold: trigger compression after this many tool calls in a single session
+// (in addition to the length-based trigger in saveChatHistory)
+const FOCUS_COMPRESSION_THRESHOLD = 12;
+
 // ─── Tool registry ───────────────────────────────────────────────────────────
 const toolsMap = {
     tiger_onboard,
@@ -177,6 +181,56 @@ async function compressChatHistory(
     } catch (err: any) {
         console.warn(`[AI] compressChatHistory failed for tenant ${tenantId} — falling back to hard trim:`, err.message);
     }
+}
+
+// ─── Focus primitives (Sawtooth session bookending) ──────────────────────────
+// focus_state:{tenantId}:{chatId} — Redis key, 24h TTL
+// Tracks tool call count per session. When completeFocus() sees >= threshold,
+// it triggers compressChatHistory() proactively (in addition to the length-based
+// trigger in saveChatHistory, which remains as the safety net).
+
+export async function startFocus(tenantId: string, chatId: number | string): Promise<string> {
+    const focusId = `${tenantId}:${chatId}:${Date.now()}`;
+    try {
+        await redis.set(
+            `focus_state:${tenantId}:${chatId}`,
+            JSON.stringify({ focusId, startedAt: new Date().toISOString(), toolCallsSinceStart: 0, status: 'active' }),
+            'EX',
+            86400,
+        );
+    } catch (err: any) {
+        console.warn(`[AI] startFocus failed for tenant ${tenantId}:`, err.message);
+    }
+    return focusId;
+}
+
+export async function incrementFocusToolCalls(tenantId: string, chatId: number | string): Promise<void> {
+    try {
+        const raw = await redis.get(`focus_state:${tenantId}:${chatId}`);
+        if (!raw) return;
+        const state = JSON.parse(raw);
+        state.toolCallsSinceStart = (state.toolCallsSinceStart ?? 0) + 1;
+        await redis.set(`focus_state:${tenantId}:${chatId}`, JSON.stringify(state), 'EX', 86400);
+    } catch { /* non-critical */ }
+}
+
+export async function completeFocus(tenantId: string, chatId: number | string, history: Content[]): Promise<void> {
+    try {
+        const raw = await redis.get(`focus_state:${tenantId}:${chatId}`);
+        if (!raw) return;
+        const state = JSON.parse(raw);
+
+        if ((state.toolCallsSinceStart ?? 0) >= FOCUS_COMPRESSION_THRESHOLD) {
+            // Tool-call-count triggered compression (Sawtooth proactive cycle)
+            const droppedEntries = history.slice(0, Math.max(0, history.length - MAX_HISTORY_TURNS * 2));
+            if (droppedEntries.length > 0) {
+                compressChatHistory(tenantId, chatId as number, droppedEntries).catch(() => {});
+            }
+        }
+
+        state.status = 'complete';
+        await redis.set(`focus_state:${tenantId}:${chatId}`, JSON.stringify(state), 'EX', 86400);
+    } catch { /* non-critical */ }
 }
 
 export async function getChatHistory(tenantId: string, chatId: number): Promise<Content[]> {
@@ -512,6 +566,7 @@ async function runToolLoop(
     initialResponse: any,
     toolContext: any,
     logPrefix: string,
+    chatId?: number | string,
 ): Promise<any> {
     let response = initialResponse;
     let toolCallCount = 0;
@@ -531,6 +586,9 @@ async function runToolLoop(
         for (const fc of calls) {
             toolCallCount++;
             console.log(`[${logPrefix}] Tool (${toolCallCount}/${MAX_TOOL_CALLS}): ${fc.name}`);
+            if (chatId !== undefined) {
+                incrementFocusToolCalls(toolContext.agentId, chatId).catch(() => {});
+            }
 
             const tool = toolsMap[fc.name as keyof typeof toolsMap];
             let toolResult: any;
@@ -589,6 +647,7 @@ export async function processTelegramMessage(
         await bot.sendChatAction(chatId, 'typing');
         console.log(`[AI] sendChatAction OK for chat ${chatId}`);
 
+        await startFocus(tenantId, chatId);
         const history = await getChatHistory(tenantId, chatId);
         console.log(`[AI] History loaded: ${history.length} entries`);
 
@@ -607,10 +666,11 @@ export async function processTelegramMessage(
         const promptBlocked = (initial.response as any).promptFeedback?.blockReason ?? null;
         const rawParts = initCandidates[0]?.content?.parts ?? [];
         console.log(`[AI] Gemini initial response: finishReason=${finishReason}, promptBlocked=${promptBlocked}, text=${!!initial.response.text?.()}, toolCalls=${(initial.response.functionCalls?.() ?? []).length}, rawParts=${JSON.stringify(rawParts).slice(0, 300)}`);
-        const finalResponse = await runToolLoop(chat, initial.response, toolContext, 'AI');
+        const finalResponse = await runToolLoop(chat, initial.response, toolContext, 'AI', chatId);
 
         const updatedHistory = await chat.getHistory();
         await saveChatHistory(tenantId, chatId, updatedHistory);
+        await completeFocus(tenantId, chatId, updatedHistory);
         console.log(`[AI] History saved: ${updatedHistory.length} entries`);
 
         const replyText = finalResponse.text?.() ?? '';
@@ -751,6 +811,7 @@ export async function processLINEMessage(
     const chatId = userId as unknown as number;
 
     try {
+        await startFocus(tenantId, chatId);
         const history = await getChatHistory(tenantId, chatId);
         const genAI = new GoogleGenerativeAI(googleKey);
         const model = genAI.getGenerativeModel({
@@ -761,10 +822,11 @@ export async function processLINEMessage(
 
         const chat = model.startChat({ history });
         const initial = await chat.sendMessage(text);
-        const finalResponse = await runToolLoop(chat, initial.response, toolContext, 'AI');
+        const finalResponse = await runToolLoop(chat, initial.response, toolContext, 'AI', chatId);
 
         const updatedHistory = await chat.getHistory();
         await saveChatHistory(tenantId, chatId, updatedHistory);
+        await completeFocus(tenantId, chatId, updatedHistory);
 
         const replyText = finalResponse.text?.() ?? '';
         if (replyText.trim().length > 0) {
