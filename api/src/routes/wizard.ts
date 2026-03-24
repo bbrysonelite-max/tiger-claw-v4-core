@@ -21,8 +21,6 @@ import {
   getFoundingMemberDisplay,
   createBYOKUser,
   createBYOKBot,
-  getBotState,
-  setBotState,
 } from "../services/db.js";
 import { encryptToken } from "../services/pool.js";
 import { provisionQueue } from "../services/queue.js";
@@ -308,26 +306,6 @@ router.post("/validate-key", async (req: Request, res: Response) => {
   }
 
   const allValid = results.every(r => r.status === "success");
-
-  // Layer 4 auto-resume: if bot was paused or on emergency key, restore to Layer 2
-  if (allValid) {
-    try {
-      const keyState = await getBotState(botId, "key_state.json") as Record<string, unknown> | null;
-      const wasPaused = keyState?.tenantPaused === true;
-      const onEmergency = keyState?.activeLayer === 4;
-      if (wasPaused || onEmergency) {
-        const firstKey = keys[0]!;
-        await setBotState(botId, "key_state.json", {
-          ...keyState,
-          activeLayer: 2,
-          tenantPaused: false,
-          layer2Key: encryptToken(firstKey.key),
-        });
-      }
-    } catch (err) {
-      console.warn(`[wizard] Layer 4 auto-resume check failed for bot ${botId} — non-critical:`, err);
-    }
-  }
 
   return res.json({
     valid: allValid,

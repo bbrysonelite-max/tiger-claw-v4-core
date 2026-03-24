@@ -11,7 +11,7 @@ import StepReviewPayment from "./wizard/StepReviewPayment";
 import PostPaymentSuccess from "./wizard/PostPaymentSuccess";
 
 export interface AIKeyConfig {
-    provider: "google";
+    provider: "google" | "openai" | "anthropic" | "grok" | "openrouter" | "kimi";
     key: string;
     model: string;
     label: string;

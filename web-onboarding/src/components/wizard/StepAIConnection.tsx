@@ -25,19 +25,19 @@ export default function StepAIConnection({ state, updateState, onNext }: AIConne
     const [selectedProvider, setSelectedProvider] = useState<typeof PROVIDERS[number]["id"]>("google");
     const [tempKey, setTempKey] = useState("");
 
-    const maxKeys = 4;
+    const maxKeys = 2;
 
     const currentProvider = PROVIDERS.find(p => p.id === selectedProvider)!;
 
     const addKey = () => {
         if (!tempKey) return;
+        const label = state.aiKeys.length === 0 ? `${currentProvider.name} — Primary` : `${currentProvider.name} — Backup`;
         const newKey: AIKeyConfig = {
             provider: selectedProvider as any,
             key: tempKey,
             model: currentProvider.model,
-            label: `${currentProvider.name} Core`
+            label,
         };
-        
         updateState({ aiKeys: [...state.aiKeys, newKey] });
         setTempKey("");
     };
@@ -53,7 +53,7 @@ export default function StepAIConnection({ state, updateState, onNext }: AIConne
             <div className="mb-6">
                 <h3 className="text-2xl font-bold mb-2 text-white">AI Power Core</h3>
                 <p className="text-white/50 text-base leading-relaxed">
-                    Add your AI key. Gemini is free — get one in 30 seconds. Supports 4-way automatic failover across providers.
+                    Use any AI provider you already have. Add a Backup key and your agent automatically switches if your Primary ever hits a rate limit.
                 </p>
             </div>
 
@@ -128,7 +128,7 @@ export default function StepAIConnection({ state, updateState, onNext }: AIConne
                     {/* Right: Active Rotation / Config */}
                     <div className="space-y-4">
                         <h4 className="text-xs font-black text-white/40 uppercase tracking-widest flex items-center gap-2">
-                            Active Key Rotation ({state.aiKeys.length}/{maxKeys})
+                            {state.aiKeys.length === 0 ? "No Keys Installed" : state.aiKeys.length === 1 ? "Primary Active — Backup Optional" : "Primary + Backup Active"}
                         </h4>
                         
                         <div className="space-y-3 min-h-[200px]">
@@ -172,7 +172,10 @@ export default function StepAIConnection({ state, updateState, onNext }: AIConne
                             <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl flex gap-3 items-start">
                                 <Info className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
                                 <p className="text-[11px] text-blue-300/80 leading-relaxed">
-                                    <strong>Smart Failover Active:</strong> We will rotate through these {state.aiKeys.length} keys to bypass rate limits and ensure 100% uptime for your Tiger.
+                                    {state.aiKeys.length === 2
+                                        ? <><strong>Failover Active:</strong> If your Primary key hits a rate limit, your Backup takes over automatically. Zero downtime.</>
+                                        : <><strong>Add a Backup key</strong> from any provider to protect against rate limits and outages.</>
+                                    }
                                 </p>
                             </div>
                         )}
