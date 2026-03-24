@@ -14,8 +14,10 @@ const connection = new IORedis(redisUrl, {
 });
 
 export const provisionQueue = new Queue('tenant-provisioning', { connection: connection as any });
-
 console.log('[Queue] BullMQ provision queue configured.');
+
+export const factExtractionQueue = new Queue('fact-extraction', { connection: connection as any });
+console.log('[Queue] BullMQ fact-extraction queue configured.');
 
 export const routineQueue = new Queue('ai-routines', { connection: connection as any });
 console.log('[Queue] BullMQ ai-routines queue configured.');
@@ -173,6 +175,12 @@ export const telegramWorker = SHOULD_RUN_WORKERS ? new Worker(
                 // Delegate to the Stateless AI engine
                 const { processTelegramMessage } = await import('./ai.js');
                 await processTelegramMessage(tenantId, botToken, chatId, text);
+
+                // Fire-and-forget fact extraction — must not block or throw
+                factExtractionQueue.add('extract', { tenantId, chatId }, {
+                    removeOnComplete: true,
+                    removeOnFail: true,
+                }).catch(err => console.warn(`[Worker] Failed to enqueue fact extraction for tenant ${tenantId}:`, err.message));
             }
         } catch (err) {
             console.error(`[Worker] Error processing Webhook for tenant ${tenantId}:`, err);
@@ -217,6 +225,12 @@ export const lineWorker = SHOULD_RUN_WORKERS ? new Worker(
         try {
             const { processLINEMessage } = await import('./ai.js');
             await processLINEMessage(tenantId, encryptedChannelAccessToken, userId, text);
+
+            // Fire-and-forget fact extraction
+            factExtractionQueue.add('extract', { tenantId, chatId: userId as unknown as number }, {
+                removeOnComplete: true,
+                removeOnFail: true,
+            }).catch(err => console.warn(`[Worker] Failed to enqueue fact extraction for tenant ${tenantId}:`, err.message));
         } catch (err) {
             console.error(`[Worker] Error processing LINE message for tenant ${tenantId}:`, err);
             throw err;
@@ -234,6 +248,40 @@ if (lineWorker) {
     // Message failures are expected (user-side issues); only log, do not alert
     lineWorker.on('failed', (job, err) => {
         console.error(`[Worker] LINE Job ${job?.id} failed (tenant: ${job?.data?.tenantId ?? 'unknown'}). Error:`, err?.message ?? err);
+    });
+}
+
+// ---------------------------------------------------------------------------
+// Fact Anchor Extraction (async, post-conversation intelligence)
+// ---------------------------------------------------------------------------
+
+export interface FactExtractionJobData {
+    tenantId: string;
+    chatId: number;
+}
+
+export const factExtractionWorker = SHOULD_RUN_WORKERS ? new Worker(
+    'fact-extraction',
+    async (job: Job<FactExtractionJobData>) => {
+        const { tenantId, chatId } = job.data;
+        try {
+            const { extractFactAnchors } = await import('./factExtractor.js');
+            await extractFactAnchors(tenantId, chatId);
+        } catch (err) {
+            console.warn(`[Worker] Fact extraction failed for tenant ${tenantId} — non-critical:`, err);
+            // Do not rethrow — fact extraction failure must never block or retry loudly
+        }
+        return { success: true };
+    },
+    {
+        connection: connection as any,
+        concurrency: 20,
+    }
+) : null;
+
+if (factExtractionWorker) {
+    factExtractionWorker.on('failed', (job, err) => {
+        console.warn(`[Worker] Fact extraction job ${job?.id} failed:`, err);
     });
 }
 
