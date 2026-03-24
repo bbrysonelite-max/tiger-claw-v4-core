@@ -1,5 +1,5 @@
 # START HERE — THE MASTER RESURRECTION BRIEFING
-**Updated:** 2026-03-23 | Session: Intelligence Overhaul + FITFO Protocol + Self-Improvement Engine
+**Updated:** 2026-03-24 | Session: Broken Window Sweep — GitGuardian unblock, tool tests, CORS/dashboard audit
 
 **CRITICAL INSTRUCTION TO ANY AI READING THIS FILE:**
 Stop. Read this entire document and STATE_OF_TIGER_CLAW.md before doing anything else. This is your injected context. Do not ask Brent to repeat himself. Do not rely on LLM memory.
@@ -25,6 +25,7 @@ The agent is NOT a chatbot. It is a strategic consulting partner. It thinks, dec
 - **Skills:** Dynamic prompt/template skills via `skills` table (migration 013). Loaded at runtime.
 - **Self-improvement:** 1-fail threshold. Any tool failure → immediate `draftSkillFromFailure()`.
 - **Frontend:** Next.js on Vercel (wizard.tigerclaw.io)
+- **Admin Dashboard:** wizard.tigerclaw.io/admin/canary — live after PR #15 merges
 - **Payments:** Stan Store + Stripe
 - **Email:** Resend (STUB — not yet implemented)
 - **Bot Pool:** 42+ Telegram bot tokens, AES-256-GCM encrypted
@@ -45,43 +46,49 @@ The agent is NOT a chatbot. It is a strategic consulting partner. It thinks, dec
 3. **Gemini Schema Bug Fix** — Patched JSON stripping in 2.5 Flash. Downgraded to 2.0 Flash. Hardened mapToGoogleSchema.
 4. **72-Hour Trial Engine** — Cron: 24h/48h/72h trial warnings via Telegram. BullMQ jobId dedup.
 5. **Google Key Disaster Recovery** — Catastrophic 403 deprecation. New keys in Cloud Secret Manager.
-6. **Web Wizard QA** — Discovered CORS block on /wizard/auth. Documented. Not yet fixed.
+6. **Web Wizard QA** — CORS block on /wizard/auth investigated. **Confirmed: CORS is working correctly.** OPTIONS returns 204 with all required headers. This P0 was a false alarm.
 7. **PRs #5-#8** — NM clichés removed, banned phrases global, admin-provisioned tenant tool routing fixed, CI auto-merge enabled.
 8. **Intelligence Overhaul (ea92225)** — Routing table replaced with TOOL JUDGMENT. First-message nudge added.
-9. **FITFO Protocol** — FITFO.md created. Injected into every agent system prompt.
-10. **Self-Improvement Engine** — self-improvement.ts rewritten. 1-fail threshold. Skills drafted on failure. Approved skills injected at runtime.
-11. **Migration 013: Skills Table** — Dynamic agent skills with full scope/status/trigger/metrics schema.
-12. **Stage 4 Tests (tiger_convert)** — 30 tests. 243 total passing. 0 TypeScript errors.
+9. **Canary Dashboard (36f38c3)** — `wizard.tigerclaw.io/admin/canary` — full React fleet view with auth, tenant table, onboarding status. Live after PR #15 merges.
+10. **FITFO Protocol** — FITFO.md created. Injected into every agent system prompt.
+11. **Self-Improvement Engine** — self-improvement.ts rewritten. 1-fail threshold. Skills drafted on failure. Approved skills injected at runtime.
+12. **Migration 013: Skills Table** — Dynamic agent skills with full scope/status/trigger/metrics schema.
+13. **Stage 4 Tests (tiger_convert)** — 30 tests. All passing.
+14. **GitGuardian Unblock** — `sk_test_fake` Stripe key pattern in webhooks.test.ts replaced with `stripe_test_key_placeholder`. PR #15 was blocked; this fixes it.
+15. **tiger_scout tests** — Unskipped. Rewrote with mutable-object mock pattern. 3/3 passing.
+16. **tiger_contact tests** — Unskipped. Completely rewritten against real API (queue/mark_sent/list). 8/8 passing.
+17. **254 tests passing, 0 TypeScript errors.**
 
 ---
 
 ## 4. Current Critical Issues
 
-### 🔴 P0 — Thursday Zoom with John
-John = $20M of $25M revenue. Bots called "dumber than hell." Intelligence fix live but untested against real canary conversations. Thursday 7 PM Scottsdale.
+### 🔴 P0 — PR #15 Must Merge
+Everything from sessions 8-16 above is on branch `feat/intelligence-prompt-rewrite`. GitGuardian was blocking it. Fixed this session. Once merged: FITFO is live, self-improvement is live, canary dashboard is live.
 
-**Before Thursday:**
-1. Reset John's bot chat history (force first-message nudge)
-2. Have John message his bot and complete onboarding
-3. Test manually with real business questions
-4. Monitor Cloud Run logs ([AI] prefix)
+### 🔴 P0 — Canaries Have No Personality
+All 10 canaries have empty `onboard_state.json`. The bot has no ICP, no product, no identity.
+Options: (1) `POST /admin/tenants/:id/reset-conversation` clears Redis history → triggers first-message nudge. (2) Tell canaries to message their bot "let's start over."
 
-### 🔴 P0 — No Admin Dashboard
-No visual fleet view. Build before Thursday. Table: name, bot handle, onboarding status, key layer, last active.
+### 🔴 P0 — Intelligence Fix Untested in Production
+Routing table removal + TOOL JUDGMENT + FITFO all pending PR merge. Once live, test manually. Monitor `[AI]` log lines in Cloud Run.
 
-### 🔴 P0 — Signup Funnel Broken (CORS)
-OPTIONS preflight or Vercel env var issue. Fix: OPTIONS handler on /wizard/auth + fix hardcoded URL in StepIdentity.tsx:40.
+### 🟠 P1 — 15 Tool Tests Still Skipped
+scout ✅ contact ✅ → nurture, briefing, onboard, then remaining 12.
 
-### 🟠 P1 — 17 Tool Tests Skipped | Single AI Provider | Hive Not Injected | Email Stub | LINE Incomplete
+### 🟠 P1 — Multi-provider BYOK | Hive Injection | Email Stub | LINE Incomplete
+Items 3, 4, 6 of the 6-item plan. All not started.
 
 ---
 
 ## 5. Immediate Directives (Execute In Order)
 
-- [ ] **Commit** current uncommitted work on feat/intelligence-prompt-rewrite
-- [ ] **Admin Dashboard** — HTML fleet view before Thursday
-- [ ] **CORS fix** on /wizard/auth
-- [ ] **tiger_scout tests** — remove describe.skip, first to re-enable
+- [ ] **Push and verify PR #15 merges** — GitGuardian fix is committed, CI should pass
+- [ ] **Canary reset** — Clear Redis history for John's bot, have him complete onboarding
+- [ ] **Manual canary test** — Ask each bot open strategy questions, monitor logs
+- [ ] **tiger_nurture tests** — next in priority order (describe.skip removal)
+- [ ] **tiger_briefing tests** — after nurture
+- [ ] **tiger_onboard tests** — after briefing
 - [ ] **resolveAIProvider** — Item 3 of 6-item plan (OpenAI BYOK)
 - [ ] **Hive injection** — Item 4 of 6-item plan
 - [ ] **Skills admin routes** — /admin/skills curation endpoints
@@ -95,9 +102,15 @@ OPTIONS preflight or Vercel env var issue. Fix: OPTIONS handler on /wizard/auth 
 
 ---
 
-## 7. Desktop Punch List
+## 7. Key File Locations
 
-`/Users/brentbryson/Desktop/TIGERCLAW_PUNCH_LIST.md` — full detail, plans, architectural decisions. Update after every session.
+- `/tiger-claw/FITFO.md` — Agent operating protocol
+- `/tiger-claw/STATE_OF_TIGER_CLAW.md` — This session's hard state
+- `/Users/brentbryson/Desktop/TIGERCLAW_PUNCH_LIST.md` — Full weakness detail
+- `api/src/services/ai.ts` — buildSystemPrompt, FITFO injection, skill injection
+- `api/src/services/self-improvement.ts` — 1-fail threshold, draftSkillFromFailure
+- `api/migrations/013_skills.sql` — Skills table schema
+- `web-onboarding/src/app/admin/canary/page.tsx` — Fleet dashboard UI
 
 ---
 *Trust the spec, not LLM memory. Read STATE_OF_TIGER_CLAW.md next. Execute.*

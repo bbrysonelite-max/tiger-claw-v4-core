@@ -1,7 +1,7 @@
 # STATE OF TIGER CLAW — HARD CONTEXT LOCK
-**Timestamp Generated:** 2026-03-23T22:00:00-07:00
-**Infrastructure Status:** LIVE (243 tests green, CI auto-merge active, 10 canary tenants provisioned)
-**Last Session:** Intelligence Overhaul + FITFO Protocol + Self-Improvement Engine
+**Timestamp Generated:** 2026-03-24T22:30:00-07:00
+**Infrastructure Status:** LIVE (254 tests green, CI auto-merge active, 10 canary tenants provisioned)
+**Last Session:** Broken Window Sweep — GitGuardian unblock, tool test activation, CORS/dashboard audit
 
 ---
 
@@ -11,7 +11,7 @@ This document is the absolute, most recent source of truth for this repository.
 1. **NO RAG.** No Mini-RAG pipelines here.
 2. **NO OPENCLAW.** No per-tenant Docker containers.
 3. **ARCHITECTURE:** Stateless Cloud Run API, Gemini 2.0 Flash (LOCKED — 2.5 Flash silently strips JSON params), 19 Native Function Calling Tools, Schema-per-tenant Postgres.
-4. **NO REWRITES:** 19 core tools compile and are backed by 243 passing tests. Do not rewrite architecture.
+4. **NO REWRITES:** 19 core tools compile and are backed by 254 passing tests. Do not rewrite architecture.
 5. **FITFO.md:** Agent operating protocol at `/tiger-claw/FITFO.md`. All agents must internalize it.
 
 ## 🛑 GIT PROTOCOL — NON-NEGOTIABLE 🛑
@@ -30,25 +30,40 @@ gh pr merge --auto --squash
 
 ---
 
-## Current State (2026-03-23 Evening)
+## Current State (2026-03-24 Evening)
 
 ### What Was Done This Session
 
-**PR ea92225 — Intelligence Overhaul (merged):**
-- Removed keyword→tool routing table from `buildSystemPrompt`. Replaced with `TOOL JUDGMENT` section.
-- Added `buildFirstMessageText()` — fires `tiger_onboard(action="start")` automatically on first message when onboarding incomplete.
-- 5 new `buildFirstMessageText` unit tests. 4 routing-table regression tests.
+**Broken Window Sweep (branch: feat/intelligence-prompt-rewrite, PR #15):**
 
-**Current session (uncommitted, branch: feat/intelligence-prompt-rewrite):**
-- **FITFO.md** — Figure It The Fuck Out. Five rules: Ant, Resource, Failure, Exhaustion, Growth.
-- **FITFO injected into `buildSystemPrompt`** — every agent has the FITFO protocol in their context window.
-- **Migration 013: skills table** — Dynamic agent skills. Fields: type (prompt/template/code), scope (tenant/flavor/platform), status (draft/submitted/approved/rejected/platform), implementation (JSONB), trigger context, metrics.
-- **self-improvement.ts rewritten** — `draftSkillFromFailure()` fires immediately on any tool failure. `loadApprovedSkills()` for runtime injection.
-- **1-fail threshold in `runToolLoop`** — Any `ok:false` or thrown exception triggers `draftSkillFromFailure()`. Fire-and-forget.
-- **Approved skills injected into `buildSystemPrompt`** — appear as `DYNAMIC SKILLS` section.
-- **243 tests passing, 0 TypeScript errors.**
+**1. GitGuardian PR Block — FIXED**
+- PR #15 was blocked by GitGuardian detecting `sk_test_fake` (Stripe key pattern) in `webhooks.test.ts`.
+- This was introduced in the Phase 1 hardening commit (`f812020`).
+- Fixed: replaced with `stripe_test_key_placeholder`.
+- PR #15 should now pass CI and auto-merge, deploying everything accumulated in this branch.
 
-### Architectural Decisions Locked 2026-03-23
+**2. CORS — Investigated, NOT broken**
+- `wizard.tigerclaw.io/wizard/auth` OPTIONS preflight returns 204 with correct `access-control-allow-origin`.
+- GET `/wizard/auth` includes CORS headers. Punch list P0 was a false alarm — already fixed in a prior session.
+
+**3. Admin Fleet Dashboard — Exists, was blocked by PR gate**
+- Dashboard lives at `web-onboarding/src/app/admin/canary/page.tsx` (commit `36f38c3`).
+- URL: `wizard.tigerclaw.io/admin/canary` — returns 404 only because PR #15 hadn't merged yet.
+- Once PR #15 merges: dashboard is live. Full table: name, bot handle, onboarding status, last active, canary badge.
+
+**4. tiger_scout tests — UNSKIPPED, 3/3 passing**
+- Rewrote mocks with mutable-object pattern (same as tiger_convert).
+- Fixed assertion: output is `'Hunt complete. Sources: ...'` not `'Scans Complete'`.
+- Fixed burst-limit test: tool returns `ok: true` with `'Hunt skipped: Maximum 3 burst scans'` (not `ok: false`).
+
+**5. tiger_contact tests — UNSKIPPED, 8/8 passing**
+- Original tests targeted `get` / `update` / `delete` actions — those actions do not exist in the tool.
+- Completely rewritten against real API: `queue`, `mark_sent`, `list`.
+- Added tests for: qualified lead queue, duplicate skip, opted-out rejection, unqualified rejection, mark_sent, list, unknown action.
+
+**Test count: 254 passing (up from 243), 0 TypeScript errors. 15 tool test files still skipped.**
+
+### Architectural Decisions Locked (all prior + carried forward)
 
 | Decision | Status | Detail |
 |----------|--------|--------|
@@ -60,37 +75,34 @@ gh pr merge --auto --squash
 | Skill scope | LOCKED | tenant → flavor → platform |
 | Skill status flow | LOCKED | draft → submitted → approved / rejected / platform |
 | Hive benchmark injection | APPROVED | Top 3 signals per flavor/region into system prompt |
-| Tool test priority | APPROVED | scout → contact → nurture → briefing → onboard → remaining 12 |
+| Tool test priority | APPROVED | scout ✅ → contact ✅ → nurture → briefing → onboard → remaining 12 |
 | Skills curation access | PENDING BRENT | Admin-only or tenant UI? |
 | Auto-drafted skill status | PENDING BRENT | draft (admin review) or auto-approved (tenant-scoped)? |
 
 ### The 10 Canaries
-All admin-provisioned. All have empty `onboard_state.json`. **First-message nudge is now live** — but only fires for new/reset conversations. Existing conversations need Redis history cleared to trigger it.
+All admin-provisioned. All have empty `onboard_state.json`. First-message nudge is live.
 
-**Critical: John (Thailand)** — $20M of $25M revenue. "Dumber than hell." Zoom Thursday 7 PM Scottsdale. Intelligence fix is live but untested against real canary conversations.
+**Critical: John (Thailand)** — $20M of $25M revenue. "Dumber than hell." Intelligence fix live, untested in real conversation. Once PR #15 merges, the canary dashboard will show bot status in real time.
 
 ---
 
 ## Open Issues — Ranked by Damage
 
-### 🔴 P0 — No Admin Dashboard
-No visual fleet view. 10 live canaries. Cannot see status without DB query.
-**Fix:** HTML route in admin.ts. Table: name, bot handle, onboarding status, key layer, last active.
+### 🔴 P0 — PR #15 Merge Pending
+GitGuardian blocker has been fixed. PR must merge to deploy: canary dashboard, FITFO, self-improvement engine, skills table, intelligence prompt overhaul.
+**Status:** Fixed this session. CI re-run should pass.
 
 ### 🔴 P0 — All 10 Canaries Have No Personality Data
-Empty onboard_state.json. First-message nudge fires for new conversations only.
-**Fix:** `POST /admin/tenants/:id/reset-conversation` — clears Redis chat history.
-
-### 🔴 P0 — Signup Funnel Broken (CORS)
-wizard.tigerclaw.io blocked from api.tigerclaw.io/wizard/auth. Zero new signups via web.
-**Fix:** OPTIONS preflight handler on /wizard/auth. Fix hardcoded URL in StepIdentity.tsx:40.
+Empty `onboard_state.json`. First-message nudge fires for new conversations only.
+**Fix:** `POST /admin/tenants/:id/reset-conversation` — clears Redis chat history. OR instruct canaries to message their bot "let's start over."
 
 ### 🔴 P0 — Intelligence Fix Untested in Production
-Changes live but never observed in real canary conversation. Thursday is the live test.
-**Fix:** Test each canary bot manually. Monitor Cloud Run logs ([AI] prefix).
+Changes live (pending PR merge) but never observed in real canary conversation.
+**Fix:** After PR merges — test each canary bot manually. Monitor Cloud Run logs ([AI] prefix).
 
-### 🟠 P1 — 17 of 19 Tool Tests Skipped
-CI blind to tool regressions. Priority: tiger_scout → tiger_contact → tiger_nurture → tiger_briefing → tiger_onboard.
+### 🟠 P1 — 15 of 19 Tool Tests Still Skipped
+tiger_scout ✅ and tiger_contact ✅ done. Remaining priority order:
+tiger_nurture → tiger_briefing → tiger_onboard → remaining 12
 
 ### 🟠 P1 — Single AI Provider
 Hard-locked to Gemini 2.0 Flash. Item 3 of 6-item plan. Not started.
@@ -111,7 +123,7 @@ Migration 013 created. Skills being drafted. No view/approve/reject/promote rout
 19 tools in Gemini format. Needed before multi-provider BYOK goes live.
 
 ### 🟡 P2 — No Pause Override for Operator
-No way to stop bot mid-conversation. Verify tenantPaused flag in processTelegramMessage.
+No way to stop bot mid-conversation. Verify `tenantPaused` flag in `processTelegramMessage`.
 
 ---
 
@@ -137,6 +149,7 @@ No way to stop bot mid-conversation. Verify tenantPaused flag in processTelegram
 - **Skills:** Dynamic via skills table (migration 013), loaded at runtime into system prompt
 - **Self-improvement:** api/src/services/self-improvement.ts — 1-fail threshold, auto-drafts skills
 - **Frontend:** Next.js on Vercel (wizard.tigerclaw.io)
+- **Admin Dashboard:** wizard.tigerclaw.io/admin/canary (live after PR #15 merges)
 - **Payments:** Stan Store + Stripe
 - **Email:** Resend (STUB — not implemented)
 - **Bot Pool:** 42+ Telegram tokens, AES-256-GCM encrypted
