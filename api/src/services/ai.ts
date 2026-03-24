@@ -156,6 +156,14 @@ export async function saveChatHistory(tenantId: string, chatId: number, history:
     );
 }
 
+export async function clearTenantChatHistory(tenantId: string): Promise<number> {
+    const keys = await redis.keys(`chat_history:${tenantId}:*`);
+    if (keys.length === 0) return 0;
+    await redis.del(...keys);
+    console.log(`[AI] Cleared ${keys.length} chat history keys for tenant ${tenantId}.`);
+    return keys.length;
+}
+
 // ─── Key resolution ──────────────────────────────────────────────────────────
 /**
  * BUG 2 FIX: Resolves the active Google API key using the 4-layer system.

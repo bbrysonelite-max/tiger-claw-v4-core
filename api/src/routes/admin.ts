@@ -921,6 +921,22 @@ router.post("/fleet/:tenantId/deprovision", async (req: Request, res: Response) 
   }
 });
 
+// ── POST /admin/fleet/:tenantId/reset-conversation ───────────────────────────
+// Clears Redis chat history — next message triggers the first-message
+// onboarding nudge, resetting the bot's personality flow for a canary.
+router.post("/fleet/:tenantId/reset-conversation", async (req: Request, res: Response) => {
+  try {
+    const tenant = await resolveTenant(req.params["tenantId"]!);
+    if (!tenant) return res.status(404).json({ error: "Tenant not found" });
+    const { clearTenantChatHistory } = await import("../services/ai.js");
+    const cleared = await clearTenantChatHistory(tenant.id);
+    await logAdminEvent("conversation_reset", tenant.id, { keys_cleared: cleared });
+    return res.json({ ok: true, keys_cleared: cleared });
+  } catch (err) {
+    return res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
 // ── Skills Curation Routes ────────────────────────────────────────────────────
 // Skills are auto-drafted by the self-improvement engine on every tool failure.
 // Admin reviews them here: list → approve/reject → optionally promote to platform.
