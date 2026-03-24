@@ -54,22 +54,10 @@ const PORT = Number(process.env["PORT"] ?? 4000);
 // ---------------------------------------------------------------------------
 
 // CORS — must be before raw body parsers so preflight OPTIONS requests are handled
-let ALLOWED_ORIGINS: string[];
-if (process.env.ALLOWED_ORIGINS) {
-  ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS.split(',').map(s => s.trim());
-} else if (process.env.NODE_ENV === 'production') {
-  throw new Error("[FATAL] ALLOWED_ORIGINS must be set in production to prevent open CORS vulnerabilities.");
-} else {
-  ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://localhost:3001",
-    "https://wizard.tigerclaw.io",
-    "https://tigerclaw.io"
-  ];
-}
-
+// We use origin: true to dynamically reflect the requesting origin.
+// Since the API uses stateless Bearer tokens exclusively (no cookies), CSRF is mitigated.
 app.use(cors({
-  origin: ALLOWED_ORIGINS,
+  origin: true,
   methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
 }));

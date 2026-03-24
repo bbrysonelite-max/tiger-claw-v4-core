@@ -1,117 +1,138 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { tiger_keys } from '../tiger_keys.js'
-import { makeContext, type Storage, type ToolResult } from './helpers.js'
+import { makeContext, type ToolResult } from './helpers.js'
 
-// tiger_keys validates and activates Google API keys via Gemini probe
-const mockFetch = vi.fn()
-vi.stubGlobal('fetch', mockFetch)
+let mockBotStates: Record<string, any> = {}
 
-describe.skip('tiger_keys', () => {
-  let storage: Storage
+vi.mock('../../services/db.js', () => ({
+  getBotState: vi.fn(async (_workdir: string, file: string) => mockBotStates[file] ?? null),
+  setBotState: vi.fn(async (_workdir: string, file: string, data: unknown) => {
+    mockBotStates[file] = data
+  }),
+  getTenant: vi.fn(async () => ({
+    id: 'test-tenant',
+    slug: 'test-slug',
+    layer1_api_key: null,
+    layer2_api_key: null,
+    layer3_api_key: null,
+    layer4_api_key: null,
+  })),
+  getPool: vi.fn(() => ({ query: vi.fn().mockResolvedValue({ rows: [] }) })),
+}))
 
+vi.mock('../../services/email.js', () => ({
+  sendKeyAbuseWarning: vi.fn().mockResolvedValue(undefined),
+}))
+
+describe('tiger_keys', () => {
   beforeEach(() => {
-    vi.resetAllMocks()
-    storage = new Map()
-    process.env['ENCRYPTION_KEY'] = 'a'.repeat(32)
+    vi.clearAllMocks()
+    mockBotStates = {}
+    // notifyAdmin requires INTERNAL_API_URL; connection will fail fast (ECONNREFUSED) which is fine
+    process.env['INTERNAL_API_URL'] = 'http://127.0.0.1:19999'
   })
 
-  it('validates a good key, stores encrypted, returns ok:true', async () => {
-    mockFetch.mockResolvedValueOnce({ ok: true, status: 200 })
-    const ctx = makeContext(storage)
-
-    const result: ToolResult = await tiger_keys.execute({ apiKey: 'AIza-good-key', action: 'activate' }, ctx)
+  it('status returns ok:true with default state when storage is empty', async () => {
+    const ctx = makeContext()
+    const result: ToolResult = await tiger_keys.execute({ action: 'status' }, ctx)
 
     expect(result.ok).toBe(true)
-    expect(mockFetch).toHaveBeenCalledOnce()
-  })
-
-  it('stores the key in encrypted form (not plaintext)', async () => {
-    mockFetch.mockResolvedValueOnce({ ok: true, status: 200 })
-    const ctx = makeContext(storage)
-
-    await tiger_keys.execute({ apiKey: 'AIza-plaintext', action: 'activate' }, ctx)
-
-    // Find any storage entry that might hold the key
-    for (const [, val] of storage.entries()) {
-      const str = typeof val === 'string' ? val : JSON.stringify(val)
-      expect(str).not.toContain('AIza-plaintext')
-    }
-  })
-
-  it('returns ok:false for an invalid key (403 from Gemini)', async () => {
-    mockFetch.mockResolvedValueOnce({ ok: false, status: 403 })
-    const ctx = makeContext(storage)
-
-    const result = await tiger_keys.execute({ apiKey: 'AIza-bad', action: 'activate' }, ctx)
-
-    expect(result.ok).toBe(false)
-    expect(result.error).toBeTruthy()
-  })
-
-  it('returns ok:false for a 401 response (expired key)', async () => {
-    mockFetch.mockResolvedValueOnce({ ok: false, status: 401 })
-    const ctx = makeContext(storage)
-
-    const result = await tiger_keys.execute({ apiKey: 'AIza-expired', action: 'activate' }, ctx)
-
-    expect(result.ok).toBe(false)
-  })
-
-  it('returns current key status when action is "status"', async () => {
-    storage.set('key_state', { layer: 'byok', valid: true, activatedAt: '2026-01-01' })
-    const ctx = makeContext(storage)
-
-    const result = await tiger_keys.execute({ action: 'status' }, ctx)
-
-    expect(result.ok).toBe(true)
-    expect(result.output).toContain('byok')
-  })
-
-  it('returns "no key configured" status when storage is empty', async () => {
-    const ctx = makeContext(storage) // empty storage
-
-    const result = await tiger_keys.execute({ action: 'status' }, ctx)
-
-    expect(result.ok).toBe(true)
-    // Should indicate no key, not crash
     expect(result.output).toBeTruthy()
   })
 
-  it('deactivates a key when action is "deactivate"', async () => {
-    storage.set('key_state', { layer: 'byok', valid: true })
-    const ctx = makeContext(storage)
-
-    const result = await tiger_keys.execute({ action: 'deactivate' }, ctx)
+  it('status shows layer info from stored key_state', async () => {
+    mockBotStates['key_state.json'] = {
+      activeLayer: 1,
+      layer1MessageCountToday: 5,
+      layer1CountDate: new Date().toISOString().slice(0, 10),
+      layer1BurstCount: 2,
+      layer1BurstWindowStart: new Date().toISOString(),
+      layer3MessageCountToday: 0,
+      layer3CountDate: '',
+      layer4TotalMessages: 0,
+      tenantPaused: false,
+      events: [],
+      lastUpdated: new Date().toISOString(),
+    }
+    const ctx = makeContext()
+    const result = await tiger_keys.execute({ action: 'status' }, ctx)
 
     expect(result.ok).toBe(true)
-    const state = storage.get('key_state') as Record<string, unknown>
-    expect(state?.['valid']).toBe(false)
+    expect(result.output).toBeTruthy()
   })
 
-  it('returns ok:false when apiKey is empty and action is activate', async () => {
-    const ctx = makeContext(storage)
+  it('report_error for rate_limited decides wait action', async () => {
+    const ctx = makeContext()
+    const result = await tiger_keys.execute({
+      action: 'report_error',
+      httpStatus: 429,
+      isTimeout: false,
+      toolName: 'tiger_scout',
+    }, ctx)
 
-    const result = await tiger_keys.execute({ apiKey: '', action: 'activate' }, ctx)
+    expect(result.ok).toBe(true)
+    expect((result.data as any)?.decision).toBe('wait')
+  })
+
+  it('report_error for invalid key (401) decides rotate', async () => {
+    const ctx = makeContext()
+    const result = await tiger_keys.execute({
+      action: 'report_error',
+      httpStatus: 401,
+      isTimeout: false,
+      toolName: 'tiger_scout',
+    }, ctx)
+
+    expect(result.ok).toBe(true)
+    expect((result.data as any)?.decision).toBe('rotate')
+  })
+
+  it('rotate action returns ok:true', async () => {
+    const ctx = makeContext()
+    const result = await tiger_keys.execute({ action: 'rotate' }, ctx)
+
+    expect(result.ok).toBe(true)
+  })
+
+  it('restore_key with invalid layer returns ok:false', async () => {
+    const ctx = makeContext()
+    // layer must be 2 or 3 — passing nothing is invalid
+    const result = await tiger_keys.execute({ action: 'restore_key' }, ctx)
 
     expect(result.ok).toBe(false)
-    expect(mockFetch).not.toHaveBeenCalled()
+    expect(result.error).toContain('Layer')
   })
 
-  it('returns ok:false when action is unknown', async () => {
-    const ctx = makeContext(storage)
-
+  it('returns ok:false for unknown action', async () => {
+    const ctx = makeContext()
     const result = await tiger_keys.execute({ action: 'warp-key' as never }, ctx)
 
     expect(result.ok).toBe(false)
   })
 
-  it('handles network failure from Gemini probe gracefully', async () => {
-    mockFetch.mockRejectedValueOnce(new Error('ECONNREFUSED'))
-    const ctx = makeContext(storage)
+  it('tenantPaused state causes report_error to return no_action', async () => {
+    mockBotStates['key_state.json'] = {
+      activeLayer: 1,
+      tenantPaused: true,
+      layer1MessageCountToday: 0,
+      layer1CountDate: '',
+      layer1BurstCount: 0,
+      layer1BurstWindowStart: new Date().toISOString(),
+      layer3MessageCountToday: 0,
+      layer3CountDate: '',
+      layer4TotalMessages: 0,
+      events: [],
+      lastUpdated: new Date().toISOString(),
+    }
+    const ctx = makeContext()
+    const result = await tiger_keys.execute({
+      action: 'report_error',
+      httpStatus: 429,
+      isTimeout: false,
+      toolName: 'tiger_scout',
+    }, ctx)
 
-    const result = await tiger_keys.execute({ apiKey: 'AIza-test', action: 'activate' }, ctx)
-
-    expect(result.ok).toBe(false)
-    expect(result.error).toBeTruthy()
+    expect(result.ok).toBe(true)
+    expect((result.data as any)?.decision).toBe('no_action')
   })
 })

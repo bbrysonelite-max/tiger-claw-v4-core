@@ -28,7 +28,7 @@ describe('POST /keys/validate', () => {
 
     const res = await request(app)
       .post('/keys/validate')
-      .send({ provider: 'google', key: 'AIza-good-key' })
+      .send({ provider: 'google', key: 'GAPI-good-key' })
 
     expect(res.status).toBe(200)
     expect(res.body.valid).toBe(true)
@@ -40,7 +40,7 @@ describe('POST /keys/validate', () => {
 
     const res = await request(app)
       .post('/keys/validate')
-      .send({ provider: 'google', key: 'AIza-bad-key' })
+      .send({ provider: 'google', key: 'GAPI-bad-key' })
 
     expect(res.status).toBe(200)
     expect(res.body.valid).toBe(false)
@@ -53,7 +53,7 @@ describe('POST /keys/validate', () => {
 
     const res = await request(app)
       .post('/keys/validate')
-      .send({ provider: 'google', key: 'AIza-expired-key' })
+      .send({ provider: 'google', key: 'GAPI-expired-key' })
 
     expect(res.status).toBe(200)
     expect(res.body.valid).toBe(false)
@@ -86,7 +86,7 @@ describe('POST /keys/validate', () => {
 
     const res = await request(app)
       .post('/keys/validate')
-      .send({ provider: 'google', key: 'AIza-some-key' })
+      .send({ provider: 'google', key: 'GAPI-some-key' })
 
     expect(res.status).toBe(500)
   })
@@ -97,12 +97,12 @@ describe('POST /keys/validate', () => {
 
     await request(app)
       .post('/keys/validate')
-      .send({ provider: 'google', key: 'AIza-test-key' })
+      .send({ provider: 'google', key: 'GAPI-test-key' })
 
     expect(mockFetch).toHaveBeenCalledOnce()
     const [url] = mockFetch.mock.calls[0]
     expect(url).toContain('generativelanguage.googleapis.com')
-    expect(url).toContain('AIza-test-key')
+    expect(url).toContain('GAPI-test-key')
 
   })
 })
