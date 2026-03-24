@@ -19,6 +19,9 @@ import {
   addAIKey,
   importContacts,
   getFoundingMemberDisplay,
+  getBotState,
+  setBotState,
+  getPool,
 } from "../services/db.js";
 import { encryptToken } from "../services/pool.js";
 import { provisionQueue } from "../services/queue.js";
@@ -265,6 +268,36 @@ router.post("/validate-key", async (req: Request, res: Response) => {
   }
 
   const allValid = results.every(r => r.status === "success");
+
+  // Layer 4 auto-resume: if any Google key was successfully stored, activate L2 and un-pause
+  // This covers the case where a tenant's trial expired (tenantPaused=true) and they're now
+  // adding their BYOK key — the bot should immediately resume without manual intervention.
+  if (allValid) {
+    try {
+      const keyState = (await getBotState<Record<string, any>>(botId, "key_state.json")) ?? {};
+      if (keyState["tenantPaused"] === true || (keyState["activeLayer"] ?? 1) >= 3) {
+        // Find the first valid Google key to store as layer2Key
+        const firstGoogleKey = keys.find(k => k.provider === "google");
+        if (firstGoogleKey) {
+          const { encryptToken } = await import("../services/pool.js");
+          keyState["layer2Key"] = encryptToken(firstGoogleKey.key);
+          keyState["activeLayer"] = 2;
+          keyState["tenantPaused"] = false;
+          await setBotState(botId, "key_state.json", keyState);
+          // Restore tenant to active if it was suspended from trial expiry
+          await getPool().query(
+            `UPDATE tenants SET status = 'active' WHERE id = $1 AND status IN ('suspended', 'onboarding')`,
+            [botId]
+          );
+          console.log(`[wizard] 🔓 Layer 4 auto-resume: bot ${botId} restored to Layer 2 (BYOK active)`);
+        }
+      }
+    } catch (resumeErr: any) {
+      // Non-fatal — key is stored, bot resume is best-effort (admin can manually fix key_state)
+      console.warn(`[wizard] Layer 4 auto-resume failed for bot ${botId} (non-fatal):`, resumeErr.message);
+    }
+  }
+
   return res.json({
     valid: allValid,
     details: results

@@ -20,7 +20,7 @@ vi.mock('../../services/tenant_data.js', () => ({
   }),
 }))
 
-describe.skip('tiger_nurture', () => {
+describe('tiger_nurture', () => {
   beforeEach(() => {
     mockLeads = {
       'c1': { id: 'c1', displayName: 'Alice', platform: 'telegram', optedOut: false },

@@ -12,12 +12,14 @@ import {
   getPoolStats,
   getPool,
   getBotState,
+  setBotState,
   checkAndGrantFoundingMember,
   type Tenant,
 } from "./db.js";
 import { releaseBot, decryptToken } from "./pool.js";
 import { sendAdminAlert } from "../routes/admin.js";
 import { logLearning } from "./self-improvement.js";
+import { VALID_FLAVOR_KEYS } from "../tools/flavorConfig.js";
 // Proactive initiation disabled temporarily during CORS testing
 
 // ---------------------------------------------------------------------------
@@ -52,6 +54,13 @@ export interface ProvisionResult {
 
 export async function provisionTenant(input: ProvisionInput): Promise<ProvisionResult> {
   const steps: string[] = [];
+
+  // Guard: reject unknown flavor keys before touching the DB
+  if (!(VALID_FLAVOR_KEYS as readonly string[]).includes(input.flavor)) {
+    const msg = `Invalid flavor key: "${input.flavor}". Valid keys: ${VALID_FLAVOR_KEYS.join(", ")}`;
+    console.error(`[provisioner] ${msg}`);
+    return { success: false, error: msg, steps };
+  }
 
   // 1. Lookup existing tenant (Stan Store hook creates them via createBYOKBot -> tenants insert)
   let tenant = await getTenantBySlug(input.slug);
@@ -227,12 +236,37 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
     }
 
   } catch (err) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    steps.push(`Webhook attachment FAILED: ${errMsg}`);
+
     await updateTenantStatus(tenant.id, "suspended", {
-      suspendedReason: `Webhook attachment failed: ${err instanceof Error ? err.message : String(err)}`,
+      suspendedReason: `Webhook attachment failed: ${errMsg}`,
     });
+
+    // Release the pool bot back to available so it isn't leaked on BullMQ retry.
+    // On retry, provisionTenant() will assign a fresh bot from the pool.
+    // Only release if the bot was drawn from the pool (not a direct admin override).
+    if (!input.botToken) {
+      try {
+        const poolBots = await listBotPool("assigned");
+        const assignedBot = poolBots.find((b) => b.tenantId === tenant.id);
+        if (assignedBot) {
+          await releaseBot(assignedBot.id);
+          // Clear bot_token on tenant record so retry gets a clean pool assignment
+          await getPool().query(
+            `UPDATE tenants SET bot_token = NULL WHERE id = $1`,
+            [tenant.id]
+          );
+          steps.push(`Pool bot @${assignedBot.botUsername} released for retry`);
+        }
+      } catch (releaseErr) {
+        console.warn(`[provisioner] Failed to release pool bot after webhook failure for ${tenant.id}:`, releaseErr);
+      }
+    }
+
     return {
       success: false,
-      error: `Webhook attach failed: ${err instanceof Error ? err.message : String(err)}`,
+      error: `Webhook attach failed: ${errMsg}`,
       steps,
       tenant,
     };
@@ -272,9 +306,17 @@ export async function suspendTenant(
   tenant: Tenant,
   reason = "Admin action"
 ): Promise<void> {
-  // To suspend a multi-tenant bot, we just drop its webhook so it stops listening
+  // Drop Telegram webhook so it stops receiving messages
   if (tenant.botToken) {
     await fetch(`https://api.telegram.org/bot${tenant.botToken}/deleteWebhook`);
+  }
+  // Set tenantPaused in key_state so LINE and any other channel also stop consuming API keys
+  try {
+    const botState = JSON.parse(await getBotState(tenant.id, "key_state.json") || "{}");
+    botState.tenantPaused = true;
+    await setBotState(tenant.id, "key_state.json", botState);
+  } catch (err: any) {
+    console.error(`[provisioner] Failed to set tenantPaused for ${tenant.id}:`, err.message);
   }
   await updateTenantStatus(tenant.id, "suspended", { suspendedReason: reason });
   await logAdminEvent("suspend", tenant.id, { reason });
@@ -295,6 +337,14 @@ export async function resumeTenant(tenant: Tenant): Promise<"active" | "onboardi
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ url: webhookUrl })
     });
+  }
+  // Clear tenantPaused so LINE and other channels resume consuming API keys
+  try {
+    const botState = JSON.parse(await getBotState(tenant.id, "key_state.json") || "{}");
+    delete botState.tenantPaused;
+    await setBotState(tenant.id, "key_state.json", botState);
+  } catch (err: any) {
+    console.error(`[provisioner] Failed to clear tenantPaused for ${tenant.id}:`, err.message);
   }
   // Determine correct status: check actual onboarding completion in bot_states.
   // onboardingKeyUsed is never incremented — use the onboarding phase state instead.
