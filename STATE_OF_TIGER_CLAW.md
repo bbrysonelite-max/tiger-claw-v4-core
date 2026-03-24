@@ -1,85 +1,130 @@
 # STATE OF TIGER CLAW — HARD CONTEXT LOCK
-**Timestamp Generated:** 2026-03-22T19:15:00-07:00
-**Infrastructure Status:** LIVE (133/133 tests green, CI auto-merge active, 10 canary tenants provisioned, PRs #6/#7/#8 merged and deployed).
+**Timestamp Generated:** 2026-03-23T22:00:00-07:00
+**Infrastructure Status:** LIVE (243 tests green, CI auto-merge active, 10 canary tenants provisioned)
+**Last Session:** Intelligence Overhaul + FITFO Protocol + Self-Improvement Engine
 
 ---
 
 ## 🛑 MANDATORY DIRECTIVE TO ALL AI AGENTS 🛑
-This document is the absolute, most recent source of truth for the Tiger Claw repository (`/Users/brentbryson/Tigerclaw-Anti_Gravity/tiger-claw/`).
+This document is the absolute, most recent source of truth for this repository.
 
-If you are reading this, you are working on the **Tiger Claw Multi-Tenant SaaS**.
-1. **NO RAG.** The personal AI OS/Mini-RAG has been physically extracted to a separate workflow. You will not write, reference, or import RAG pipelines here.
-2. **NO OPENCLAW.** We do not spin up per-tenant Docker containers.
-3. **ARCHITECTURE:** Stateless Google Cloud Run API, Gemini 2.0 Flash (locked — 2.5 Flash has a GCP function-calling bug), 19 Native Function Calling Tools (`api/src/tools/`), Schema-per-tenant Postgres.
-4. **NO REWRITES:** The 19 core tools compile flawlessly and are backed by 133 passing tests. Do not rewrite architecture.
-5. **PROTOCOL:** Read this document fully before making any assumptions or taking any action.
+1. **NO RAG.** No Mini-RAG pipelines here.
+2. **NO OPENCLAW.** No per-tenant Docker containers.
+3. **ARCHITECTURE:** Stateless Cloud Run API, Gemini 2.0 Flash (LOCKED — 2.5 Flash silently strips JSON params), 19 Native Function Calling Tools, Schema-per-tenant Postgres.
+4. **NO REWRITES:** 19 core tools compile and are backed by 243 passing tests. Do not rewrite architecture.
+5. **FITFO.md:** Agent operating protocol at `/tiger-claw/FITFO.md`. All agents must internalize it.
 
 ## 🛑 GIT PROTOCOL — NON-NEGOTIABLE 🛑
 
-- NEVER push directly to main. main is branch-protected.
-- ALL work goes on a feature branch.
-- Branch naming: feat/description, fix/description, chore/description
-- When work is complete and tests pass: open a PR and IMMEDIATELY enable auto-merge.
-- Brent does NOT review or merge PRs. CI green = ships. That is the policy.
-- PR title must be clear and descriptive.
-- PR body must include: what changed, why, and what tests cover it.
-
-**Full autonomous deploy sequence (agents must follow this exactly):**
+- NEVER push to main. Branch-protected.
+- ALL work: feature branch → PR → CI green → auto-merge → auto-deploy.
+- Brent does NOT review PRs. CI green = ships.
 ```bash
 git checkout -b feat/your-description
-# make changes, run tests
+npx vitest run   # must pass before PR
 git push origin feat/your-description
-gh pr create --title "feat: your description" --body "What changed and why"
-gh pr merge --auto --squash   # fires immediately when CI passes — no human needed
+gh pr create --title "feat: description" --body "What changed and why"
+gh pr merge --auto --squash
 ```
-
-**After any merge to main — deploy to Cloud Run:**
-**Agent constraint:** NEVER checkout the main branch locally. All deployments are handled exclusively by GitHub Actions upon PR merge. The human operator must set GCP_CREDENTIALS in GitHub Secrets for this to work. Do not run ops/deploy-cloudrun.sh locally.
+- NEVER checkout main locally. GitHub Actions deploys on merge.
 
 ---
 
-## Current State (2026-03-22 Evening)
+## Current State (2026-03-23 Evening)
 
 ### What Was Done This Session
-- **PR #5:** Removed NM clichés from onboarding system prompt (merged)
-- **PR #6:** Moved banned NM phrases to global voice rule — now applies in ALL modes, not just onboarding. Added exact variants: "mouth is closed your business is closed", "What's the move?", "manufacture some success", etc. (merged)
-- **PR #7:** Fixed tiger_scout throwing "Onboarding not complete" for admin-provisioned tenants. Added explicit tool routing to system prompt so Gemini knows which tool to call for which user request. (merged)
-- **PR #8:** Removed CODEOWNERS human review gate. CI green = auto-merge = ships. (merged)
-- **Cloud Run deploy:** Manually triggered after session — building from latest main.
+
+**PR ea92225 — Intelligence Overhaul (merged):**
+- Removed keyword→tool routing table from `buildSystemPrompt`. Replaced with `TOOL JUDGMENT` section.
+- Added `buildFirstMessageText()` — fires `tiger_onboard(action="start")` automatically on first message when onboarding incomplete.
+- 5 new `buildFirstMessageText` unit tests. 4 routing-table regression tests.
+
+**Current session (uncommitted, branch: feat/intelligence-prompt-rewrite):**
+- **FITFO.md** — Figure It The Fuck Out. Five rules: Ant, Resource, Failure, Exhaustion, Growth.
+- **FITFO injected into `buildSystemPrompt`** — every agent has the FITFO protocol in their context window.
+- **Migration 013: skills table** — Dynamic agent skills. Fields: type (prompt/template/code), scope (tenant/flavor/platform), status (draft/submitted/approved/rejected/platform), implementation (JSONB), trigger context, metrics.
+- **self-improvement.ts rewritten** — `draftSkillFromFailure()` fires immediately on any tool failure. `loadApprovedSkills()` for runtime injection.
+- **1-fail threshold in `runToolLoop`** — Any `ok:false` or thrown exception triggers `draftSkillFromFailure()`. Fire-and-forget.
+- **Approved skills injected into `buildSystemPrompt`** — appear as `DYNAMIC SKILLS` section.
+- **243 tests passing, 0 TypeScript errors.**
+
+### Architectural Decisions Locked 2026-03-23
+
+| Decision | Status | Detail |
+|----------|--------|--------|
+| 5-layer intelligence architecture | APPROVED | Core 19 tools → dynamic skills → curation → self-improvement → multi-provider BYOK |
+| Skills system | APPROVED | Prompt (A) + template (B) now; code (C) future |
+| Self-improvement threshold | LOCKED | **1 failure** — immediate draft |
+| FITFO protocol | LOCKED | /tiger-claw/FITFO.md governs all agent behavior |
+| Provider expansion | APPROVED | Add OpenAI; resolveGoogleKey → resolveAIProvider returning { key, provider, model } |
+| Skill scope | LOCKED | tenant → flavor → platform |
+| Skill status flow | LOCKED | draft → submitted → approved / rejected / platform |
+| Hive benchmark injection | APPROVED | Top 3 signals per flavor/region into system prompt |
+| Tool test priority | APPROVED | scout → contact → nurture → briefing → onboard → remaining 12 |
+| Skills curation access | PENDING BRENT | Admin-only or tenant UI? |
+| Auto-drafted skill status | PENDING BRENT | draft (admin review) or auto-approved (tenant-scoped)? |
 
 ### The 10 Canaries
-All 10 early adopters (NM distributor network, mostly Thailand) were provisioned with `comped:true` via `/admin/provision`. Their bots were broken due to the OpenClaw infrastructure failure before Tiger Claw V4.
+All admin-provisioned. All have empty `onboard_state.json`. **First-message nudge is now live** — but only fires for new/reset conversations. Existing conversations need Redis history cleared to trigger it.
 
-**Critical canary: John (Thailand)** — Brent's top distributor, responsible for $20M of $25M total network revenue. John called this session to report his bot was "dumber than hell." He was told to check back in 30 minutes. Brent has a **Zoom call with John on Thursday 7 PM Scottsdale time.**
+**Critical: John (Thailand)** — $20M of $25M revenue. "Dumber than hell." Zoom Thursday 7 PM Scottsdale. Intelligence fix is live but untested against real canary conversations.
 
-**The core problem with canary bots:**
-1. Admin-provisioned tenants never completed the Telegram onboarding interview — `onboard_state.json` is empty. The bot has no ICP, no product, no identity data. It's a blank shell.
-2. Bots were giving generic NM cliché responses (fixed in PR #6)
-3. Bots were not calling tiger_scout when asked to find prospects (fixed in PR #7)
-4. **The bot needs to handle ANY request intelligently** — not just the 19 predefined tool scenarios. This is the core intelligence gap that remains open.
+---
 
-**What canary users need to do:**
-Each canary must message their Telegram bot and complete the onboarding interview. The bot will ask about their product, their biggest result, their ideal prospect. Without this, the bot has no context and will underperform.
+## Open Issues — Ranked by Damage
 
-### Open Issues (Not Yet Fixed)
+### 🔴 P0 — No Admin Dashboard
+No visual fleet view. 10 live canaries. Cannot see status without DB query.
+**Fix:** HTML route in admin.ts. Table: name, bot handle, onboarding status, key layer, last active.
 
-1. **Agent Intelligence Gap** — The bots behave like a tool router, not a general agent. When a user asks something outside the 19 tools, the bot fails or gives a canned response. The bar is: handle anything a business person throws at it. This is the #1 priority.
+### 🔴 P0 — All 10 Canaries Have No Personality Data
+Empty onboard_state.json. First-message nudge fires for new conversations only.
+**Fix:** `POST /admin/tenants/:id/reset-conversation` — clears Redis chat history.
 
-2. **No Admin Dashboard** — There is no visual interface showing all tenants, their bot Telegram handles, onboarding completion status, and last activity. Brent cannot see who's who without a DB query. This is needed urgently — especially to manage the canary group before Thursday.
+### 🔴 P0 — Signup Funnel Broken (CORS)
+wizard.tigerclaw.io blocked from api.tigerclaw.io/wizard/auth. Zero new signups via web.
+**Fix:** OPTIONS preflight handler on /wizard/auth. Fix hardcoded URL in StepIdentity.tsx:40.
 
-3. **Wizard Flow** — "Launch My Agent" on tigerclaw.io hits `/wizard/auth` which requires an existing Stan Store purchase. New users are blocked before they can try the 72-hour free trial. Deprioritized per Brent — address after canary situation is resolved.
+### 🔴 P0 — Intelligence Fix Untested in Production
+Changes live but never observed in real canary conversation. Thursday is the live test.
+**Fix:** Test each canary bot manually. Monitor Cloud Run logs ([AI] prefix).
 
-4. **Auto-Deploy in CI** — GitHub Actions runs tests and automatically deploys to Cloud Run upon merge to main. Agents are strictly forbidden from checking out `main` to deploy manually.
+### 🟠 P1 — 17 of 19 Tool Tests Skipped
+CI blind to tool regressions. Priority: tiger_scout → tiger_contact → tiger_nurture → tiger_briefing → tiger_onboard.
 
-5. **Facebook/LINE/WhatsApp** — All stubbed. Not functional.
+### 🟠 P1 — Single AI Provider
+Hard-locked to Gemini 2.0 Flash. Item 3 of 6-item plan. Not started.
 
-### Immediate Priorities Before Thursday
+### 🟠 P1 — Hive Benchmarks Not in System Prompt
+Hive data not in agent context. Item 4 of 6-item plan. Not started.
 
-1. **Admin dashboard** — One page showing all tenants: name, Telegram bot handle, onboarding status (complete/incomplete), last active timestamp. Must be visual, not a terminal query.
+### 🟠 P1 — Email Is a Stub
+Resend not implemented. RESEND_API_KEY unused. No transactional email.
 
-2. **Full click-through walkthrough** — Every screen, every command, every edge case on a real bot. This should have been done before canaries received their bots.
+### 🟠 P1 — LINE/Facebook Scouting Incomplete
+Facebook: silently returns empty if SERPER_KEY_* missing. LINE: reads local file. John's Thai network uses LINE.
 
-3. **Agent intelligence** — Bots must handle any business question, not just tool-mapped requests. The system prompt currently treats Gemini as a switch statement. It needs to behave as a capable general agent that also has 19 specialized tools.
+### 🟡 P2 — Skills Curation Has No Admin Routes
+Migration 013 created. Skills being drafted. No view/approve/reject/promote routes.
+
+### 🟡 P2 — OpenAI Tool Declaration Mapper
+19 tools in Gemini format. Needed before multi-provider BYOK goes live.
+
+### 🟡 P2 — No Pause Override for Operator
+No way to stop bot mid-conversation. Verify tenantPaused flag in processTelegramMessage.
+
+---
+
+## 6-Item Intelligence Plan Status
+
+| # | Item | Status |
+|---|------|--------|
+| 1 | Remove routing table; add TOOL JUDGMENT | ✅ Done |
+| 2 | First-message onboarding nudge | ✅ Done |
+| 3 | Multi-provider BYOK — resolveAIProvider | ⬜ Not started |
+| 4 | Hive benchmark injection | ⬜ Not started |
+| 5 | self-improvement.ts — real 1-fail threshold | ✅ Done |
+| 6 | OpenAI tool declaration mapper | ⬜ Not started |
 
 ---
 
@@ -88,13 +133,18 @@ Each canary must message their Telegram bot and complete the onboarding intervie
 - **API:** Cloud Run, Node.js/Express, port 4000
 - **DB:** Cloud SQL PostgreSQL HA, schema-per-tenant isolation
 - **Cache/Queue:** Cloud Redis HA + BullMQ (5 queues)
-- **AI:** Gemini 2.0 Flash via `@google/generative-ai` SDK
-- **Frontend:** Next.js on Vercel (`wizard.tigerclaw.io`)
+- **AI:** Gemini 2.0 Flash — LOCKED
+- **Skills:** Dynamic via skills table (migration 013), loaded at runtime into system prompt
+- **Self-improvement:** api/src/services/self-improvement.ts — 1-fail threshold, auto-drafts skills
+- **Frontend:** Next.js on Vercel (wizard.tigerclaw.io)
 - **Payments:** Stan Store + Stripe
-- **Email:** Resend
-- **Bot Pool:** 42+ Telegram bot tokens, AES-256-GCM encrypted
-- **GCP Project:** `hybrid-matrix-472500-k5`
-- **Cloud Run Service:** `tiger-claw-api`, region `us-central1`
+- **Email:** Resend (STUB — not implemented)
+- **Bot Pool:** 42+ Telegram tokens, AES-256-GCM encrypted
+- **GCP Project:** hybrid-matrix-472500-k5, region us-central1
+- **Key Layers:** L1 platform onboarding (72h), L2 tenant primary BYOK, L3 tenant fallback BYOK, L4 platform emergency
+
+## Punch List
+Full weakness detail + plans: /Users/brentbryson/Desktop/TIGERCLAW_PUNCH_LIST.md
 
 ---
 *Locked. Proceed.*

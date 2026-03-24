@@ -53,6 +53,11 @@ vi.mock('../../tools/flavorConfig.js', () => ({
   })),
 }));
 
+vi.mock('../self-improvement.js', () => ({
+  loadApprovedSkills: vi.fn().mockResolvedValue([]),
+  draftSkillFromFailure: vi.fn().mockResolvedValue(null),
+}));
+
 // Mock all 19 tools so the module loads without error
 vi.mock('../../tools/tiger_onboard.js', () => ({ tiger_onboard: { name: 'tiger_onboard', description: '', parameters: {}, execute: vi.fn() } }));
 vi.mock('../../tools/tiger_scout.js', () => ({ tiger_scout: { name: 'tiger_scout', description: '', parameters: {}, execute: vi.fn() } }));
@@ -87,7 +92,7 @@ vi.mock('@google/generative-ai', () => ({
 }));
 
 // Import AFTER all mocks are defined
-import { getChatHistory, saveChatHistory, buildSystemPrompt, resolveGoogleKey } from '../ai.js';
+import { getChatHistory, saveChatHistory, buildSystemPrompt, resolveGoogleKey, buildFirstMessageText } from '../ai.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -393,5 +398,39 @@ describe('resolveGoogleKey', () => {
     expect(key).toBe('platform-layer1-key');
     expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('[AI] [ALERT]'), expect.any(String));
     consoleSpy.mockRestore();
+  });
+});
+
+// ─── Item 2: buildFirstMessageText (first-message onboarding nudge) ──────────
+
+describe('buildFirstMessageText', () => {
+  it('injects SYSTEM nudge when onboarding incomplete and first message', () => {
+    const result = buildFirstMessageText('hello', false, true);
+    expect(result).toContain('[SYSTEM');
+    expect(result).toContain('calibrate');
+    expect(result).toContain('tiger_onboard');
+    expect(result).toContain('hello');
+  });
+
+  it('preserves the operator original message inside the nudge', () => {
+    const result = buildFirstMessageText('what can you do?', false, true);
+    expect(result).toContain('what can you do?');
+  });
+
+  it('returns plain text when onboarding is complete', () => {
+    const result = buildFirstMessageText('find me leads', true, true);
+    expect(result).toBe('find me leads');
+    expect(result).not.toContain('[SYSTEM');
+  });
+
+  it('returns plain text when not the first message (history exists)', () => {
+    const result = buildFirstMessageText('follow up', false, false);
+    expect(result).toBe('follow up');
+    expect(result).not.toContain('[SYSTEM');
+  });
+
+  it('returns plain text when both onboarding complete and not first message', () => {
+    const result = buildFirstMessageText('scan for leads', true, false);
+    expect(result).toBe('scan for leads');
   });
 });

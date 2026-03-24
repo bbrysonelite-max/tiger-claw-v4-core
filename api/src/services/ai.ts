@@ -6,6 +6,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { loadFlavorConfig } from '../tools/flavorConfig.js';
 import { decryptToken } from './pool.js';
+import { draftSkillFromFailure, loadApprovedSkills } from './self-improvement.js';
 
 // Load all 19 tools — ALL must remain registered. Missing tool = infinite loop.
 import { tiger_onboard }     from '../tools/tiger_onboard.js';
@@ -256,6 +257,18 @@ function buildToolContext(tenantId: string, tenant: any) {
     };
 }
 
+// ─── FITFO loader ────────────────────────────────────────────────────────────
+function loadFitfao(): string {
+    try {
+        // __dirname = api/dist/services (at runtime) or api/src/services (ts-node)
+        // Walk up 3 levels to reach the repo root where FITFO.md lives
+        const fitfaoPath = path.resolve(__dirname, '..', '..', '..', 'FITFO.md');
+        return fs.readFileSync(fitfaoPath, 'utf-8');
+    } catch {
+        return ''; // Non-fatal — operate without it if file is missing
+    }
+}
+
 // ─── System prompt ────────────────────────────────────────────────────────────
 // Async version — reads onboard_state.json so the bot has full operator context.
 export async function buildSystemPrompt(tenant: any): Promise<string> {
@@ -277,6 +290,12 @@ export async function buildSystemPrompt(tenant: any): Promise<string> {
     const botName = onboardState?.botName ?? 'Tiger';
     const operatorName = identity.name ?? tenant.name ?? 'your operator';
     const hasOnboarding = onboardState?.phase === 'complete';
+
+    // Load dynamic approved skills for this tenant
+    const approvedSkills = await loadApprovedSkills(tenant.id, tenant.flavor).catch(() => []);
+
+    // Load FITFO operating protocol
+    const fitfao = loadFitfao();
 
     // Build operator context block — only injected when onboarding is complete
     const operatorBlock = hasOnboarding ? [
@@ -373,6 +392,13 @@ export async function buildSystemPrompt(tenant: any): Promise<string> {
         `CRITICAL TELEMETRY (silent, always):`,
         `- After every outbound prospect message or significant tool result, call tiger_keys(action="record_message").`,
         `- If an API errors out, call tiger_keys(action="report_error", error=status).`,
+        // Dynamic approved skills (injected at runtime, curated by platform/admin)
+        ...(approvedSkills.length > 0
+            ? [``, `━━━━ DYNAMIC SKILLS (PLATFORM-APPROVED) ━━━━`, ...approvedSkills]
+            : []
+        ),
+        // FITFO operating protocol (agent self-improvement and persistence rules)
+        ...(fitfao ? [``, `━━━━ OPERATING PROTOCOL ━━━━`, fitfao] : []),
     ].join('\n');
 }
 
@@ -412,9 +438,26 @@ async function runToolLoop(
             } else {
                 try {
                     toolResult = await tool.execute(fc.args, toolContext);
+                    // FITFO Failure Rule: if tool returns ok:false, draft a skill immediately
+                    if (toolResult?.ok === false || toolResult?.success === false) {
+                        const errMsg = toolResult?.error ?? toolResult?.message ?? 'unknown error';
+                        draftSkillFromFailure({
+                            tenantId: toolContext.agentId,
+                            toolName: fc.name,
+                            args: fc.args ?? {},
+                            error: String(errMsg),
+                        }).catch(e => console.error(`[${logPrefix}] draftSkillFromFailure failed:`, e.message));
+                    }
                 } catch (toolErr: any) {
                     console.error(`[${logPrefix}] Tool ${fc.name} threw:`, toolErr.message);
                     toolResult = { error: toolErr.message };
+                    // FITFO Failure Rule: exception = immediate skill draft
+                    draftSkillFromFailure({
+                        tenantId: toolContext.agentId,
+                        toolName: fc.name,
+                        args: fc.args ?? {},
+                        error: toolErr.message,
+                    }).catch(e => console.error(`[${logPrefix}] draftSkillFromFailure failed:`, e.message));
                 }
             }
 
@@ -428,6 +471,18 @@ async function runToolLoop(
     }
 
     return response;
+}
+
+// ─── Exported for testing ─────────────────────────────────────────────────────
+export function buildFirstMessageText(
+    operatorText: string,
+    onboardingComplete: boolean,
+    isFirstMessage: boolean,
+): string {
+    if (!onboardingComplete && isFirstMessage) {
+        return `[SYSTEM — NOT VISIBLE TO PROSPECT] This is the operator's first message. Onboarding is not complete. Introduce yourself warmly in one sentence, tell the operator you need 5 minutes to calibrate to their business, then immediately call tiger_onboard(action="start"). The operator's actual message was: "${operatorText}"`;
+    }
+    return operatorText;
 }
 
 // ─── Public: process a Telegram user message ─────────────────────────────────
@@ -462,6 +517,14 @@ export async function processTelegramMessage(
         const history = await getChatHistory(tenantId, chatId);
         console.log(`[AI] History loaded: ${history.length} entries`);
 
+        // First-message onboarding nudge: if no history and onboarding not complete,
+        // prepend a hidden SYSTEM directive so the model's first action is to
+        // introduce itself and start onboarding — regardless of what the operator typed.
+        const onboardState = await getBotState<any>(tenantId, 'onboard_state.json').catch(() => null);
+        const onboardingComplete = onboardState?.phase === 'complete';
+        const isFirstMessage = history.length === 0;
+        const effectiveText = buildFirstMessageText(text, onboardingComplete, isFirstMessage);
+
         const genAI = new GoogleGenerativeAI(googleKey);
         const model = genAI.getGenerativeModel({
             model: 'gemini-2.0-flash',
@@ -470,8 +533,8 @@ export async function processTelegramMessage(
         });
 
         const chat = model.startChat({ history });
-        console.log(`[AI] Sending message to Gemini: "${text.slice(0, 50)}"`);
-        const initial = await chat.sendMessage(text);
+        console.log(`[AI] Sending message to Gemini: "${effectiveText.slice(0, 80)}"`);
+        const initial = await chat.sendMessage(effectiveText);
         const initCandidates = (initial.response as any).candidates ?? [];
         const finishReason = initCandidates[0]?.finishReason ?? 'unknown';
         const promptBlocked = (initial.response as any).promptFeedback?.blockReason ?? null;
