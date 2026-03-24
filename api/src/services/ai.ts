@@ -117,20 +117,101 @@ export async function getTenantChatIds(tenantId: string): Promise<number[]> {
     return keys.map(k => parseInt(k.split(':')[2], 10)).filter(id => !isNaN(id));
 }
 
+// ─── Sawtooth compression ────────────────────────────────────────────────────
+// When history hits the trim threshold, summarize the entries about to be
+// dropped and merge into chat_memory (30-day TTL). On next load, the summary
+// is injected as a synthetic user/model pair so the agent retains long-term
+// context without blowing the context window.
+//
+// Uses PLATFORM_ONBOARDING_KEY — this is an internal platform call, not
+// tenant-billable. Fails silently: the hard trim still happens on any error.
+async function compressChatHistory(
+    tenantId: string,
+    chatId: number,
+    droppedEntries: Content[],
+): Promise<void> {
+    try {
+        const platformKey = process.env.PLATFORM_ONBOARDING_KEY ?? process.env.GOOGLE_API_KEY;
+        if (!platformKey) return;
+
+        // Serialize dropped entries as plain text for the compression prompt
+        const plainText = droppedEntries
+            .filter(e => e.role === 'user' || e.role === 'model')
+            .map(e => {
+                const text = (e.parts ?? []).map((p: any) => p.text ?? '').join(' ').trim();
+                return text ? `${e.role}: ${text}` : null;
+            })
+            .filter(Boolean)
+            .join('\n');
+
+        if (!plainText) return;
+
+        const genAI = new GoogleGenerativeAI(platformKey);
+        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+        const result = await model.generateContent(
+            `Summarize the key facts from this conversation that the agent needs to remember about the operator's business. ` +
+            `Be concise. Max 150 words. Focus on stated preferences, ICP updates, hot leads, and decisions made.\n\n${plainText}`,
+        );
+        const newSummary = result.response.text?.() ?? '';
+        if (!newSummary.trim()) return;
+
+        // Merge with any existing memory blob
+        const memKey = `chat_memory:${tenantId}:${chatId}`;
+        const existing = await redis.get(memKey);
+        let combined = newSummary;
+        if (existing) {
+            try {
+                const blob = JSON.parse(existing);
+                if (blob.summary) combined = `${blob.summary}\n---\n${newSummary}`;
+            } catch { /* malformed — overwrite */ }
+        }
+
+        await redis.set(
+            memKey,
+            JSON.stringify({ summary: combined, compressedAt: new Date().toISOString(), turnsCompressed: droppedEntries.length }),
+            'EX',
+            86400 * 30,
+        );
+        console.log(`[AI] Compressed ${droppedEntries.length} entries into chat_memory for tenant ${tenantId}`);
+    } catch (err: any) {
+        console.warn(`[AI] compressChatHistory failed for tenant ${tenantId} — falling back to hard trim:`, err.message);
+    }
+}
+
 export async function getChatHistory(tenantId: string, chatId: number): Promise<Content[]> {
     try {
-        const raw = await redis.get(`chat_history:${tenantId}:${chatId}`);
+        const [raw, memRaw] = await Promise.all([
+            redis.get(`chat_history:${tenantId}:${chatId}`),
+            redis.get(`chat_memory:${tenantId}:${chatId}`),
+        ]);
+
         if (!raw) return [];
         const history: Content[] = JSON.parse(raw);
         // Gemini requires history to start with role 'user'. If a trim previously cut mid-exchange,
         // a 'function' or 'model' role entry could be at position 0. Strip leading non-user entries.
         const firstUserIdx = history.findIndex(h => h.role === 'user');
         if (firstUserIdx < 0) return []; // no user entry at all — discard
+        const cleaned = firstUserIdx > 0 ? history.slice(firstUserIdx) : history;
         if (firstUserIdx > 0) {
             console.warn(`[AI] History for tenant ${tenantId} started with role '${history[0].role}' — trimming ${firstUserIdx} leading entries.`);
-            return history.slice(firstUserIdx);
         }
-        return history;
+
+        // Prepend conversation memory as a synthetic user/model pair so the agent
+        // has long-term context without it counting against the active turn window.
+        if (memRaw) {
+            try {
+                const blob = JSON.parse(memRaw);
+                if (blob.summary) {
+                    const memoryPair: Content[] = [
+                        { role: 'user', parts: [{ text: '[CONVERSATION MEMORY — prior session context]' }] },
+                        { role: 'model', parts: [{ text: blob.summary }] },
+                    ];
+                    return [...memoryPair, ...cleaned];
+                }
+            } catch { /* malformed memory blob — ignore */ }
+        }
+
+        return cleaned;
     } catch (err: any) {
         // BUG 3 FIX: loud failure — do not silently ignore
         console.error(`[AI] [ALERT] Failed to load chat history for tenant ${tenantId}:`, err.message);
@@ -139,6 +220,13 @@ export async function getChatHistory(tenantId: string, chatId: number): Promise<
 }
 
 export async function saveChatHistory(tenantId: string, chatId: number, history: Content[]): Promise<void> {
+    // Sawtooth: before trimming, compress the entries that are about to be dropped
+    // into a chat_memory summary. Fire-and-forget — trim still happens immediately.
+    if (history.length > MAX_HISTORY_TURNS * 2) {
+        const droppedEntries = history.slice(0, history.length - MAX_HISTORY_TURNS * 2);
+        compressChatHistory(tenantId, chatId, droppedEntries).catch(() => { /* already logged inside */ });
+    }
+
     // BUG 5 FIX: trim before saving — last MAX_HISTORY_TURNS turns kept
     // Also ensure trim always starts at a 'user' role boundary to prevent the
     // "First content should be with role 'user'" error on next load.
@@ -353,6 +441,8 @@ export async function buildSystemPrompt(tenant: any): Promise<string> {
         `"your why", "what's the play", "what's the move", "let's get after it", "ready to get after it",`,
         `"manufacture some success", "let's manufacture", "hustle", "grind", "beast mode",`,
         `or any variation of classic network marketing hype scripts. These are permanently banned.`,
+        ``,
+        `MEMORY RULE: If you see a [CONVERSATION MEMORY] entry at the start of the conversation history, treat it as a factual briefing from prior sessions — not as a message to respond to.`,
     ];
 
     // ── Intelligence briefing (dynamic) ────────────────────────────────────────

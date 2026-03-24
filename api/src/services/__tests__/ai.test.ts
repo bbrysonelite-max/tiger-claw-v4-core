@@ -329,6 +329,90 @@ describe('buildSystemPrompt', () => {
   });
 });
 
+// ─── getChatHistory — memory blob injection ───────────────────────────────────
+
+describe('getChatHistory — Sawtooth memory injection', () => {
+  beforeEach(() => {
+    mockRedisGet.mockReset();
+    mockRedisSet.mockReset();
+  });
+
+  it('prepends synthetic memory pair when chat_memory blob exists', async () => {
+    const history = makeHistory(['user', 'model']);
+    // First get = chat_history, second get = chat_memory
+    mockRedisGet
+      .mockResolvedValueOnce(JSON.stringify(history))
+      .mockResolvedValueOnce(JSON.stringify({ summary: 'Operator sells NuSkin. ICP: health-conscious moms.', compressedAt: '2024-01-01T00:00:00Z', turnsCompressed: 10 }));
+
+    const result = await getChatHistory(TENANT_ID, CHAT_ID);
+    expect(result).toHaveLength(4); // 2 memory + 2 real
+    expect(result[0]!.role).toBe('user');
+    expect((result[0]!.parts[0] as any).text).toContain('[CONVERSATION MEMORY');
+    expect((result[1]!.parts[0] as any).text).toContain('NuSkin');
+    expect(result[2]!.role).toBe('user');
+  });
+
+  it('returns history without memory pair when no chat_memory key exists', async () => {
+    const history = makeHistory(['user', 'model']);
+    mockRedisGet
+      .mockResolvedValueOnce(JSON.stringify(history))
+      .mockResolvedValueOnce(null);
+
+    const result = await getChatHistory(TENANT_ID, CHAT_ID);
+    expect(result).toHaveLength(2);
+    expect((result[0]!.parts[0] as any).text).not.toContain('[CONVERSATION MEMORY');
+  });
+
+  it('ignores malformed chat_memory blob without crashing', async () => {
+    const history = makeHistory(['user', 'model']);
+    mockRedisGet
+      .mockResolvedValueOnce(JSON.stringify(history))
+      .mockResolvedValueOnce('NOT VALID JSON{{');
+
+    const result = await getChatHistory(TENANT_ID, CHAT_ID);
+    expect(result).toHaveLength(2);
+  });
+});
+
+// ─── saveChatHistory — Sawtooth compression trigger ──────────────────────────
+
+describe('saveChatHistory — Sawtooth compression', () => {
+  const MAX_TURNS = 20;
+
+  beforeEach(() => {
+    mockRedisGet.mockReset();
+    mockRedisSet.mockReset().mockResolvedValue('OK');
+  });
+
+  it('does NOT trigger compression when history is at or below the threshold', async () => {
+    // Exactly at threshold — no compression
+    const roles = Array.from({ length: MAX_TURNS * 2 }, (_, i) => (i % 2 === 0 ? 'user' : 'model'));
+    await saveChatHistory(TENANT_ID, CHAT_ID, makeHistory(roles));
+    // Only the chat_history set call — no extra Redis set for chat_memory yet
+    // (compression is async fire-and-forget; Gemini mock not called means no compression attempt)
+    expect(mockRedisSet).toHaveBeenCalledTimes(1);
+    const [key] = mockRedisSet.mock.calls[0]!;
+    expect(key).toBe(`chat_history:${TENANT_ID}:${CHAT_ID}`);
+  });
+
+  it('triggers compression when history exceeds threshold', async () => {
+    // 50 entries — 10 will be "dropped" (50 - 40 = 10)
+    const roles = Array.from({ length: 50 }, (_, i) => (i % 2 === 0 ? 'user' : 'model'));
+    await saveChatHistory(TENANT_ID, CHAT_ID, makeHistory(roles));
+    // The chat_history Redis set still happens synchronously
+    expect(mockRedisSet).toHaveBeenCalledWith(
+      `chat_history:${TENANT_ID}:${CHAT_ID}`,
+      expect.any(String),
+      'EX',
+      86400 * 7,
+    );
+    // Trimmed result starts at user boundary and is within limit
+    const saved = JSON.parse(mockRedisSet.mock.calls[0]![1] as string);
+    expect(saved.length).toBeLessThanOrEqual(MAX_TURNS * 2);
+    expect(saved[0].role).toBe('user');
+  });
+});
+
 // ─── resolveGoogleKey ─────────────────────────────────────────────────────────
 
 describe('resolveGoogleKey', () => {
