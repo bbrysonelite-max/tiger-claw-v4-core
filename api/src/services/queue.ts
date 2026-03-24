@@ -286,6 +286,40 @@ if (factExtractionWorker) {
 }
 
 // ---------------------------------------------------------------------------
+// Fact Anchor Extraction (async, post-conversation intelligence)
+// ---------------------------------------------------------------------------
+
+export interface FactExtractionJobData {
+    tenantId: string;
+    chatId: number;
+}
+
+export const factExtractionWorker = SHOULD_RUN_WORKERS ? new Worker(
+    'fact-extraction',
+    async (job: Job<FactExtractionJobData>) => {
+        const { tenantId, chatId } = job.data;
+        try {
+            const { extractFactAnchors } = await import('./factExtractor.js');
+            await extractFactAnchors(tenantId, chatId);
+        } catch (err) {
+            console.warn(`[Worker] Fact extraction failed for tenant ${tenantId} — non-critical:`, err);
+            // Do not rethrow — fact extraction failure must never block or retry loudly
+        }
+        return { success: true };
+    },
+    {
+        connection: connection as any,
+        concurrency: 20,
+    }
+) : null;
+
+if (factExtractionWorker) {
+    factExtractionWorker.on('failed', (job, err) => {
+        console.warn(`[Worker] Fact extraction job ${job?.id} failed:`, err);
+    });
+}
+
+// ---------------------------------------------------------------------------
 // Background AI Routines (Scouting, Nurture Checks, Daily Reports)
 // ---------------------------------------------------------------------------
 
