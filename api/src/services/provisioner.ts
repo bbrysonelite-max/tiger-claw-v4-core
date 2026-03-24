@@ -18,6 +18,7 @@ import {
 import { releaseBot, decryptToken } from "./pool.js";
 import { sendAdminAlert } from "../routes/admin.js";
 import { logLearning } from "./self-improvement.js";
+import { VALID_FLAVOR_KEYS } from "../tools/flavorConfig.js";
 // Proactive initiation disabled temporarily during CORS testing
 
 // ---------------------------------------------------------------------------
@@ -52,6 +53,13 @@ export interface ProvisionResult {
 
 export async function provisionTenant(input: ProvisionInput): Promise<ProvisionResult> {
   const steps: string[] = [];
+
+  // Guard: reject unknown flavor keys before touching the DB
+  if (!(VALID_FLAVOR_KEYS as readonly string[]).includes(input.flavor)) {
+    const msg = `Invalid flavor key: "${input.flavor}". Valid keys: ${VALID_FLAVOR_KEYS.join(", ")}`;
+    console.error(`[provisioner] ${msg}`);
+    return { success: false, error: msg, steps };
+  }
 
   // 1. Lookup existing tenant (Stan Store hook creates them via createBYOKBot -> tenants insert)
   let tenant = await getTenantBySlug(input.slug);

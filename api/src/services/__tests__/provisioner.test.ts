@@ -193,6 +193,60 @@ describe('provisionTenant', () => {
   });
 });
 
+// ─── provisionTenant — flavor validation (Phase 1 hardening) ─────────────────
+
+describe('provisionTenant — flavor validation', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetTenantBySlug.mockResolvedValue(null);
+  });
+
+  it('rejects director-of-operations (removed invalid flavor) before touching DB', async () => {
+    const result = await provisionTenant({ ...BASE_INPUT, flavor: 'director-of-operations' });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('Invalid flavor key');
+    expect(result.error).toContain('director-of-operations');
+    // Guard must fire before any DB writes
+    expect(mockCreateTenant).not.toHaveBeenCalled();
+    expect(mockGetTenantBySlug).not.toHaveBeenCalled();
+  });
+
+  it('rejects intelligence-specialist (removed invalid flavor) before touching DB', async () => {
+    const result = await provisionTenant({ ...BASE_INPUT, flavor: 'intelligence-specialist' });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('Invalid flavor key');
+    expect(mockCreateTenant).not.toHaveBeenCalled();
+  });
+
+  it('rejects admin (internal-only, never customer-provisioned)', async () => {
+    const result = await provisionTenant({ ...BASE_INPUT, flavor: 'admin' });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('Invalid flavor key');
+    expect(mockCreateTenant).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    'network-marketer', 'real-estate', 'health-wellness', 'airbnb-host',
+    'baker', 'candle-maker', 'doctor', 'gig-economy', 'lawyer', 'plumber', 'sales-tiger',
+  ])('accepts valid flavor key: %s', async (flavor) => {
+    // Set up minimal mocks so the flow doesn't crash past the guard
+    mockGetPoolStats.mockResolvedValue({ total: 10, assigned: 0, unassigned: 10 });
+    mockCreateTenant.mockResolvedValue({ ...MOCK_TENANT, flavor });
+    mockAssignBotToken.mockResolvedValue({ botToken: 'enc:token', botUsername: 'Bot' });
+    mockGetPoolQuery.mockResolvedValue({ rows: [] });
+    vi.stubGlobal('fetch', mockFetch);
+    mockFetch.mockResolvedValue({ json: () => Promise.resolve({ ok: true }) });
+
+    const result = await provisionTenant({ ...BASE_INPUT, flavor, botToken: 'direct-token' });
+
+    // Flavor guard didn't fire — steps array is non-empty and flow continued
+    expect(result.steps.length).toBeGreaterThan(0);
+  });
+});
+
 // ─── suspendTenant ────────────────────────────────────────────────────────────
 
 describe('suspendTenant', () => {
