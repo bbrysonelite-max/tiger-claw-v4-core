@@ -13,7 +13,7 @@ vi.mock('../../services/tenant_data.js', () => ({
   getTenantState: vi.fn(async () => ({ language: 'en' })),
 }))
 
-describe.skip('tiger_note', () => {
+describe('tiger_note', () => {
   beforeEach(() => {
     mockLeads = {
       'c1': { id: 'c1', displayName: 'Alice', platform: 'telegram', builderScore: 50, customerScore: 50, qualifyingScore: 50, optedOut: false, notes: [] }

@@ -503,8 +503,11 @@ export async function assignBotToTenant(botId: string, tenantId: string): Promis
 }
 
 export async function releaseBotToPool(botId: string): Promise<void> {
+  // Stamp released_at so assignBotToken can enforce the 30-minute cool-down.
+  // A just-released bot's Telegram profile (name/description) may still be cached
+  // by Telegram for several minutes after the identity reset calls complete.
   await getPool().query(
-    `UPDATE bot_pool SET status='available', tenant_id=NULL, assigned_at=NULL WHERE id=$1`,
+    `UPDATE bot_pool SET status='available', tenant_id=NULL, assigned_at=NULL, released_at=NOW() WHERE id=$1`,
     [botId]
   );
 }
@@ -553,6 +556,7 @@ export async function assignBotToken(
       const result = await client.query(
         `SELECT * FROM bot_pool
          WHERE status = 'available'
+           AND (released_at IS NULL OR released_at < NOW() - INTERVAL '30 minutes')
          ORDER BY created_at ASC
          LIMIT 1
          FOR UPDATE SKIP LOCKED`,

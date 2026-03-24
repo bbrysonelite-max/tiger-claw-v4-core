@@ -2,7 +2,7 @@ const { Client } = require('pg');
 
 async function main() {
   const client = new Client({
-    connectionString: "postgres://botcraft:TigerClaw2026MasterKey!@127.0.0.1:5432/tiger_claw_shared"
+    connectionString: process.env.DATABASE_URL ?? (() => { throw new Error("Set DATABASE_URL env var before running this script."); })()
   });
   await client.connect();
   const res = await client.query("SELECT bot_token, bot_username FROM bot_pool WHERE bot_username ILIKE '%johnhidebrand%'");
