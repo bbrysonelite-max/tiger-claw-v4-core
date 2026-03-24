@@ -40,9 +40,11 @@ All three are loaded in `Promise.all()` and fail silently — DB unreachable = s
 
 **Memory phases:**
 - [x] Phase 1: Dynamic prompt enrichment (ICP + hive + pipeline) — shipped
-- [ ] Phase 2: Sawtooth context compression (`chat_memory`)
-- [ ] Phase 3: Fact anchor extraction (`tenant_states.fact_anchors`)
-- [ ] Phase 4: `startFocus` / `completeFocus` primitives
+- [x] Phase 2: Sawtooth context compression (`chat_memory`) — shipped
+- [x] Phase 3: Fact anchor extraction (`tenant_states.fact_anchors`) — shipped
+- [x] Phase 4: `startFocus` / `completeFocus` primitives — shipped (PR #23)
 
 ## FINAL REMINDER
 Everything you need is in `ARCHITECTURE.md`, `specs/`, and `Rules.md`. Trust the GitHub spec, not your LLM memory.
+
+**`CLAUDE.md` contains the non-negotiable product philosophy and engineering constraints. Read it before writing any code.**
