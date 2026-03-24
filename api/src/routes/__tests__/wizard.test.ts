@@ -214,7 +214,7 @@ describe('POST /wizard/validate-key — Layer 4 auto-resume', () => {
       .send({ botId: 'b1', keys: [{ provider: 'google', key: 'AIzaMyRealKey5678', model: 'gemini-2.0-flash' }] })
 
     expect(savedState).not.toBeNull()
-    const layer2Key = (savedState as Record<string, string>)['layer2Key']
+    const layer2Key = (savedState as unknown as Record<string, string>)['layer2Key']
     expect(layer2Key).toMatch(/^enc:/) // Must be encrypted, not plaintext
   })
 

@@ -160,7 +160,7 @@ describe('queue.ts workers', () => {
 
             // tenant-ok-1 and tenant-ok-2 still got their nurture checks
             const nurtureCalls = (routineQueue.add as ReturnType<typeof vi.fn>).mock.calls
-                .filter(([type]: [string]) => type === 'nurture_check');
+                .filter((call: any[]) => call[0] === 'nurture_check');
             expect(nurtureCalls.length).toBe(2); // only 2 of 3 tenants (bad one failed before add)
 
             vi.useRealTimers();
@@ -207,7 +207,7 @@ describe('queue.ts workers', () => {
 
             // No trial reminder should have been added
             const trialCalls = (routineQueue.add as ReturnType<typeof vi.fn>).mock.calls
-                .filter(([type]: [string]) => type === 'trial_reminder_24h');
+                .filter((call: any[]) => call[0] === 'trial_reminder_24h');
             expect(trialCalls.length).toBe(0);
 
             vi.useRealTimers();

@@ -147,7 +147,7 @@ describe('assignBotToken — cool-down enforcement', () => {
 
     // Verify the SELECT query contains the cool-down WHERE clause
     const selectCall = mockClient.query.mock.calls.find(
-      ([sql]: [string]) => typeof sql === 'string' && sql.includes('SELECT')
+      (call: any[]) => typeof call[0] === 'string' && (call[0] as string).includes('SELECT')
     )
     expect(selectCall).toBeDefined()
     const selectSql = selectCall![0] as string

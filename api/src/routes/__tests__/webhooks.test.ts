@@ -4,7 +4,7 @@
 //   - POST /webhooks/telegram/:tenantId  (status gating, queue enqueueing)
 //   - POST /webhooks/stripe              (missing config, bad sig, ignored events)
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import request from 'supertest';
 import express, { type Express } from 'express';
 
