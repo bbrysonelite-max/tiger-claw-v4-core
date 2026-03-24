@@ -3,7 +3,7 @@ require('dotenv').config();
 
 async function run() {
     // I am manually setting this to the good key for the local test so it doesn't hit 400 Expired
-    const key = "AIzaSyAq3KzzX1aE3wtjy39j6yDQ2e3dWcb-af0".trim();
+    const key = process.env.GOOGLE_API_KEY ?? (()=>{throw new Error("Set GOOGLE_API_KEY env var")})().trim();
     const ai = new GoogleGenerativeAI(key);
     
     try {
