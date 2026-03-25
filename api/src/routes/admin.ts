@@ -74,30 +74,37 @@ router.use(requireAdmin);
 // Reads TELEGRAM_WEBHOOK_SECRET from env and includes it in the setWebhook call.
 router.post("/fix-all-webhooks", async (req: Request, res: Response) => {
   try {
-    const tenants = await getPool().query(
-      "SELECT id, slug, bot_token FROM tenants WHERE status IN ('active', 'onboarding', 'suspended') AND bot_token IS NOT NULL"
-    );
-    
+    // V4 arch: bot tokens live in bot_pool (encrypted), not on the tenants table.
+    // JOIN bot_pool to get the encrypted token, then decrypt before calling Telegram.
+    const rows = await getPool().query(`
+      SELECT t.id, t.slug, bp.bot_token AS encrypted_token
+      FROM tenants t
+      INNER JOIN bot_pool bp ON bp.tenant_id = t.id AND bp.status = 'assigned'
+      WHERE t.status IN ('active', 'onboarding', 'suspended')
+    `);
+
+    const { decryptToken } = await import("../services/pool.js");
     const webhookSecret = process.env["TELEGRAM_WEBHOOK_SECRET"];
     const baseUrl = (process.env["TIGER_CLAW_API_URL"] ?? "https://api.tigerclaw.io").replace(/\/$/, "");
-    
-    console.log(`[fix-webhooks] Re-binding ${tenants.rows.length} tenants. Secret: ${webhookSecret ? "✅ wired" : "⚠️  missing"}`);
+
+    console.log(`[fix-webhooks] Re-binding ${rows.rows.length} tenants. Secret: ${webhookSecret ? "✅ wired" : "⚠️  missing"}`);
     const results: { slug: string; status: string; msg?: string }[] = [];
 
-    for (const row of tenants.rows) {
+    for (const row of rows.rows) {
       try {
+        const token = decryptToken(row.encrypted_token);
         const webhookUrl = `${baseUrl}/webhooks/telegram/${row.id}`;
-        
+
         const body: Record<string, string> = { url: webhookUrl };
         if (webhookSecret) body.secret_token = webhookSecret;
 
-        const tgResponse = await fetch(`https://api.telegram.org/bot${row.bot_token}/setWebhook`, {
+        const tgResponse = await fetch(`https://api.telegram.org/bot${token}/setWebhook`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
         });
         const tgData = await tgResponse.json() as { ok: boolean; description?: string };
-        
+
         if (tgData.ok) {
           results.push({ slug: row.slug, status: "fixed" });
         } else {
@@ -111,8 +118,8 @@ router.post("/fix-all-webhooks", async (req: Request, res: Response) => {
     return res.json({
       ok: true,
       secretWired: !!webhookSecret,
-      processed: tenants.rows.length,
-      results
+      processed: rows.rows.length,
+      results,
     });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
