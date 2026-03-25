@@ -27,7 +27,6 @@ import {
   listBotPool,
   getRecentAdminEvents,
   getPoolStats,
-  addTokenToPool,
   getPool,
   type Tenant,
 } from "../services/db.js";
@@ -47,7 +46,6 @@ import {
   retireBot,
   getPoolStatus,
   getBotPoolEntryByUsername,
-  encryptToken,
 } from "../services/pool.js";
 
 const router = Router();
@@ -758,54 +756,54 @@ router.get("/pool/health", async (_req: Request, res: Response) => {
   }
 });
 
-// POST /admin/pool/add — simple token insert (no Telegram validation)
-// Token is encrypted via AES-256-GCM before storage (Locked Decision #9).
+// POST /admin/pool/add — validated token import with waitlist sweep trigger.
+// Accepts { botToken, phoneAccount? } from the ops/botpool/create_bots.ts script.
+// Uses importToken() to validate via Telegram getMe, store real telegramBotId, and dedup correctly.
 router.post("/pool/add", async (req: Request, res: Response) => {
-  const { botToken, botUsername } = req.body as { botToken?: string; botUsername?: string };
-  if (!botToken || !botUsername) {
-    return res.status(400).json({ error: "botToken and botUsername are required." });
+  const { botToken, phoneAccount } = req.body as { botToken?: string; phoneAccount?: string };
+  if (!botToken) {
+    return res.status(400).json({ error: "botToken is required." });
   }
   try {
-    await addTokenToPool(encryptToken(botToken), botUsername);
-    
-    // Background waitlist sweeper trigger
+    const result = await importToken(botToken, phoneAccount);
+    if (!result.ok) {
+      // Duplicate = 409, invalid token = 422
+      const status = (result.error ?? "").includes("already in pool") ? 409 : 422;
+      return res.status(status).json(result);
+    }
+
+    // Background waitlist sweep: if a tenant was waitlisted due to empty pool,
+    // automatically try to provision them now that a bot is available.
     setImmediate(async () => {
-        try {
-            const { getPool: pg } = await import("../services/db.js");
-            const pool = pg();
-            const { rows } = await pool.query(
-                `SELECT id, slug, name, email, flavor, region, language, preferred_channel 
-                 FROM tenants WHERE status = 'waitlisted' 
-                 ORDER BY updated_at ASC LIMIT 1`
-            );
-            
-            if (rows.length > 0) {
-               console.log(`[admin] Sweep triggered: Found waitlisted tenant ${rows[0].id}. Enqueueing provision.`);
-               const { provisionQueue } = await import("../services/queue.js");
-               // Automatically try to provision them with the new bot!
-               await provisionQueue.add("tenant-provisioning", {
-                   botId: rows[0].id,
-                   slug: rows[0].slug,
-                   name: rows[0].name,
-                   email: rows[0].email,
-                   flavor: rows[0].flavor,
-                   region: rows[0].region,
-                   language: rows[0].language,
-                   preferredChannel: rows[0].preferred_channel || "telegram"
-               }, { attempts: 3, backoff: { type: 'exponential', delay: 5000 } });
-            }
-        } catch (sweepErr) {
-            console.error("[admin] Background sweep error:", sweepErr);
+      try {
+        const pool = getPool();
+        const { rows } = await pool.query(
+          `SELECT id, slug, name, email, flavor, region, language, preferred_channel
+           FROM tenants WHERE status = 'waitlisted'
+           ORDER BY updated_at ASC LIMIT 1`
+        );
+        if (rows.length > 0) {
+          console.log(`[admin] Waitlist sweep: found tenant ${rows[0].id} (${rows[0].slug}). Enqueuing provision.`);
+          const { provisionQueue } = await import("../services/queue.js");
+          await provisionQueue.add("tenant-provisioning", {
+            botId: rows[0].id,
+            slug: rows[0].slug,
+            name: rows[0].name,
+            email: rows[0].email,
+            flavor: rows[0].flavor,
+            region: rows[0].region,
+            language: rows[0].language,
+            preferredChannel: rows[0].preferred_channel || "telegram",
+          }, { attempts: 3, backoff: { type: "exponential", delay: 5000 } });
         }
+      } catch (sweepErr) {
+        console.error("[admin] Waitlist sweep error:", sweepErr);
+      }
     });
 
-    return res.json({ ok: true, botUsername });
+    return res.json({ ok: true, username: result.username, telegramBotId: result.telegramBotId });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    if (msg.includes("unique") || msg.includes("duplicate")) {
-      return res.status(409).json({ error: `Bot @${botUsername} already in pool.` });
-    }
-    return res.status(500).json({ error: msg });
+    return res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
   }
 });
 
