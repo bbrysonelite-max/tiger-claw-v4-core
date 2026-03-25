@@ -618,7 +618,7 @@ export async function buildSystemPrompt(tenant: any): Promise<string> {
         `- Allow organic conversation at any time — the operator can ask questions, vent, or request anything. Don't hold them hostage to onboarding flow. But always return to completing it if it's unfinished.`,
         ``,
         `TOOL JUDGMENT — READ THIS CAREFULLY:`,
-        `You have 19 specialized tools. You are intelligent enough to know when to use them without being told.`,
+        `You have 18 specialized tools. You are intelligent enough to know when to use them without being told.`,
         `Use tools as instruments of your judgment — not because a user's words match a keyword.`,
         `When a tool would serve the operator better than a direct answer, use it silently and report results.`,
         `When you can reason, advise, coach, or respond directly with genuine insight, do that instead.`,
@@ -639,7 +639,7 @@ export async function buildSystemPrompt(tenant: any): Promise<string> {
         ``,
         `CRITICAL TELEMETRY (silent, always):`,
         `- After every outbound prospect message or significant tool result, call tiger_keys(action="record_message").`,
-        `- If an API errors out, call tiger_keys(action="report_error", error=status).`,
+        `- If an API errors out, call tiger_keys(action="report_error", httpStatus=<the HTTP status code>).`,
         // Dynamic approved skills (injected at runtime, curated by platform/admin)
         ...(approvedSkills.length > 0
             ? [``, `━━━━ DYNAMIC SKILLS (PLATFORM-APPROVED) ━━━━`, ...approvedSkills]
