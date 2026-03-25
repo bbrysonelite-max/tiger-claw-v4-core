@@ -22,7 +22,7 @@
         "scarcity_takeaway": "Hi {{name}},\n\nI'll be direct — {{tenantName}} pours in small batches so quality stays high. Our next pour is almost fully allocated.\n\nIf you want in on this batch, let me know. If you're just window shopping, I completely respect that and will let you browse in peace!\n\n— {{botName}}",
         "pattern_interrupt": "Hi {{name}},\n\nBefore I stop following up, consider this.\n\nYour environment dictates your mood. A cheap candle smells like a cheap candle. A beautifully crafted scent elevates an entire room.\n\nIf you're ready to actually elevate your space, simply reply \"Let's ship it.\"\n\n— {{botName}}",
         "final_takeaway": "Hi {{name}},\n\nThis is my final message. I'm taking you off our active outreach list.\n\n{{tenantName}} is back in the studio pouring! If you ever need artisan goods, our site is always open.\n\n— {{botName}}",
-        "slow_drip_value": "Hi {{name}},\n\nChecking in — just passing along some studio news.\n\nWe just dropped a new collection focused on {{differentiator}}. \n\nHope your space is smelling amazing!\n\n— {{botName}}",
+        "slow_drip_value": "Hi {{name}},\n\nChecking in — just passing along some studio news.\n\nWe just dropped a new collection focused on {{differentiator}}.\n\nHope your space is smelling amazing!\n\n— {{botName}}",
         "default_fallback": "Hi {{name}}, just checking in. — {{botName}}"
     }
 }

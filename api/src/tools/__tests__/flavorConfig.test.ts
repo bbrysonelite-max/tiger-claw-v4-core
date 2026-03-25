@@ -13,8 +13,8 @@ import {
 // ─── VALID_FLAVOR_KEYS ────────────────────────────────────────────────────────
 
 describe('VALID_FLAVOR_KEYS', () => {
-  it('contains exactly 11 customer-facing flavors', () => {
-    expect(VALID_FLAVOR_KEYS).toHaveLength(11);
+  it('contains exactly 10 customer-facing flavors', () => {
+    expect(VALID_FLAVOR_KEYS).toHaveLength(10);
   });
 
   it('does not include admin (internal-only, never provisioned)', () => {
@@ -29,7 +29,11 @@ describe('VALID_FLAVOR_KEYS', () => {
     expect(VALID_FLAVOR_KEYS).not.toContain('intelligence-specialist');
   });
 
-  it('includes all 11 expected valid flavor keys', () => {
+  it('does not include removed flavor: doctor (healthcare compliance risk)', () => {
+    expect(VALID_FLAVOR_KEYS).not.toContain('doctor');
+  });
+
+  it('includes all 10 expected valid flavor keys', () => {
     const expected = [
       'network-marketer',
       'real-estate',
@@ -37,7 +41,6 @@ describe('VALID_FLAVOR_KEYS', () => {
       'airbnb-host',
       'baker',
       'candle-maker',
-      'doctor',
       'gig-economy',
       'lawyer',
       'plumber',
@@ -52,15 +55,15 @@ describe('VALID_FLAVOR_KEYS', () => {
 // ─── validateAllFlavors ───────────────────────────────────────────────────────
 
 describe('validateAllFlavors', () => {
-  it('returns valid:true — all 11 flavor JSON files are present', () => {
+  it('returns valid:true — all 10 flavor JSON files are present', () => {
     const result = validateAllFlavors();
     expect(result.valid).toBe(true);
     expect(result.missing).toHaveLength(0);
   });
 
-  it('reports 11 loaded flavors', () => {
+  it('reports 10 loaded flavors', () => {
     const result = validateAllFlavors();
-    expect(result.loaded).toHaveLength(11);
+    expect(result.loaded).toHaveLength(10);
   });
 
   it('loaded list contains every key in VALID_FLAVOR_KEYS', () => {
@@ -101,9 +104,9 @@ describe('loadFlavorConfig', () => {
 // ─── listFlavors ──────────────────────────────────────────────────────────────
 
 describe('listFlavors', () => {
-  it('returns all 11 valid flavor IDs', () => {
+  it('returns all 10 valid flavor IDs', () => {
     const flavors = listFlavors();
-    expect(flavors).toHaveLength(11);
+    expect(flavors).toHaveLength(10);
   });
 
   it('includes network-marketer', () => {

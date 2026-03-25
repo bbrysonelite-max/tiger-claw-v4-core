@@ -306,7 +306,7 @@ describe('provisionTenant — flavor validation', () => {
 
   it.each([
     'network-marketer', 'real-estate', 'health-wellness', 'airbnb-host',
-    'baker', 'candle-maker', 'doctor', 'gig-economy', 'lawyer', 'plumber', 'sales-tiger',
+    'baker', 'candle-maker', 'gig-economy', 'lawyer', 'plumber', 'sales-tiger',
   ])('accepts valid flavor key: %s', async (flavor) => {
     // Set up minimal mocks so the flow doesn't crash past the guard
     mockGetPoolStats.mockResolvedValue({ total: 10, assigned: 0, unassigned: 10 });

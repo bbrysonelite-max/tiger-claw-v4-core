@@ -22,7 +22,7 @@
         "scarcity_takeaway": "Hey {{name}},\n\nThe schedule is filling up fast this week and {{tenantName}}'s trucks are almost fully dispatched.\n\nI have a slot I can hold for you, but if you don't need us right now, I need to open it up for emergency calls.\n\nLet me know either way!\n\n— {{botName}}",
         "pattern_interrupt": "Hey {{name}},\n\nBefore I pull your ticket out of the queue, remember this.\n\nWater damage is undefeated. A $200 fix today can turn into a $5,000 mold remediation next month if it's ignored.\n\nIf you want peace of mind instead of crossing your fingers, hit reply and say \"Send the truck.\"\n\n— {{botName}}",
         "final_takeaway": "Hey {{name}},\n\nThis is my last message regarding your service request. I'm closing the ticket.\n\n{{tenantName}}'s crew is out in the field. If you have an emergency later, keep our number handy.\n\nTake care!\n\n— {{botName}}",
-        "slow_drip_value": "Hey {{name}},\n\nChecking in! Highlighting a quick home maintenance tip.\n\n{{tenantName}} has been advising everyone about {{differentiator}}. Definitely something to keep an eye on as the seasons change.\n\nStay dry!\n\n— {{botName}}",
+        "slow_drip_value": "Hey {{name}},\n\nChecking in! Highlighting a quick home maintenance tip.\n\n{{tenantName}} has been advising homeowners about {{differentiator}} — worth keeping in mind as the seasons change.\n\nStay dry!\n\n— {{botName}}",
         "default_fallback": "Hey {{name}}, just checking in. — {{botName}}"
     }
 }
