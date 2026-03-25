@@ -1,6 +1,6 @@
 # STATE OF TIGER CLAW — HARD CONTEXT LOCK
-**Timestamp:** 2026-03-24
-**Infrastructure Status:** LIVE. 383/383 tests green. Memory Architecture V4.1 fully merged. Value-gap cron shipped (PR #26 pending merge).
+**Timestamp:** 2026-03-25
+**Infrastructure Status:** LIVE. 383/383 tests green. All cleanup PRs merged (#26 value-gap cron, #27 tiger_knowledge removal, #28 tiger_keys simplification).
 
 ---
 
@@ -12,7 +12,7 @@ This is the single source of truth for the Tiger Claw repository.
 2. **NO OPENCLAW.** No per-tenant Docker containers. OpenClaw is dead.
 3. **NO CANARIES.** The canary group concept is deprecated. All tenants are treated equally until scale justifies it.
 4. **NO FREE TRIAL.** The free trial model is dead. Card is charged at checkout via Stan Store. 7-day money-back guarantee, no questions asked. `trialExpired` code paths have been removed. Do not restore them.
-5. **ARCHITECTURE:** Stateless Google Cloud Run API, Gemini 2.0 Flash (locked — 2.5 Flash has a GCP function-calling bug), 19 Native Function Calling Tools (`api/src/tools/`), shared PostgreSQL.
+5. **ARCHITECTURE:** Stateless Google Cloud Run API, Gemini 2.0 Flash (locked — 2.5 Flash has a GCP function-calling bug), 18 Native Function Calling Tools (`api/src/tools/`), shared PostgreSQL.
 6. **NO REWRITES:** The 18 core tools compile cleanly and are backed by 383 passing tests. Do not rewrite architecture.
 7. **PROTOCOL:** Read `CLAUDE.md` before writing any code.
 
@@ -23,7 +23,7 @@ This is the single source of truth for the Tiger Claw repository.
 - NEVER push directly to main. main is branch-protected.
 - ALL work goes on a feature branch: `feat/`, `fix/`, `chore/`
 - When work is complete and tests pass: open a PR.
-- **PR #26** (`feat/value-gap-cron`) is currently open. Merge it next.
+- All PRs through #28 are merged to main. Next: flavor file quality review.
 
 **Deploy sequence:**
 ```bash
@@ -38,7 +38,7 @@ Deployments to Cloud Run are handled by GitHub Actions on merge to main. Do not 
 
 ---
 
-## Current State (2026-03-24)
+## Current State (2026-03-25)
 
 ### Architecture
 - **API:** Cloud Run, Node.js/Express, port 4000, `https://api.tigerclaw.io`
@@ -66,31 +66,25 @@ Deployments to Cloud Run are handled by GitHub Actions on merge to main. Do not 
 - Key auto-detection on paste: `AIza→google`, `sk-ant-→anthropic`, `xai-→grok`, `sk-or-→openrouter`, `sk-→openai`.
 - Server validates each key on INSTALL click before saving. Fail-fast, not fail-silent.
 
-### Recent Work Completed (This Session)
+### Recent Work Completed
 - **Business model pivot:** Removed free trial entirely. Card upfront. 7-day MBG. `trialExpired` code path and Layer 4 auto-resume dead and removed from all wizard components.
-- **Key strategy rewrite:** 4-layer system → Primary + Backup. Restored all 6 providers. Auto-detect from prefix. Server validation on INSTALL. Hand-holding wizard UX.
+- **Key strategy rewrite:** 4-layer system → Primary + Backup. All 6 providers. Auto-detect from prefix. Server validation on INSTALL. Hand-holding wizard UX.
 - **Memory Architecture V4.1 (PRs #20–#24, all merged):**
   - PR #20: Phase 1 — `buildSystemPrompt()` async, ICP + hive + pipeline injection
   - PR #21: Phase 2 — Sawtooth context compression (`chat_memory` Redis key)
   - PR #22: Phase 3 — Fact anchor extraction (async BullMQ → `tenant_states.fact_anchors`)
   - PR #23: Phase 4 — `startFocus` / `completeFocus` / `incrementFocusToolCalls`
   - PR #24: CLAUDE.md product philosophy + doc rewrites
-- **Value-gap detection cron (PR #26 — pending merge):**
-  - 9 AM UTC daily check: active tenant with zero leads in 3 days triggers `value_gap_checkin` job
-  - Dedup via `value_gap_{tenantId}_{YYYY-MM-DD}` jobId
-  - Fires plain-language diagnostic message to operator via their bot
-  - 3-day window (per CLAUDE.md mandate, tightened from initial 7-day spec)
+- **Value-gap detection cron (PR #26, merged):** 9 AM UTC daily — active tenant with zero leads in 3 days triggers `value_gap_checkin` diagnostic message. Dedup by date. 3-day window per CLAUDE.md mandate.
+- **`tiger_knowledge` removed (PR #27, merged):** Dead tool that called Mini-RAG (defunct). Context now injected via `buildSystemPrompt()`.
+- **`tiger_keys` simplified (PR #28, merged):** 4-layer → Primary + Backup. Removed Layer 1 (Platform Onboarding) and Layer 4 (Emergency) entirely. `detectProvider()` now covers all 6 providers. Net: -261 lines.
 - **Website + OG tags:** `tigerclaw.io` updated — OG/Twitter Card meta tags, Tiger Claw Agent claw OG image (1200×675), 7-day MBG banner, corrected Stan Store links.
 
 ### Open Issues
 
-1. **PR #26 — merge when ready.** `feat/value-gap-cron`. 383/383 tests green.
+1. **Agent flavor file quality review.** The 13 flavor files and core system constitution have not been line-reviewed for launch quality. Network Marketer flavor is highest priority. Start here next.
 
-2. **`tiger_keys` tool uses old 4-layer naming.** Layer 1/4 "platform key" concept is dead. Tool should reflect Primary + Backup model. (See open issue 3 below — consolidating)
-
-3. **Agent flavor file quality review.** The 13 flavor files and core system constitution have not been line-reviewed. Network Marketer flavor is highest priority before launch.
-
-4. **Mac cluster Reflexion Loop tooling.** Offline batch job for `fact_anchors` / `chat_memory` analysis not yet built. Not a production blocker.
+2. **Mac cluster Reflexion Loop tooling.** Offline batch job for `fact_anchors` / `chat_memory` analysis not yet built. Not a production blocker.
 
 
 ---

@@ -30,10 +30,12 @@ Stop what you are doing. Read this entire document and `CLAUDE.md`. These are yo
 3. **Business Model: Card Upfront** — No free trial. Card charged at checkout via Stan Store. 7-day money-back guarantee, no questions asked. The `trialExpired` code path is dead and removed.
 4. **Key Strategy: Primary + Backup, 6 Providers** — Wizard supports all 6 AI providers (Google, OpenAI, Anthropic, Grok, OpenRouter, Kimi). Auto-detects provider from key prefix on paste. Server validates on INSTALL. Layer 4 "platform emergency" key concept is dead.
 5. **Memory Architecture V4.1 (All 4 Phases)** — `buildSystemPrompt()` is async. Injects ICP, hive signals, pipeline stats, and fact anchors on every request. Sawtooth compression, fact anchor extraction, and focus primitives all shipped (PRs #20–#24, all merged to main).
-6. **Value-Gap Detection Cron** — Every day at 9 AM UTC, the heartbeat checks each active tenant for leads in the past **3 days**. If none, fires a `value_gap_checkin` diagnostic message to the operator. Required by CLAUDE.md. (PR #26 — pending merge)
-7. **Integrity First Product Philosophy** — Baked into `CLAUDE.md`. Non-negotiable for all future code.
-8. **Website + OG Tags** — `tigerclaw.io` updated with correct product naming, Stan Store links, 7-day MBG banner, and full OG/Twitter Card meta tags. `og-image.jpg` deployed (Tiger Claw Agent claw graphic, 1200×675).
-9. **Hive Intelligence (V4 Analytics)** — Universal Prior, Founding Member Program, ICP signal mapping. Migrations 005a-009.
+6. **Value-Gap Detection Cron** — Every day at 9 AM UTC, the heartbeat checks each active tenant for leads in the past **3 days**. If none, fires a `value_gap_checkin` diagnostic message to the operator. Required by CLAUDE.md. Merged PR #26.
+7. **Dead Tool Removal** — `tiger_knowledge` (Mini-RAG, defunct) removed. Merged PR #27.
+8. **`tiger_keys` Simplified** — 4-layer system (Layers 1+4 were platform-owned, now dead) replaced with Primary + Backup. `detectProvider()` covers all 6 providers. Merged PR #28.
+9. **Integrity First Product Philosophy** — Baked into `CLAUDE.md`. Non-negotiable for all future code.
+10. **Website + OG Tags** — `tigerclaw.io` updated with correct product naming, Stan Store links, 7-day MBG banner, and full OG/Twitter Card meta tags. `og-image.jpg` deployed (Tiger Claw Agent claw graphic, 1200×675).
+11. **Hive Intelligence (V4 Analytics)** — Universal Prior, Founding Member Program, ICP signal mapping. Migrations 005a-009.
 
 ---
 
@@ -80,9 +82,8 @@ All loaded in `Promise.all()` — DB unreachable = static prompt, no crash.
 
 ## 5. Open Issues (Priority Order)
 
-1. **`tiger_keys` still uses old 4-layer naming.** Code should reflect Primary + Backup model. Layer 1/4 "platform key" concepts are dead — remove from tool and documentation.
-2. **Agent flavor file quality review** — The 13 flavor files and core constitution have not been line-reviewed for launch quality. Network Marketer flavor is the highest priority.
-3. **Mac cluster Reflexion Loop tooling** — Offline batch job for `fact_anchors` / `chat_memory` analysis not built yet. Not a production blocker.
+1. **Agent flavor file quality review** — The 13 flavor files and core constitution have not been line-reviewed for launch quality. Network Marketer is the highest priority flavor. Start here next.
+2. **Mac cluster Reflexion Loop tooling** — Offline batch job for `fact_anchors` / `chat_memory` analysis not built yet. Not a production blocker.
 
 ---
 
