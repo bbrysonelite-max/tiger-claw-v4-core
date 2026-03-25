@@ -467,6 +467,38 @@ export const cronWorker = SHOULD_RUN_WORKERS ? new Worker(
             }
 
             console.log(`[Cron] Enqueued routine checks for ${tenants.length} active tenants (hour: ${nowHour} UTC).`);
+
+            // ── Platform key health check — 8 AM UTC daily ────────────────────
+            // Validates that PLATFORM_ONBOARDING_KEY is live. This is the key
+            // used as the fallback for all tenants who have not yet added their own key.
+            // If it expires silently, every new signup gets a broken bot.
+            if (nowHour === 8) {
+                try {
+                    const platformKey = process.env.PLATFORM_ONBOARDING_KEY ?? process.env.GOOGLE_API_KEY;
+                    if (!platformKey) {
+                        console.error('[Cron] [ALERT] PLATFORM_ONBOARDING_KEY is not set!');
+                        await sendAdminAlert(
+                            '🚨 PLATFORM KEY MISSING\n' +
+                            'PLATFORM_ONBOARDING_KEY env var is not set.\n' +
+                            'All tenant fallback traffic will fail. Set it in GCP Secret Manager immediately.'
+                        );
+                    } else {
+                        const { GoogleGenerativeAI } = await import('@google/generative-ai');
+                        const genAI = new GoogleGenerativeAI(platformKey);
+                        const healthModel = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+                        await healthModel.generateContent('ping');
+                        console.log('[Cron] Platform key health check passed.');
+                    }
+                } catch (keyErr: any) {
+                    console.error('[Cron] [ALERT] Platform key health check FAILED:', keyErr.message);
+                    await sendAdminAlert(
+                        '🚨 PLATFORM KEY HEALTH CHECK FAILED\n' +
+                        'The platform onboarding key is expired or invalid.\n' +
+                        `Error: ${keyErr.message}\n` +
+                        'Action: renew the key in GCP Secret Manager and update the PLATFORM_ONBOARDING_KEY secret version.'
+                    ).catch(() => {});
+                }
+            }
         } catch (err) {
             console.error(`[Cron] Heartbeat check failed:`, err);
             throw err;

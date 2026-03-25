@@ -270,7 +270,7 @@ function defaultModel(provider: 'google' | 'openai'): string {
  *   3. Platform fallback (Google)
  */
 export async function resolveAIProvider(tenantId: string): Promise<AIProvider | undefined> {
-    // Step 1 — key_state.json (Google platform keys, 4-layer system)
+    // Step 1 — key_state.json (Primary = layer2Key, Backup = layer3Key)
     try {
         const state = await getBotState<any>(tenantId, 'key_state.json');
         if (state) {
@@ -278,13 +278,13 @@ export async function resolveAIProvider(tenantId: string): Promise<AIProvider | 
                 console.warn(`[AI] [ALERT] Tenant ${tenantId} is paused. No key issued.`);
                 return undefined;
             }
-            const activeLayer: number = state.activeLayer ?? 1;
+            const activeLayer: number = state.activeLayer ?? 2;
             let rawKey: string | undefined;
             switch (activeLayer) {
-                case 1: rawKey = process.env.PLATFORM_ONBOARDING_KEY ?? process.env.GOOGLE_API_KEY; break;
                 case 2: rawKey = state.layer2Key ? decryptToken(state.layer2Key) : undefined; break;
                 case 3: rawKey = state.layer3Key ? decryptToken(state.layer3Key) : undefined; break;
-                case 4: rawKey = process.env.PLATFORM_EMERGENCY_KEY ?? process.env.GOOGLE_API_KEY; break;
+                default:
+                    console.warn(`[AI] Tenant ${tenantId} has unknown activeLayer=${activeLayer} — falling through to DB lookup.`);
             }
             if (rawKey) {
                 const provider = detectProvider(rawKey) ?? 'google';
@@ -314,9 +314,11 @@ export async function resolveAIProvider(tenantId: string): Promise<AIProvider | 
         console.error(`[AI] [ALERT] resolveAIProvider DB lookup failed for ${tenantId}:`, err.message);
     }
 
-    // Step 3 — Platform fallback
+    // Step 3 — Platform fallback key
     const fallbackKey = process.env.PLATFORM_ONBOARDING_KEY ?? process.env.GOOGLE_API_KEY;
     if (fallbackKey) return { key: fallbackKey, provider: 'google', model: 'gemini-2.0-flash' };
+
+    console.error(`[AI] [ALERT] resolveAIProvider: no key found for tenant ${tenantId} — all resolution paths exhausted.`);
     return undefined;
 }
 
@@ -828,12 +830,28 @@ export async function processTelegramMessage(
         }
     } catch (err: any) {
         console.error(`[AI] [ALERT] processTelegramMessage failed for tenant ${tenantId}:`, err.message);
-        // Do not expose internal error details to the customer
-        await bot.sendMessage(
-            chatId,
-            '❌ Something went wrong. The operator has been notified. Please try again in a moment.',
-        );
+        const wizardUrl = process.env['FRONTEND_URL'] ?? 'https://wizard.tigerclaw.io';
+        const errorType = classifyAIError(err);
+        const userMsg =
+            errorType === 'key'     ? `⚠️ Your AI key appears to be expired or invalid. Please update it at ${wizardUrl}.`
+            : errorType === 'rate'  ? '⏳ The AI is temporarily at capacity. Please try again in a moment.'
+            : errorType === 'network' ? '🔌 Connection issue. Please try again in a moment.'
+            : '❌ Something went wrong. The operator has been notified. Please try again in a moment.';
+        await bot.sendMessage(chatId, userMsg);
     }
+}
+
+// ─── Error classification ─────────────────────────────────────────────────────
+/**
+ * Classifies an AI API error into a user-facing category.
+ * Used to send differentiated, actionable error messages instead of a generic "something went wrong".
+ */
+function classifyAIError(err: any): 'key' | 'rate' | 'network' | 'general' {
+    const msg = (err?.message ?? String(err)).toLowerCase();
+    if (/401|403|api.?key.?invalid|invalid.?key|authentication|permission.?denied|api_key/i.test(msg)) return 'key';
+    if (/429|quota|rate.?limit|resource.*exhausted|too many requests/i.test(msg)) return 'rate';
+    if (/econnreset|etimedout|fetch.*failed|network|timeout|socket hang up/i.test(msg)) return 'network';
+    return 'general';
 }
 
 // ─── Public: process a background system routine ──────────────────────────────
@@ -1171,6 +1189,13 @@ export async function processLINEMessage(
         }
     } catch (err: any) {
         console.error(`[AI] [ALERT] processLINEMessage failed for tenant ${tenantId}:`, err.message);
-        await sendLineMessage('❌ Something went wrong. The operator has been notified. Please try again in a moment.');
+        const wizardUrl = process.env['FRONTEND_URL'] ?? 'https://wizard.tigerclaw.io';
+        const errorType = classifyAIError(err);
+        const userMsg =
+            errorType === 'key'     ? `⚠️ Your AI key appears to be expired or invalid. Please update it at ${wizardUrl}.`
+            : errorType === 'rate'  ? '⏳ The AI is temporarily at capacity. Please try again in a moment.'
+            : errorType === 'network' ? '🔌 Connection issue. Please try again in a moment.'
+            : '❌ Something went wrong. The operator has been notified. Please try again in a moment.';
+        await sendLineMessage(userMsg);
     }
 }
