@@ -87,8 +87,16 @@ All loaded in `Promise.all()` — DB unreachable = static prompt, no crash.
 
 ## 5. Open Issues (Priority Order)
 
-1. **PR #30 — flavor cleanup pending merge.** Drop doctor, tighten language. 382/382 tests green.
-2. **Mac cluster Reflexion Loop tooling** — Offline batch job for `fact_anchors` / `chat_memory` analysis not built yet. Not a production blocker.
+1. **PRs #33–#36** — open, all green, awaiting merge. See `STATE_OF_TIGER_CLAW.md` for full list.
+2. **Mac cluster Reflexion Loop tooling** — offline batch for `fact_anchors`/`chat_memory`. Not a production blocker.
+
+## 6. What Was Validated This Session (2026-03-26)
+
+- LINE integration proven end-to-end: webhook → BullMQ → processLINEMessage → onboarding → Hive injection
+- Platform key expired silently — discovered, renewed, health check added to cron (PR #33)
+- Botpool ingestion pipeline audited: `addTokenToPool` stored username as telegramBotId — fixed (PR #34)
+- `/admin/demo` had no `requireAdmin` middleware — unprotected free bot provisioner — deleted (PR #35)
+- Comprehensive codebase audit complete; all customer-facing gotchas addressed
 
 ---
 
