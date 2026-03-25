@@ -15,6 +15,7 @@ Stop what you are doing. Read this entire document and `CLAUDE.md`. These are yo
 - **AI Engine:** Gemini 2.0 Flash (LOCKED — `gemini-2.5-flash` has a GCP function-calling bug, do not use it)
 - **Tests:** 382/382 passing
 - **Flavors:** 10 customer-facing industry flavors (doctor was removed — healthcare compliance risk)
+- **Min-instances:** 1 — no cold start
 
 **Strict Rule 1:** OpenClaw, Mini-RAG, and per-tenant Docker containers are DEAD. Their folders have been physically eradicated. Do not reference or restore them.
 
@@ -34,10 +35,11 @@ Stop what you are doing. Read this entire document and `CLAUDE.md`. These are yo
 6. **Value-Gap Detection Cron** — 9 AM UTC daily: active tenant with zero leads in 3 days fires a diagnostic message to the operator. Per CLAUDE.md mandate. Merged PR #26.
 7. **Dead Code Removal** — `tiger_knowledge` (dead Mini-RAG tool) removed PR #27. `tiger_keys` simplified from 4-layer to Primary+Backup PR #28.
 8. **System Prompt Fixes** — Tool count corrected (18), `tiger_keys` telemetry parameter fixed (`httpStatus` not `error`). Merged PR #29.
-9. **Flavor File Review & Cleanup — COMPLETE** — All 10 remaining flavors reviewed. Doctor dropped (compliance risk). Loose language tightened across real-estate, health-wellness, plumber, lawyer, gig-economy, candle-maker, baker. PR #30 (pending merge).
+9. **Flavor File Review & Cleanup — COMPLETE** — All 10 remaining flavors reviewed. Doctor dropped (compliance risk). Language tightened. PR #30 merged.
 10. **Integrity First Product Philosophy** — Baked into `CLAUDE.md`. Non-negotiable for all future code.
-11. **Website + OG Tags** — `tigerclaw.io` updated with product naming, Stan Store links, 7-day MBG banner, OG/Twitter Card meta tags, claw graphic (1200×675). Flavor count updated to 10.
+11. **Website + OG Tags** — `tigerclaw.io` updated with product naming, Stan Store links, 7-day MBG banner, OG/Twitter Card meta tags.
 12. **Hive Intelligence (V4 Analytics)** — Universal Prior, Founding Member Program, ICP signal mapping. Migrations 005a-009.
+13. **PRs #30–#39 all merged.** Admin dashboard live. Vercel build fixed.
 
 ---
 
@@ -68,7 +70,7 @@ All loaded in `Promise.all()` — DB unreachable = static prompt, no crash.
 
 ---
 
-## 4. Product (as of 2026-03-25)
+## 4. Product (as of 2026-03-26)
 
 | Product | Price | Stan Store URL |
 |---|---|---|
@@ -85,19 +87,55 @@ All loaded in `Promise.all()` — DB unreachable = static prompt, no crash.
 
 ---
 
-## 5. Open Issues (Priority Order)
+## 5. Tenant Roster
 
-1. **PRs #30–#36 all merged.** Repo is clean. See `STATE_OF_TIGER_CLAW.md` for full history.
-2. **Two P1 items before Zoom call (2026-03-27):** See `LAUNCH_READINESS.md` — feedback loop dead routes + Cloud Run min-instances.
-3. **Mac cluster Reflexion Loop tooling** — offline batch for `fact_anchors`/`chat_memory`. Sprint 2.
+| Slug | Status | Notes |
+|---|---|---|
+| `debbie-cameron` | onboarding | Paying customer (2 months). Provisioned 2026-03-26. Bot: @tiger10000000003_bot. Send magic link: `https://wizard.tigerclaw.io/wizard?email=justagreatdirector@outlook.com` |
+| `john-thailand` | onboarding | Fresh provision 2026-03-24. Bot: @tc_62g6al77_bot |
+| `john-noon` | suspended | Webhook conflict tombstone. Superseded by john-thailand. Recycle token when convenient. |
 
-## 6. What Was Validated This Session (2026-03-26)
+---
 
-- LINE integration proven end-to-end: webhook → BullMQ → processLINEMessage → onboarding → Hive injection
-- Platform key expired silently — discovered, renewed, health check added to cron (PR #33)
-- Botpool ingestion pipeline audited: `addTokenToPool` stored username as telegramBotId — fixed (PR #34)
-- `/admin/demo` had no `requireAdmin` middleware — unprotected free bot provisioner — deleted (PR #35)
-- Comprehensive codebase audit complete; all customer-facing gotchas addressed
+## 6. Beta Hardening — Work in Progress (2026-03-26 session)
+
+**Next session must complete these in order:**
+
+### SECURITY — Do First
+1. **Rotate ADMIN_TOKEN** — current value `s3825` is 5 chars, not random. Must be replaced.
+   - Generate: `openssl rand -hex 32`
+   - Update GCP: `gcloud secrets versions add tiger-claw-admin-token --data-file=- --project=hybrid-matrix-472500-k5`
+   - Redeploy: `gcloud run deploy tiger-claw-api --region=us-central1` (or trigger via GitHub Actions)
+   - Update local `.env` to match
+
+2. **Add Telegram webhook secret token validation** — No signature check on incoming Telegram webhooks. Anyone who knows the URL can spam it.
+   - Telegram supports `secret_token` param on `setWebhook` and sends `X-Telegram-Bot-Api-Secret-Token` header
+   - Store per-bot secret in encrypted bot pool or as a global env var
+   - Validate in `webhooks.ts` Telegram handler
+
+### DEAD CODE — Do Second
+3. **Delete `resolveGoogleKey`** in `api/src/services/ai.ts` — old 4-layer resolver, never called by any message path. Delete function + its test block.
+
+4. **Delete `StepPlanSelection`** component — `web-onboarding/src/components/wizard/StepPlanSelection.tsx` — not imported anywhere, has dead "demo" plan. Delete the file.
+
+5. **Clean dead trial code** in `api/src/routes/webhooks.ts` — `isTrialConversion` logic is dead. Remove it. Lines ~162-225.
+
+### ADMIN_TOKEN NOTE
+- GCP secret name: `tiger-claw-admin-token`
+- API URL: `https://tiger-claw-api-1059104880024.us-central1.run.app`
+- Auth header: `Authorization: Bearer <token>`
+
+---
+
+## 7. What Was Validated This Session (2026-03-26)
+
+- LINE integration proven end-to-end
+- Platform key expiry incident discovered, resolved, health check added
+- Botpool ingestion pipeline fully audited and corrected
+- `/admin/demo` security hole deleted
+- Admin fleet dashboard shipped (PR #36), Vercel build bug fixed (PR #39)
+- Both P1 items confirmed resolved: feedback loop handlers exist, min-instances=1
+- Debbie Cameron provisioned manually — first paying customer with a live bot
 
 ---
 
@@ -105,6 +143,6 @@ All loaded in `Promise.all()` — DB unreachable = static prompt, no crash.
 
 `CLAUDE.md` contains the non-negotiable product philosophy and engineering constraints. Read it before writing any code.
 
-**Next session:** Read `LAUNCH_READINESS.md` first. It has the go/no-go verdict, the 10 known weaknesses, the pre-launch checklist, and sprint 2 priorities. That is the single source of truth for what happens before and after the 2026-03-27 Zoom call.
+**Zoom call:** Thursday 2026-03-27, 7 PM Pacific. Platform is GO. See `LAUNCH_READINESS.md` for smoke test sequence.
 
 Everything else you need is in `ARCHITECTURE.md`, `STATE_OF_TIGER_CLAW.md`, `specs/`, and `docs/`. Trust the repo, not your base-model memory.
