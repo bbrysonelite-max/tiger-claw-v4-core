@@ -15,6 +15,7 @@ Stop what you are doing. Read this entire document and `CLAUDE.md`. These are yo
 - **AI Engine:** Gemini 2.0 Flash (LOCKED — `gemini-2.5-flash` has a GCP function-calling bug, do not use it)
 - **Tests:** 382/382 passing
 - **Flavors:** 10 customer-facing industry flavors (doctor was removed — healthcare compliance risk)
+- **Repo status:** Clean. All PRs #20–#30 merged. No open PRs.
 
 **Strict Rule 1:** OpenClaw, Mini-RAG, and per-tenant Docker containers are DEAD. Their folders have been physically eradicated. Do not reference or restore them.
 
@@ -34,7 +35,7 @@ Stop what you are doing. Read this entire document and `CLAUDE.md`. These are yo
 6. **Value-Gap Detection Cron** — 9 AM UTC daily: active tenant with zero leads in 3 days fires a diagnostic message to the operator. Per CLAUDE.md mandate. Merged PR #26.
 7. **Dead Code Removal** — `tiger_knowledge` (dead Mini-RAG tool) removed PR #27. `tiger_keys` simplified from 4-layer to Primary+Backup PR #28.
 8. **System Prompt Fixes** — Tool count corrected (18), `tiger_keys` telemetry parameter fixed (`httpStatus` not `error`). Merged PR #29.
-9. **Flavor File Review & Cleanup — COMPLETE** — All 10 remaining flavors reviewed. Doctor dropped (compliance risk). Loose language tightened across real-estate, health-wellness, plumber, lawyer, gig-economy, candle-maker, baker. PR #30 (pending merge).
+9. **Flavor File Review & Cleanup — COMPLETE** — All 10 remaining flavors reviewed. Doctor dropped (compliance risk). Loose language tightened across real-estate, health-wellness, plumber, lawyer, gig-economy, candle-maker, baker. Merged PR #30.
 10. **Integrity First Product Philosophy** — Baked into `CLAUDE.md`. Non-negotiable for all future code.
 11. **Website + OG Tags** — `tigerclaw.io` updated with product naming, Stan Store links, 7-day MBG banner, OG/Twitter Card meta tags, claw graphic (1200×675). Flavor count updated to 10.
 12. **Hive Intelligence (V4 Analytics)** — Universal Prior, Founding Member Program, ICP signal mapping. Migrations 005a-009.
@@ -64,7 +65,7 @@ All loaded in `Promise.all()` — DB unreachable = static prompt, no crash.
 - [x] Phase 3: Fact anchor extraction (`tenant_states.fact_anchors`) — merged PR #22
 - [x] Phase 4: `startFocus` / `completeFocus` primitives — merged PR #23
 
-**Mac cluster (192.168.0.2) is an OFFLINE ops tool.** It reads Cloud SQL via Auth Proxy for Reflexion Loop analysis. It is NOT called by Cloud Run and cannot break production.
+**Mac cluster (192.168.0.2) is an OFFLINE ops tool.** Reflexion Loop tooling not yet built — deferred to next session. It is NOT called by Cloud Run and cannot break production.
 
 ---
 
@@ -87,8 +88,7 @@ All loaded in `Promise.all()` — DB unreachable = static prompt, no crash.
 
 ## 5. Open Issues (Priority Order)
 
-1. **PR #30 — flavor cleanup pending merge.** Drop doctor, tighten language. 382/382 tests green.
-2. **Mac cluster Reflexion Loop tooling** — Offline batch job for `fact_anchors` / `chat_memory` analysis not built yet. Not a production blocker.
+1. **Mac cluster Reflexion Loop tooling** — Offline batch job for `fact_anchors` / `chat_memory` analysis. Not built yet. Not a production blocker. Scope TBD next session.
 
 ---
 

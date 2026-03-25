@@ -1,6 +1,6 @@
 # STATE OF TIGER CLAW — HARD CONTEXT LOCK
-**Timestamp:** 2026-03-25
-**Infrastructure Status:** LIVE. 382/382 tests green. Flavor review complete. PR #30 pending merge.
+**Timestamp:** 2026-03-25T02:00Z
+**Infrastructure Status:** LIVE. 382/382 tests green. All PRs #20–#30 merged. Repo clean.
 
 ---
 
@@ -24,7 +24,7 @@ This is the single source of truth for the Tiger Claw repository.
 - NEVER push directly to main. main is branch-protected.
 - ALL work goes on a feature branch: `feat/`, `fix/`, `chore/`
 - When work is complete and tests pass: open a PR.
-- **PR #30** (`fix/flavor-cleanup-drop-doctor`) is currently open. Merge it next.
+- **Repo is clean.** No open PRs. Next work goes on a new `feat/` branch.
 
 **Deploy sequence:**
 ```bash
@@ -39,7 +39,7 @@ Deployments to Cloud Run are handled by GitHub Actions on merge to main. Do not 
 
 ---
 
-## Current State (2026-03-25)
+## Current State (2026-03-25T02:00Z)
 
 ### Architecture
 - **API:** Cloud Run, Node.js/Express, port 4000, `https://api.tigerclaw.io`
@@ -64,16 +64,16 @@ Deployments to Cloud Run are handled by GitHub Actions on merge to main. Do not 
 - Customers purchase on Stan Store. Stan Store webhook provisions their tenant and emails a magic link.
 - Wizard flow: StepIdentity → StepAIConnection → StepReviewPayment → PostPaymentSuccess
 - Keys: Primary + Backup. All 6 providers: Google, OpenAI, Anthropic, Grok, OpenRouter, Kimi.
-- Key auto-detection on paste: `AIza→google`, `sk-ant-→anthropic`, `xai-→grok`, `sk-or-→openrouter`, `sk-→openai`.
+- Key auto-detection on paste: `AIza→google`, `sk-ant-→anthropic`, `xai-→grok`, `sk-or-→openrouter`, `sk-→openai`, `km-→kimi`.
 - Server validates each key on INSTALL click. Fail-fast, not fail-silent.
 
-### Recent Work Completed (This Session)
+### All Work Completed — Session Closed
 - **PRs #20–#24 (merged):** Memory Architecture V4.1 — async buildSystemPrompt, Sawtooth compression, fact anchors, focus primitives, CLAUDE.md philosophy
 - **PR #26 (merged):** Value-gap cron — 9 AM UTC daily, 3-day lead check, diagnostic message to operator
 - **PR #27 (merged):** Removed `tiger_knowledge` — dead Mini-RAG tool
 - **PR #28 (merged):** Simplified `tiger_keys` — 4-layer → Primary + Backup, all 6 providers
 - **PR #29 (merged):** Fixed `buildSystemPrompt` — tool count 19→18, `httpStatus` parameter name
-- **PR #30 (pending):** Flavor review complete
+- **PR #30 (merged):** Flavor review complete
   - Doctor flavor dropped (healthcare outcome claims — compliance risk)
   - Loose language tightened: real-estate, health-wellness, plumber, lawyer, gig-economy, candle-maker, baker
   - Flavor count: 11 → 10 in all code, tests, and website copy
@@ -83,9 +83,7 @@ Deployments to Cloud Run are handled by GitHub Actions on merge to main. Do not 
 
 ### Open Issues
 
-1. **PR #30 — merge when ready.** `fix/flavor-cleanup-drop-doctor`. 382/382 tests green.
-
-2. **Mac cluster Reflexion Loop tooling.** Offline batch job for `fact_anchors` / `chat_memory` analysis. Not a production blocker.
+1. **Mac cluster Reflexion Loop tooling.** Offline batch job for `fact_anchors` / `chat_memory` analysis. Not a production blocker. Deferred — scope TBD next session.
 
 ---
 
@@ -113,7 +111,7 @@ Deployments to Cloud Run are handled by GitHub Actions on merge to main. Do not 
 - [x] Phase 4: `startFocus` / `completeFocus` primitives — merged PR #23
 
 ### Mac Cluster (192.168.0.2) — OFFLINE ONLY
-The Cheese Grater is an **offline Reflexion Loop tool**. It reads Cloud SQL via Auth Proxy, analyzes `fact_anchors` and `chat_memory` across tenants, and proposes system prompt improvements for Brent to review. It is **NOT** called by Cloud Run and cannot break production if offline.
+The Cheese Grater is an **offline Reflexion Loop tool**. It reads Cloud SQL via Auth Proxy, analyzes `fact_anchors` and `chat_memory` across tenants, and proposes system prompt improvements for Brent to review. It is **NOT** called by Cloud Run and cannot break production if offline. Tooling not yet built — deferred.
 
 ---
 
