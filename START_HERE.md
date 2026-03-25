@@ -13,7 +13,8 @@ Stop what you are doing. Read this entire document and `CLAUDE.md`. These are yo
 - **Database:** PostgreSQL HA via Cloud SQL Proxy (`tiger_claw_shared`)
 - **Cache/Queue:** Redis HA + BullMQ (6 queues: provision, telegram, line, fact-extraction, ai-routines, global-cron)
 - **AI Engine:** Gemini 2.0 Flash (LOCKED — `gemini-2.5-flash` has a GCP function-calling bug, do not use it)
-- **Tests:** 383/383 passing
+- **Tests:** 382/382 passing
+- **Flavors:** 10 customer-facing industry flavors (doctor was removed — healthcare compliance risk)
 
 **Strict Rule 1:** OpenClaw, Mini-RAG, and per-tenant Docker containers are DEAD. Their folders have been physically eradicated. Do not reference or restore them.
 
@@ -26,16 +27,17 @@ Stop what you are doing. Read this entire document and `CLAUDE.md`. These are yo
 ## 2. What Has Been Accomplished
 
 1. **V4 Stateless Architecture** — Cloud Run API, shared PostgreSQL, Redis, BullMQ. No Docker containers per tenant.
-2. **18 Native Function Calling Tools** — All in `api/src/tools/`. Backed by 383 passing tests.
+2. **18 Native Function Calling Tools** — All in `api/src/tools/`. Backed by 382 passing tests.
 3. **Business Model: Card Upfront** — No free trial. Card charged at checkout via Stan Store. 7-day money-back guarantee, no questions asked. The `trialExpired` code path is dead and removed.
-4. **Key Strategy: Primary + Backup, 6 Providers** — Wizard supports all 6 AI providers (Google, OpenAI, Anthropic, Grok, OpenRouter, Kimi). Auto-detects provider from key prefix on paste. Server validates on INSTALL. Layer 4 "platform emergency" key concept is dead.
-5. **Memory Architecture V4.1 (All 4 Phases)** — `buildSystemPrompt()` is async. Injects ICP, hive signals, pipeline stats, and fact anchors on every request. Sawtooth compression, fact anchor extraction, and focus primitives all shipped (PRs #20–#24, all merged to main).
-6. **Value-Gap Detection Cron** — Every day at 9 AM UTC, the heartbeat checks each active tenant for leads in the past **3 days**. If none, fires a `value_gap_checkin` diagnostic message to the operator. Required by CLAUDE.md. Merged PR #26.
-7. **Dead Tool Removal** — `tiger_knowledge` (Mini-RAG, defunct) removed. Merged PR #27.
-8. **`tiger_keys` Simplified** — 4-layer system (Layers 1+4 were platform-owned, now dead) replaced with Primary + Backup. `detectProvider()` covers all 6 providers. Merged PR #28.
-9. **Integrity First Product Philosophy** — Baked into `CLAUDE.md`. Non-negotiable for all future code.
-10. **Website + OG Tags** — `tigerclaw.io` updated with correct product naming, Stan Store links, 7-day MBG banner, and full OG/Twitter Card meta tags. `og-image.jpg` deployed (Tiger Claw Agent claw graphic, 1200×675).
-11. **Hive Intelligence (V4 Analytics)** — Universal Prior, Founding Member Program, ICP signal mapping. Migrations 005a-009.
+4. **Key Strategy: Primary + Backup, 6 Providers** — Wizard supports all 6 AI providers (Google, OpenAI, Anthropic, Grok, OpenRouter, Kimi). Auto-detects provider from key prefix on paste. Server validates on INSTALL.
+5. **Memory Architecture V4.1 (All 4 Phases)** — `buildSystemPrompt()` is async. Injects ICP, hive signals, pipeline stats, and fact anchors on every request. Sawtooth compression, fact anchor extraction, and focus primitives all shipped (PRs #20–#24, merged).
+6. **Value-Gap Detection Cron** — 9 AM UTC daily: active tenant with zero leads in 3 days fires a diagnostic message to the operator. Per CLAUDE.md mandate. Merged PR #26.
+7. **Dead Code Removal** — `tiger_knowledge` (dead Mini-RAG tool) removed PR #27. `tiger_keys` simplified from 4-layer to Primary+Backup PR #28.
+8. **System Prompt Fixes** — Tool count corrected (18), `tiger_keys` telemetry parameter fixed (`httpStatus` not `error`). Merged PR #29.
+9. **Flavor File Review & Cleanup — COMPLETE** — All 10 remaining flavors reviewed. Doctor dropped (compliance risk). Loose language tightened across real-estate, health-wellness, plumber, lawyer, gig-economy, candle-maker, baker. PR #30 (pending merge).
+10. **Integrity First Product Philosophy** — Baked into `CLAUDE.md`. Non-negotiable for all future code.
+11. **Website + OG Tags** — `tigerclaw.io` updated with product naming, Stan Store links, 7-day MBG banner, OG/Twitter Card meta tags, claw graphic (1200×675). Flavor count updated to 10.
+12. **Hive Intelligence (V4 Analytics)** — Universal Prior, Founding Member Program, ICP signal mapping. Migrations 005a-009.
 
 ---
 
@@ -66,7 +68,7 @@ All loaded in `Promise.all()` — DB unreachable = static prompt, no crash.
 
 ---
 
-## 4. Product (as of 2026-03-24)
+## 4. Product (as of 2026-03-25)
 
 | Product | Price | Stan Store URL |
 |---|---|---|
@@ -78,11 +80,14 @@ All loaded in `Promise.all()` — DB unreachable = static prompt, no crash.
 - "Standard Agent" is a dead name. It is "Industry Agent."
 - **No free trial.** Card upfront. 7-day money-back guarantee.
 
+**10 Customer-Facing Flavors:** network-marketer, real-estate, health-wellness, airbnb-host, baker, candle-maker, gig-economy, lawyer, plumber, sales-tiger.
+**Removed:** doctor (healthcare outcome claims in templates — compliance risk).
+
 ---
 
 ## 5. Open Issues (Priority Order)
 
-1. **Agent flavor file quality review** — The 13 flavor files and core constitution have not been line-reviewed for launch quality. Network Marketer is the highest priority flavor. Start here next.
+1. **PR #30 — flavor cleanup pending merge.** Drop doctor, tighten language. 382/382 tests green.
 2. **Mac cluster Reflexion Loop tooling** — Offline batch job for `fact_anchors` / `chat_memory` analysis not built yet. Not a production blocker.
 
 ---

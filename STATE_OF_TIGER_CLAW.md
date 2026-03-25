@@ -1,6 +1,6 @@
 # STATE OF TIGER CLAW — HARD CONTEXT LOCK
 **Timestamp:** 2026-03-25
-**Infrastructure Status:** LIVE. 383/383 tests green. All cleanup PRs merged (#26 value-gap cron, #27 tiger_knowledge removal, #28 tiger_keys simplification).
+**Infrastructure Status:** LIVE. 382/382 tests green. Flavor review complete. PR #30 pending merge.
 
 ---
 
@@ -10,11 +10,12 @@ This is the single source of truth for the Tiger Claw repository.
 
 1. **NO RAG.** Mini-RAG has been physically removed. It does not exist.
 2. **NO OPENCLAW.** No per-tenant Docker containers. OpenClaw is dead.
-3. **NO CANARIES.** The canary group concept is deprecated. All tenants are treated equally until scale justifies it.
-4. **NO FREE TRIAL.** The free trial model is dead. Card is charged at checkout via Stan Store. 7-day money-back guarantee, no questions asked. `trialExpired` code paths have been removed. Do not restore them.
+3. **NO CANARIES.** The canary group concept is deprecated.
+4. **NO FREE TRIAL.** Card is charged at checkout via Stan Store. 7-day money-back guarantee. `trialExpired` code paths removed. Do not restore them.
 5. **ARCHITECTURE:** Stateless Google Cloud Run API, Gemini 2.0 Flash (locked — 2.5 Flash has a GCP function-calling bug), 18 Native Function Calling Tools (`api/src/tools/`), shared PostgreSQL.
-6. **NO REWRITES:** The 18 core tools compile cleanly and are backed by 383 passing tests. Do not rewrite architecture.
-7. **PROTOCOL:** Read `CLAUDE.md` before writing any code.
+6. **NO REWRITES:** The 18 core tools compile cleanly and are backed by 382 passing tests. Do not rewrite architecture.
+7. **10 FLAVORS ONLY:** network-marketer, real-estate, health-wellness, airbnb-host, baker, candle-maker, gig-economy, lawyer, plumber, sales-tiger. Doctor was removed — compliance risk. Do not re-add it.
+8. **PROTOCOL:** Read `CLAUDE.md` before writing any code.
 
 ---
 
@@ -23,7 +24,7 @@ This is the single source of truth for the Tiger Claw repository.
 - NEVER push directly to main. main is branch-protected.
 - ALL work goes on a feature branch: `feat/`, `fix/`, `chore/`
 - When work is complete and tests pass: open a PR.
-- All PRs through #28 are merged to main. Next: flavor file quality review.
+- **PR #30** (`fix/flavor-cleanup-drop-doctor`) is currently open. Merge it next.
 
 **Deploy sequence:**
 ```bash
@@ -53,39 +54,38 @@ Deployments to Cloud Run are handled by GitHub Actions on merge to main. Do not 
 - **GCP Project:** `hybrid-matrix-472500-k5`
 - **Cloud Run Service:** `tiger-claw-api`, region `us-central1`
 
-### Product (as of 2026-03-24)
-- **Tiger-Claw Pro (Pre-Flavored):** $147/mo — Telegram + LINE, pre-trained for sales and network marketing. Stan Store: `stan.store/brentbryson/p/tired-of-manually-searching-for-leads-`
-- **Industry Agent:** $197/mo — domain pre-trained for a specific vertical. Stan Store: `stan.store/brentbryson/p/custom-agent-flavor`
+### Product (as of 2026-03-25)
+- **Tiger-Claw Pro (Pre-Flavored):** $147/mo — Telegram + LINE, pre-trained for sales and network marketing.
+- **Industry Agent:** $197/mo — domain pre-trained for a specific vertical.
 - "Standard Agent" naming is DEAD. It is now "Industry Agent."
 - **No free trial.** Card upfront. 7-day money-back guarantee, no questions asked.
 
 ### Business Model
 - Customers purchase on Stan Store. Stan Store webhook provisions their tenant and emails a magic link.
 - Wizard flow: StepIdentity → StepAIConnection → StepReviewPayment → PostPaymentSuccess
-- Keys: Primary + Backup. All 6 providers supported: Google, OpenAI, Anthropic, Grok, OpenRouter, Kimi.
+- Keys: Primary + Backup. All 6 providers: Google, OpenAI, Anthropic, Grok, OpenRouter, Kimi.
 - Key auto-detection on paste: `AIza→google`, `sk-ant-→anthropic`, `xai-→grok`, `sk-or-→openrouter`, `sk-→openai`.
-- Server validates each key on INSTALL click before saving. Fail-fast, not fail-silent.
+- Server validates each key on INSTALL click. Fail-fast, not fail-silent.
 
-### Recent Work Completed
-- **Business model pivot:** Removed free trial entirely. Card upfront. 7-day MBG. `trialExpired` code path and Layer 4 auto-resume dead and removed from all wizard components.
-- **Key strategy rewrite:** 4-layer system → Primary + Backup. All 6 providers. Auto-detect from prefix. Server validation on INSTALL. Hand-holding wizard UX.
-- **Memory Architecture V4.1 (PRs #20–#24, all merged):**
-  - PR #20: Phase 1 — `buildSystemPrompt()` async, ICP + hive + pipeline injection
-  - PR #21: Phase 2 — Sawtooth context compression (`chat_memory` Redis key)
-  - PR #22: Phase 3 — Fact anchor extraction (async BullMQ → `tenant_states.fact_anchors`)
-  - PR #23: Phase 4 — `startFocus` / `completeFocus` / `incrementFocusToolCalls`
-  - PR #24: CLAUDE.md product philosophy + doc rewrites
-- **Value-gap detection cron (PR #26, merged):** 9 AM UTC daily — active tenant with zero leads in 3 days triggers `value_gap_checkin` diagnostic message. Dedup by date. 3-day window per CLAUDE.md mandate.
-- **`tiger_knowledge` removed (PR #27, merged):** Dead tool that called Mini-RAG (defunct). Context now injected via `buildSystemPrompt()`.
-- **`tiger_keys` simplified (PR #28, merged):** 4-layer → Primary + Backup. Removed Layer 1 (Platform Onboarding) and Layer 4 (Emergency) entirely. `detectProvider()` now covers all 6 providers. Net: -261 lines.
-- **Website + OG tags:** `tigerclaw.io` updated — OG/Twitter Card meta tags, Tiger Claw Agent claw OG image (1200×675), 7-day MBG banner, corrected Stan Store links.
+### Recent Work Completed (This Session)
+- **PRs #20–#24 (merged):** Memory Architecture V4.1 — async buildSystemPrompt, Sawtooth compression, fact anchors, focus primitives, CLAUDE.md philosophy
+- **PR #26 (merged):** Value-gap cron — 9 AM UTC daily, 3-day lead check, diagnostic message to operator
+- **PR #27 (merged):** Removed `tiger_knowledge` — dead Mini-RAG tool
+- **PR #28 (merged):** Simplified `tiger_keys` — 4-layer → Primary + Backup, all 6 providers
+- **PR #29 (merged):** Fixed `buildSystemPrompt` — tool count 19→18, `httpStatus` parameter name
+- **PR #30 (pending):** Flavor review complete
+  - Doctor flavor dropped (healthcare outcome claims — compliance risk)
+  - Loose language tightened: real-estate, health-wellness, plumber, lawyer, gig-economy, candle-maker, baker
+  - Flavor count: 11 → 10 in all code, tests, and website copy
+- **Business model pivot:** No free trial. Card upfront. 7-day MBG. All trial code removed.
+- **Key strategy rewrite:** 6 providers, Primary + Backup, auto-detect, server validation on INSTALL.
+- **Website:** OG/Twitter Card tags, claw graphic (1200×675), 7-day MBG banner, 10 flavors.
 
 ### Open Issues
 
-1. **Agent flavor file quality review.** The 13 flavor files and core system constitution have not been line-reviewed for launch quality. Network Marketer flavor is highest priority. Start here next.
+1. **PR #30 — merge when ready.** `fix/flavor-cleanup-drop-doctor`. 382/382 tests green.
 
-2. **Mac cluster Reflexion Loop tooling.** Offline batch job for `fact_anchors` / `chat_memory` analysis not yet built. Not a production blocker.
-
+2. **Mac cluster Reflexion Loop tooling.** Offline batch job for `fact_anchors` / `chat_memory` analysis. Not a production blocker.
 
 ---
 

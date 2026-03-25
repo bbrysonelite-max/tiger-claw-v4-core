@@ -22,7 +22,7 @@
         "scarcity_takeaway": "Hi {{name}},\n\nI'll be upfront — {{tenantName}} has a smaller commercial kitchen, so our calendar fills up weeks in advance.\n\nI can hold a tentative slot for your date, but if you aren't ready to commit, I need to release it to other clients.\n\nLet me know where you stand!\n\n— {{botName}}",
         "pattern_interrupt": "Hi {{name}},\n\nBefore I clear your date off our calendar, think about this.\n\nPeople forget the decorations at a party, but they always remember if the food was incredible or terrible. \n\nIf you want to guarantee your guests are raving about dessert, let's get you in the books. Reply \"Let's bake\" if you're ready.\n\n— {{botName}}",
         "final_takeaway": "Hi {{name}},\n\nThis is my last message about your inquiry. I'll take your info off our active list.\n\n{{tenantName}} is busy in the kitchen prepping for this weekend's orders! Reach out if you ever need anything in the future.\n\n— {{botName}}",
-        "slow_drip_value": "Hi {{name}},\n\nChecking in — just passing along some sweet news.\n\n{{tenantName}} just introduced a new menu featuring {{differentiator}}. \n\nHope you're having a great season!\n\n— {{botName}}",
+        "slow_drip_value": "Hi {{name}},\n\nChecking in — just passing along some sweet news.\n\n{{tenantName}} just introduced a new menu featuring {{differentiator}}.\n\nHope you're having a great season!\n\n— {{botName}}",
         "default_fallback": "Hi {{name}}, just checking in. — {{botName}}"
     }
 }

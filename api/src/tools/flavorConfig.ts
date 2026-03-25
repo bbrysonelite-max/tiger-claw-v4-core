@@ -1,6 +1,6 @@
 // Tiger Claw — Config-Driven Flavor System
 // GAP 1: Adding a new flavor requires only dropping a JSON file — zero code changes.
-// 11 required flavors validated at boot time.
+// 10 required flavors validated at boot time.
 
 import * as fs from "fs";
 import * as path from "path";
@@ -28,6 +28,7 @@ export interface FlavorConfig {
 
 // All valid customer-facing flavors — adding a new flavor = add JSON file + add slug here.
 // "admin" is intentionally excluded: it is internal-only and never provisioned for customers.
+// "doctor" was removed: healthcare outcome claims in nurture templates create compliance risk.
 export const VALID_FLAVOR_KEYS = [
     "network-marketer",
     "real-estate",
@@ -35,7 +36,6 @@ export const VALID_FLAVOR_KEYS = [
     "airbnb-host",
     "baker",
     "candle-maker",
-    "doctor",
     "gig-economy",
     "lawyer",
     "plumber",
