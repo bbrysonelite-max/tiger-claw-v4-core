@@ -76,11 +76,12 @@ router.post("/fix-all-webhooks", async (req: Request, res: Response) => {
   try {
     // V4 arch: bot tokens live in bot_pool (encrypted), not on the tenants table.
     // JOIN bot_pool to get the encrypted token, then decrypt before calling Telegram.
+    // NOTE: legacy V3 tenants may still have status='live' in the DB.
     const rows = await getPool().query(`
       SELECT t.id, t.slug, bp.bot_token AS encrypted_token
       FROM tenants t
       INNER JOIN bot_pool bp ON bp.tenant_id = t.id AND bp.status = 'assigned'
-      WHERE t.status IN ('active', 'onboarding', 'suspended')
+      WHERE t.status IN ('active', 'onboarding', 'suspended', 'live')
     `);
 
     const { decryptToken } = await import("../services/pool.js");
