@@ -39,7 +39,7 @@ Deployments to Cloud Run are handled by GitHub Actions on merge to main. Do not 
 
 ---
 
-## Current State (2026-03-25)
+## Current State (2026-03-25, updated 2026-03-26)
 
 ### Architecture
 - **API:** Cloud Run, Node.js/Express, port 4000, `https://api.tigerclaw.io`
@@ -67,25 +67,30 @@ Deployments to Cloud Run are handled by GitHub Actions on merge to main. Do not 
 - Key auto-detection on paste: `AIza→google`, `sk-ant-→anthropic`, `xai-→grok`, `sk-or-→openrouter`, `sk-→openai`.
 - Server validates each key on INSTALL click. Fail-fast, not fail-silent.
 
-### Recent Work Completed (This Session)
+### Recent Work Completed
 - **PRs #20–#24 (merged):** Memory Architecture V4.1 — async buildSystemPrompt, Sawtooth compression, fact anchors, focus primitives, CLAUDE.md philosophy
 - **PR #26 (merged):** Value-gap cron — 9 AM UTC daily, 3-day lead check, diagnostic message to operator
 - **PR #27 (merged):** Removed `tiger_knowledge` — dead Mini-RAG tool
 - **PR #28 (merged):** Simplified `tiger_keys` — 4-layer → Primary + Backup, all 6 providers
 - **PR #29 (merged):** Fixed `buildSystemPrompt` — tool count 19→18, `httpStatus` parameter name
-- **PR #30 (pending):** Flavor review complete
-  - Doctor flavor dropped (healthcare outcome claims — compliance risk)
-  - Loose language tightened: real-estate, health-wellness, plumber, lawyer, gig-economy, candle-maker, baker
-  - Flavor count: 11 → 10 in all code, tests, and website copy
-- **Business model pivot:** No free trial. Card upfront. 7-day MBG. All trial code removed.
-- **Key strategy rewrite:** 6 providers, Primary + Backup, auto-detect, server validation on INSTALL.
-- **Website:** OG/Twitter Card tags, claw graphic (1200×675), 7-day MBG banner, 10 flavors.
+- **PR #30 (merged):** Flavor review — doctor dropped (compliance), language tightened, 11→10 flavors
+- **PR #31 (merged):** Doc sync post-PR #30
+- **PR #32 (merged):** Customer-facing fixes — website key copy, LINE wizard auto-reply warning, LINE token length 200→1000
+- **PR #33 (open):** Error handling end-to-end — `classifyAIError`, differentiated user messages, platform key health check in cron (8 AM UTC)
+- **PR #34 (open):** Botpool ops audit — `/admin/pool/add` now uses `importToken` (correct telegramBotId), `create_bots.ts` ADMIN_TOKEN warning + `--phone-account` flag
+- **PR #35 (open):** Ops cleanup — deleted `/admin/demo` (dead Layer 1 + unprotected endpoint) and `seed_tenant.ts` (dead V3 code)
+- **PR #36 (in progress):** Admin fleet dashboard — fleet table, pool health, alarms, per-tenant actions
+- **LINE integration proven:** Full stack tested end-to-end. Webhook → BullMQ → processLINEMessage → onboarding → fact anchors → Hive injection. Working.
+- **Platform key expired silently:** Both platform keys were expired; renewed and deployed. Platform key health check (PR #33) prevents recurrence.
+- **Botpool ops pipeline debugged:** `addTokenToPool` was storing username as telegramBotId. Fixed in PR #34.
 
-### Open Issues
+### Open Issues / PRs Pending Merge
 
-1. **PR #30 — merge when ready.** `fix/flavor-cleanup-drop-doctor`. 382/382 tests green.
-
-2. **Mac cluster Reflexion Loop tooling.** Offline batch job for `fact_anchors` / `chat_memory` analysis. Not a production blocker.
+1. **PR #33** — error handling. 382/382 green.
+2. **PR #34** — botpool ops fix. 382/382 green.
+3. **PR #35** — ops cleanup. 382/382 green.
+4. **PR #36** — admin dashboard (in progress).
+5. **Mac cluster Reflexion Loop tooling** — offline batch for `fact_anchors`/`chat_memory`. Not a production blocker.
 
 ---
 
