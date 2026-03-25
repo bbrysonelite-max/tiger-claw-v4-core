@@ -165,82 +165,6 @@ export async function clearTenantChatHistory(tenantId: string): Promise<number> 
 }
 
 // ─── Key resolution ──────────────────────────────────────────────────────────
-/**
- * BUG 2 FIX: Resolves the active Google API key using the 4-layer system.
- *
- * Priority:
- *   1. key_state.json in tenant workdir (managed by tiger_keys tool) — authoritative
- *   2. DB bot_ai_config (BYOK set during onboarding, before key_state exists)
- *   3. Platform Layer 1 default (PLATFORM_ONBOARDING_KEY or GOOGLE_API_KEY)
- *
- * All failures are logged loudly with [ALERT] tag.
- * Wire [ALERT] logs to admin Telegram bot for production monitoring.
- */
-export async function resolveGoogleKey(tenantId: string): Promise<string | undefined> {
-    // Step 1 — tiger_keys state file (4-layer system source of truth)
-    try {
-        const state = await getBotState<any>(tenantId, 'key_state.json');
-        if (state) {
-
-            if (state.tenantPaused) {
-                console.warn(`[AI] [ALERT] Tenant ${tenantId} is paused (key_state.json tenantPaused=true). No key issued.`);
-                return undefined;
-            }
-
-            const activeLayer: number = state.activeLayer ?? 1;
-
-            switch (activeLayer) {
-                case 1:
-                    return process.env.PLATFORM_ONBOARDING_KEY ?? process.env.GOOGLE_API_KEY;
-
-                case 2:
-                    if (!state.layer2Key) {
-                        console.error(`[AI] [ALERT] Tenant ${tenantId} is on Layer 2 but layer2Key is missing from key_state.json.`);
-                    }
-                    return state.layer2Key ? decryptToken(state.layer2Key) : undefined;
-
-                case 3:
-                    if (!state.layer3Key) {
-                        console.error(`[AI] [ALERT] Tenant ${tenantId} is on Layer 3 but layer3Key is missing from key_state.json.`);
-                    }
-                    return state.layer3Key ? decryptToken(state.layer3Key) : undefined;
-
-                case 4:
-                    console.warn(`[AI] [ALERT] Tenant ${tenantId} on Layer 4 (platform emergency key). Operator action required.`);
-                    return process.env.PLATFORM_EMERGENCY_KEY ?? process.env.GOOGLE_API_KEY;
-
-                default:
-                    console.error(`[AI] [ALERT] Tenant ${tenantId} has unknown activeLayer=${activeLayer} in key_state.json.`);
-            }
-        }
-    } catch (err: any) {
-        // BUG 3 FIX: was `catch (_)` — now loud
-        console.error(`[AI] [ALERT] Failed to read key_state.json for tenant ${tenantId}:`, err.message);
-    }
-
-    // Step 2 — DB BYOK lookup (new tenant whose key_state hasn't been initialized yet)
-    try {
-        const pool = getPool();
-        const configRes = await pool.query(
-            `SELECT * FROM bot_ai_config
-             WHERE tenant_id = $1`,
-            [tenantId],
-        );
-        if (configRes.rows.length > 0) {
-            const config = configRes.rows[0];
-            if (config.provider === 'google' && config.encrypted_key) {
-                const { decryptToken } = await import('./pool.js');
-                return decryptToken(config.encrypted_key);
-            }
-        }
-    } catch (err: any) {
-        // BUG 3 FIX: was `catch (_)` — now loud
-        console.error(`[AI] [ALERT] BYOK DB lookup failed for tenant ${tenantId}:`, err.message);
-    }
-
-    // Step 3 — Platform Layer 1 fallback (onboarding / new tenant)
-    return process.env.PLATFORM_ONBOARDING_KEY ?? process.env.GOOGLE_API_KEY;
-}
 
 // ─── Multi-provider resolution ────────────────────────────────────────────────
 
@@ -264,8 +188,8 @@ function defaultModel(provider: 'google' | 'openai'): string {
  * Resolves the active AI provider + key for a tenant.
  * Returns { key, provider, model } or undefined if tenant is paused / no key available.
  *
- * Resolution order mirrors resolveGoogleKey but is provider-agnostic:
- *   1. key_state.json (layer 1-4, Google platform keys)
+ * Resolution order (provider-agnostic):
+ *   1. key_state.json (Primary = layer2Key, Backup = layer3Key)
  *   2. bot_ai_config DB (BYOK — any provider)
  *   3. Platform fallback (Google)
  */
