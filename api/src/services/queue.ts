@@ -416,7 +416,7 @@ export const cronWorker = SHOULD_RUN_WORKERS ? new Worker(
                                   AND t.status = 'active'
                                 GROUP BY t.id
                                 HAVING COUNT(l.id) = 0
-                                    OR MAX(l.created_at) < NOW() - INTERVAL '7 days'
+                                    OR MAX(l.created_at) < NOW() - INTERVAL '3 days'
                             `, [tenant.id]);
 
                             if (gapRows.length > 0) {

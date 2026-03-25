@@ -40,11 +40,11 @@ endpoint, and every background job.**
 ## 2. Radical Value Delivery — Keeping Money Without Value Is a Moral Failure
 
 ### Value-Gap Detection
-- Any tenant who is paying and has **not generated a lead in 7 consecutive
+- Any tenant who is paying and has **not generated a lead in 3 consecutive
   days** must be flagged in the system.
 - The flag triggers a "Value Check-in" message to the operator — not a
   retention campaign, but a genuine diagnostic: *"Your bot hasn't surfaced a
-  lead in 7 days. Here's what might be wrong, and here's how to fix it."*
+  lead in 3 days. Here's what might be wrong, and here's how to fix it."*
 - This logic lives in the cron heartbeat. It is not optional.
 
 ### Proactive Error Correction
