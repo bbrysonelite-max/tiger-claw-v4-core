@@ -306,6 +306,7 @@ router.post("/validate-key", async (req: Request, res: Response) => {
   }
 
   const allValid = results.every(r => r.status === "success");
+
   return res.json({
     valid: allValid,
     details: results
