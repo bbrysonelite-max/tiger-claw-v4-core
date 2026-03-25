@@ -70,26 +70,35 @@ function requireAdmin(req: Request, res: Response, next: NextFunction): void {
 router.use(requireAdmin);
 
 // ── POST /admin/fix-all-webhooks ─────────────────────────────────────────────
-// GAP 10 — Nuclear option to restore webhooks for all assigned bots.
+// Nuclear option to restore webhooks for all assigned bots and wire the secret.
+// Reads TELEGRAM_WEBHOOK_SECRET from env and includes it in the setWebhook call.
 router.post("/fix-all-webhooks", async (req: Request, res: Response) => {
   try {
     const tenants = await getPool().query(
-      "SELECT id, slug, bot_token FROM tenants WHERE status IN ('onboarding', 'suspended') AND bot_token IS NOT NULL"
+      "SELECT id, slug, bot_token FROM tenants WHERE status IN ('active', 'onboarding', 'suspended') AND bot_token IS NOT NULL"
     );
     
-    console.log(`[recovery] Found ${tenants.rows.length} candidates for bulk recovery.`);
-    const results: any[] = [];
+    const webhookSecret = process.env["TELEGRAM_WEBHOOK_SECRET"];
+    const baseUrl = (process.env["TIGER_CLAW_API_URL"] ?? "https://api.tigerclaw.io").replace(/\/$/, "");
+    
+    console.log(`[fix-webhooks] Re-binding ${tenants.rows.length} tenants. Secret: ${webhookSecret ? "✅ wired" : "⚠️  missing"}`);
+    const results: { slug: string; status: string; msg?: string }[] = [];
 
     for (const row of tenants.rows) {
       try {
-        const webhookUrl = `${process.env["TIGER_CLAW_API_URL"]}/webhooks/telegram/${row.id}`;
-        console.log(`[recovery] Resetting ${row.slug} -> ${webhookUrl}`);
+        const webhookUrl = `${baseUrl}/webhooks/telegram/${row.id}`;
         
-        const tgResponse = await fetch(`https://api.telegram.org/bot${row.bot_token}/setWebhook?url=${webhookUrl}`);
-        const tgData = await tgResponse.json();
+        const body: Record<string, string> = { url: webhookUrl };
+        if (webhookSecret) body.secret_token = webhookSecret;
+
+        const tgResponse = await fetch(`https://api.telegram.org/bot${row.bot_token}/setWebhook`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        const tgData = await tgResponse.json() as { ok: boolean; description?: string };
         
         if (tgData.ok) {
-          await getPool().query("UPDATE tenants SET status = 'live', suspended_at = NULL WHERE id = $1", [row.id]);
           results.push({ slug: row.slug, status: "fixed" });
         } else {
           results.push({ slug: row.slug, status: "error", msg: tgData.description });
@@ -99,11 +108,17 @@ router.post("/fix-all-webhooks", async (req: Request, res: Response) => {
       }
     }
 
-    return res.json({ ok: true, processed: tenants.rows.length, results });
+    return res.json({
+      ok: true,
+      secretWired: !!webhookSecret,
+      processed: tenants.rows.length,
+      results
+    });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
 });
+
 // POST /admin/provision — manual provisioning
 // ---------------------------------------------------------------------------
 
