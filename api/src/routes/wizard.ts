@@ -370,13 +370,13 @@ router.post("/:slug/save", async (req: Request, res: Response) => {
     };
 
     if (lineChannelSecret !== undefined && lineChannelSecret !== "") {
-      if (typeof lineChannelSecret !== "string" || lineChannelSecret.length > 200) {
-        return res.status(400).json({ error: "LINE channel secret must be 200 characters or fewer." });
+      if (typeof lineChannelSecret !== "string" || lineChannelSecret.length > 1000) {
+        return res.status(400).json({ error: "LINE channel secret must be 1000 characters or fewer." });
       }
     }
     if (lineChannelAccessToken !== undefined && lineChannelAccessToken !== "") {
-      if (typeof lineChannelAccessToken !== "string" || lineChannelAccessToken.length > 200) {
-        return res.status(400).json({ error: "LINE channel access token must be 200 characters or fewer." });
+      if (typeof lineChannelAccessToken !== "string" || lineChannelAccessToken.length > 1000) {
+        return res.status(400).json({ error: "LINE channel access token must be 1000 characters or fewer." });
       }
     }
 
