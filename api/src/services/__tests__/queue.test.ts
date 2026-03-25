@@ -212,5 +212,94 @@ describe('queue.ts workers', () => {
 
             vi.useRealTimers();
         });
+
+        // ── Value-gap detection tests (CLAUDE.md mandate) ─────────────────────
+
+        it('enqueues value_gap_checkin at 9 AM UTC for tenants with no leads in 7 days', async () => {
+            // First call: main tenant query. Second call: value-gap sub-query returns a row (tenant IS in gap).
+            mockQuery
+                .mockResolvedValueOnce({ rows: [{ id: 'tenant-gap', created_at: new Date().toISOString() }] })
+                .mockResolvedValueOnce({ rows: [{ 1: 1 }] }); // gap query returns a row
+
+            const { getBotState } = await import('../db.js');
+            (getBotState as ReturnType<typeof vi.fn>).mockResolvedValue(JSON.stringify({ layer2Key: 'key', trialRemindersSent: {} }));
+
+            vi.useFakeTimers();
+            vi.setSystemTime(new Date('2024-01-01T09:00:00Z'));
+
+            await processors.cron();
+
+            const gapCalls = (routineQueue.add as ReturnType<typeof vi.fn>).mock.calls
+                .filter((call: any[]) => call[0] === 'value_gap_checkin');
+            expect(gapCalls.length).toBe(1);
+            expect(gapCalls[0][1]).toMatchObject({ tenantId: 'tenant-gap', routineType: 'value_gap_checkin' });
+            // jobId must be date-stamped for dedup
+            expect(gapCalls[0][2]).toMatchObject({ jobId: 'value_gap_tenant-gap_2024-01-01' });
+
+            vi.useRealTimers();
+        });
+
+        it('does NOT enqueue value_gap_checkin when tenant has a recent lead', async () => {
+            // First call: main tenant query. Second call: value-gap query returns no rows (no gap).
+            mockQuery
+                .mockResolvedValueOnce({ rows: [{ id: 'tenant-healthy', created_at: new Date().toISOString() }] })
+                .mockResolvedValueOnce({ rows: [] }); // no gap
+
+            const { getBotState } = await import('../db.js');
+            (getBotState as ReturnType<typeof vi.fn>).mockResolvedValue(JSON.stringify({ layer2Key: 'key', trialRemindersSent: {} }));
+
+            vi.useFakeTimers();
+            vi.setSystemTime(new Date('2024-01-01T09:00:00Z'));
+
+            await processors.cron();
+
+            const gapCalls = (routineQueue.add as ReturnType<typeof vi.fn>).mock.calls
+                .filter((call: any[]) => call[0] === 'value_gap_checkin');
+            expect(gapCalls.length).toBe(0);
+
+            vi.useRealTimers();
+        });
+
+        it('does NOT enqueue value_gap_checkin outside of 9 AM UTC hour', async () => {
+            mockQuery
+                .mockResolvedValueOnce({ rows: [{ id: 'tenant-gap', created_at: new Date().toISOString() }] });
+
+            const { getBotState } = await import('../db.js');
+            (getBotState as ReturnType<typeof vi.fn>).mockResolvedValue(JSON.stringify({ layer2Key: 'key', trialRemindersSent: {} }));
+
+            vi.useFakeTimers();
+            vi.setSystemTime(new Date('2024-01-01T10:00:00Z')); // 10 AM, not 9
+
+            await processors.cron();
+
+            const gapCalls = (routineQueue.add as ReturnType<typeof vi.fn>).mock.calls
+                .filter((call: any[]) => call[0] === 'value_gap_checkin');
+            expect(gapCalls.length).toBe(0);
+
+            vi.useRealTimers();
+        });
+
+        it('continues cron cycle when value-gap DB query throws (error isolation)', async () => {
+            // First call: main tenant query. Second call: value-gap query throws.
+            mockQuery
+                .mockResolvedValueOnce({ rows: [{ id: 'tenant-gap', created_at: new Date().toISOString() }] })
+                .mockRejectedValueOnce(new Error('DB timeout'));
+
+            const { getBotState } = await import('../db.js');
+            (getBotState as ReturnType<typeof vi.fn>).mockResolvedValue(JSON.stringify({ layer2Key: 'key', trialRemindersSent: {} }));
+
+            vi.useFakeTimers();
+            vi.setSystemTime(new Date('2024-01-01T09:00:00Z'));
+
+            // Must not throw — inner try/catch isolates the gap query failure
+            await expect(processors.cron()).resolves.toBeUndefined();
+
+            // nurture_check still enqueued despite the gap error
+            const nurtureCalls = (routineQueue.add as ReturnType<typeof vi.fn>).mock.calls
+                .filter((call: any[]) => call[0] === 'nurture_check');
+            expect(nurtureCalls.length).toBe(1);
+
+            vi.useRealTimers();
+        });
     });
 });
