@@ -10,7 +10,8 @@ import { decryptToken } from './pool.js';
 import { draftSkillFromFailure, loadApprovedSkills } from './self-improvement.js';
 import { hiveAttributionLabel } from './hiveEmitter.js';
 
-// Load all 19 tools — ALL must remain registered. Missing tool = infinite loop.
+// Load all 18 tools — ALL must remain registered. Missing tool = infinite loop.
+// tiger_knowledge removed: Mini-RAG is dead. Document context is injected via buildSystemPrompt().
 import { tiger_onboard }     from '../tools/tiger_onboard.js';
 import { tiger_scout }       from '../tools/tiger_scout.js';
 import { tiger_contact }     from '../tools/tiger_contact.js';
@@ -21,7 +22,6 @@ import { tiger_export }      from '../tools/tiger_export.js';
 import { tiger_email }       from '../tools/tiger_email.js';
 import { sendTrialReminderEmail } from './email.js';
 import { tiger_hive }        from '../tools/tiger_hive.js';
-import { tiger_knowledge }   from '../tools/tiger_knowledge.js';
 import { tiger_import }      from '../tools/tiger_import.js';
 import { tiger_keys }        from '../tools/tiger_keys.js';
 import { tiger_lead }        from '../tools/tiger_lead.js';
@@ -54,7 +54,6 @@ const toolsMap = {
     tiger_export,
     tiger_email,
     tiger_hive,
-    tiger_knowledge,
     tiger_import,
     tiger_keys,
     tiger_lead,

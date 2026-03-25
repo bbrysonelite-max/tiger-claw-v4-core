@@ -26,7 +26,7 @@ Stop what you are doing. Read this entire document and `CLAUDE.md`. These are yo
 ## 2. What Has Been Accomplished
 
 1. **V4 Stateless Architecture** — Cloud Run API, shared PostgreSQL, Redis, BullMQ. No Docker containers per tenant.
-2. **19 Native Function Calling Tools** — All in `api/src/tools/`. Backed by 383 passing tests.
+2. **18 Native Function Calling Tools** — All in `api/src/tools/`. Backed by 383 passing tests.
 3. **Business Model: Card Upfront** — No free trial. Card charged at checkout via Stan Store. 7-day money-back guarantee, no questions asked. The `trialExpired` code path is dead and removed.
 4. **Key Strategy: Primary + Backup, 6 Providers** — Wizard supports all 6 AI providers (Google, OpenAI, Anthropic, Grok, OpenRouter, Kimi). Auto-detects provider from key prefix on paste. Server validates on INSTALL. Layer 4 "platform emergency" key concept is dead.
 5. **Memory Architecture V4.1 (All 4 Phases)** — `buildSystemPrompt()` is async. Injects ICP, hive signals, pipeline stats, and fact anchors on every request. Sawtooth compression, fact anchor extraction, and focus primitives all shipped (PRs #20–#24, all merged to main).
@@ -80,11 +80,9 @@ All loaded in `Promise.all()` — DB unreachable = static prompt, no crash.
 
 ## 5. Open Issues (Priority Order)
 
-1. **PR #26 — Value-gap cron pending merge.** Branch `feat/value-gap-cron`. Tests green. Merge when ready.
-2. **`tiger_knowledge` tool references dead Mini-RAG.** Tool still in `api/src/tools/` but the vector DB it queries no longer exists. Needs to be rewired or removed before launch.
-3. **`tiger_keys` still uses old 4-layer naming.** Code should reflect Primary + Backup model. Layer 1 "Platform Onboarding Key" concept is dead — remove from `tiger_keys` tool and any documentation.
-4. **Mac cluster Reflexion Loop tooling** — Offline batch job for `fact_anchors` / `chat_memory` analysis not built yet. Not a production blocker.
-5. **Agent flavor file quality review** — The 13 flavor files and core constitution have not been line-reviewed for launch quality. Network Marketer flavor is the highest priority.
+1. **`tiger_keys` still uses old 4-layer naming.** Code should reflect Primary + Backup model. Layer 1/4 "platform key" concepts are dead — remove from tool and documentation.
+2. **Agent flavor file quality review** — The 13 flavor files and core constitution have not been line-reviewed for launch quality. Network Marketer flavor is the highest priority.
+3. **Mac cluster Reflexion Loop tooling** — Offline batch job for `fact_anchors` / `chat_memory` analysis not built yet. Not a production blocker.
 
 ---
 
