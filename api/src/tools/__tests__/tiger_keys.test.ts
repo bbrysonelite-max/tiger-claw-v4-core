@@ -12,17 +12,12 @@ vi.mock('../../services/db.js', () => ({
   getTenant: vi.fn(async () => ({
     id: 'test-tenant',
     slug: 'test-slug',
-    layer1_api_key: null,
     layer2_api_key: null,
     layer3_api_key: null,
-    layer4_api_key: null,
   })),
   getPool: vi.fn(() => ({ query: vi.fn().mockResolvedValue({ rows: [] }) })),
 }))
 
-vi.mock('../../services/email.js', () => ({
-  sendKeyAbuseWarning: vi.fn().mockResolvedValue(undefined),
-}))
 
 describe('tiger_keys', () => {
   beforeEach(() => {
@@ -42,14 +37,9 @@ describe('tiger_keys', () => {
 
   it('status shows layer info from stored key_state', async () => {
     mockBotStates['key_state.json'] = {
-      activeLayer: 1,
-      layer1MessageCountToday: 5,
-      layer1CountDate: new Date().toISOString().slice(0, 10),
-      layer1BurstCount: 2,
-      layer1BurstWindowStart: new Date().toISOString(),
+      activeLayer: 2,
       layer3MessageCountToday: 0,
       layer3CountDate: '',
-      layer4TotalMessages: 0,
       tenantPaused: false,
       events: [],
       lastUpdated: new Date().toISOString(),
@@ -112,15 +102,10 @@ describe('tiger_keys', () => {
 
   it('tenantPaused state causes report_error to return no_action', async () => {
     mockBotStates['key_state.json'] = {
-      activeLayer: 1,
+      activeLayer: 2,
       tenantPaused: true,
-      layer1MessageCountToday: 0,
-      layer1CountDate: '',
-      layer1BurstCount: 0,
-      layer1BurstWindowStart: new Date().toISOString(),
       layer3MessageCountToday: 0,
       layer3CountDate: '',
-      layer4TotalMessages: 0,
       events: [],
       lastUpdated: new Date().toISOString(),
     }
