@@ -491,6 +491,9 @@ function LineWizardModal({ slug, webhookUrl, configured, onClose, botTelegramLin
                             <p className="text-white/30 text-xs mt-3">
                                 Then click <strong className="text-white/60">Verify</strong> in the LINE console and enable <strong className="text-white/60">Use webhook</strong>.
                             </p>
+                            <div className="mt-3 bg-amber-500/10 border border-amber-500/20 rounded-lg p-3 text-xs text-amber-300">
+                                <strong>Important:</strong> In the LINE Official Account Manager → Settings → Response Settings, turn <strong>Webhooks ON</strong> and <strong>Auto-reply messages OFF</strong>. Otherwise LINE will send its own replies alongside your agent.
+                            </div>
                             {!saved && channelSecret && accessToken && (
                                 <button
                                     onClick={saveConfig}
