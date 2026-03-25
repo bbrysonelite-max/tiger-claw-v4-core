@@ -13,7 +13,7 @@ This is the single source of truth for the Tiger Claw repository.
 3. **NO CANARIES.** The canary group concept is deprecated. All tenants are treated equally until scale justifies it.
 4. **NO FREE TRIAL.** The free trial model is dead. Card is charged at checkout via Stan Store. 7-day money-back guarantee, no questions asked. `trialExpired` code paths have been removed. Do not restore them.
 5. **ARCHITECTURE:** Stateless Google Cloud Run API, Gemini 2.0 Flash (locked — 2.5 Flash has a GCP function-calling bug), 19 Native Function Calling Tools (`api/src/tools/`), shared PostgreSQL.
-6. **NO REWRITES:** The 19 core tools compile cleanly and are backed by 383 passing tests. Do not rewrite architecture.
+6. **NO REWRITES:** The 18 core tools compile cleanly and are backed by 383 passing tests. Do not rewrite architecture.
 7. **PROTOCOL:** Read `CLAUDE.md` before writing any code.
 
 ---
@@ -86,13 +86,12 @@ Deployments to Cloud Run are handled by GitHub Actions on merge to main. Do not 
 
 1. **PR #26 — merge when ready.** `feat/value-gap-cron`. 383/383 tests green.
 
-2. **`tiger_knowledge` tool references dead Mini-RAG.** The vector DB it queries no longer exists. Must be rewired or removed before any customer-facing launch.
+2. **`tiger_keys` tool uses old 4-layer naming.** Layer 1/4 "platform key" concept is dead. Tool should reflect Primary + Backup model. (See open issue 3 below — consolidating)
 
-3. **`tiger_keys` tool uses old 4-layer naming.** Layer 1 "Platform Onboarding Key" concept is dead. Tool code and any documentation should reflect Primary + Backup model.
+3. **Agent flavor file quality review.** The 13 flavor files and core system constitution have not been line-reviewed. Network Marketer flavor is highest priority before launch.
 
-4. **Agent flavor file quality review.** The 13 flavor files and core system constitution have not been line-reviewed. Network Marketer flavor is highest priority before launch.
+4. **Mac cluster Reflexion Loop tooling.** Offline batch job for `fact_anchors` / `chat_memory` analysis not yet built. Not a production blocker.
 
-5. **Mac cluster Reflexion Loop tooling.** Offline batch job for `fact_anchors` / `chat_memory` analysis not yet built. Not a production blocker.
 
 ---
 
