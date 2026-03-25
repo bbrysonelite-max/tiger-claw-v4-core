@@ -2,7 +2,6 @@
 // Covers the critical bugs that caused production failures:
 //   1. History role invariant (getChatHistory / saveChatHistory)
 //   2. System prompt content (buildSystemPrompt)
-//   3. Key resolution (resolveGoogleKey)
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
@@ -92,7 +91,7 @@ vi.mock('@google/generative-ai', () => ({
 }));
 
 // Import AFTER all mocks are defined
-import { getChatHistory, saveChatHistory, buildSystemPrompt, resolveGoogleKey, buildFirstMessageText } from '../ai.js';
+import { getChatHistory, saveChatHistory, buildSystemPrompt, buildFirstMessageText } from '../ai.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -307,101 +306,7 @@ describe('buildSystemPrompt', () => {
   });
 });
 
-// ─── resolveGoogleKey ─────────────────────────────────────────────────────────
-
-describe('resolveGoogleKey', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockFsMkdirSync.mockReturnValue(undefined);
-    // Default: no DB BYOK config found
-    mockDbQuery.mockResolvedValue({ rows: [] });
-    // Default env
-    process.env['PLATFORM_ONBOARDING_KEY'] = 'platform-layer1-key';
-    process.env['PLATFORM_EMERGENCY_KEY'] = 'platform-layer4-key';
-    process.env['GOOGLE_API_KEY'] = 'google-fallback-key';
-  });
-
-  afterEach(() => {
-    delete process.env['PLATFORM_ONBOARDING_KEY'];
-    delete process.env['PLATFORM_EMERGENCY_KEY'];
-    delete process.env['GOOGLE_API_KEY'];
-  });
-
-  it('returns PLATFORM_ONBOARDING_KEY for layer 1', async () => {
-    mockGetBotState.mockResolvedValue({ activeLayer: 1 });
-
-    const key = await resolveGoogleKey(TENANT_ID);
-    expect(key).toBe('platform-layer1-key');
-  });
-
-  it('returns PLATFORM_EMERGENCY_KEY for layer 4 (emergency fallback)', async () => {
-    mockGetBotState.mockResolvedValue({ activeLayer: 4 });
-
-    const key = await resolveGoogleKey(TENANT_ID);
-    expect(key).toBe('platform-layer4-key');
-  });
-
-  it('decrypts and returns layer2Key for layer 2', async () => {
-    mockGetBotState.mockResolvedValue({
-      activeLayer: 2,
-      layer2Key: 'enc:some-encrypted-key',
-    });
-
-    const key = await resolveGoogleKey(TENANT_ID);
-    expect(mockDecryptToken).toHaveBeenCalledWith('enc:some-encrypted-key');
-    expect(key).toBe('decrypted:enc:some-encrypted-key');
-  });
-
-  it('returns undefined and does not throw when layer2Key is missing (logs ALERT)', async () => {
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    mockGetBotState.mockResolvedValue({ activeLayer: 2 }); // no layer2Key
-
-    const key = await resolveGoogleKey(TENANT_ID);
-    expect(key).toBeUndefined();
-    expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining('layer2Key'),
-    );
-    consoleSpy.mockRestore();
-  });
-
-  it('returns undefined when tenantPaused=true in key_state', async () => {
-    const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    mockGetBotState.mockResolvedValue({ activeLayer: 1, tenantPaused: true });
-
-    const key = await resolveGoogleKey(TENANT_ID);
-    expect(key).toBeUndefined();
-    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('paused'));
-    consoleSpy.mockRestore();
-  });
-
-  it('falls back to PLATFORM_ONBOARDING_KEY when no key_state.json exists', async () => {
-    mockGetBotState.mockResolvedValue(null); // no key_state.json
-
-    const key = await resolveGoogleKey(TENANT_ID);
-    expect(key).toBe('platform-layer1-key');
-  });
-
-  it('falls back to GOOGLE_API_KEY when PLATFORM_ONBOARDING_KEY not set', async () => {
-    delete process.env['PLATFORM_ONBOARDING_KEY'];
-    mockGetBotState.mockResolvedValue(null);
-
-    const key = await resolveGoogleKey(TENANT_ID);
-    expect(key).toBe('google-fallback-key');
-  });
-
-  it('does not throw and logs alert when key_state.json has invalid JSON', async () => {
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    mockGetBotState.mockRejectedValue(new Error('SyntaxError: Unexpected token'));
-
-    const key = await resolveGoogleKey(TENANT_ID);
-    // Falls through to env var after failed parse
-    expect(key).toBe('platform-layer1-key');
-    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('[AI] [ALERT]'), expect.any(String));
-    consoleSpy.mockRestore();
-  });
-});
-
-// ─── Item 2: buildFirstMessageText (first-message onboarding nudge) ──────────
+// ─── buildFirstMessageText (first-message onboarding nudge) ──────────────────
 
 describe('buildFirstMessageText', () => {
   it('injects SYSTEM nudge when onboarding incomplete and first message', () => {

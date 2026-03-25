@@ -17,17 +17,13 @@ import { Router, type Request, type Response } from "express";
 import Stripe from "stripe";
 import { createHmac } from "crypto";
 import Redis from "ioredis";
-import { provisionQueue, telegramQueue, lineQueue } from "../services/queue.js";
+import { telegramQueue, lineQueue } from "../services/queue.js";
 import {
   createBYOKUser,
   createBYOKBot,
-  createBYOKConfig,
   createBYOKSubscription,
   getTenant,
   logAdminEvent,
-  getPool,
-  getBotState,
-  setBotState,
 } from "../services/db.js";
 import { decryptToken } from "../services/pool.js";
 import { sendAdminAlert } from "./admin.js";
@@ -150,54 +146,11 @@ router.post("/stripe", async (req: Request, res: Response) => {
       // 1. Create User
       const userId = await createBYOKUser(email, name, typeof session.customer === "string" ? session.customer : undefined);
 
-      // Trial-to-paid conversion check!
-      const pool = getPool();
-      const existingBotRes = await pool.query(
-        "SELECT id FROM bots WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1",
-        [userId]
-      );
-      
-      let botId;
-      let preBotId = meta["botId"] && meta["botId"] !== "pending" ? meta["botId"] : null;
-      let isTrialConversion = false;
+      // 2. Create a 'pending' bot record for this purchase so the wizard can find it
+      const preBotId = meta["botId"] && meta["botId"] !== "pending" ? meta["botId"] : null;
+      const botId = preBotId ?? await createBYOKBot(userId, meta["botName"] ?? name, flavor, "pending");
 
-      if (existingBotRes.rows.length > 0) {
-        // This user already has a bot — unlock it
-        botId = existingBotRes.rows[0].id;
-        const botState = JSON.parse(await getBotState(botId, "key_state.json") || "{}");
-        
-        if (botState.tenantPaused) {
-            botState.tenantPaused = false;
-            await setBotState(botId, "key_state.json", botState);
-            isTrialConversion = true;
-            
-            await pool.query("UPDATE bots SET status = 'live' WHERE id = $1", [botId]);
-            await pool.query("UPDATE tenants SET status = 'active' WHERE id = $1", [botId]);
-            
-            console.log(`[stripe-webhook] 🔓 Trial-to-paid conversion! Unlocked bot ${botId}`);
-            await logAdminEvent("trial_conversion_unlock", botId, { email, sessionId: session.id });
-        }
-      } else {
-        // 2. Identify Bot record (pre-registered vs new)
-        // Stan Store purchases don't have a preBotId, so we create a blank 'pending' bot here
-        botId = preBotId ?? await createBYOKBot(userId, meta["botName"] ?? name, flavor, "pending");
-      }
-
-      // 3. Create AI Config only if no pre-registration (wizard already stored key via /wizard/validate-key)
-      if (!preBotId && !isTrialConversion) {
-        console.log(`[stripe-webhook] Creating fallback AI config for bot ${botId}`);
-        await createBYOKConfig({
-          botId,
-          connectionType: "byok",
-          provider: meta["aiProvider"] ?? "google",
-          model: meta["aiModel"] ?? "gemini-2.0-flash",
-          encryptedKey: undefined,
-          keyPreview: undefined,
-        });
-      }
-
-      // 4. Create Subscription record
-      // Stan Store might charge one-time via standard checkout, so we fallback to the session ID if subscription isn't present
+      // 3. Create Subscription record
       if (session.subscription || session.payment_status === "paid") {
         await createBYOKSubscription({
           userId,
@@ -207,42 +160,12 @@ router.post("/stripe", async (req: Request, res: Response) => {
         });
       }
 
-      // HALT AUTO-PROVISIONING IF STAN STORE
-      if (!preBotId && !isTrialConversion) {
-        console.log(`[stripe-webhook] 🛍️ STAN STORE PRE-SALE for ${email}. User created, waiting for Wizard completion.`);
-        await logAdminEvent("stan_store_purchase", botId, { email, slug, sessionId: session.id });
-        
-        // Dispatch the V4 magic link email to the customer
-        await sendStanStoreWelcome(email, name);
-        
-        return; // The wizard's hatch endpoint will do the actual provisioning later
-      }
-
-      if (isTrialConversion) {
-        // We unlocked them. No need to provision again.
-        console.log(`[stripe-webhook] ✅ Trial-to-paid conversion complete for ${slug}`);
-        return;
-      }
-
-      // 5. Enqueue provisioning job (Legacy V3 Native flow where Wizard ran first)
-      await provisionQueue.add('tenant-provisioning', {
-        userId,
-        botId,
-        slug,
-        name,
-        email,
-        flavor,
-        region,
-        language,
-        preferredChannel,
-        timezone,
-      }, {
-        attempts: 5,
-        backoff: { type: 'exponential', delay: 10000 },
-      });
-
-      console.log(`[stripe-webhook] ✅ Successfully enqueued provisioning for ${slug}`);
-      await logAdminEvent("stripe_webhook_success", botId, { email, slug, sessionId: session.id });
+      // Stan Store pre-sale: user + pending bot created, waiting for Wizard to complete setup
+      console.log(`[stripe-webhook] 🛍️ STAN STORE PRE-SALE for ${email}. User created, waiting for Wizard completion.`);
+      await logAdminEvent("stan_store_purchase", botId, { email, slug, sessionId: session.id });
+      
+      // Dispatch the V4 magic link email to the customer
+      await sendStanStoreWelcome(email, name);
 
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err);
@@ -265,6 +188,21 @@ router.post("/telegram/:tenantId", async (req: Request, res: Response) => {
 
   if (!tenantId) {
     return res.status(400).json({ error: "tenantId missing." });
+  }
+
+  // Validate Telegram webhook secret token.
+  // Telegram sends X-Telegram-Bot-Api-Secret-Token on every update when the bot
+  // was registered with setWebhook({ secret_token: TELEGRAM_WEBHOOK_SECRET }).
+  // Any request missing or mismatching this header is rejected immediately.
+  const TELEGRAM_WEBHOOK_SECRET = process.env["TELEGRAM_WEBHOOK_SECRET"];
+  if (TELEGRAM_WEBHOOK_SECRET) {
+    const incomingSecret = req.headers["x-telegram-bot-api-secret-token"];
+    if (incomingSecret !== TELEGRAM_WEBHOOK_SECRET) {
+      console.warn(`[webhooks] Telegram secret token mismatch for tenant: ${tenantId}`);
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+  } else {
+    console.warn("[webhooks] TELEGRAM_WEBHOOK_SECRET not set — webhook signature validation is DISABLED. Set this env var immediately.");
   }
 
   // Ensure tenant exists and is active/onboarding
@@ -295,6 +233,7 @@ router.post("/telegram/:tenantId", async (req: Request, res: Response) => {
     res.status(500).send("Internal Server Error");
   }
 });
+
 
 // ---------------------------------------------------------------------------
 // POST /webhooks/line/:tenantId
