@@ -1,14 +1,14 @@
 import { ToolContext, ToolResult } from "./ToolContext.js";
 // Tiger Claw — tiger_keys Tool
-// Four-layer API key management — Block 1.7 + Block 4 of TIGERCLAW-MASTER-SPEC-v2.md
+// Primary + Backup key management.
 //
-// Four layers (LOCKED):
-//   Layer 1 — Platform Onboarding Key (TC's): 50 msg total, 72h expiry. Deactivated after onboarding.
-//   Layer 2 — Tenant Primary Key (theirs):    no TC limit. Powers the daily flywheel.
-//   Layer 3 — Tenant Fallback Key (theirs):   20 msg/day. Activates if Layer 2 fails.
-//   Layer 4 — Platform Emergency Key (TC's):  5 msg total. Last resort. 24h then auto-pause.
+// Two layers:
+//   Primary (Layer 2) — Tenant's main key. No Tiger Claw message limit.
+//   Backup  (Layer 3) — Tenant's backup key. 20 messages/day limit.
 //
-// Error classification (LOCKED, Block 4.1):
+// If Backup exhausts → bot pauses. Tenant restores a key to resume.
+//
+// Error classification:
 //   401 → rotate immediately
 //   402 → rotate + notify tenant
 //   403 → rotate + notify tenant
@@ -22,16 +22,13 @@ import { ToolContext, ToolResult } from "./ToolContext.js";
 import * as https from "https";
 import * as http from "http";
 import { getTenant, getBotState, setBotState } from "../services/db.js";
-import { sendKeyAbuseWarning } from "../services/email.js";
+
 // ---------------------------------------------------------------------------
-// Constants — LOCKED per spec
+// Constants
 // ---------------------------------------------------------------------------
 
 const LAYER_LIMITS = {
-  1: { dailyMessages: 50, burstMaxMessages: 5, BurstWindowMs: 60000 }, // 5 msgs per minute burst, 50 daily
-  2: { totalMessages: Infinity, expiryHours: Infinity },
-  3: { dailyMessages: 20 },
-  4: { totalMessages: 5, pauseAfterHours: 24 },
+  3: { dailyMessages: 20 }, // Backup key daily cap
 } as const;
 
 // Retry policy per error type
@@ -52,7 +49,7 @@ const MAX_EVENTS = 100;
 // Types
 // ---------------------------------------------------------------------------
 
-type LayerNumber = 1 | 2 | 3 | 4;
+type LayerNumber = 2 | 3;
 
 type ApiErrorType =
   | "invalid_key"    // 401
@@ -77,9 +74,7 @@ type KeyEventType =
   | "limit_exceeded"
   | "pause"
   | "error"
-  | "retry_recommended"
-  | "layer4_activated"
-  | "layer4_exhausted";
+  | "retry_recommended";
 
 interface KeyEvent {
   type: KeyEventType;
@@ -102,19 +97,9 @@ interface RetryTracker {
 interface KeyState {
   activeLayer: LayerNumber;
 
-  // Layer 1 tracking (Platform Key)
-  layer1MessageCountToday: number;
-  layer1CountDate: string; // YYYY-MM-DD
-  layer1BurstCount: number;
-  layer1BurstWindowStart: string; // ISO String
-
-  // Layer 3 tracking (daily limit)
+  // Backup key (Layer 3) daily limit tracking
   layer3MessageCountToday: number;
-  layer3CountDate: string;        // YYYY-MM-DD
-
-  // Layer 4 tracking (total limit + 24h pause timer)
-  layer4TotalMessages: number;
-  layer4ActivatedAt?: string;
+  layer3CountDate: string; // YYYY-MM-DD
 
   // Retry state (cleared on successful call or rotation)
   currentRetry?: RetryTracker;
@@ -124,10 +109,8 @@ interface KeyState {
   tenantPausedAt?: string;
 
   // Persisted tenant key values (written by restore_key)
-  // Keys are stored in plaintext in the tenant directory. The ENCRYPTION_KEY env var is
-  // available if a future iteration adds at-rest encryption.
-  layer2Key?: string;   // Tenant primary key
-  layer3Key?: string;   // Tenant fallback key
+  layer2Key?: string; // Tenant primary key
+  layer3Key?: string; // Tenant backup key
 
   // SecretRef reload tracking
   secretsReloadedAt?: string;
@@ -142,14 +125,14 @@ interface KeyState {
 interface ReportErrorParams {
   action: "report_error";
   httpStatus: number;
-  retryAfterSeconds?: number;   // From Retry-After header (429 responses)
-  isTimeout?: boolean;          // True if the call timed out (no HTTP status)
+  retryAfterSeconds?: number;
+  isTimeout?: boolean;
 }
 
 interface RestoreKeyParams {
   action: "restore_key";
-  layer: LayerNumber;            // Which layer to restore (2 or 3)
-  apiKey: string;                // The new key to validate
+  layer: LayerNumber;
+  apiKey: string;
 }
 
 interface RecordMessageParams {
@@ -172,31 +155,20 @@ type KeysParams =
   | RotateParams
   | StatusParams;
 
-/* removed */
-
-
-
 // ---------------------------------------------------------------------------
 // State persistence
 // ---------------------------------------------------------------------------
 
 function defaultState(): KeyState {
   return {
-    activeLayer: 1,
-    layer1MessageCountToday: 0,
-    layer1CountDate: "",
-    layer1BurstCount: 0,
-    layer1BurstWindowStart: new Date().toISOString(),
+    activeLayer: 2,
     layer3MessageCountToday: 0,
     layer3CountDate: "",
-    layer4TotalMessages: 0,
     tenantPaused: false,
     events: [],
     lastUpdated: new Date().toISOString(),
   };
 }
-
-
 
 async function loadKeyState(workdir: string): Promise<KeyState> {
   const data = await getBotState(workdir, "key_state.json");
@@ -205,7 +177,6 @@ async function loadKeyState(workdir: string): Promise<KeyState> {
 
 async function saveKeyState(workdir: string, state: KeyState): Promise<void> {
   state.lastUpdated = new Date().toISOString();
-  // Keep only the last MAX_EVENTS events
   if (state.events.length > MAX_EVENTS) {
     state.events = state.events.slice(-MAX_EVENTS);
   }
@@ -220,7 +191,7 @@ function appendEvent(state: KeyState, event: KeyEvent): void {
 }
 
 // ---------------------------------------------------------------------------
-// Error classification (LOCKED per Block 4.1)
+// Error classification
 // ---------------------------------------------------------------------------
 
 function classifyError(
@@ -237,10 +208,6 @@ function classifyError(
   return "degraded";
 }
 
-/**
- * Determine the rotation decision for a given error type and current retry state.
- * Implements the full decision tree from Block 4.1.
- */
 function decideAction(
   errorType: ApiErrorType,
   currentRetry: RetryTracker | undefined,
@@ -252,63 +219,51 @@ function decideAction(
     case "invalid_key":
     case "billing":
     case "forbidden":
-      return "rotate"; // Immediate rotation, no retries
+      return "rotate";
 
     case "rate_limited":
-      return "wait"; // Respect Retry-After, do NOT rotate
+      return "wait";
 
     case "server_error": {
       const maxRetries = RETRY_POLICY["5xx"].maxRetries;
       const attempts = currentRetry?.errorType === "5xx" ? currentRetry.attempts : 0;
       if (attempts < maxRetries) return "retry";
-      return "rotate"; // Exhausted retries
+      return "rotate";
     }
 
     case "timeout": {
       const maxRetries = RETRY_POLICY["timeout"].maxRetries;
       const attempts = currentRetry?.errorType === "timeout" ? currentRetry.attempts : 0;
       if (attempts < maxRetries) return "retry";
-      return "rotate"; // Exhausted retries
+      return "rotate";
     }
 
     case "degraded":
-      return "log_warning"; // Log only, keep current layer
+      return "log_warning";
   }
 }
 
 // ---------------------------------------------------------------------------
-// Backoff calculation with ±10% jitter (LOCKED per Block 4.1)
+// Backoff calculation with ±10% jitter
 // ---------------------------------------------------------------------------
 
 function backoffMs(attempt: number): number {
   const base = Math.min(BACKOFF_BASE_MS * Math.pow(2, attempt), BACKOFF_MAX_MS);
   const jitterRange = base * BACKOFF_JITTER;
-  const jitter = (Math.random() * 2 - 1) * jitterRange; // ±10%
+  const jitter = (Math.random() * 2 - 1) * jitterRange;
   return Math.round(base + jitter);
 }
 
 // ---------------------------------------------------------------------------
-// Next layer in cascade
+// Layer helpers
 // ---------------------------------------------------------------------------
 
 function nextLayer(current: LayerNumber): LayerNumber | null {
-  const cascade: Record<LayerNumber, LayerNumber | null> = {
-    1: 2,
-    2: 3,
-    3: 4,
-    4: null, // After Layer 4 → pause (not another layer)
-  };
-  return cascade[current];
+  return current === 2 ? 3 : null; // Primary → Backup → Pause
 }
 
 function layerName(layer: LayerNumber): string {
-  const names: Record<LayerNumber, string> = {
-    1: "Platform Onboarding Key",
-    2: "Primary Key",
-    3: "Fallback Key",
-    4: "Emergency Keep-Alive",
-  };
-  return names[layer];
+  return layer === 2 ? "Primary Key" : "Backup Key";
 }
 
 // ---------------------------------------------------------------------------
@@ -316,7 +271,6 @@ function layerName(layer: LayerNumber): string {
 // ---------------------------------------------------------------------------
 
 function notifyAdmin(tenantId: string, message: string): void {
-  // INTERNAL_API_URL for self-calls — TIGER_CLAW_API_URL is the external/public URL
   const apiUrl = process.env.INTERNAL_API_URL ?? (() => { throw new Error("[FATAL] INTERNAL_API_URL environment variable is required"); })();
 
   try {
@@ -350,60 +304,59 @@ function notifyAdmin(tenantId: string, message: string): void {
 }
 
 // ---------------------------------------------------------------------------
-// Key validation (mirrors tiger_onboard.ts — same logic, self-contained)
+// Key validation
 // ---------------------------------------------------------------------------
 
-function detectProvider(key: string): "google" | "openai" | "unknown" {
-  if (key.startsWith("AIza")) return "google";
-  if (key.startsWith("sk-")) return "openai"; // retained for mock fallback
+function detectProvider(key: string): "google" | "openai" | "anthropic" | "grok" | "openrouter" | "kimi" | "unknown" {
+  if (key.startsWith("AIza"))    return "google";
+  if (key.startsWith("sk-ant-")) return "anthropic";
+  if (key.startsWith("xai-"))    return "grok";
+  if (key.startsWith("sk-or-"))  return "openrouter";
+  if (key.startsWith("sk-"))     return "openai";
+  if (key.startsWith("km-"))     return "kimi";
   return "unknown";
 }
 
 async function validateApiKey(key: string): Promise<{ valid: boolean; error?: string }> {
   const provider = detectProvider(key);
-  if (provider === "unknown") {
-    return { valid: false, error: "Unrecognized key format. Google AI keys start with 'AIza'." };
-  }
-  try {
-    // Rely on Google validation from platform instead of importing duplicate code
-    // The key validation logic is primarily done in tiger_onboard.ts during setup.
-    // Here we can just accept Google format or add a fetch block if needed.
-    // For tiger_keys.ts, it calls validateApiKey when restoring a key.
-    if (provider === "google") {
-        return new Promise((resolve) => {
-            const req = https.request(
-            {
-                hostname: "generativelanguage.googleapis.com",
-                path: `/v1beta/models?key=${encodeURIComponent(key)}&pageSize=1`,
-                method: "GET",
-            },
-            (res) => {
-                let data = "";
-                res.on("data", (chunk) => (data += chunk));
-                res.on("end", () => {
-                if (res.statusCode === 200) {
-                    resolve({ valid: true });
-                } else if (res.statusCode === 400 || res.statusCode === 403) {
-                    resolve({ valid: false, error: "That key is not valid." });
-                } else {
-                    resolve({ valid: false, error: `Validation returned status ${res.statusCode}. Please try again.` });
-                }
-                });
-            }
-            );
 
-            req.on("error", (err) => resolve({ valid: false, error: `Network error: ${err.message}` }));
-            req.setTimeout(15000, () => { req.destroy(); resolve({ valid: false, error: "Validation timed out." }); });
-            req.end();
-        });
-    }
-    return { valid: true }; // mock pass for openai 
-  } catch (err) {
-    return { valid: false, error: String(err) };
+  if (provider === "unknown") {
+    return { valid: false, error: "Unrecognized key format. Check your provider's API key format and try again." };
   }
+
+  // Google: make a live validation call
+  if (provider === "google") {
+    return new Promise((resolve) => {
+      const req = https.request(
+        {
+          hostname: "generativelanguage.googleapis.com",
+          path: `/v1beta/models?key=${encodeURIComponent(key)}&pageSize=1`,
+          method: "GET",
+        },
+        (res) => {
+          let data = "";
+          res.on("data", (chunk) => (data += chunk));
+          res.on("end", () => {
+            if (res.statusCode === 200) {
+              resolve({ valid: true });
+            } else if (res.statusCode === 400 || res.statusCode === 403) {
+              resolve({ valid: false, error: "That key is not valid." });
+            } else {
+              resolve({ valid: false, error: `Validation returned status ${res.statusCode}. Please try again.` });
+            }
+          });
+        }
+      );
+      req.on("error", (err) => resolve({ valid: false, error: `Network error: ${err.message}` }));
+      req.setTimeout(15000, () => { req.destroy(); resolve({ valid: false, error: "Validation timed out." }); });
+      req.end();
+    });
+  }
+
+  // All other providers: format is valid — live validation happens at call time
+  return { valid: true };
 }
 
-// ---------------------------------------------------------------------------
 // ---------------------------------------------------------------------------
 // Rotation — perform a layer switch
 // ---------------------------------------------------------------------------
@@ -419,7 +372,7 @@ async function performRotation(
   const toLayer = nextLayer(fromLayer);
 
   if (toLayer === null) {
-    // Layer 4 → Pause
+    // Backup exhausted → Pause
     state.tenantPaused = true;
     state.tenantPausedAt = new Date().toISOString();
 
@@ -431,84 +384,55 @@ async function performRotation(
     });
 
     await saveKeyState(workdir, state);
-    // No key rotation on pause — ai.ts resolveGoogleKey() returns undefined when
-    // tenantPaused=true, preventing any further Gemini calls.
-    notifyAdmin(tenantId, `🔴 Tenant ${tenantId} auto-paused — Emergency key exhausted. Reason: ${reason}`);
+    notifyAdmin(tenantId, `🔴 Tenant ${tenantId} auto-paused — both keys exhausted. Reason: ${reason}`);
 
     return {
       toLayer: null,
       tenantMessage: [
         `⚠️ Your bot has been paused.`,
         ``,
-        `Both your API keys failed and my emergency backup has run out of messages.`,
+        `Both your Primary and Backup keys failed.`,
         ``,
-        `To resume: restore your API keys and message me "restore key" with your new key.`,
+        `To resume: message me "restore key [your-new-key]" with a working key.`,
         `Your leads, sequences, and data are all preserved.`,
       ].join("\n"),
       adminAlert: true,
     };
   }
 
-  // Bug #4: skip layers with no key configured — cascade to next available layer
-  let effectiveLayer: LayerNumber = toLayer;
-  if (effectiveLayer === 2 && !state.layer2Key) {
-    effectiveLayer = (nextLayer(2) ?? 4) as LayerNumber;
-  }
-  if (effectiveLayer === 3 && !state.layer3Key) {
-    effectiveLayer = (nextLayer(3) ?? 4) as LayerNumber;
+  // Skip Backup if no key configured → go straight to pause
+  if (toLayer === 3 && !state.layer3Key) {
+    return performRotation(state, 3, `No Backup key configured — ${reason}`, workdir, tenantId, logger);
   }
 
-  // Normal rotation
-  state.activeLayer = effectiveLayer;
-  state.currentRetry = undefined; // Clear retry tracker on rotation
-
-  if (effectiveLayer === 4) {
-    state.layer4ActivatedAt = new Date().toISOString();
-  }
+  // Normal rotation: Primary → Backup
+  state.activeLayer = toLayer;
+  state.currentRetry = undefined;
 
   appendEvent(state, {
-    type: effectiveLayer === 4 ? "layer4_activated" : "rotation",
+    type: "rotation",
     timestamp: new Date().toISOString(),
     fromLayer,
-    toLayer: effectiveLayer,
+    toLayer,
     message: reason,
   });
 
   await saveKeyState(workdir, state);
 
-  const requiresAdminAlert = effectiveLayer === 3 || effectiveLayer === 4;
-  if (requiresAdminAlert) {
-    const severity = effectiveLayer === 4 ? "🔴 CRITICAL" : "🟡 WARNING";
-    notifyAdmin(
-      tenantId,
-      `${severity} Tenant ${tenantId} rotated to ${layerName(effectiveLayer)}. Reason: ${reason}`
-    );
-  }
+  notifyAdmin(
+    tenantId,
+    `🟡 WARNING Tenant ${tenantId} rotated to ${layerName(toLayer)}. Reason: ${reason}`
+  );
 
-  // Tenant message varies by destination layer
-  const tenantMessages: Record<number, string> = {
-    2: `Your key has been restored and your primary brain is back online.`,
-    3: [
-      `Your primary API key stopped working. I've switched to your backup key.`,
-      ``,
-      `You can keep using me, but your backup key has a limit of 20 messages per day.`,
-      ``,
-      `To fix this: restore your primary API key and message me "restore key [your-new-key]".`,
-    ].join("\n"),
-    4: [
-      `⚠️ Both your API keys are down. I've switched to emergency mode.`,
-      ``,
-      `I have 5 messages remaining before I have to pause. After 24 hours without a fix, I'll pause automatically.`,
-      ``,
-      `To fix this: restore either of your API keys and message me "restore key [your-new-key]".`,
-    ].join("\n"),
-  };
+  const tenantMessage = [
+    `Your primary API key stopped working. I've switched to your backup key.`,
+    ``,
+    `You can keep using me, but your backup key has a limit of ${LAYER_LIMITS[3].dailyMessages} messages per day.`,
+    ``,
+    `To fix this: restore your primary API key and message me "restore key [your-new-key]".`,
+  ].join("\n");
 
-  return {
-    toLayer: effectiveLayer,
-    tenantMessage: tenantMessages[effectiveLayer] ?? `Rotated to ${layerName(effectiveLayer)}.`,
-    adminAlert: requiresAdminAlert,
-  };
+  return { toLayer, tenantMessage, adminAlert: true };
 }
 
 // ---------------------------------------------------------------------------
@@ -545,7 +469,7 @@ async function handleReportError(
     timestamp: new Date().toISOString(),
     httpStatus: params.httpStatus,
     errorType,
-    message: `HTTP ${params.httpStatus ?? "timeout"} on Layer ${state.activeLayer} — decision: ${decision}`,
+    message: `HTTP ${params.httpStatus ?? "timeout"} on ${layerName(state.activeLayer)} — decision: ${decision}`,
   });
 
   switch (decision) {
@@ -654,10 +578,9 @@ async function handleRestoreKey(
   workdir: string,
   logger: ToolContext["logger"]
 ): Promise<ToolResult> {
-  // Coerce layer to number — Gemini may send it as a string even though schema says number.
   const restoredLayer = Number(params.layer) as LayerNumber;
   if (![2, 3].includes(restoredLayer)) {
-    return { ok: false, error: "Only Layer 2 (primary) or Layer 3 (fallback) can be restored by the tenant." };
+    return { ok: false, error: "Only Layer 2 (Primary) or Layer 3 (Backup) can be restored by the tenant." };
   }
 
   logger.info("tiger_keys: validating restored key", { layer: restoredLayer });
@@ -672,17 +595,13 @@ async function handleRestoreKey(
 
   const previousLayer = state.activeLayer;
 
-  // Persist the validated key value
-  // (entrypoint reads layer2Key / layer3Key from key_state.json at startup)
   if (restoredLayer === 2) state.layer2Key = params.apiKey;
   if (restoredLayer === 3) state.layer3Key = params.apiKey;
 
-  // Switch to restored layer if it's better than current active
-  // (e.g., primary restored while on fallback or emergency)
   const shouldSwitch =
     !state.tenantPaused
-      ? restoredLayer < state.activeLayer // Restore to a better layer
-      : restoredLayer <= 3; // If paused, any valid key resumes
+      ? restoredLayer < state.activeLayer
+      : true; // Any valid key resumes from pause
 
   if (shouldSwitch) {
     state.activeLayer = restoredLayer;
@@ -691,11 +610,6 @@ async function handleRestoreKey(
       state.tenantPaused = false;
       state.tenantPausedAt = undefined;
     }
-    // Bug #8: clear Layer 4 state on restore to prevent stale timer/counter on re-entry
-    if (restoredLayer < 4) {
-      state.layer4ActivatedAt = undefined;
-      state.layer4TotalMessages = 0;
-    }
   }
 
   appendEvent(state, {
@@ -703,7 +617,7 @@ async function handleRestoreKey(
     timestamp: new Date().toISOString(),
     fromLayer: previousLayer,
     toLayer: restoredLayer,
-    message: `Layer ${restoredLayer} (${layerName(restoredLayer)}) restored and validated.`,
+    message: `${layerName(restoredLayer)} restored and validated.`,
   });
 
   await saveKeyState(workdir, state);
@@ -714,15 +628,12 @@ async function handleRestoreKey(
     newActiveLayer: state.activeLayer,
   });
 
-  const wasResumed = previousLayer !== restoredLayer && shouldSwitch;
-  const wasPaused = state.tenantPaused === false && previousLayer > restoredLayer;
+  const wasResumed = shouldSwitch && previousLayer !== restoredLayer;
 
   const output = [
     `✅ ${layerName(restoredLayer)} validated and restored.`,
     wasResumed ? `Switched from ${layerName(previousLayer)} back to ${layerName(restoredLayer)}.` : "",
-    wasPaused || state.tenantPaused === false
-      ? `Your bot is fully operational. Flywheel is running.`
-      : "",
+    `Your bot is fully operational. Flywheel is running.`,
   ].filter(Boolean).join("\n");
 
   return {
@@ -750,69 +661,7 @@ async function handleRecordMessage(
   const today = new Date().toISOString().slice(0, 10);
   const layer = state.activeLayer;
 
-  // Layer 1: Strict Platform Key rate limits (Daily + Burst)
-  if (layer === 1) {
-    if (state.layer1CountDate !== today) {
-      state.layer1MessageCountToday = 0;
-      state.layer1CountDate = today;
-    }
-
-    // Check Burst Limits (e.g. max 5 messages per minute)
-    const now = Date.now();
-    const burstStart = new Date(state.layer1BurstWindowStart).getTime();
-    if (now - burstStart > LAYER_LIMITS[1].BurstWindowMs) {
-      // Reset burst window
-      state.layer1BurstCount = 0;
-      state.layer1BurstWindowStart = new Date(now).toISOString();
-    }
-
-    state.layer1BurstCount++;
-    state.layer1MessageCountToday++;
-
-    if (state.layer1BurstCount > LAYER_LIMITS[1].burstMaxMessages) {
-      appendEvent(state, {
-        type: "limit_exceeded",
-        timestamp: new Date().toISOString(),
-        message: `Layer 1 Burst limit exceeded (${LAYER_LIMITS[1].burstMaxMessages} msgs / ${LAYER_LIMITS[1].BurstWindowMs}ms). Loop suspected.`,
-      });
-      const rotation = await performRotation(state, 1, "Platform Key Burst Limit Exceeded (Loop Prevention)", workdir, tenantId, logger);
-      await saveKeyState(workdir, state);
-      return {
-        ok: true,
-        output: rotation.tenantMessage,
-        data: { layer, burstExceeded: true, rotatedTo: rotation.toLayer },
-      };
-    }
-
-    const remaining = LAYER_LIMITS[1].dailyMessages - state.layer1MessageCountToday;
-
-    if (state.layer1MessageCountToday > LAYER_LIMITS[1].dailyMessages) {
-      appendEvent(state, {
-        type: "limit_exceeded",
-        timestamp: new Date().toISOString(),
-        message: `Layer 1 daily limit reached (${LAYER_LIMITS[1].dailyMessages} messages).`,
-      });
-      const rotation = await performRotation(state, 1, "Platform Key Daily Limit Reached", workdir, tenantId, logger);
-      await saveKeyState(workdir, state);
-      return {
-        ok: true,
-        output: rotation.tenantMessage,
-        data: { layer, limitExceeded: true, rotatedTo: rotation.toLayer },
-      };
-    }
-
-    if (remaining <= 10) {
-      appendEvent(state, {
-        type: "limit_warning",
-        timestamp: new Date().toISOString(),
-        message: `Layer 1: ${remaining} messages remaining today.`,
-      });
-    }
-    await saveKeyState(workdir, state);
-    return { ok: true, output: "", data: { layer, remaining } };
-  }
-
-  // Layer 3: daily limit
+  // Backup key (Layer 3): enforce daily limit
   if (layer === 3) {
     if (state.layer3CountDate !== today) {
       state.layer3MessageCountToday = 0;
@@ -825,10 +674,10 @@ async function handleRecordMessage(
       appendEvent(state, {
         type: "limit_exceeded",
         timestamp: new Date().toISOString(),
-        message: `Layer 3 daily limit reached (${LAYER_LIMITS[3].dailyMessages} messages).`,
+        message: `Backup key daily limit reached (${LAYER_LIMITS[3].dailyMessages} messages).`,
       });
 
-      const rotation = await performRotation(state, 3, "Layer 3 daily message limit reached", workdir, tenantId, logger);
+      const rotation = await performRotation(state, 3, "Backup key daily message limit reached", workdir, tenantId, logger);
       await saveKeyState(workdir, state);
 
       return {
@@ -842,11 +691,11 @@ async function handleRecordMessage(
       appendEvent(state, {
         type: "limit_warning",
         timestamp: new Date().toISOString(),
-        message: `Layer 3: ${remaining} messages remaining today.`,
+        message: `Backup key: ${remaining} messages remaining today.`,
       });
       await saveKeyState(workdir, state);
 
-      logger.warn("tiger_keys: Layer 3 approaching daily limit", { remaining });
+      logger.warn("tiger_keys: Backup key approaching daily limit", { remaining });
       return {
         ok: true,
         output: `⚠️ Backup key running low: ${remaining} messages left today. Please restore your primary key.`,
@@ -858,81 +707,7 @@ async function handleRecordMessage(
     return { ok: true, output: "", data: { layer, remaining } };
   }
 
-  // Layer 4: total message count
-  if (layer === 4) {
-    state.layer4TotalMessages++;
-    const remaining = LAYER_LIMITS[4].totalMessages - state.layer4TotalMessages;
-
-    // Check 24h auto-pause timer
-    if (state.layer4ActivatedAt) {
-      const hoursSinceActivation =
-        (Date.now() - new Date(state.layer4ActivatedAt).getTime()) / 3600000;
-      if (hoursSinceActivation >= LAYER_LIMITS[4].pauseAfterHours) {
-        const rotation = await performRotation(state, 4, "Layer 4 active for 24 hours — auto-pause", workdir, tenantId, logger);
-        await saveKeyState(workdir, state);
-        return {
-          ok: true,
-          output: rotation.tenantMessage,
-          data: { layer, tenantPaused: true, reason: "24h_timeout" },
-        };
-      }
-    }
-
-    // Check total message limit
-    if (state.layer4TotalMessages >= LAYER_LIMITS[4].totalMessages) {
-      appendEvent(state, {
-        type: "layer4_exhausted",
-        timestamp: new Date().toISOString(),
-        message: `Layer 4 exhausted (${LAYER_LIMITS[4].totalMessages} messages used).`,
-      });
-
-      const rotation = await performRotation(state, 4, "Layer 4 message limit exhausted", workdir, tenantId, logger);
-      await saveKeyState(workdir, state);
-
-      try {
-        const tenant = await getTenant(tenantId);
-        if (tenant?.email) await sendKeyAbuseWarning(tenant.email, 3, 0); // Strike 3 — Auto Pause
-      } catch (err) {
-        logger.error("tiger_keys: failed to send strike 3 warning", { err: String(err) });
-      }
-
-      return {
-        ok: true,
-        output: rotation.tenantMessage,
-        data: { layer, limitExceeded: true, tenantPaused: true },
-      };
-    }
-
-    if (remaining <= 2) {
-      appendEvent(state, {
-        type: "limit_warning",
-        timestamp: new Date().toISOString(),
-        message: `Layer 4: ${remaining} emergency messages remaining.`,
-      });
-    }
-
-    await saveKeyState(workdir, state);
-
-    // Trigger 3-strike warnings
-    if (state.layer4TotalMessages === 2 || state.layer4TotalMessages === 4) {
-      const strike = state.layer4TotalMessages === 2 ? 1 : 2;
-      try {
-        const tenant = await getTenant(tenantId);
-        if (tenant?.email) await sendKeyAbuseWarning(tenant.email, strike, remaining);
-      } catch (err) {
-        logger.error(`tiger_keys: failed to send strike ${strike} warning`, { err: String(err) });
-      }
-    }
-
-    // Always warn on Layer 4 — every message counts
-    return {
-      ok: true,
-      output: `⚠️ Emergency mode: ${remaining} messages remaining. Restore your API keys immediately.`,
-      data: { layer, remaining, emergency: true },
-    };
-  }
-
-  // Layer 2: no TC limits — just track for logging
+  // Primary key (Layer 2): no Tiger Claw limits — just track for logging
   await saveKeyState(workdir, state);
   return { ok: true, output: "", data: { layer, unlimited: true } };
 }
@@ -982,33 +757,16 @@ function handleStatus(state: KeyState): ToolResult {
 
   const lines = [
     `Key Management Status`,
-    `Active layer: ${state.activeLayer} — ${layerName(state.activeLayer)}`,
+    `Active: ${layerName(state.activeLayer)}`,
     `Bot paused: ${state.tenantPaused ? `Yes (since ${state.tenantPausedAt})` : "No"}`,
     ``,
-    `Layer limits:`,
+    `Key limits:`,
+    `  Primary Key: No Tiger Claw limit`,
   ];
 
-  // Layer 1
-  lines.push(`  Layer 1 (Onboarding): ${state.layer1MessageCountToday}/${LAYER_LIMITS[1].dailyMessages} messages used today`);
-
-  // Layer 2
-  lines.push(`  Layer 2 (Primary): No Tiger Claw limit`);
-
-  // Layer 3
   const layer3Today = state.layer3CountDate === today ? state.layer3MessageCountToday : 0;
-  lines.push(`  Layer 3 (Fallback): ${layer3Today}/${LAYER_LIMITS[3].dailyMessages} messages today`);
+  lines.push(`  Backup Key: ${layer3Today}/${LAYER_LIMITS[3].dailyMessages} messages today`);
 
-  // Layer 4
-  lines.push(`  Layer 4 (Emergency): ${state.layer4TotalMessages}/${LAYER_LIMITS[4].totalMessages} messages total`);
-  if (state.layer4ActivatedAt) {
-    const hoursActive = Math.round(
-      (Date.now() - new Date(state.layer4ActivatedAt).getTime()) / 3600000
-    );
-    const hoursRemaining = Math.max(0, LAYER_LIMITS[4].pauseAfterHours - hoursActive);
-    lines.push(`  Layer 4 activated ${hoursActive}h ago — ${hoursRemaining}h until auto-pause`);
-  }
-
-  // Recent events
   const recentEvents = state.events.slice(-5);
   if (recentEvents.length > 0) {
     lines.push(``);
@@ -1030,14 +788,10 @@ function handleStatus(state: KeyState): ToolResult {
     data: {
       activeLayer: state.activeLayer,
       tenantPaused: state.tenantPaused,
-      layer1MessageCount: state.layer1MessageCountToday,
       layer3MessageCountToday: layer3Today,
       layer3DailyLimit: LAYER_LIMITS[3].dailyMessages,
-      layer4TotalMessages: state.layer4TotalMessages,
-      layer4TotalLimit: LAYER_LIMITS[4].totalMessages,
-      layer4ActivatedAt: state.layer4ActivatedAt ?? null,
       currentRetry: state.currentRetry ?? null,
-      recentEvents: recentEvents,
+      recentEvents,
     },
   };
 }
@@ -1098,7 +852,7 @@ async function execute(
 export const tiger_keys = {
   name: "tiger_keys",
   description:
-    "Four-layer API key management. Tracks which key layer is active, enforces message limits (Layer 3: 20/day, Layer 4: 5 total), manages the rotation cascade (Layer 2→3→4→Pause), handles exponential backoff with jitter, and validates restored keys before accepting. Call record_message before every LLM call to enforce limits. Call report_error with the HTTP status after any LLM API failure to get the rotation decision. Call restore_key when tenant provides a new key.",
+    "Primary + Backup key management. Tracks which key is active, enforces Backup key daily limit (20/day), manages the rotation cascade (Primary→Backup→Pause), handles exponential backoff with jitter, and validates restored keys before accepting. Call record_message before every LLM call. Call report_error with the HTTP status after any LLM API failure to get the rotation decision. Call restore_key when the tenant provides a new key.",
 
   parameters: {
     type: "object",
@@ -1107,7 +861,7 @@ export const tiger_keys = {
         type: "string",
         enum: ["report_error", "restore_key", "record_message", "rotate", "status"],
         description:
-          "report_error: classify an API error and get rotation decision. restore_key: validate and restore a tenant key. record_message: increment counter for current layer (call before every LLM message). rotate: manual layer rotation. status: show active layer and limits.",
+          "report_error: classify an API error and get rotation decision. restore_key: validate and restore a tenant key. record_message: increment counter for current layer (call before every LLM message). rotate: manual layer rotation. status: show active key and limits.",
       },
       httpStatus: {
         type: "number",
@@ -1124,7 +878,7 @@ export const tiger_keys = {
       layer: {
         type: "string",
         enum: ["2", "3"],
-        description: "Which layer to restore — 2 (primary) or 3 (fallback). For restore_key only.",
+        description: "Which key to restore — 2 (Primary) or 3 (Backup). For restore_key only.",
       },
       apiKey: {
         type: "string",
