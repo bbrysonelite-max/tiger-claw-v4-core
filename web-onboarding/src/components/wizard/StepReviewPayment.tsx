@@ -22,29 +22,8 @@ export default function StepReviewPayment({ state, isDeploying, setIsDeploying, 
         setIsDeploying(true);
 
         try {
-            // 1. Validate & Store AI Keys
-            if (state.aiKeys.length > 0) {
-                const keyResponse = await fetch(`${API_BASE}/wizard/validate-key`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        botId: state.botId,
-                        keys: state.aiKeys.map(k => ({
-                            provider: k.provider,
-                            key: k.key,
-                            model: k.model
-                        }))
-                    })
-                });
-
-                const keyData = await keyResponse.json();
-                if (!keyResponse.ok || !keyData.valid) {
-                    const errDetails = keyData.details?.filter((d: any) => d.status === "error").map((d: any) => `${d.provider}: ${d.error}`).join(", ");
-                    throw new Error("Invalid AI Keys: " + (errDetails || "Validation failed"));
-                }
-            }
-
-            // 2. Transmit final wizard settings & Hatch Target
+            // Keys already validated at install time in StepAIConnection — skip re-validation here.
+            // Transmit final wizard settings & Hatch Target
             const hatchResponse = await fetch(`${API_BASE}/wizard/hatch`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
