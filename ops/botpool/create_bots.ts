@@ -51,6 +51,9 @@ interface AccountState {
 
 const API_BASE = process.env["TIGER_CLAW_API_URL"] ?? (() => { throw new Error("[FATAL] TIGER_CLAW_API_URL environment variable is required"); })();
 const ADMIN_TOKEN = process.env["ADMIN_TOKEN"] ?? "";
+if (!ADMIN_TOKEN) {
+  console.warn("[WARNING] ADMIN_TOKEN env var is not set — requests will be sent without authentication and will fail with 401.");
+}
 const BOTFATHER_PEER = "BotFather";
 const TOKEN_REGEX = /(\d{8,12}:[A-Za-z0-9_-]{35,})/;
 const NAME_RETRY_DELAY_MS = 30_000;
@@ -98,6 +101,8 @@ function ts(): string {
   return new Date().toISOString().slice(11, 19);
 }
 
+const PHONE_ACCOUNT = flag("--phone-account", process.env["PHONE_ACCOUNT"] ?? "");
+
 async function postToPool(botToken: string, botUsername: string): Promise<boolean> {
   try {
     const resp = await fetch(`${API_BASE}/admin/pool/add`, {
@@ -106,7 +111,7 @@ async function postToPool(botToken: string, botUsername: string): Promise<boolea
         "Content-Type": "application/json",
         ...(ADMIN_TOKEN ? { Authorization: `Bearer ${ADMIN_TOKEN}` } : {}),
       },
-      body: JSON.stringify({ botToken, botUsername }),
+      body: JSON.stringify({ botToken, ...(PHONE_ACCOUNT ? { phoneAccount: PHONE_ACCOUNT } : {}) }),
     });
     if (resp.ok) return true;
     const body = await resp.json().catch(() => ({}));
@@ -587,10 +592,11 @@ if (hasFlag("--mtproto")) {
   console.log("    --mtproto           Use MTProto automated creation");
   console.log("    --sessions <path>   Session strings JSON file (required for --mtproto)");
   console.log("    --count <n>         Number of bots to create (default: 10)");
-  console.log("    --delay <seconds>   Seconds between reuses of same account (default: 480)");
+  console.log("    --delay <seconds>   (ignored in --mtproto mode — uses 16-25min jitter to evade bans)");
   console.log("    --api-id <id>       Telegram API ID (or TELEGRAM_API_ID env var)");
   console.log("    --api-hash <hash>   Telegram API hash (or TELEGRAM_API_HASH env var)");
   console.log("    --api-url <url>     Tiger Claw API base URL (or TIGER_CLAW_API_URL env var — required)");
-  console.log("    --admin-token <tok> Admin auth token (or ADMIN_TOKEN env var)");
+  console.log("    --admin-token <tok> Admin auth token (or ADMIN_TOKEN env var)
+    --phone-account <label> Label for which SIM created these bots (e.g. "SIM-1") — stored for auditing");
   process.exit(0);
 }
