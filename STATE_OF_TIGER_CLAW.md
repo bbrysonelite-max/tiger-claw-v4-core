@@ -84,13 +84,12 @@ Deployments to Cloud Run are handled by GitHub Actions on merge to main. Do not 
 - **Platform key expired silently:** Both platform keys were expired; renewed and deployed. Platform key health check (PR #33) prevents recurrence.
 - **Botpool ops pipeline debugged:** `addTokenToPool` was storing username as telegramBotId. Fixed in PR #34.
 
-### Open Issues / PRs Pending Merge
+### Open Issues / Next Actions
 
-1. **PR #33** — error handling. 382/382 green.
-2. **PR #34** — botpool ops fix. 382/382 green.
-3. **PR #35** — ops cleanup. 382/382 green.
-4. **PR #36** — admin dashboard (in progress).
-5. **Mac cluster Reflexion Loop tooling** — offline batch for `fact_anchors`/`chat_memory`. Not a production blocker.
+- **PRs #30–#36 all merged.** Repo is clean. main is deployable.
+- **See `LAUNCH_READINESS.md`** — full go/no-go assessment, 10 known weaknesses, pre-launch checklist, sprint 2 priorities.
+- **P1 before Zoom (2026-03-27):** feedback loop dead routes + Cloud Run min-instances=1
+- **Mac cluster Reflexion Loop tooling** — offline batch for `fact_anchors`/`chat_memory`. Not a production blocker.
 
 ---
 

@@ -87,8 +87,9 @@ All loaded in `Promise.all()` — DB unreachable = static prompt, no crash.
 
 ## 5. Open Issues (Priority Order)
 
-1. **PRs #33–#36** — open, all green, awaiting merge. See `STATE_OF_TIGER_CLAW.md` for full list.
-2. **Mac cluster Reflexion Loop tooling** — offline batch for `fact_anchors`/`chat_memory`. Not a production blocker.
+1. **PRs #30–#36 all merged.** Repo is clean. See `STATE_OF_TIGER_CLAW.md` for full history.
+2. **Two P1 items before Zoom call (2026-03-27):** See `LAUNCH_READINESS.md` — feedback loop dead routes + Cloud Run min-instances.
+3. **Mac cluster Reflexion Loop tooling** — offline batch for `fact_anchors`/`chat_memory`. Sprint 2.
 
 ## 6. What Was Validated This Session (2026-03-26)
 
@@ -103,5 +104,7 @@ All loaded in `Promise.all()` — DB unreachable = static prompt, no crash.
 ## FINAL REMINDER
 
 `CLAUDE.md` contains the non-negotiable product philosophy and engineering constraints. Read it before writing any code.
+
+**Next session:** Read `LAUNCH_READINESS.md` first. It has the go/no-go verdict, the 10 known weaknesses, the pre-launch checklist, and sprint 2 priorities. That is the single source of truth for what happens before and after the 2026-03-27 Zoom call.
 
 Everything else you need is in `ARCHITECTURE.md`, `STATE_OF_TIGER_CLAW.md`, `specs/`, and `docs/`. Trust the repo, not your base-model memory.
