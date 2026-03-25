@@ -1,6 +1,6 @@
 # STATE OF TIGER CLAW — HARD CONTEXT LOCK
 **Timestamp:** 2026-03-24
-**Infrastructure Status:** LIVE. 155/155 tests green. Memory Architecture V4.1 fully shipped.
+**Infrastructure Status:** LIVE. 383/383 tests green. Memory Architecture V4.1 fully merged. Value-gap cron shipped (PR #26 pending merge).
 
 ---
 
@@ -11,9 +11,10 @@ This is the single source of truth for the Tiger Claw repository.
 1. **NO RAG.** Mini-RAG has been physically removed. It does not exist.
 2. **NO OPENCLAW.** No per-tenant Docker containers. OpenClaw is dead.
 3. **NO CANARIES.** The canary group concept is deprecated. All tenants are treated equally until scale justifies it.
-4. **ARCHITECTURE:** Stateless Google Cloud Run API, Gemini 2.0 Flash (locked — 2.5 Flash has a GCP function-calling bug), 19 Native Function Calling Tools (`api/src/tools/`), shared PostgreSQL.
-5. **NO REWRITES:** The 19 core tools compile cleanly and are backed by 155 passing tests. Do not rewrite architecture.
-6. **PROTOCOL:** Read `CLAUDE.md` before writing any code.
+4. **NO FREE TRIAL.** The free trial model is dead. Card is charged at checkout via Stan Store. 7-day money-back guarantee, no questions asked. `trialExpired` code paths have been removed. Do not restore them.
+5. **ARCHITECTURE:** Stateless Google Cloud Run API, Gemini 2.0 Flash (locked — 2.5 Flash has a GCP function-calling bug), 19 Native Function Calling Tools (`api/src/tools/`), shared PostgreSQL.
+6. **NO REWRITES:** The 19 core tools compile cleanly and are backed by 383 passing tests. Do not rewrite architecture.
+7. **PROTOCOL:** Read `CLAUDE.md` before writing any code.
 
 ---
 
@@ -22,7 +23,7 @@ This is the single source of truth for the Tiger Claw repository.
 - NEVER push directly to main. main is branch-protected.
 - ALL work goes on a feature branch: `feat/`, `fix/`, `chore/`
 - When work is complete and tests pass: open a PR.
-- PRs #23 and #24 are pending merge (memory Phase 4 + CLAUDE.md product philosophy).
+- **PR #26** (`feat/value-gap-cron`) is currently open. Merge it next.
 
 **Deploy sequence:**
 ```bash
@@ -42,11 +43,11 @@ Deployments to Cloud Run are handled by GitHub Actions on merge to main. Do not 
 ### Architecture
 - **API:** Cloud Run, Node.js/Express, port 4000, `https://api.tigerclaw.io`
 - **DB:** Cloud SQL PostgreSQL HA (`tiger_claw_shared`)
-- **Cache/Queue:** Cloud Redis HA + BullMQ (5 queues)
+- **Cache/Queue:** Cloud Redis HA + BullMQ (6 queues: provision, telegram, line, fact-extraction, ai-routines, global-cron)
 - **AI:** Gemini 2.0 Flash via `@google/generative-ai` SDK (locked — do not change)
-- **Frontend (wizard):** Next.js on Vercel (`wizard.tigerclaw.io`) — part of `tiger-claw-v4-core` repo, `web-onboarding/` subdirectory
-- **Frontend (website):** Static HTML on Vercel (`tigerclaw.io`) — separate repo `tiger-bot-website`
-- **Payments:** Stan Store (purchase gating) + Stripe (subscription checkout)
+- **Frontend (wizard):** Next.js on Vercel (`wizard.tigerclaw.io`) — part of this repo, `web-onboarding/` subdirectory
+- **Frontend (website):** Static HTML on Vercel (`tigerclaw.io`) — `tiger-bot-website/` subdirectory
+- **Payments:** Stan Store (purchase gating + checkout)
 - **Email:** Resend
 - **Bot Pool:** 42 available Telegram bot tokens, AES-256-GCM encrypted
 - **GCP Project:** `hybrid-matrix-472500-k5`
@@ -56,36 +57,46 @@ Deployments to Cloud Run are handled by GitHub Actions on merge to main. Do not 
 - **Tiger-Claw Pro (Pre-Flavored):** $147/mo — Telegram + LINE, pre-trained for sales and network marketing. Stan Store: `stan.store/brentbryson/p/tired-of-manually-searching-for-leads-`
 - **Industry Agent:** $197/mo — domain pre-trained for a specific vertical. Stan Store: `stan.store/brentbryson/p/custom-agent-flavor`
 - "Standard Agent" naming is DEAD. It is now "Industry Agent."
+- **No free trial.** Card upfront. 7-day money-back guarantee, no questions asked.
 
-### Recent Work Completed
-- **Memory Architecture V4.1** — All 4 phases shipped:
-  - Phase 1: `buildSystemPrompt()` async, injects ICP + hive signals + pipeline stats
-  - Phase 2: Sawtooth context compression (`chat_memory` Redis key, 30d TTL)
-  - Phase 3: Fact anchor extraction (async BullMQ job → `tenant_states.fact_anchors`)
-  - Phase 4: `startFocus` / `completeFocus` / `incrementFocusToolCalls` session primitives
-- **CLAUDE.md:** Product philosophy baked in — Integrity First, Radical Value Delivery, Zero Complexity
-- **Website fixes:** Industry Agent naming, Stan Store deep links wired, Pre-Flavored label on Tiger-Claw Pro
-- **CORS fixed:** `wizard/auth` API call works cleanly from wizard.tigerclaw.io
-- **john-thailand:** Fresh tenant provisioned for John (Thailand). `john-noon` left as suspended tombstone.
-- **pat-sullivan:** Removed (never activated).
+### Business Model
+- Customers purchase on Stan Store. Stan Store webhook provisions their tenant and emails a magic link.
+- Wizard flow: StepIdentity → StepAIConnection → StepReviewPayment → PostPaymentSuccess
+- Keys: Primary + Backup. All 6 providers supported: Google, OpenAI, Anthropic, Grok, OpenRouter, Kimi.
+- Key auto-detection on paste: `AIza→google`, `sk-ant-→anthropic`, `xai-→grok`, `sk-or-→openrouter`, `sk-→openai`.
+- Server validates each key on INSTALL click before saving. Fail-fast, not fail-silent.
+
+### Recent Work Completed (This Session)
+- **Business model pivot:** Removed free trial entirely. Card upfront. 7-day MBG. `trialExpired` code path and Layer 4 auto-resume dead and removed from all wizard components.
+- **Key strategy rewrite:** 4-layer system → Primary + Backup. Restored all 6 providers. Auto-detect from prefix. Server validation on INSTALL. Hand-holding wizard UX.
+- **Memory Architecture V4.1 (PRs #20–#24, all merged):**
+  - PR #20: Phase 1 — `buildSystemPrompt()` async, ICP + hive + pipeline injection
+  - PR #21: Phase 2 — Sawtooth context compression (`chat_memory` Redis key)
+  - PR #22: Phase 3 — Fact anchor extraction (async BullMQ → `tenant_states.fact_anchors`)
+  - PR #23: Phase 4 — `startFocus` / `completeFocus` / `incrementFocusToolCalls`
+  - PR #24: CLAUDE.md product philosophy + doc rewrites
+- **Value-gap detection cron (PR #26 — pending merge):**
+  - 9 AM UTC daily check: active tenant with zero leads in 3 days triggers `value_gap_checkin` job
+  - Dedup via `value_gap_{tenantId}_{YYYY-MM-DD}` jobId
+  - Fires plain-language diagnostic message to operator via their bot
+  - 3-day window (per CLAUDE.md mandate, tightened from initial 7-day spec)
+- **Website + OG tags:** `tigerclaw.io` updated — OG/Twitter Card meta tags, Tiger Claw Agent claw OG image (1200×675), 7-day MBG banner, corrected Stan Store links.
 
 ### Open Issues
 
-1. **Value-gap detection** — No cron logic yet to detect paying tenants with zero leads in 7 days and send a diagnostic message. Required by CLAUDE.md product philosophy.
+1. **PR #26 — merge when ready.** `feat/value-gap-cron`. 383/383 tests green.
 
-2. **`[Mockup] Skip AI` button** — Not in source code. Was in a stale compiled build. Will be eliminated on next wizard deploy (when PRs #23/#24 merge to main).
+2. **`tiger_knowledge` tool references dead Mini-RAG.** The vector DB it queries no longer exists. Must be rewired or removed before any customer-facing launch.
 
-3. **OG/social meta tags** — `tigerclaw.io` has no `og:title`, `og:image`, `twitter:card`. Every shared link renders as a bare URL. Low effort, high impact fix.
+3. **`tiger_keys` tool uses old 4-layer naming.** Layer 1 "Platform Onboarding Key" concept is dead. Tool code and any documentation should reflect Primary + Backup model.
 
-4. **Wizard auth error has no purchase CTA** — When a user enters an email with no purchase, the error message tells them to go to Stan Store but provides no link.
+4. **Agent flavor file quality review.** The 13 flavor files and core system constitution have not been line-reviewed. Network Marketer flavor is highest priority before launch.
 
-5. **Wizard deployed build is stale** — PRs #23/#24 need to merge to main to trigger a fresh Vercel deploy and kill the stale build artifacts.
-
-6. **Mac cluster Reflexion Loop tooling** — The offline batch job that reads `fact_anchors` / `chat_memory` and proposes system prompt improvements has not been built yet.
+5. **Mac cluster Reflexion Loop tooling.** Offline batch job for `fact_anchors` / `chat_memory` analysis not yet built. Not a production blocker.
 
 ---
 
-## Memory Architecture (V4.1 — FULLY SHIPPED)
+## Memory Architecture (V4.1 — FULLY SHIPPED, ALL MERGED)
 
 **Design:** Hybrid Cognitive Architecture — Cloud Run executes stateless, Redis/PostgreSQL hold all persistent memory.
 
@@ -103,10 +114,10 @@ Deployments to Cloud Run are handled by GitHub Actions on merge to main. Do not 
 | `fact_anchors` | Extracted business facts from live conversations |
 
 ### Phase Status
-- [x] Phase 1: Dynamic prompt enrichment — shipped
-- [x] Phase 2: Sawtooth context compression — shipped
-- [x] Phase 3: Fact anchor extraction — shipped
-- [x] Phase 4: `startFocus` / `completeFocus` primitives — shipped (PR #23 pending merge)
+- [x] Phase 1: Dynamic prompt enrichment — merged PR #20
+- [x] Phase 2: Sawtooth context compression — merged PR #21
+- [x] Phase 3: Fact anchor extraction — merged PR #22
+- [x] Phase 4: `startFocus` / `completeFocus` primitives — merged PR #23
 
 ### Mac Cluster (192.168.0.2) — OFFLINE ONLY
 The Cheese Grater is an **offline Reflexion Loop tool**. It reads Cloud SQL via Auth Proxy, analyzes `fact_anchors` and `chat_memory` across tenants, and proposes system prompt improvements for Brent to review. It is **NOT** called by Cloud Run and cannot break production if offline.
@@ -119,7 +130,6 @@ The Cheese Grater is an **offline Reflexion Loop tool**. It reads Cloud SQL via 
 |---|---|---|
 | `john-thailand` | onboarding | Fresh provision 2026-03-24. Bot: @tc_62g6al77_bot |
 | `john-noon` | suspended | Webhook conflict. Left as tombstone. Superseded by john-thailand |
-| `pat-sullivan` | terminated | Never activated. Removed 2026-03-24 |
 
 ---
 

@@ -291,7 +291,7 @@ if (factExtractionWorker) {
 
 export interface AIRoutineJobData {
     tenantId: string;
-    routineType: 'daily_scout' | 'nurture_check';
+    routineType: 'daily_scout' | 'nurture_check' | 'value_gap_checkin';
 }
 
 export const routineWorker = SHOULD_RUN_WORKERS ? new Worker(
@@ -400,6 +400,34 @@ export const cronWorker = SHOULD_RUN_WORKERS ? new Worker(
                             tenantId: tenant.id,
                             routineType: 'daily_scout',
                         }, { jobId: `scout_${tenant.id}_${today}`, removeOnComplete: true, removeOnFail: true });
+                    }
+
+                    // ── Value-gap detection — runs once per day at 9 AM UTC ────────────
+                    // CLAUDE.md mandate: any paying tenant with no lead in 7 consecutive
+                    // days must receive a genuine diagnostic check-in, not a retention push.
+                    if (nowHour === 9) {
+                        try {
+                            const pool = getPool();
+                            const { rows: gapRows } = await pool.query(`
+                                SELECT 1
+                                FROM tenants t
+                                LEFT JOIN tenant_leads l ON l.tenant_id = t.id
+                                WHERE t.id = $1
+                                  AND t.status = 'active'
+                                GROUP BY t.id
+                                HAVING COUNT(l.id) = 0
+                                    OR MAX(l.created_at) < NOW() - INTERVAL '3 days'
+                            `, [tenant.id]);
+
+                            if (gapRows.length > 0) {
+                                await routineQueue.add('value_gap_checkin', {
+                                    tenantId: tenant.id,
+                                    routineType: 'value_gap_checkin',
+                                }, { jobId: `value_gap_${tenant.id}_${today}`, removeOnComplete: true, removeOnFail: true });
+                            }
+                        } catch (gapErr) {
+                            console.error(`[Cron] Value-gap check failed for tenant ${tenant.id}:`, gapErr);
+                        }
                     }
 
                     // ── Feedback loop enforcement ──────────────────────────────────────
