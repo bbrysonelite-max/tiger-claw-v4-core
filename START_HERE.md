@@ -11,9 +11,9 @@ Stop what you are doing. Read this entire document and `CLAUDE.md`. These are yo
 
 - **Architecture:** V4 Stateless Serverless — one API process, all tenants, context resolved per-request
 - **Database:** PostgreSQL HA via Cloud SQL Proxy (`tiger_claw_shared`)
-- **Cache/Queue:** Redis HA + BullMQ (6 queues: provision, telegram, line, fact-extraction, ai-routines, global-cron)
+- **Cache/Queue:** Redis HA + BullMQ (7 queues: provision, telegram, line, email-support, fact-extraction, ai-routines, global-cron)
 - **AI Engine:** Gemini 2.0 Flash (LOCKED — `gemini-2.5-flash` has a GCP function-calling bug, do not use it)
-- **Tests:** 382/382 passing
+- **Tests:** 374/374 passing
 - **Flavors:** 10 customer-facing industry flavors (doctor was removed — healthcare compliance risk)
 - **Min-instances:** 1 — no cold start
 
@@ -28,18 +28,21 @@ Stop what you are doing. Read this entire document and `CLAUDE.md`. These are yo
 ## 2. What Has Been Accomplished
 
 1. **V4 Stateless Architecture** — Cloud Run API, shared PostgreSQL, Redis, BullMQ. No Docker containers per tenant.
-2. **18 Native Function Calling Tools** — All in `api/src/tools/`. Backed by 382 passing tests.
+2. **18 Native Function Calling Tools** — All in `api/src/tools/`. Backed by 374 passing tests.
 3. **Business Model: Card Upfront** — No free trial. Card charged at checkout via Stan Store. 7-day money-back guarantee, no questions asked. The `trialExpired` code path is dead and removed.
 4. **Key Strategy: Primary + Backup, 6 Providers** — Wizard supports all 6 AI providers (Google, OpenAI, Anthropic, Grok, OpenRouter, Kimi). Auto-detects provider from key prefix on paste. Server validates on INSTALL.
 5. **Memory Architecture V4.1 (All 4 Phases)** — `buildSystemPrompt()` is async. Injects ICP, hive signals, pipeline stats, and fact anchors on every request. Sawtooth compression, fact anchor extraction, and focus primitives all shipped (PRs #20–#24, merged).
 6. **Value-Gap Detection Cron** — 9 AM UTC daily: active tenant with zero leads in 3 days fires a diagnostic message to the operator. Per CLAUDE.md mandate. Merged PR #26.
-7. **Dead Code Removal** — `tiger_knowledge` (dead Mini-RAG tool) removed PR #27. `tiger_keys` simplified from 4-layer to Primary+Backup PR #28.
+7. **Dead Code Removal** — `tiger_knowledge` (dead Mini-RAG tool) removed PR #27. `tiger_keys` simplified from 4-layer to Primary+Backup PR #28. `resolveGoogleKey` removed PR #41.
 8. **System Prompt Fixes** — Tool count corrected (18), `tiger_keys` telemetry parameter fixed (`httpStatus` not `error`). Merged PR #29.
 9. **Flavor File Review & Cleanup — COMPLETE** — All 10 remaining flavors reviewed. Doctor dropped (compliance risk). Language tightened. PR #30 merged.
 10. **Integrity First Product Philosophy** — Baked into `CLAUDE.md`. Non-negotiable for all future code.
 11. **Website + OG Tags** — `tigerclaw.io` updated with product naming, Stan Store links, 7-day MBG banner, OG/Twitter Card meta tags.
 12. **Hive Intelligence (V4 Analytics)** — Universal Prior, Founding Member Program, ICP signal mapping. Migrations 005a-009.
-13. **PRs #30–#39 all merged.** Admin dashboard live. Vercel build fixed.
+13. **PRs #30–#45 all merged.** Admin dashboard live. Email support agent live.
+14. **Beta Hardening (PRs #41–#44)** — ADMIN_TOKEN rotated, Telegram webhook secret wired, dead trial code removed, fix-all-webhooks corrected for V4 encrypted tokens.
+15. **Email Infrastructure** — Resend wired (RESEND_API_KEY in GCP Secrets), `tigerclaw.io` domain added (pending DNS verification). FROM_EMAIL corrected to `hello@tigerclaw.io`.
+16. **Email Support Agent (PR #45)** — `POST /webhooks/email` inbound Postmark webhook. AI generates replies using platform key. Sends from `support@tigerclaw.io` via Resend. Postmark MX live on Porkbun.
 
 ---
 
@@ -70,7 +73,7 @@ All loaded in `Promise.all()` — DB unreachable = static prompt, no crash.
 
 ---
 
-## 4. Product (as of 2026-03-26)
+## 4. Product (as of 2026-03-25)
 
 | Product | Price | Stan Store URL |
 |---|---|---|
@@ -89,53 +92,56 @@ All loaded in `Promise.all()` — DB unreachable = static prompt, no crash.
 
 ## 5. Tenant Roster
 
-| Slug | Status | Notes |
+| Slug | Status | Email | Notes |
+|---|---|---|---|
+| `debbie-cameron` | live | justagreatdirector@outlook.com | Paying customer. Magic link sent 2026-03-25. Bot: @tiger10000000003_bot |
+| `john-thailand` | live | vijohn@hotmail.com | Paying customer (John and Noon). Magic link sent 2026-03-25. Bot: @tc_62g6al77_bot |
+| `chana-loha` | live | chana.loh@gmail.com | Paying customer (Chana Lohasaptawee). Magic link sent 2026-03-25 |
+
+**Note:** All three are V3-era records — `user_id` is null, `containerName` is a legacy artifact. They have bot tokens assigned and are live. Onboarding completes when they click their magic link and connect an AI key.
+
+**john-noon** was deprovisioned (2026-03-25) — tombstone recycled back to pool.
+
+**7 past customers** (paid, never received service) have been preserved. Personal outreach planned post-Zoom. See memory file for emails and draft message.
+
+---
+
+## 6. Email Infrastructure
+
+| Address | Purpose | Status |
 |---|---|---|
-| `debbie-cameron` | onboarding | Paying customer (2 months). Provisioned 2026-03-26. Bot: @tiger10000000003_bot. Send magic link: `https://wizard.tigerclaw.io/wizard?email=justagreatdirector@outlook.com` |
-| `john-thailand` | onboarding | Fresh provision 2026-03-24. Bot: @tc_62g6al77_bot |
-| `john-noon` | suspended | Webhook conflict tombstone. Superseded by john-thailand. Recycle token when convenient. |
+| `hello@tigerclaw.io` | Transactional outbound (magic links, receipts) | ✅ Sending via Resend |
+| `support@tigerclaw.io` | AI-handled customer support (inbound via Postmark) | ✅ Live |
+| `noreply@tigerclaw.io` | System alerts | Planned |
+| `brent@tigerclaw.io` | Personal | Planned |
+
+**Resend domain:** `tigerclaw.io` added, DNS records on Porkbun — pending propagation (DKIM + SPF).
+**Postmark inbound:** MX record live. Webhook URL `https://api.tigerclaw.io/webhooks/email` configured. Token in GCP Secrets as `tiger-claw-postmark-webhook-token`.
 
 ---
 
-## 6. Beta Hardening — Work in Progress (2026-03-26 session)
+## 7. Bot Pool
 
-**Next session must complete these in order:**
-
-### SECURITY — Do First
-1. **Rotate ADMIN_TOKEN** — current value `s3825` is 5 chars, not random. Must be replaced.
-   - Generate: `openssl rand -hex 32`
-   - Update GCP: `gcloud secrets versions add tiger-claw-admin-token --data-file=- --project=hybrid-matrix-472500-k5`
-   - Redeploy: `gcloud run deploy tiger-claw-api --region=us-central1` (or trigger via GitHub Actions)
-   - Update local `.env` to match
-
-2. **Add Telegram webhook secret token validation** — No signature check on incoming Telegram webhooks. Anyone who knows the URL can spam it.
-   - Telegram supports `secret_token` param on `setWebhook` and sends `X-Telegram-Bot-Api-Secret-Token` header
-   - Store per-bot secret in encrypted bot pool or as a global env var
-   - Validate in `webhooks.ts` Telegram handler
-
-### DEAD CODE — Do Second
-3. **Delete `resolveGoogleKey`** in `api/src/services/ai.ts` — old 4-layer resolver, never called by any message path. Delete function + its test block.
-
-4. **Delete `StepPlanSelection`** component — `web-onboarding/src/components/wizard/StepPlanSelection.tsx` — not imported anywhere, has dead "demo" plan. Delete the file.
-
-5. **Clean dead trial code** in `api/src/routes/webhooks.ts` — `isTrialConversion` logic is dead. Remove it. Lines ~162-225.
-
-### ADMIN_TOKEN NOTE
-- GCP secret name: `tiger-claw-admin-token`
-- API URL: `https://tiger-claw-api-1059104880024.us-central1.run.app`
-- Auth header: `Authorization: Bearer <token>`
+- **Available:** 63 tokens
+- **Assigned:** 13 tokens (real customers + internal/sandbox)
+- **Status:** Healthy
+- 21 demo/tombstone tenants were deprovisioned 2026-03-25 — tokens recycled
 
 ---
 
-## 7. What Was Validated This Session (2026-03-26)
+## 8. What Was Done This Session (2026-03-25)
 
-- LINE integration proven end-to-end
-- Platform key expiry incident discovered, resolved, health check added
-- Botpool ingestion pipeline fully audited and corrected
-- `/admin/demo` security hole deleted
-- Admin fleet dashboard shipped (PR #36), Vercel build bug fixed (PR #39)
-- Both P1 items confirmed resolved: feedback loop handlers exist, min-instances=1
-- Debbie Cameron provisioned manually — first paying customer with a live bot
+- **Damage assessment** — all PRs #40–#44 clean, no breakage
+- **Both P1s confirmed already resolved** — min-instances=1, feedback loop handlers exist
+- **Pool cleanup** — 21 demo/tombstone tenants deprovisioned, pool 42→63
+- **Admin dashboard** — Vercel was pinned to stale deployment; redeployed, now live at `wizard.tigerclaw.io/admin/dashboard`
+- **RESEND_API_KEY** wired into Cloud Run — emails now actually send (were mock-only before)
+- **FROM_EMAIL** corrected to `hello@tigerclaw.io`
+- **tigerclaw.io domain** added to Resend, DNS records added on Porkbun
+- **Email support agent** built and deployed (PR #45) — Postmark inbound → BullMQ → AI → Resend reply
+- **Customer emails updated** in DB — john-thailand → vijohn@hotmail.com, chana-loha → chana.loh@gmail.com
+- **Magic links sent** to all 3 paying customers
+- **Past customer outreach** drafted and saved to memory (7 people, post-Zoom)
 
 ---
 
@@ -144,5 +150,7 @@ All loaded in `Promise.all()` — DB unreachable = static prompt, no crash.
 `CLAUDE.md` contains the non-negotiable product philosophy and engineering constraints. Read it before writing any code.
 
 **Zoom call:** Thursday 2026-03-27, 7 PM Pacific. Platform is GO. See `LAUNCH_READINESS.md` for smoke test sequence.
+
+**Fire test (smoke test) still needs to be run** — Stan Store purchase → email → wizard → bot flow has not been validated end-to-end in production.
 
 Everything else you need is in `ARCHITECTURE.md`, `STATE_OF_TIGER_CLAW.md`, `specs/`, and `docs/`. Trust the repo, not your base-model memory.

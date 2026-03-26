@@ -1,6 +1,6 @@
 # STATE OF TIGER CLAW — HARD CONTEXT LOCK
 **Timestamp:** 2026-03-25
-**Infrastructure Status:** LIVE. 382/382 tests green. Flavor review complete. PR #30 pending merge.
+**Infrastructure Status:** LIVE. 374/374 tests green. PRs #30–#45 all merged.
 
 ---
 
@@ -13,7 +13,7 @@ This is the single source of truth for the Tiger Claw repository.
 3. **NO CANARIES.** The canary group concept is deprecated.
 4. **NO FREE TRIAL.** Card is charged at checkout via Stan Store. 7-day money-back guarantee. `trialExpired` code paths removed. Do not restore them.
 5. **ARCHITECTURE:** Stateless Google Cloud Run API, Gemini 2.0 Flash (locked — 2.5 Flash has a GCP function-calling bug), 18 Native Function Calling Tools (`api/src/tools/`), shared PostgreSQL.
-6. **NO REWRITES:** The 18 core tools compile cleanly and are backed by 382 passing tests. Do not rewrite architecture.
+6. **NO REWRITES:** The 18 core tools compile cleanly and are backed by 374 passing tests. Do not rewrite architecture.
 7. **10 FLAVORS ONLY:** network-marketer, real-estate, health-wellness, airbnb-host, baker, candle-maker, gig-economy, lawyer, plumber, sales-tiger. Doctor was removed — compliance risk. Do not re-add it.
 8. **PROTOCOL:** Read `CLAUDE.md` before writing any code.
 
@@ -24,7 +24,6 @@ This is the single source of truth for the Tiger Claw repository.
 - NEVER push directly to main. main is branch-protected.
 - ALL work goes on a feature branch: `feat/`, `fix/`, `chore/`
 - When work is complete and tests pass: open a PR.
-- **PR #30** (`fix/flavor-cleanup-drop-doctor`) is currently open. Merge it next.
 
 **Deploy sequence:**
 ```bash
@@ -39,18 +38,19 @@ Deployments to Cloud Run are handled by GitHub Actions on merge to main. Do not 
 
 ---
 
-## Current State (2026-03-25, updated 2026-03-26)
+## Current State (2026-03-25)
 
 ### Architecture
 - **API:** Cloud Run, Node.js/Express, port 4000, `https://api.tigerclaw.io`
 - **DB:** Cloud SQL PostgreSQL HA (`tiger_claw_shared`)
-- **Cache/Queue:** Cloud Redis HA + BullMQ (6 queues: provision, telegram, line, fact-extraction, ai-routines, global-cron)
+- **Cache/Queue:** Cloud Redis HA + BullMQ (7 queues: provision, telegram, line, email-support, fact-extraction, ai-routines, global-cron)
 - **AI:** Gemini 2.0 Flash via `@google/generative-ai` SDK (locked — do not change)
 - **Frontend (wizard):** Next.js on Vercel (`wizard.tigerclaw.io`) — part of this repo, `web-onboarding/` subdirectory
 - **Frontend (website):** Static HTML on Vercel (`tigerclaw.io`) — `tiger-bot-website/` subdirectory
 - **Payments:** Stan Store (purchase gating + checkout)
-- **Email:** Resend
-- **Bot Pool:** 42 available Telegram bot tokens, AES-256-GCM encrypted
+- **Email (outbound):** Resend — `hello@tigerclaw.io`, `support@tigerclaw.io`. Domain `tigerclaw.io` added, DNS pending propagation.
+- **Email (inbound):** Postmark — `support@tigerclaw.io` → AI support agent via `POST /webhooks/email`
+- **Bot Pool:** 63 available Telegram bot tokens, AES-256-GCM encrypted
 - **GCP Project:** `hybrid-matrix-472500-k5`
 - **Cloud Run Service:** `tiger-claw-api`, region `us-central1`
 
@@ -67,29 +67,42 @@ Deployments to Cloud Run are handled by GitHub Actions on merge to main. Do not 
 - Key auto-detection on paste: `AIza→google`, `sk-ant-→anthropic`, `xai-→grok`, `sk-or-→openrouter`, `sk-→openai`.
 - Server validates each key on INSTALL click. Fail-fast, not fail-silent.
 
-### Recent Work Completed
-- **PRs #20–#24 (merged):** Memory Architecture V4.1 — async buildSystemPrompt, Sawtooth compression, fact anchors, focus primitives, CLAUDE.md philosophy
-- **PR #26 (merged):** Value-gap cron — 9 AM UTC daily, 3-day lead check, diagnostic message to operator
-- **PR #27 (merged):** Removed `tiger_knowledge` — dead Mini-RAG tool
-- **PR #28 (merged):** Simplified `tiger_keys` — 4-layer → Primary + Backup, all 6 providers
-- **PR #29 (merged):** Fixed `buildSystemPrompt` — tool count 19→18, `httpStatus` parameter name
-- **PR #30 (merged):** Flavor review — doctor dropped (compliance), language tightened, 11→10 flavors
-- **PR #31 (merged):** Doc sync post-PR #30
-- **PR #32 (merged):** Customer-facing fixes — website key copy, LINE wizard auto-reply warning, LINE token length 200→1000
-- **PR #33 (open):** Error handling end-to-end — `classifyAIError`, differentiated user messages, platform key health check in cron (8 AM UTC)
-- **PR #34 (open):** Botpool ops audit — `/admin/pool/add` now uses `importToken` (correct telegramBotId), `create_bots.ts` ADMIN_TOKEN warning + `--phone-account` flag
-- **PR #35 (open):** Ops cleanup — deleted `/admin/demo` (dead Layer 1 + unprotected endpoint) and `seed_tenant.ts` (dead V3 code)
-- **PR #36 (in progress):** Admin fleet dashboard — fleet table, pool health, alarms, per-tenant actions
-- **LINE integration proven:** Full stack tested end-to-end. Webhook → BullMQ → processLINEMessage → onboarding → fact anchors → Hive injection. Working.
-- **Platform key expired silently:** Both platform keys were expired; renewed and deployed. Platform key health check (PR #33) prevents recurrence.
-- **Botpool ops pipeline debugged:** `addTokenToPool` was storing username as telegramBotId. Fixed in PR #34.
+### PRs Merged (all of them)
+- **PRs #20–#24:** Memory Architecture V4.1
+- **PR #26:** Value-gap cron
+- **PR #27:** Removed `tiger_knowledge`
+- **PR #28:** Simplified `tiger_keys`
+- **PR #29:** Fixed `buildSystemPrompt`
+- **PR #30:** Flavor cleanup — doctor dropped
+- **PRs #31–#36:** Doc sync, customer fixes, error handling, botpool fix, ops cleanup, fleet dashboard
+- **PRs #37–#39:** Launch readiness docs, Vercel build fix
+- **PR #40:** Session wrap docs
+- **PR #41:** Beta hardening — ADMIN_TOKEN rotated, Telegram webhook secret, dead code removed
+- **PR #42:** Telegram webhook secret wired into all setWebhook calls
+- **PR #43:** fix-all-webhooks — JOIN bot_pool for V4 encrypted tokens
+- **PR #44:** fix-all-webhooks — include 'live' status
+- **PR #45:** Email support agent — Postmark inbound → BullMQ → AI → Resend reply
+
+### Tenant Roster
+
+| Slug | Email | Status | Notes |
+|---|---|---|---|
+| `debbie-cameron` | justagreatdirector@outlook.com | live | Paying customer. Magic link sent 2026-03-25 |
+| `john-thailand` | vijohn@hotmail.com | live | Paying customer (John and Noon). Magic link sent 2026-03-25 |
+| `chana-loha` | chana.loh@gmail.com | live | Paying customer (Chana Lohasaptawee). Magic link sent 2026-03-25 |
+
+All three are V3-era records — `user_id` null, `containerName` is legacy artifact. Onboarding completes when they click magic link and connect an AI key.
+
+**john-noon** deprovisioned 2026-03-25 — webhook conflict tombstone, token recycled to pool.
+
+**7 past customers** preserved for post-Zoom outreach (paid, never received service). See memory for contact details.
 
 ### Open Issues / Next Actions
 
-- **PRs #30–#36 all merged.** Repo is clean. main is deployable.
-- **See `LAUNCH_READINESS.md`** — full go/no-go assessment, 10 known weaknesses, pre-launch checklist, sprint 2 priorities.
-- **P1 before Zoom (2026-03-27):** feedback loop dead routes + Cloud Run min-instances=1
-- **Mac cluster Reflexion Loop tooling** — offline batch for `fact_anchors`/`chat_memory`. Not a production blocker.
+- **Fire test (smoke test) not yet run** — Stan Store → email → wizard → bot flow unvalidated in production. Do before Zoom.
+- **Resend DNS propagation** — DKIM + SPF records on Porkbun pending. Will complete automatically.
+- **Post-Zoom:** personal outreach to 7 past customers with complimentary access offer.
+- **Sprint 2:** rate limiting on webhooks, HMAC-signed magic links, Reflexion Loop on Mac cluster, bot pool replenishment.
 
 ---
 
@@ -118,15 +131,6 @@ Deployments to Cloud Run are handled by GitHub Actions on merge to main. Do not 
 
 ### Mac Cluster (192.168.0.2) — OFFLINE ONLY
 The Cheese Grater is an **offline Reflexion Loop tool**. It reads Cloud SQL via Auth Proxy, analyzes `fact_anchors` and `chat_memory` across tenants, and proposes system prompt improvements for Brent to review. It is **NOT** called by Cloud Run and cannot break production if offline.
-
----
-
-## Tenant Roster (Notable)
-
-| Slug | Status | Notes |
-|---|---|---|
-| `john-thailand` | onboarding | Fresh provision 2026-03-24. Bot: @tc_62g6al77_bot |
-| `john-noon` | suspended | Webhook conflict. Left as tombstone. Superseded by john-thailand |
 
 ---
 
