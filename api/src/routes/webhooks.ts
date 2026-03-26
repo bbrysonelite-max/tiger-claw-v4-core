@@ -17,7 +17,7 @@ import { Router, type Request, type Response } from "express";
 import Stripe from "stripe";
 import { createHmac } from "crypto";
 import Redis from "ioredis";
-import { telegramQueue, lineQueue } from "../services/queue.js";
+import { telegramQueue, lineQueue, emailQueue } from "../services/queue.js";
 import {
   createBYOKUser,
   createBYOKBot,
@@ -316,6 +316,56 @@ router.post("/line/:tenantId", async (req: Request, res: Response) => {
       console.error(`[webhooks] LINE event processing failed for tenant ${tenantId}:`, err);
     }
   });
+});
+
+// ---------------------------------------------------------------------------
+// POST /webhooks/email
+// Postmark inbound webhook — receives emails to support@tigerclaw.io and
+// enqueues them for AI-generated replies.
+// Secured by POSTMARK_WEBHOOK_TOKEN env var checked against the
+// X-Postmark-Webhook-Token header Postmark sends with every inbound POST.
+// ---------------------------------------------------------------------------
+router.post("/email", async (req: Request, res: Response) => {
+  // Validate Postmark webhook token
+  const POSTMARK_WEBHOOK_TOKEN = process.env["POSTMARK_WEBHOOK_TOKEN"];
+  if (POSTMARK_WEBHOOK_TOKEN) {
+    const incoming = req.headers["x-postmark-webhook-token"];
+    if (incoming !== POSTMARK_WEBHOOK_TOKEN) {
+      console.warn("[webhooks] Postmark email webhook token mismatch");
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+  } else {
+    console.warn("[webhooks] POSTMARK_WEBHOOK_TOKEN not set — email webhook is unprotected");
+  }
+
+  const body = req.body;
+  const fromEmail: string = body?.From ?? body?.FromFull?.Email ?? "";
+  const fromName: string  = body?.FromName ?? body?.FromFull?.Name ?? "";
+  const subject: string   = body?.Subject ?? "(no subject)";
+  const text: string      = body?.StrippedTextReply ?? body?.TextBody ?? body?.HtmlBody ?? "";
+  const messageId: string = body?.MessageID ?? body?.Headers?.find((h: any) => h.Name === "Message-ID")?.Value ?? Date.now().toString();
+
+  if (!fromEmail) {
+    return res.status(400).json({ error: "No sender email in payload" });
+  }
+
+  // Acknowledge immediately — AI reply is async
+  res.status(200).json({ received: true });
+
+  await emailQueue.add("email-support", {
+    fromEmail,
+    fromName,
+    subject,
+    body: text,
+    messageId,
+  }, {
+    attempts: 3,
+    backoff: { type: "exponential", delay: 5000 },
+    removeOnComplete: true,
+    removeOnFail: true,
+  });
+
+  console.log(`[webhooks] Inbound email queued from ${fromEmail}: "${subject}"`);
 });
 
 // ---------------------------------------------------------------------------
