@@ -1,7 +1,7 @@
 import { Resend } from "resend";
 
 const resend = new Resend(process.env["RESEND_API_KEY"] ?? "re_mock_key");
-const FROM_EMAIL = "Tiger Claw <hello@api.tigerclaw.io>";
+const FROM_EMAIL = "Tiger Claw <hello@tigerclaw.io>";
 
 export async function sendProvisioningReceipt(email: string, botUsername: string, planName: string): Promise<void> {
   const isMock = process.env["RESEND_API_KEY"] === undefined;
@@ -109,6 +109,38 @@ export async function sendTrialReminderEmail(
     console.log(`[Email] sendTrialReminderEmail (${hoursRemaining}h) sent to ${email}`);
   } catch (error) {
     console.error(`[Email] sendTrialReminderEmail failed:`, error);
+  }
+}
+
+export async function sendSupportReply(to: string, toName: string, subject: string, replyText: string): Promise<void> {
+  const isMock = process.env["RESEND_API_KEY"] === undefined;
+  if (isMock) {
+    console.log(`[Email] MOCK sendSupportReply to ${to}: ${replyText.slice(0, 80)}`);
+    return;
+  }
+
+  const replySubject = subject.startsWith("Re:") ? subject : `Re: ${subject}`;
+  const html = `
+<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:600px;margin:0 auto;padding:24px;color:#1a1a2e;">
+  <p>${replyText.replace(/\n/g, "<br>")}</p>
+  <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;">
+  <p style="color:#6b7280;font-size:12px;">
+    Tiger Claw Support · <a href="https://tigerclaw.io" style="color:#f59e0b;">tigerclaw.io</a><br>
+    Reply to this email to continue the conversation.
+  </p>
+</div>`;
+
+  try {
+    await resend.emails.send({
+      from: "Tiger Claw Support <support@tigerclaw.io>",
+      to,
+      subject: replySubject,
+      html,
+      replyTo: "support@tigerclaw.io",
+    });
+    console.log(`[Email] sendSupportReply sent to ${to}`);
+  } catch (error) {
+    console.error(`[Email] sendSupportReply failed:`, error);
   }
 }
 

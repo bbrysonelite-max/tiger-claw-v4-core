@@ -252,6 +252,47 @@ if (lineWorker) {
 }
 
 // ---------------------------------------------------------------------------
+// Email Support Queue — inbound support emails routed to the AI support agent
+// ---------------------------------------------------------------------------
+
+export const emailQueue = new Queue('email-support', { connection: connection as any });
+console.log('[Queue] BullMQ email-support queue configured.');
+
+export interface EmailSupportJobData {
+    fromEmail: string;
+    fromName: string;
+    subject: string;
+    body: string;
+    messageId: string;
+}
+
+export const emailWorker = SHOULD_RUN_WORKERS ? new Worker(
+    'email-support',
+    async (job: Job<EmailSupportJobData>) => {
+        const { fromEmail, fromName, subject, body, messageId } = job.data;
+        console.log(`[Worker] Processing support email from ${fromEmail}: "${subject}"`);
+        try {
+            const { processEmailSupportMessage } = await import('./ai.js');
+            await processEmailSupportMessage(fromEmail, fromName, subject, body, messageId);
+        } catch (err) {
+            console.error(`[Worker] Email support job failed for ${fromEmail}:`, err);
+            throw err;
+        }
+        return { success: true };
+    },
+    {
+        connection: connection as any,
+        concurrency: 10,
+    }
+) : null;
+
+if (emailWorker) {
+    emailWorker.on('failed', (job, err) => {
+        console.error(`[Worker] Email support job ${job?.id} failed (from: ${job?.data?.fromEmail ?? 'unknown'}). Error:`, err?.message ?? err);
+    });
+}
+
+// ---------------------------------------------------------------------------
 // Fact Anchor Extraction (async, post-conversation intelligence)
 // ---------------------------------------------------------------------------
 

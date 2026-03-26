@@ -1123,3 +1123,74 @@ export async function processLINEMessage(
         await sendLineMessage(userMsg);
     }
 }
+
+// ---------------------------------------------------------------------------
+// processEmailSupportMessage — inbound support email → AI reply → Resend
+// ---------------------------------------------------------------------------
+// Called by the email BullMQ worker. Looks up the sender as a tenant if known,
+// builds a support-aware prompt, generates a reply, sends it via Resend.
+export async function processEmailSupportMessage(
+    fromEmail: string,
+    fromName: string,
+    subject: string,
+    body: string,
+    messageId: string,
+): Promise<void> {
+    const { sendSupportReply } = await import('./email.js');
+
+    // Look up sender as a known tenant (they might be a customer writing in)
+    const pool = getPool();
+    const tenantRes = await pool.query(
+        `SELECT id, slug, name, status, flavor FROM tenants WHERE email = $1 LIMIT 1`,
+        [fromEmail],
+    ).catch(() => ({ rows: [] as any[] }));
+    const tenant = tenantRes.rows[0];
+
+    const customerContext = tenant
+        ? `The sender is a Tiger Claw customer. Tenant: ${tenant.name} (${tenant.slug}), status: ${tenant.status}, flavor: ${tenant.flavor}.`
+        : `The sender is not a recognised Tiger Claw customer. They may be a prospect or a cancelled customer.`;
+
+    const systemPrompt = `You are the Tiger Claw support agent — friendly, direct, and technically knowledgeable.
+Tiger Claw is an AI-powered lead prospecting bot delivered via Telegram and LINE. Customers bring their own AI key (Google, OpenAI, Anthropic, Grok, OpenRouter, or Kimi). Setup takes 5 minutes via a wizard at wizard.tigerclaw.io.
+
+${customerContext}
+
+Your job:
+1. Answer the customer's question clearly and helpfully.
+2. If they have a technical issue, give them a concrete next step (e.g. "Check your API key at wizard.tigerclaw.io").
+3. If you cannot resolve it, tell them Brent will follow up personally — do not invent timelines.
+4. Keep replies concise. No filler. No corporate speak.
+5. Sign off as "Tiger Claw Support".`;
+
+    const platformKey = process.env['PLATFORM_ONBOARDING_KEY'] ?? process.env['GOOGLE_API_KEY'];
+    if (!platformKey) {
+        console.error('[Email Support] No platform key — cannot generate reply');
+        return;
+    }
+
+    try {
+        const genAI = new GoogleGenerativeAI(platformKey);
+        const model = genAI.getGenerativeModel({
+            model: 'gemini-2.0-flash',
+            systemInstruction: systemPrompt,
+        });
+        const result = await model.generateContent(
+            `Subject: ${subject}\n\nMessage:\n${body}`
+        );
+        const replyText = result.response.text?.() ?? '';
+
+        if (replyText.trim()) {
+            await sendSupportReply(fromEmail, fromName, subject, replyText);
+            console.log(`[Email Support] Replied to ${fromEmail} (subject: ${subject})`);
+        }
+    } catch (err: any) {
+        console.error(`[Email Support] AI generation failed for ${fromEmail}:`, err.message);
+        // Send a graceful fallback so the customer isn't left hanging
+        await sendSupportReply(
+            fromEmail,
+            fromName,
+            subject,
+            `Hi ${fromName || 'there'},\n\nThanks for reaching out. We've received your message and Brent will get back to you shortly.\n\nTiger Claw Support`,
+        );
+    }
+}
