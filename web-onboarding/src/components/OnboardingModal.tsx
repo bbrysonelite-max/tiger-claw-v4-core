@@ -60,9 +60,12 @@ function loadPersistedState(): WizardState {
     return initialState;
 }
 
-export default function OnboardingModal({ onClose }: { onClose: () => void }) {
+export default function OnboardingModal({ onClose, initialEmail }: { onClose: () => void; initialEmail?: string }) {
     const [step, setStep] = useState(1);
-    const [state, setState] = useState<WizardState>(loadPersistedState);
+    const [state, setState] = useState<WizardState>(() => {
+        const persisted = loadPersistedState();
+        return initialEmail ? { ...persisted, email: initialEmail } : persisted;
+    });
     const [isDeploying, setIsDeploying] = useState(false);
     const [deploymentComplete, setDeploymentComplete] = useState(false);
 

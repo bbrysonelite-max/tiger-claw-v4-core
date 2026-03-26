@@ -1,12 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Zap, Bot, Lock, Code2, ArrowRight } from "lucide-react";
 import OnboardingModal from "@/components/OnboardingModal";
 
 export default function Home() {
   const [wizardOpen, setWizardOpen] = useState(false);
+  const [prefillEmail, setPrefillEmail] = useState<string | undefined>();
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const email = params.get("email");
+    if (email) {
+      setPrefillEmail(email);
+      setWizardOpen(true);
+    }
+  }, []);
 
   return (
     <div className="relative min-h-[calc(100vh-64px)] overflow-hidden flex flex-col justify-center">
@@ -85,7 +95,7 @@ export default function Home() {
       </div>
 
       {wizardOpen && (
-        <OnboardingModal onClose={() => setWizardOpen(false)} />
+        <OnboardingModal onClose={() => setWizardOpen(false)} initialEmail={prefillEmail} />
       )}
     </div>
   );

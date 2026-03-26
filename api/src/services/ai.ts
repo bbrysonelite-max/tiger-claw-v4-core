@@ -172,11 +172,20 @@ export type AIProvider = {
     key: string;
     provider: 'google' | 'openai';
     model: string;
+    baseURL?: string; // set for OpenAI-compatible providers (kimi, grok, openrouter)
+};
+
+// OpenAI-compatible providers — routed through OpenAI SDK with a custom base URL
+const OPENAI_COMPAT: Record<string, { baseURL: string; defaultModel: string }> = {
+    kimi:       { baseURL: 'https://api.moonshot.cn/v1',   defaultModel: 'moonshot-v1-8k' },
+    grok:       { baseURL: 'https://api.x.ai/v1',          defaultModel: 'grok-2-1212' },
+    openrouter: { baseURL: 'https://openrouter.ai/api/v1', defaultModel: 'openai/gpt-4o-mini' },
 };
 
 function detectProvider(key: string): 'google' | 'openai' | null {
     if (key.startsWith('AIza')) return 'google';
     if (key.startsWith('sk-')) return 'openai';
+    if (key.startsWith('xai-')) return 'openai'; // Grok
     return null;
 }
 
@@ -230,6 +239,11 @@ export async function resolveAIProvider(tenantId: string): Promise<AIProvider | 
             const { provider, model, encrypted_key } = res.rows[0];
             if (encrypted_key) {
                 const key = decryptToken(encrypted_key);
+                // OpenAI-compatible providers (kimi, grok, openrouter) — route through OpenAI SDK
+                const compat = OPENAI_COMPAT[provider as string];
+                if (compat) {
+                    return { key, provider: 'openai', model: model ?? compat.defaultModel, baseURL: compat.baseURL };
+                }
                 const resolvedProvider = (provider as 'google' | 'openai') ?? detectProvider(key) ?? 'google';
                 return { key, provider: resolvedProvider, model: model ?? defaultModel(resolvedProvider) };
             }
@@ -707,7 +721,7 @@ export async function processTelegramMessage(
         await maybeLogFeedback(tenantId, chatId, text, bot, tenant, aiProvider, toolContext);
 
         if (aiProvider.provider === 'openai') {
-            const openai = new OpenAI({ apiKey: aiProvider.key });
+            const openai = new OpenAI({ apiKey: aiProvider.key, ...(aiProvider.baseURL ? { baseURL: aiProvider.baseURL } : {}) });
             const history = await getOpenAIChatHistory(tenantId, chatId);
             const systemPrompt = await buildSystemPrompt(tenant);
             const { reply, updatedHistory } = await runToolLoopOpenAI(
@@ -819,7 +833,7 @@ export async function processSystemRoutine(tenantId: string, routineType: string
         // Helper: get text from either provider
         const getRoutineText = async (): Promise<string> => {
             if (aiProvider.provider === 'openai') {
-                const openai = new OpenAI({ apiKey: aiProvider.key });
+                const openai = new OpenAI({ apiKey: aiProvider.key, ...(aiProvider.baseURL ? { baseURL: aiProvider.baseURL } : {}) });
                 const res = await openai.chat.completions.create({
                     model: aiProvider.model,
                     messages: [
@@ -990,7 +1004,7 @@ Use your exact personality. Be specific to what they said, not generic. Do NOT e
     let coachingReply = '';
     try {
         if (aiProvider.provider === 'openai') {
-            const openai = new OpenAI({ apiKey: aiProvider.key });
+            const openai = new OpenAI({ apiKey: aiProvider.key, ...(aiProvider.baseURL ? { baseURL: aiProvider.baseURL } : {}) });
             const res2 = await openai.chat.completions.create({
                 model: aiProvider.model,
                 messages: [
@@ -1092,7 +1106,7 @@ export async function processLINEMessage(
 
         let replyText = '';
         if (aiProvider.provider === 'openai') {
-            const openai = new OpenAI({ apiKey: aiProvider.key });
+            const openai = new OpenAI({ apiKey: aiProvider.key, ...(aiProvider.baseURL ? { baseURL: aiProvider.baseURL } : {}) });
             const oaiHistory = await getOpenAIChatHistory(tenantId, chatId);
             const { reply, updatedHistory: newHist } = await runToolLoopOpenAI(
                 openai, aiProvider.model, await buildSystemPrompt(tenant), text, oaiHistory, toolContext, 'AI LINE',

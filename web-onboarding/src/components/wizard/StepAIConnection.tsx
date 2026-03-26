@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ExternalLink, ArrowRight, Trash2, Key, Info, Shield, Check, Loader2, AlertCircle } from "lucide-react";
+import { ArrowRight, Trash2, Key, Info, Shield, Check, Loader2, AlertCircle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { WizardState, AIKeyConfig } from "../OnboardingModal";
 import { cn } from "@/lib/utils";
@@ -14,23 +14,21 @@ interface AIConnectionProps {
 }
 
 const PROVIDERS = [
-    { id: "google",      name: "Gemini",      icon: "💎", url: "https://aistudio.google.com/apikey",              model: "gemini-2.0-flash",  free: true,  help: "Free tier available. Get a key at Google AI Studio in under 60 seconds." },
-    { id: "openai",      name: "OpenAI",       icon: "🧠", url: "https://platform.openai.com/api-keys",            model: "gpt-4o-mini",       free: false, help: "Industry standard. Needs credits loaded on your account." },
-    { id: "anthropic",   name: "Anthropic",    icon: "🗿", url: "https://console.anthropic.com/settings/keys",     model: "claude-3-5-haiku",  free: false, help: "High intelligence. Great for niche tuning and complex objections." },
-    { id: "grok",        name: "Grok",         icon: "✖️", url: "https://console.x.ai/",                           model: "grok-2-1212",       free: false, help: "Real-time X/Twitter data access. Great for social selling." },
-    { id: "openrouter",  name: "OpenRouter",   icon: "🌐", url: "https://openrouter.ai/keys",                      model: "auto",              free: true,  help: "One key unlocks Llama, Mistral, and 50+ models. Free tier available." },
-    { id: "kimi",        name: "Kimi",         icon: "🌙", url: "https://platform.moonshot.cn/console/api-keys",   model: "moonshot-v1-8k",    free: false, help: "Moonshot AI — optimized for Asian markets and long context." },
+    { id: "google",      name: "Gemini",      icon: "💎", url: "https://aistudio.google.com/apikey",              model: "gemini-2.0-flash",      free: true,  help: "Free tier available. Get a key at Google AI Studio in under 60 seconds." },
+    { id: "openai",      name: "OpenAI",       icon: "🧠", url: "https://platform.openai.com/api-keys",            model: "gpt-4o-mini",           free: false, help: "Industry standard. Needs credits loaded on your account." },
+    { id: "grok",        name: "Grok",         icon: "✖️", url: "https://console.x.ai/",                           model: "grok-2-1212",           free: false, help: "Real-time X/Twitter data access. Great for social selling." },
+    { id: "openrouter",  name: "OpenRouter",   icon: "🌐", url: "https://openrouter.ai/keys",                      model: "openai/gpt-4o-mini",    free: true,  help: "One key unlocks Llama, Mistral, and 50+ models. Free tier available." },
+    { id: "kimi",        name: "Kimi",         icon: "🌙", url: "https://platform.moonshot.cn/console/api-keys",   model: "moonshot-v1-8k",        free: false, help: "Moonshot AI — optimized for Asian markets and long context." },
 ] as const;
 
 type ProviderId = typeof PROVIDERS[number]["id"];
 
 // Detect provider from key prefix so we can auto-select the tile on paste
 function detectProvider(key: string): ProviderId | null {
-    if (key.startsWith("AIza"))      return "google";
-    if (key.startsWith("sk-ant-"))   return "anthropic";
-    if (key.startsWith("xai-"))      return "grok";
-    if (key.startsWith("sk-or-"))    return "openrouter";
-    if (key.startsWith("sk-"))       return "openai"; // also catches Kimi — both use sk- prefix
+    if (key.startsWith("AIza"))    return "google";
+    if (key.startsWith("xai-"))   return "grok";
+    if (key.startsWith("sk-or-")) return "openrouter";
+    if (key.startsWith("sk-"))    return "openai";
     return null;
 }
 
@@ -130,22 +128,29 @@ export default function StepAIConnection({ state, updateState, onNext }: AIConne
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 flex-1">
                 {/* Left: Provider Selection & Key Input */}
                 <div className="space-y-4">
-                    {/* Provider tiles */}
+                    {/* Provider tiles — click to select + open key page */}
                     <div className="grid grid-cols-3 gap-2">
                         {PROVIDERS.map((p) => (
                             <button
                                 key={p.id}
-                                onClick={() => { setSelectedProvider(p.id); setDetectedHint(""); }}
+                                onClick={() => {
+                                    setSelectedProvider(p.id);
+                                    setDetectedHint("");
+                                    window.open(p.url, "_blank", "noopener,noreferrer");
+                                }}
                                 className={cn(
-                                    "flex flex-col items-center justify-center p-3 rounded-xl border transition-all text-center",
+                                    "flex flex-col items-center justify-center p-3 rounded-xl border transition-all text-center group",
                                     selectedProvider === p.id
                                         ? "bg-primary/10 border-primary text-white"
-                                        : "bg-black/20 border-white/5 text-white/40 hover:border-white/20"
+                                        : "bg-black/20 border-white/5 text-white/40 hover:border-white/20 hover:text-white"
                                 )}
                             >
                                 <span className="text-2xl mb-1">{p.icon}</span>
                                 <span className="text-[10px] font-bold uppercase tracking-tighter">{p.name}</span>
-                                {p.free && <span className="text-[8px] bg-green-500/20 text-green-400 px-1 rounded mt-1">FREE</span>}
+                                {p.free
+                                    ? <span className="text-[8px] bg-green-500/20 text-green-400 px-1 rounded mt-1">FREE</span>
+                                    : <span className="text-[8px] text-white/20 mt-1">get key →</span>
+                                }
                             </button>
                         ))}
                     </div>
@@ -160,16 +165,9 @@ export default function StepAIConnection({ state, updateState, onNext }: AIConne
                             <p className="text-[11px] text-white/40">{currentProvider.help}</p>
                         </div>
 
-                        <a
-                            href={currentProvider.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center justify-center gap-2 w-full p-2.5 rounded-xl bg-primary/10 border border-primary/20 text-primary font-bold text-xs hover:bg-primary/20 transition-all group"
-                        >
-                            <ExternalLink className="w-3.5 h-3.5" />
-                            Don't have a key? Get your {currentProvider.name} key here →
-                            <ArrowRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
-                        </a>
+                        <p className="text-[11px] text-white/30 text-center">
+                            Tap a provider above to select it and open its key page.
+                        </p>
 
                         <div className="flex gap-2">
                             <div className="relative flex-1">
