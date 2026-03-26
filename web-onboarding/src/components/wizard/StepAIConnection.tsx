@@ -160,16 +160,15 @@ export default function StepAIConnection({ state, updateState, onNext }: AIConne
                             <p className="text-[11px] text-white/40">{currentProvider.help}</p>
                         </div>
 
-                        <a
-                            href={currentProvider.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
+                        <button
+                            type="button"
+                            onClick={() => window.open(currentProvider.url, "_blank", "noopener,noreferrer")}
                             className="flex items-center justify-center gap-2 w-full p-2.5 rounded-xl bg-primary/10 border border-primary/20 text-primary font-bold text-xs hover:bg-primary/20 transition-all group"
                         >
                             <ExternalLink className="w-3.5 h-3.5" />
                             Don't have a key? Get your {currentProvider.name} key here →
                             <ArrowRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
-                        </a>
+                        </button>
 
                         <div className="flex gap-2">
                             <div className="relative flex-1">

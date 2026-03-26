@@ -39,7 +39,8 @@ Stop what you are doing. Read this entire document and `CLAUDE.md`. These are yo
 10. **Integrity First Product Philosophy** — Baked into `CLAUDE.md`. Non-negotiable for all future code.
 11. **Website + OG Tags** — `tigerclaw.io` updated with product naming, Stan Store links, 7-day MBG banner, OG/Twitter Card meta tags.
 12. **Hive Intelligence (V4 Analytics)** — Universal Prior, Founding Member Program, ICP signal mapping. Migrations 005a-009.
-13. **PRs #30–#45 all merged.** Admin dashboard live. Email support agent live.
+13. **PRs #30–#46 all merged (PR #46 open).** Admin dashboard live. Email support agent live.
+17. **Wizard hardening** — niche selection required, doctor removed from UI, "Get your key" links fixed (window.open), magic link URL corrected (`/?email=`), wizard auto-opens on magic link click with email pre-filled.
 14. **Beta Hardening (PRs #41–#44)** — ADMIN_TOKEN rotated, Telegram webhook secret wired, dead trial code removed, fix-all-webhooks corrected for V4 encrypted tokens.
 15. **Email Infrastructure** — Resend wired (RESEND_API_KEY in GCP Secrets), `tigerclaw.io` domain added (pending DNS verification). FROM_EMAIL corrected to `hello@tigerclaw.io`.
 16. **Email Support Agent (PR #45)** — `POST /webhooks/email` inbound Postmark webhook. AI generates replies using platform key. Sends from `support@tigerclaw.io` via Resend. Postmark MX live on Porkbun.
@@ -151,6 +152,6 @@ All loaded in `Promise.all()` — DB unreachable = static prompt, no crash.
 
 **Zoom call:** Thursday 2026-03-27, 7 PM Pacific. Platform is GO. See `LAUNCH_READINESS.md` for smoke test sequence.
 
-**Fire test (smoke test) still needs to be run** — Stan Store purchase → email → wizard → bot flow has not been validated end-to-end in production.
+**Fire test: BOT CONFIRMED LIVE (2026-03-25)** — Telegram bot responding in character. Message delivery end-to-end validated.
 
 Everything else you need is in `ARCHITECTURE.md`, `STATE_OF_TIGER_CLAW.md`, `specs/`, and `docs/`. Trust the repo, not your base-model memory.

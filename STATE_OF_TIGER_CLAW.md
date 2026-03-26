@@ -1,6 +1,6 @@
 # STATE OF TIGER CLAW — HARD CONTEXT LOCK
-**Timestamp:** 2026-03-25
-**Infrastructure Status:** LIVE. 374/374 tests green. PRs #30–#45 all merged.
+**Timestamp:** 2026-03-25 (updated 11:45 PM)
+**Infrastructure Status:** LIVE. 374/374 tests green. PRs #30–#46 all merged (PR #46 open, pending merge).
 
 ---
 
@@ -99,7 +99,8 @@ All three are V3-era records — `user_id` null, `containerName` is legacy artif
 
 ### Open Issues / Next Actions
 
-- **Fire test (smoke test) not yet run** — Stan Store → email → wizard → bot flow unvalidated in production. Do before Zoom.
+- **Fire test: BOT CONFIRMED LIVE** — Telegram bot responding in character (network-marketer, "Sales Scout"). Message delivery end-to-end working.
+- **Wizard bugs fixed (deployed)** — niche selection now required, doctor removed from UI, "Get your key" links fixed (window.open), magic link URL corrected (was `/wizard?email=`, now `/?email=`), email pre-fills wizard and auto-opens it.
 - **Resend DNS propagation** — DKIM + SPF records on Porkbun pending. Will complete automatically.
 - **Post-Zoom:** personal outreach to 7 past customers with complimentary access offer.
 - **Sprint 2:** rate limiting on webhooks, HMAC-signed magic links, Reflexion Loop on Mac cluster, bot pool replenishment.
