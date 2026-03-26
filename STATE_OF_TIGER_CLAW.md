@@ -1,6 +1,6 @@
 # STATE OF TIGER CLAW — HARD CONTEXT LOCK
-**Timestamp:** 2026-03-25 (updated 11:45 PM)
-**Infrastructure Status:** LIVE. 374/374 tests green. PRs #30–#46 all merged (PR #46 open, pending merge).
+**Timestamp:** 2026-03-26 (midnight session wrap)
+**Infrastructure Status:** LIVE. 374/374 tests green. PR #46 open on `feat/email-support-agent`.
 
 ---
 
@@ -16,6 +16,7 @@ This is the single source of truth for the Tiger Claw repository.
 6. **NO REWRITES:** The 18 core tools compile cleanly and are backed by 374 passing tests. Do not rewrite architecture.
 7. **10 FLAVORS ONLY:** network-marketer, real-estate, health-wellness, airbnb-host, baker, candle-maker, gig-economy, lawyer, plumber, sales-tiger. Doctor was removed — compliance risk. Do not re-add it.
 8. **PROTOCOL:** Read `CLAUDE.md` before writing any code.
+9. **AI PROVIDERS:** 5 providers are live end-to-end: Google, OpenAI, Grok, OpenRouter, Kimi. Anthropic is intentionally absent — it needs its own SDK and is deferred to Sprint 2. Do not add Anthropic back to the wizard without implementing the full SDK path in `ai.ts`.
 
 ---
 
@@ -38,7 +39,7 @@ Deployments to Cloud Run are handled by GitHub Actions on merge to main. Do not 
 
 ---
 
-## Current State (2026-03-25)
+## Current State (2026-03-26, midnight)
 
 ### Architecture
 - **API:** Cloud Run, Node.js/Express, port 4000, `https://api.tigerclaw.io`
@@ -48,26 +49,37 @@ Deployments to Cloud Run are handled by GitHub Actions on merge to main. Do not 
 - **Frontend (wizard):** Next.js on Vercel (`wizard.tigerclaw.io`) — part of this repo, `web-onboarding/` subdirectory
 - **Frontend (website):** Static HTML on Vercel (`tigerclaw.io`) — `tiger-bot-website/` subdirectory
 - **Payments:** Stan Store (purchase gating + checkout)
-- **Email (outbound):** Resend — `hello@tigerclaw.io`, `support@tigerclaw.io`. Domain `tigerclaw.io` added, DNS pending propagation.
+- **Email (outbound):** Resend — `hello@tigerclaw.io`, `support@tigerclaw.io`. DNS propagating on Porkbun (DKIM + SPF).
 - **Email (inbound):** Postmark — `support@tigerclaw.io` → AI support agent via `POST /webhooks/email`
 - **Bot Pool:** 63 available Telegram bot tokens, AES-256-GCM encrypted
 - **GCP Project:** `hybrid-matrix-472500-k5`
 - **Cloud Run Service:** `tiger-claw-api`, region `us-central1`
 
-### Product (as of 2026-03-25)
+### AI Provider Support
+| Provider | Status | How |
+|---|---|---|
+| Google Gemini | ✅ Live | Native `@google/generative-ai` SDK |
+| OpenAI | ✅ Live | `openai` SDK |
+| Grok (xAI) | ✅ Live | `openai` SDK → `api.x.ai/v1` |
+| OpenRouter | ✅ Live | `openai` SDK → `openrouter.ai/api/v1` |
+| Kimi (Moonshot) | ✅ Live | `openai` SDK → `api.moonshot.cn/v1` |
+| Anthropic | ⏳ Sprint 2 | Needs `@anthropic-ai/sdk` — not yet wired |
+
+### Product (as of 2026-03-26)
 - **Tiger-Claw Pro (Pre-Flavored):** $147/mo — Telegram + LINE, pre-trained for sales and network marketing.
 - **Industry Agent:** $197/mo — domain pre-trained for a specific vertical.
 - "Standard Agent" naming is DEAD. It is now "Industry Agent."
 - **No free trial.** Card upfront. 7-day money-back guarantee, no questions asked.
 
-### Business Model
-- Customers purchase on Stan Store. Stan Store webhook provisions their tenant and emails a magic link.
-- Wizard flow: StepIdentity → StepAIConnection → StepReviewPayment → PostPaymentSuccess
-- Keys: Primary + Backup. All 6 providers: Google, OpenAI, Anthropic, Grok, OpenRouter, Kimi.
-- Key auto-detection on paste: `AIza→google`, `sk-ant-→anthropic`, `xai-→grok`, `sk-or-→openrouter`, `sk-→openai`.
-- Server validates each key on INSTALL click. Fail-fast, not fail-silent.
+### Wizard (wizard.tigerclaw.io) — HARDENED
+- Magic link email auto-opens wizard with email pre-filled (`?email=` param)
+- Niche/industry selection is required before proceeding (was bypassable)
+- Doctor removed from niche picker (backend already dropped it)
+- Provider tiles open key page on click (one tap = select + get key)
+- Anthropic tile removed (not wired in backend)
+- Magic link URL fixed: was `/wizard?email=`, now `/?email=`
 
-### PRs Merged (all of them)
+### PRs Merged
 - **PRs #20–#24:** Memory Architecture V4.1
 - **PR #26:** Value-gap cron
 - **PR #27:** Removed `tiger_knowledge`
@@ -82,6 +94,7 @@ Deployments to Cloud Run are handled by GitHub Actions on merge to main. Do not 
 - **PR #43:** fix-all-webhooks — JOIN bot_pool for V4 encrypted tokens
 - **PR #44:** fix-all-webhooks — include 'live' status
 - **PR #45:** Email support agent — Postmark inbound → BullMQ → AI → Resend reply
+- **PR #46 (open):** Email infra + wizard hardening + provider fixes + session docs
 
 ### Tenant Roster
 
@@ -93,17 +106,16 @@ Deployments to Cloud Run are handled by GitHub Actions on merge to main. Do not 
 
 All three are V3-era records — `user_id` null, `containerName` is legacy artifact. Onboarding completes when they click magic link and connect an AI key.
 
-**john-noon** deprovisioned 2026-03-25 — webhook conflict tombstone, token recycled to pool.
-
 **7 past customers** preserved for post-Zoom outreach (paid, never received service). See memory for contact details.
 
 ### Open Issues / Next Actions
 
-- **Fire test: BOT CONFIRMED LIVE** — Telegram bot responding in character (network-marketer, "Sales Scout"). Message delivery end-to-end working.
-- **Wizard bugs fixed (deployed)** — niche selection now required, doctor removed from UI, "Get your key" links fixed (window.open), magic link URL corrected (was `/wizard?email=`, now `/?email=`), email pre-fills wizard and auto-opens it.
-- **Resend DNS propagation** — DKIM + SPF records on Porkbun pending. Will complete automatically.
+- **FIRE TEST: BOT CONFIRMED LIVE** — Telegram bot responding in character (network-marketer, "Sales Scout"). Message delivery end-to-end working.
+- **Resend DNS propagation** — DKIM + SPF on Porkbun pending. Will complete automatically before Zoom.
+- **Zoom call:** 2026-03-27 (Thursday), 7 PM Pacific. Platform is GO.
+- **Tomorrow (2026-03-26):** Morning session — ROADMAP.md, KNOWN_ISSUES.md, CHANGELOG.md, polish, practice. Break ~3–4 PM. Back for Zoom prep.
 - **Post-Zoom:** personal outreach to 7 past customers with complimentary access offer.
-- **Sprint 2:** rate limiting on webhooks, HMAC-signed magic links, Reflexion Loop on Mac cluster, bot pool replenishment.
+- **Sprint 2:** Anthropic SDK support, rate limiting on webhooks, HMAC-signed magic links, Reflexion Loop on Mac cluster, bot pool replenishment.
 
 ---
 
