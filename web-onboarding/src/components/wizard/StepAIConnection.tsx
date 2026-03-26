@@ -14,23 +14,21 @@ interface AIConnectionProps {
 }
 
 const PROVIDERS = [
-    { id: "google",      name: "Gemini",      icon: "💎", url: "https://aistudio.google.com/apikey",              model: "gemini-2.0-flash",  free: true,  help: "Free tier available. Get a key at Google AI Studio in under 60 seconds." },
-    { id: "openai",      name: "OpenAI",       icon: "🧠", url: "https://platform.openai.com/api-keys",            model: "gpt-4o-mini",       free: false, help: "Industry standard. Needs credits loaded on your account." },
-    { id: "anthropic",   name: "Anthropic",    icon: "🗿", url: "https://console.anthropic.com/settings/keys",     model: "claude-3-5-haiku",  free: false, help: "High intelligence. Great for niche tuning and complex objections." },
-    { id: "grok",        name: "Grok",         icon: "✖️", url: "https://console.x.ai/",                           model: "grok-2-1212",       free: false, help: "Real-time X/Twitter data access. Great for social selling." },
-    { id: "openrouter",  name: "OpenRouter",   icon: "🌐", url: "https://openrouter.ai/keys",                      model: "auto",              free: true,  help: "One key unlocks Llama, Mistral, and 50+ models. Free tier available." },
-    { id: "kimi",        name: "Kimi",         icon: "🌙", url: "https://platform.moonshot.cn/console/api-keys",   model: "moonshot-v1-8k",    free: false, help: "Moonshot AI — optimized for Asian markets and long context." },
+    { id: "google",      name: "Gemini",      icon: "💎", url: "https://aistudio.google.com/apikey",              model: "gemini-2.0-flash",      free: true,  help: "Free tier available. Get a key at Google AI Studio in under 60 seconds." },
+    { id: "openai",      name: "OpenAI",       icon: "🧠", url: "https://platform.openai.com/api-keys",            model: "gpt-4o-mini",           free: false, help: "Industry standard. Needs credits loaded on your account." },
+    { id: "grok",        name: "Grok",         icon: "✖️", url: "https://console.x.ai/",                           model: "grok-2-1212",           free: false, help: "Real-time X/Twitter data access. Great for social selling." },
+    { id: "openrouter",  name: "OpenRouter",   icon: "🌐", url: "https://openrouter.ai/keys",                      model: "openai/gpt-4o-mini",    free: true,  help: "One key unlocks Llama, Mistral, and 50+ models. Free tier available." },
+    { id: "kimi",        name: "Kimi",         icon: "🌙", url: "https://platform.moonshot.cn/console/api-keys",   model: "moonshot-v1-8k",        free: false, help: "Moonshot AI — optimized for Asian markets and long context." },
 ] as const;
 
 type ProviderId = typeof PROVIDERS[number]["id"];
 
 // Detect provider from key prefix so we can auto-select the tile on paste
 function detectProvider(key: string): ProviderId | null {
-    if (key.startsWith("AIza"))      return "google";
-    if (key.startsWith("sk-ant-"))   return "anthropic";
-    if (key.startsWith("xai-"))      return "grok";
-    if (key.startsWith("sk-or-"))    return "openrouter";
-    if (key.startsWith("sk-"))       return "openai"; // also catches Kimi — both use sk- prefix
+    if (key.startsWith("AIza"))    return "google";
+    if (key.startsWith("xai-"))   return "grok";
+    if (key.startsWith("sk-or-")) return "openrouter";
+    if (key.startsWith("sk-"))    return "openai";
     return null;
 }
 
