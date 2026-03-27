@@ -84,7 +84,7 @@ async function execute(
       await saveMarketFact({
         domain: report.domain,
         category: fact.type,
-        entity_id: entityId || (fact.metadata.author ? `u/${fact.metadata.author}` : null),
+        entity_id: entityId || (fact.metadata.author ? `u/${fact.metadata.author}` : undefined),
         entity_label: fact.metadata.demographic || "Unknown",
         fact_summary: fact.purifiedFact,
         confidence_score: fact.confidenceScore,
