@@ -4,6 +4,17 @@ export const ADMIN_FLAVOR: FlavorConfig = {
   key: "admin",
   displayName: "Tiger Admin",
   description: "Internal operations assistant for the Tiger Claw multi-tenant AI platform. Operated by Brent.",
+  professionLabel: "internal operations",
+  defaultKeywords: [
+    "fleet status",
+    "hive health",
+    "queue depth",
+    "active trials",
+    "paused tenants",
+    "founding members",
+    "system anomalies",
+  ],
+  scoutQueries: [],
   conversion: {
     oars: ["single"],
     builderConversionGoal: "N/A",
@@ -53,5 +64,19 @@ export const ADMIN_FLAVOR: FlavorConfig = {
   },
   discovery: {
     activeSources: [],
+  },
+  nurtureTemplates: {
+    value_drop: "System check: ops nominal. — Tiger Admin",
+    testimonial: "System check: ops nominal. — Tiger Admin",
+    authority_transfer: "System check: ops nominal. — Tiger Admin",
+    personal_checkin: "System check: ops nominal. — Tiger Admin",
+    one_to_ten_part1: "System check: ops nominal. — Tiger Admin",
+    one_to_ten_part2: "System check: ops nominal. — Tiger Admin",
+    gap_closing: "System check: ops nominal. — Tiger Admin",
+    scarcity_takeaway: "System check: ops nominal. — Tiger Admin",
+    pattern_interrupt: "System check: ops nominal. — Tiger Admin",
+    final_takeaway: "System check: ops nominal. — Tiger Admin",
+    slow_drip_value: "System check: ops nominal. — Tiger Admin",
+    default_fallback: "System check: ops nominal. — Tiger Admin",
   },
 };

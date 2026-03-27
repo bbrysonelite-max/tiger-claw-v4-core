@@ -265,7 +265,7 @@ function buildTouchMessage(
     answer: gapAnswer ?? "what you mentioned"
   };
 
-  const template = (config.nurtureTemplates as Record<string, string>)[touchType] ?? config.nurtureTemplates.default_fallback;
+  const template = (config.nurtureTemplates as unknown as Record<string, string>)[touchType] ?? config.nurtureTemplates.default_fallback;
   return fillFlavorTemplate(template, variables);
 }
 

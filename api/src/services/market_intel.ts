@@ -129,6 +129,7 @@ export async function queryMarketIntel(params: {
     fact_summary: row.fact_summary,
     confidence_score: row.confidence_score,
     source_url: row.source_url,
+    captured_by: row.captured_by ?? "unknown",
     metadata: row.metadata,
     verified_at: row.verified_at
   }));

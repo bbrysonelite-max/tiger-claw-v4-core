@@ -531,7 +531,7 @@ export async function buildSystemPrompt(tenant: any): Promise<string> {
     return [
         `You are ${botName}, an elite, highly intelligent, and autonomous AI sales and recruiting consulting partner.`,
         `You are currently deployed to serve: ${operatorName}.`,
-        `Industry flavor: ${flavor.name} (${flavor.professionLabel}).`,
+        `Industry flavor: ${flavor.displayName} (${flavor.professionLabel}).`,
         `Respond in: ${tenant.language ?? 'English'}.`,
         `Lead scoring threshold: 80 (LOCKED — never contact a prospect scoring below 80).`,
         `Key prospect keywords: ${flavor.defaultKeywords.slice(0, 8).join(', ')}.`,

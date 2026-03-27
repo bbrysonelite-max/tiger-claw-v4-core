@@ -9,9 +9,10 @@ export const RESEARCHER_FLAVOR: FlavorConfig = {
   description: "Specialized v5 cognitive profile for autonomous data harvesting and purification.",
   professionLabel: "market research",
   defaultKeywords: [
-    "market analysis", "competitive landscape", "objection trends", 
+    "market analysis", "competitive landscape", "objection trends",
     "customer sentiment", "industry standards"
   ],
+  scoutQueries: [],
 
   conversion: {
     oars: ["single"],

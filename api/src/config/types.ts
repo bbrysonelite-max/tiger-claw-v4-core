@@ -102,7 +102,7 @@ export interface ObjectionBucket {
 // Pattern interrupt stories
 // ---------------------------------------------------------------------------
 
-export type PatternInterruptMoment = "stall" | "pre_takeaway" | "general";
+export type PatternInterruptMoment = "stall" | "pre_takeaway" | "general" | "not_interested" | "international" | "geographic_expansion";
 
 export interface PatternInterruptStory {
   name: string;
@@ -161,6 +161,25 @@ export interface RegionalConfig {
 }
 
 // ---------------------------------------------------------------------------
+// Nurture Templates
+// ---------------------------------------------------------------------------
+
+export interface NurtureTemplates {
+  value_drop: string;
+  testimonial: string;
+  authority_transfer: string;
+  personal_checkin: string;
+  one_to_ten_part1: string;
+  one_to_ten_part2: string;
+  gap_closing: string;
+  scarcity_takeaway: string;
+  pattern_interrupt: string;
+  final_takeaway: string;
+  slow_drip_value: string;
+  default_fallback: string;
+}
+
+// ---------------------------------------------------------------------------
 // Flavor
 // ---------------------------------------------------------------------------
 
@@ -168,12 +187,16 @@ export interface FlavorConfig {
   key: string;                        // "network-marketer", "real-estate", "health-wellness"
   displayName: string;
   description: string;
+  professionLabel: string;
+  defaultKeywords: string[];
+  scoutQueries: string[];             // High-intent search strings for v5 Data Refinery
   conversion: ConversionConfig;
   objectionBuckets: ObjectionBucket[];
   patternInterrupts: PatternInterruptStory[];
   onboarding: OnboardingConfig;
   soul: SoulConfig;
   discovery: Partial<DiscoveryConfig>;
+  nurtureTemplates: NurtureTemplates;
 }
 
 // ---------------------------------------------------------------------------
