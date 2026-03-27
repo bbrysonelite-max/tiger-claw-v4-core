@@ -46,7 +46,7 @@ vi.mock('../pool.js', () => ({
 
 vi.mock('../../tools/flavorConfig.js', () => ({
   loadFlavorConfig: vi.fn(() => ({
-    name: 'Network Marketer',
+    displayName: 'Network Marketer',
     professionLabel: 'Independent Distributor',
     defaultKeywords: ['MLM', 'network', 'recruiter', 'business', 'opportunity', 'team', 'grow', 'leader'],
   })),
