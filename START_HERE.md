@@ -7,16 +7,17 @@ Stop what you are doing. Read this entire document and `CLAUDE.md`. These are yo
 
 ## 1. The Current State of the Universe
 
-**Tiger Claw is LIVE on Google Cloud Run (`https://api.tigerclaw.io`).**
-
+**Tiger Claw is LIVE and fully deployed. CI is green. All PRs merged.**
+- **API:** `https://api.tigerclaw.io` — Cloud Run `tiger-claw-api`, multi-region (us-central1 + asia-southeast1)
+- **Load Balancer:** Global HTTPS LB at `34.54.146.69` — both regions behind Anycast IP
 - **Architecture:** V4 Stateless Serverless — one API process, all tenants, context resolved per-request
 - **Database:** PostgreSQL HA via Cloud SQL Proxy (`tiger_claw_shared`)
-- **Cache/Queue:** Redis HA + BullMQ (7 queues: provision, telegram, line, email-support, fact-extraction, ai-routines, global-cron)
+- **Cache/Queue:** Redis HA + BullMQ (7 queues)
 - **AI Engine:** Gemini 2.0 Flash (LOCKED — `gemini-2.5-flash` has a GCP function-calling bug, do not use it)
-- **Tests:** 377/377 passing
-- **Flavors:** 13 customer-facing industry flavors
+- **Tests:** All passing (CI green as of 2026-03-27)
+- **Flavors:** 13 customer-facing industry flavors, all with full field set
 - **Min-instances:** 1 — no cold start
-- **Data Refinery:** v5 pipeline live on Birdie — scout runs every 6h
+- **Data Refinery:** v5 pipeline live — `/flavors` + `/mining/refine` deployed. Birdie scout runs every 6h.
 
 **Strict Rule 1:** OpenClaw, Mini-RAG, and per-tenant Docker containers are DEAD. Do not reference or restore them.
 
@@ -33,7 +34,7 @@ Stop what you are doing. Read this entire document and `CLAUDE.md`. These are yo
 ## 2. What Has Been Accomplished (Full History)
 
 1. **V4 Stateless Architecture** — Cloud Run API, shared PostgreSQL, Redis, BullMQ.
-2. **18 Native Function Calling Tools** — `api/src/tools/`. 377 passing tests.
+2. **18 Native Function Calling Tools** — `api/src/tools/`. All tests passing.
 3. **Business Model: Card Upfront** — No free trial. Stan Store checkout. 7-day MBG.
 4. **Multi-Provider AI** — Google, OpenAI, Grok, OpenRouter, Kimi. Anthropic deferred to Sprint 2.
 5. **Memory Architecture V4.1** — `buildSystemPrompt()` is async. Sawtooth compression, fact anchors, hive signals, focus primitives. PRs #20–#24, merged.
@@ -44,40 +45,63 @@ Stop what you are doing. Read this entire document and `CLAUDE.md`. These are yo
 10. **Beta Hardening** — ADMIN_TOKEN rotated, Telegram webhook secret, dead trial code removed. PRs #41–#44.
 11. **Stan Store Webhook** — `POST /webhooks/stripe` provisions user + pending bot + sends magic link email. Idempotent via Redis.
 12. **Zoom Call 2026-03-27** — Went well. Post-call: 5-instance cap, 7-day observation window.
-13. **SWOT Analysis completed** — 6 weaknesses identified. 5 of 6 fixed in post-Zoom sprint.
+13. **SWOT Analysis completed** — 6 weaknesses identified, all 6 fixed.
 14. **Birdie Scout Node** — LaunchAgent installed. Runs `reddit_scout.mjs` every 6h against production API.
 15. **13 Flavors** — 3 new niches added (dorm-design, mortgage-broker, personal-trainer). scoutQueries added to all 13.
+16. **Multi-Region Deploy** — asia-southeast1 added. Global HTTPS LB at 34.54.146.69. SSL cert ACTIVE. PR #53.
+17. **v5 Data Refinery** — `/flavors` + `/mining/refine` live. `market_intelligence` table provisioned. PR #52.
+18. **Webhook Rate Limiting** — 60 req/min per tenant, 20/min per IP email. PR #49.
+19. **HMAC Magic Links** — `MAGIC_LINK_SECRET`-signed, 72h TTL. PR #50.
+20. **CI Type Fixes** — All TypeScript errors post-merge resolved (types.ts, 9 files). PRs #54, #55.
 
 ---
 
-## 3. SWOT Weakness Fix Status (Post-Zoom Sprint)
+## 3. SWOT Weakness Fix Status (ALL RESOLVED)
 
 | # | Weakness | Status | PR |
 |---|---|---|---|
-| 1 | No rate limiting on webhooks | ✅ Fixed | #49 (open — merge) |
-| 2 | Magic links unsigned | ✅ Fixed | #50 (open — merge) |
-| 3 | Birdie cron not running | ✅ Fixed | LaunchAgent on Birdie (live) |
-| 4 | 3 missing flavor niches | ✅ Fixed | #51 (open — merge) |
-| 5 | Thin data volume / Refinery undeployed | ✅ Fixed | #52 (open — merge after #48) |
-| 6 | Single-region (us-central1 only) | 🔲 Pending | — |
+| 1 | No rate limiting on webhooks | ✅ Fixed | #49 |
+| 2 | Magic links unsigned | ✅ Fixed | #50 |
+| 3 | Birdie cron not running | ✅ Fixed | LaunchAgent on Birdie |
+| 4 | 3 missing flavor niches | ✅ Fixed | #51 |
+| 5 | Thin data volume / Refinery undeployed | ✅ Fixed | #52 |
+| 6 | Single-region (us-central1 only) | ✅ Fixed | #53 |
 
 ---
 
-## 4. Open PRs — Merge in This Order
+## 4. Open PRs
 
-| PR | Branch | What | Notes |
-|---|---|---|---|
-| **#48** | `feat/migration-017-market-intel` | Migration 017 — `market_intelligence` table | **Merge first** |
-| **#49** | `feat/webhook-rate-limiting` | Webhook rate limits 60/min tenant, 20/min email | After #48 |
-| **#50** | `feat/hmac-magic-links` | HMAC magic links 72h TTL, `GET /admin/magic-link` | After #48 |
-| **#51** | `feat/three-new-flavors` | dorm-design, mortgage-broker, personal-trainer | After #48 |
-| **#52** | `feat/data-refinery-pipeline` | `/flavors` + `/mining/refine` + scoutQueries all flavors | After #48 |
+**None.** All PRs #47–#55 merged. `main` is clean and deployed.
 
-After merging #50: add `MAGIC_LINK_SECRET` to GCP Secret Manager.
+**One pending manual step:** Verify `MAGIC_LINK_SECRET` exists in GCP Secret Manager.
+
+```bash
+gcloud secrets describe tiger-claw-magic-link-secret --project hybrid-matrix-472500-k5
+# If missing:
+echo -n "$(openssl rand -hex 32)" | gcloud secrets create tiger-claw-magic-link-secret \
+  --data-file=- --project hybrid-matrix-472500-k5
+# Then add to SECRETS in ops/deploy-cloudrun.sh and redeploy
+```
 
 ---
 
-## 5. Memory Architecture (V4.1 — Fully Shipped)
+## 5. Multi-Region Architecture
+
+| Component | Detail |
+|---|---|
+| Primary region | `us-central1` |
+| Secondary region | `asia-southeast1` (Singapore) — for Thai customers |
+| Load Balancer IP | `34.54.146.69` (Anycast) |
+| DNS | `api.tigerclaw.io A → 34.54.146.69` (Porkbun) |
+| SSL cert | `tiger-claw-lb-cert` — managed, ACTIVE |
+| VPC | `tiger-claw-vpc` — BGP routing GLOBAL (cross-region Redis/SQL access) |
+| VPC connector SEA | `tiger-claw-connector-sea` (10.8.1.0/28) |
+| CI variable | `MULTI_REGION_READY=true` — deploys both regions on every merge to main |
+| Setup script | `ops/setup-multi-region.sh` — run once, already done |
+
+---
+
+## 6. Memory Architecture (V4.1 — Fully Shipped)
 
 `buildSystemPrompt()` is **async**. On every request it injects four live signals:
 - **Operator profile** — from `onboard_state` in `tenant_states`
@@ -96,7 +120,7 @@ All loaded in `Promise.all()` — DB unreachable = static prompt, no crash.
 
 ---
 
-## 6. Product
+## 7. Product
 
 | Product | Price |
 |---|---|
@@ -109,7 +133,7 @@ Doctor removed — healthcare compliance risk. Do not re-add it.
 
 ---
 
-## 7. Tenant Roster (Active)
+## 8. Tenant Roster (Active)
 
 | Slug | Email | Status | Notes |
 |---|---|---|---|
@@ -119,16 +143,16 @@ Doctor removed — healthcare compliance risk. Do not re-add it.
 
 **5-instance cap active until ~2026-04-03.** Do not activate more tenants before then.
 
-**7 past customers** (paid, never received service) — preserved for post-observation-window complimentary outreach.
+**7 past customers** (paid, never received service) — preserved for complimentary re-activation outreach ~2026-04-03.
 
 ---
 
-## 8. Infrastructure
+## 9. Infrastructure
 
 ### Cloud
 | Service | Detail |
 |---|---|
-| API | `https://api.tigerclaw.io` — Cloud Run `tiger-claw-api` `us-central1` |
+| API | `https://api.tigerclaw.io` — Cloud Run multi-region behind Global HTTPS LB |
 | DB | Cloud SQL PostgreSQL HA `tiger_claw_shared` |
 | GCP Project | `hybrid-matrix-472500-k5` |
 | Wizard | `wizard.tigerclaw.io` — Next.js, Vercel, `web-onboarding/` |
@@ -157,12 +181,12 @@ Doctor removed — healthcare compliance risk. Do not re-add it.
 
 ---
 
-## 9. Key Secrets (GCP Secret Manager — never commit)
+## 10. Key Secrets (GCP Secret Manager — never commit)
 
 | Secret | Notes |
 |---|---|
 | `ADMIN_TOKEN` | `b1cb78d33181c705ec838cdfec06912922808a423ebabad056c39450ae84e69e` |
-| `MAGIC_LINK_SECRET` | Set separately — needed after PR #50 merges |
+| `MAGIC_LINK_SECRET` | ⚠️ Verify it exists in GCP Secret Manager (see Section 4) |
 | `RESEND_API_KEY` | Outbound email |
 | `STRIPE_SECRET_KEY` | Stan Store webhook |
 | `STRIPE_WEBHOOK_SECRET` | Webhook signature |
@@ -171,22 +195,14 @@ Doctor removed — healthcare compliance risk. Do not re-add it.
 
 ---
 
-## 10. Remaining Work
+## 11. Sprint 2 (Starting ~2026-04-03)
 
-### Immediate
-1. Merge #48 → #49, #50, #51, #52 (in order)
-2. Set `MAGIC_LINK_SECRET` in GCP Secret Manager after #50 deploys
-3. Verify `/Users/birdie/logs/scout.log` shows `✅ Purified facts` after #52 deploys
-
-### Weakness #6 (next session)
-- Add `asia-southeast1` region to Cloud Run for Thai customers
-
-### Sprint 2
-- Anthropic SDK support
-- Reflexion Loop on Cheese Grater
-- Bot pool replenishment (needs physical SIMs + BotFather)
-- Post-observation-window outreach to 7 past customers (~2026-04-03)
+1. **Anthropic SDK** — wire `@anthropic-ai/sdk` in `api/src/services/ai.ts`
+2. **Reflexion Loop** — offline Cheese Grater tool for self-improvement
+3. **Bot pool replenishment** — needs physical SIMs + BotFather (hardware-limited)
+4. **Outreach to 7 past customers** — complimentary re-activation offer (~2026-04-03)
+5. **Monitor Birdie scout** — check `/Users/birdie/logs/scout.log` for `✅ Purified facts`
 
 ---
 
-*Last updated: 2026-03-27 (post-Zoom sprint). Locked. Proceed.*
+*Last updated: 2026-03-27 (post-Zoom full SWOT sprint complete, all 6 weaknesses fixed, all PRs #47–#55 merged, CI green, multi-region live). Locked. Proceed.*
