@@ -25,6 +25,9 @@ console.log('[Queue] BullMQ ai-routines queue configured.');
 export const cronQueue = new Queue('global-cron', { connection: connection as any });
 console.log('[Queue] BullMQ global-cron queue configured.');
 
+export const miningQueue = new Queue('market-mining', { connection: connection as any });
+console.log('[Queue] BullMQ market-mining queue configured.');
+
 export interface ProvisionJobData {
     userId: string;
     botId: string;
@@ -509,6 +512,18 @@ export const cronWorker = SHOULD_RUN_WORKERS ? new Worker(
 
             console.log(`[Cron] Enqueued routine checks for ${tenants.length} active tenants (hour: ${nowHour} UTC).`);
 
+            // ── Market Intelligence Mining — 2 AM UTC daily ───────────────────
+            // One full Reddit harvest pass across all 15 active flavors.
+            // Date-stamped jobId prevents duplicate runs within the same UTC day.
+            if (nowHour === 2) {
+                await miningQueue.add('global_market_mining', {}, {
+                    jobId: `market_mining_${today}`,
+                    removeOnComplete: true,
+                    removeOnFail: true,
+                });
+                console.log(`[Cron] Enqueued daily market intelligence mining run.`);
+            }
+
             // ── Platform key health check — 8 AM UTC daily ────────────────────
             // Validates that PLATFORM_ONBOARDING_KEY is live. This is the key
             // used as the fallback for all tenants who have not yet added their own key.
@@ -550,6 +565,33 @@ export const cronWorker = SHOULD_RUN_WORKERS ? new Worker(
         concurrency: 1,
     }
 ) : null;
+
+// ---------------------------------------------------------------------------
+// Market Mining Worker
+// ---------------------------------------------------------------------------
+
+export const miningWorker = SHOULD_RUN_WORKERS ? new Worker(
+    'market-mining',
+    async () => {
+        console.log('[Mining] Daily market intelligence run starting...');
+        try {
+            const { runMarketMining } = await import('./market_miner.js');
+            const result = await runMarketMining();
+            console.log(`[Mining] Run complete — flavors: ${result.flavorsProcessed}, posts: ${result.postsFound}, facts: ${result.factsSaved}`);
+        } catch (err) {
+            console.error('[Mining] Run failed:', err);
+            throw err;
+        }
+    },
+    { connection: connection as any, concurrency: 1 }
+) : null;
+
+if (miningWorker) {
+    miningWorker.on('failed', (job, err) => {
+        console.error(`[Mining] Job ${job?.id} failed:`, err?.message ?? err);
+        sendAdminAlert(`⚠️ Market mining job failed\nJob: ${job?.id}\nError: ${err?.message ?? String(err)}`).catch(() => {});
+    });
+}
 
 if (cronWorker) {
     cronWorker.on('failed', (job, err) => {
