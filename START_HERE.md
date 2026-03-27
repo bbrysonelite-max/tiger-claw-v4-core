@@ -13,45 +13,71 @@ Stop what you are doing. Read this entire document and `CLAUDE.md`. These are yo
 - **Database:** PostgreSQL HA via Cloud SQL Proxy (`tiger_claw_shared`)
 - **Cache/Queue:** Redis HA + BullMQ (7 queues: provision, telegram, line, email-support, fact-extraction, ai-routines, global-cron)
 - **AI Engine:** Gemini 2.0 Flash (LOCKED — `gemini-2.5-flash` has a GCP function-calling bug, do not use it)
-- **Tests:** 374/374 passing
-- **Flavors:** 10 customer-facing industry flavors (doctor was removed — healthcare compliance risk)
+- **Tests:** 377/377 passing
+- **Flavors:** 13 customer-facing industry flavors
 - **Min-instances:** 1 — no cold start
+- **Data Refinery:** v5 pipeline live on Birdie — scout runs every 6h
 
-**Strict Rule 1:** OpenClaw, Mini-RAG, and per-tenant Docker containers are DEAD. Their folders have been physically eradicated. Do not reference or restore them.
+**Strict Rule 1:** OpenClaw, Mini-RAG, and per-tenant Docker containers are DEAD. Do not reference or restore them.
 
 **Strict Rule 2:** `main` is branch-protected. NEVER push directly. Always use `feat/` branches and `gh pr create`.
 
-**Strict Rule 3:** Read `CLAUDE.md` before writing any code. It contains non-negotiable product and engineering directives.
+**Strict Rule 3:** Read `CLAUDE.md` before writing any code. Non-negotiable product and engineering directives.
 
-**Strict Rule 4:** Anthropic is NOT wired. Do not add it back to the wizard without implementing the full `@anthropic-ai/sdk` code path in `api/src/services/ai.ts`. It is deferred to Sprint 2 intentionally.
+**Strict Rule 4:** Anthropic is NOT wired. Do not add it back without implementing the full `@anthropic-ai/sdk` code path in `api/src/services/ai.ts`. Deferred to Sprint 2.
 
----
-
-## 2. What Has Been Accomplished
-
-1. **V4 Stateless Architecture** — Cloud Run API, shared PostgreSQL, Redis, BullMQ. No Docker containers per tenant.
-2. **18 Native Function Calling Tools** — All in `api/src/tools/`. Backed by 374 passing tests.
-3. **Business Model: Card Upfront** — No free trial. Card charged at checkout via Stan Store. 7-day money-back guarantee. The `trialExpired` code path is dead and removed.
-4. **Key Strategy: Primary + Backup, 5 Live Providers** — Google, OpenAI, Grok, OpenRouter, Kimi. Grok/OpenRouter/Kimi route through OpenAI SDK with custom `baseURL`. Anthropic deferred to Sprint 2.
-5. **Memory Architecture V4.1 (All 4 Phases)** — `buildSystemPrompt()` is async. Injects ICP, hive signals, pipeline stats, and fact anchors on every request. Sawtooth compression, fact anchor extraction, and focus primitives all shipped (PRs #20–#24, merged).
-6. **Value-Gap Detection Cron** — 9 AM UTC daily: active tenant with zero leads in 3 days fires a diagnostic message to the operator. Per CLAUDE.md mandate. Merged PR #26.
-7. **Dead Code Removal** — `tiger_knowledge` removed PR #27. `tiger_keys` simplified PR #28. `resolveGoogleKey` removed PR #41.
-8. **System Prompt Fixes** — Tool count corrected (18), telemetry param fixed. Merged PR #29.
-9. **Flavor Cleanup** — All 10 remaining flavors reviewed. Doctor dropped (compliance risk). PR #30 merged.
-10. **Integrity First Product Philosophy** — Baked into `CLAUDE.md`. Non-negotiable.
-11. **Website + OG Tags** — `tigerclaw.io` updated with product naming, Stan Store links, 7-day MBG banner.
-12. **Hive Intelligence (V4 Analytics)** — Universal Prior, Founding Member Program, ICP signal mapping.
-13. **PRs #30–#45 merged. PR #46 open.** Admin dashboard live. Email support agent live.
-14. **Beta Hardening (PRs #41–#44)** — ADMIN_TOKEN rotated, Telegram webhook secret wired, dead trial code removed, fix-all-webhooks corrected.
-15. **Email Infrastructure** — Resend wired (RESEND_API_KEY in GCP Secrets), `tigerclaw.io` domain added (DNS propagating). FROM_EMAIL = `hello@tigerclaw.io`.
-16. **Email Support Agent (PR #45)** — `POST /webhooks/email` inbound Postmark webhook. AI generates replies using platform key. Sends from `support@tigerclaw.io` via Resend.
-17. **Wizard Hardening** — Magic link auto-opens wizard with email pre-filled. Niche required. Doctor removed from UI. Provider tiles open key page on click. Magic link URL fixed.
-18. **Multi-Provider AI (PR #46)** — Kimi, Grok, OpenRouter wired as OpenAI-compatible. `OPENAI_COMPAT` base URL map in `ai.ts`. All 4 OpenAI client instantiations pass `baseURL` when set.
-19. **FIRE TEST CONFIRMED** — Telegram bot responding in character (2026-03-26, midnight). End-to-end message delivery working.
+**Strict Rule 5:** 5-instance cap in effect until ~2026-04-03. Do not bulk-activate the founding member cohort before that date.
 
 ---
 
-## 3. Memory Architecture (V4.1 — Fully Shipped)
+## 2. What Has Been Accomplished (Full History)
+
+1. **V4 Stateless Architecture** — Cloud Run API, shared PostgreSQL, Redis, BullMQ.
+2. **18 Native Function Calling Tools** — `api/src/tools/`. 377 passing tests.
+3. **Business Model: Card Upfront** — No free trial. Stan Store checkout. 7-day MBG.
+4. **Multi-Provider AI** — Google, OpenAI, Grok, OpenRouter, Kimi. Anthropic deferred to Sprint 2.
+5. **Memory Architecture V4.1** — `buildSystemPrompt()` is async. Sawtooth compression, fact anchors, hive signals, focus primitives. PRs #20–#24, merged.
+6. **Value-Gap Detection Cron** — 9 AM UTC daily. Active tenant, zero leads in 3 days → diagnostic message to operator. PR #26.
+7. **Email Infrastructure** — Resend (outbound), Postmark (inbound support). `hello@tigerclaw.io`, `support@tigerclaw.io` live.
+8. **Email Support Agent** — PR #45: Postmark → BullMQ → AI → Resend reply.
+9. **Admin Dashboard** — `wizard.tigerclaw.io/admin/dashboard`. Bearer token auth. Fleet management, bot pool health.
+10. **Beta Hardening** — ADMIN_TOKEN rotated, Telegram webhook secret, dead trial code removed. PRs #41–#44.
+11. **Stan Store Webhook** — `POST /webhooks/stripe` provisions user + pending bot + sends magic link email. Idempotent via Redis.
+12. **Zoom Call 2026-03-27** — Went well. Post-call: 5-instance cap, 7-day observation window.
+13. **SWOT Analysis completed** — 6 weaknesses identified. 5 of 6 fixed in post-Zoom sprint.
+14. **Birdie Scout Node** — LaunchAgent installed. Runs `reddit_scout.mjs` every 6h against production API.
+15. **13 Flavors** — 3 new niches added (dorm-design, mortgage-broker, personal-trainer). scoutQueries added to all 13.
+
+---
+
+## 3. SWOT Weakness Fix Status (Post-Zoom Sprint)
+
+| # | Weakness | Status | PR |
+|---|---|---|---|
+| 1 | No rate limiting on webhooks | ✅ Fixed | #49 (open — merge) |
+| 2 | Magic links unsigned | ✅ Fixed | #50 (open — merge) |
+| 3 | Birdie cron not running | ✅ Fixed | LaunchAgent on Birdie (live) |
+| 4 | 3 missing flavor niches | ✅ Fixed | #51 (open — merge) |
+| 5 | Thin data volume / Refinery undeployed | ✅ Fixed | #52 (open — merge after #48) |
+| 6 | Single-region (us-central1 only) | 🔲 Pending | — |
+
+---
+
+## 4. Open PRs — Merge in This Order
+
+| PR | Branch | What | Notes |
+|---|---|---|---|
+| **#48** | `feat/migration-017-market-intel` | Migration 017 — `market_intelligence` table | **Merge first** |
+| **#49** | `feat/webhook-rate-limiting` | Webhook rate limits 60/min tenant, 20/min email | After #48 |
+| **#50** | `feat/hmac-magic-links` | HMAC magic links 72h TTL, `GET /admin/magic-link` | After #48 |
+| **#51** | `feat/three-new-flavors` | dorm-design, mortgage-broker, personal-trainer | After #48 |
+| **#52** | `feat/data-refinery-pipeline` | `/flavors` + `/mining/refine` + scoutQueries all flavors | After #48 |
+
+After merging #50: add `MAGIC_LINK_SECRET` to GCP Secret Manager.
+
+---
+
+## 5. Memory Architecture (V4.1 — Fully Shipped)
 
 `buildSystemPrompt()` is **async**. On every request it injects four live signals:
 - **Operator profile** — from `onboard_state` in `tenant_states`
@@ -68,91 +94,99 @@ All loaded in `Promise.all()` — DB unreachable = static prompt, no crash.
 | `chat_memory:{tenantId}:{chatId}` | Sawtooth compressed summaries | 30 days |
 | `focus_state:{tenantId}:{chatId}` | Session bookending | 24 hours |
 
-**Memory phases — all complete:**
-- [x] Phase 1: Dynamic prompt enrichment — merged PR #20
-- [x] Phase 2: Sawtooth context compression — merged PR #21
-- [x] Phase 3: Fact anchor extraction — merged PR #22
-- [x] Phase 4: `startFocus` / `completeFocus` primitives — merged PR #23
+---
 
-**Mac cluster (192.168.0.2) is an OFFLINE ops tool.** Not called by Cloud Run. Cannot break production.
+## 6. Product
+
+| Product | Price |
+|---|---|
+| Tiger-Claw Pro (Pre-Flavored) | $147/mo |
+| Industry Agent | $197/mo |
+
+**13 Customer-Facing Flavors:** network-marketer, real-estate, health-wellness, airbnb-host, baker, candle-maker, gig-economy, lawyer, plumber, sales-tiger, dorm-design, mortgage-broker, personal-trainer.
+
+Doctor removed — healthcare compliance risk. Do not re-add it.
 
 ---
 
-## 4. Product (as of 2026-03-26)
+## 7. Tenant Roster (Active)
 
-| Product | Price | Stan Store URL |
-|---|---|---|
-| Tiger-Claw Pro (Pre-Flavored) | $147/mo | `stan.store/brentbryson/p/tired-of-manually-searching-for-leads-` |
-| Industry Agent | $197/mo | `stan.store/brentbryson/p/custom-agent-flavor` |
-
-- Tiger-Claw Pro = pre-trained for sales and network marketing. Ships ready.
-- Industry Agent = domain pre-trained for a specific vertical.
-- "Standard Agent" is a dead name. It is "Industry Agent."
-- **No free trial.** Card upfront. 7-day money-back guarantee.
-
-**10 Customer-Facing Flavors:** network-marketer, real-estate, health-wellness, airbnb-host, baker, candle-maker, gig-economy, lawyer, plumber, sales-tiger.
-
----
-
-## 5. Tenant Roster
-
-| Slug | Status | Email | Notes |
+| Slug | Email | Status | Notes |
 |---|---|---|---|
-| `debbie-cameron` | live | justagreatdirector@outlook.com | Paying customer. Magic link sent 2026-03-25 |
-| `john-thailand` | live | vijohn@hotmail.com | Paying customer (John and Noon). Magic link sent 2026-03-25 |
-| `chana-loha` | live | chana.loh@gmail.com | Paying customer (Chana Lohasaptawee). Magic link sent 2026-03-25 |
+| `debbie-cameron` | justagreatdirector@outlook.com | live | Founding member |
+| `john-thailand` | vijohn@hotmail.com | live | Founding member — John + Noon (Thailand) |
+| `chana-loha` | chana.loh@gmail.com | live | Founding member — Chana |
 
-**7 past customers** (paid, never received service) preserved for post-Zoom outreach. See memory file for emails and draft message.
+**5-instance cap active until ~2026-04-03.** Do not activate more tenants before then.
+
+**7 past customers** (paid, never received service) — preserved for post-observation-window complimentary outreach.
 
 ---
 
-## 6. Email Infrastructure
+## 8. Infrastructure
 
-| Address | Purpose | Status |
+### Cloud
+| Service | Detail |
+|---|---|
+| API | `https://api.tigerclaw.io` — Cloud Run `tiger-claw-api` `us-central1` |
+| DB | Cloud SQL PostgreSQL HA `tiger_claw_shared` |
+| GCP Project | `hybrid-matrix-472500-k5` |
+| Wizard | `wizard.tigerclaw.io` — Next.js, Vercel, `web-onboarding/` |
+| Website | `tigerclaw.io` — static, Vercel, `tiger-bot-website/` |
+| Email outbound | Resend — `hello@tigerclaw.io`, `support@tigerclaw.io` |
+| Email inbound | Postmark — `support@tigerclaw.io` → `/webhooks/email` |
+
+### Local Mac Cluster
+| Machine | IP | Role |
 |---|---|---|
-| `hello@tigerclaw.io` | Transactional outbound (magic links) | ✅ Sending via Resend |
-| `support@tigerclaw.io` | AI-handled inbound support | ✅ Live via Postmark |
-| `noreply@tigerclaw.io` | System alerts | Planned |
-| `brent@tigerclaw.io` | Personal | Planned |
+| Cheese Grater | 192.168.0.2 | Primary dev — offline Reflexion Loop tool |
+| Birdie | 192.168.0.136 | Scout node — reddit_scout every 6h |
+| Monica | 192.168.0.138 | Compute node (standby) |
+| iMac | 192.168.0.116 | — |
+| MacBook Air | 192.168.0.237 | brents-2020-air.local |
 
-**Resend domain:** `tigerclaw.io` added, DNS records on Porkbun — pending propagation (DKIM + SPF).
+**Birdie SSH:** `ssh -i ~/.ssh/trashcan birdie@192.168.0.136`
 
----
+**Mac cluster is an OFFLINE ops tool.** Never called by Cloud Run.
 
-## 7. Bot Pool
-
-- **Available:** 63 tokens
-- **Assigned:** 13 tokens (real customers + internal/sandbox)
-- **Status:** Healthy
-
----
-
-## 8. What Was Done This Session (2026-03-25 → 2026-03-26)
-
-- **Fire test** — bot confirmed live and responding in character on Telegram
-- **Email infra** — RESEND_API_KEY wired, FROM_EMAIL corrected, Resend domain added, Postmark inbound configured
-- **Email support agent** — PR #45 merged: Postmark → BullMQ → AI → Resend
-- **Bot pool cleanup** — 21 demo/tombstone tenants deprovisioned, pool 42 → 63
-- **3 paying customers** — emails corrected in DB, magic links sent
-- **Admin dashboard** — Vercel redeployed, now live
-- **Wizard hardening** — magic link URL, auto-open, niche required, doctor removed, tile UX
-- **Multi-provider AI** — Kimi, Grok, OpenRouter wired end-to-end; Anthropic deferred
-- **Docs** — START_HERE.md, STATE_OF_TIGER_CLAW.md updated
+### Birdie LaunchAgents
+| Label | Schedule | Log |
+|---|---|---|
+| `com.birdie.heartbeat` | Daily midnight | `/Users/birdie/.openclaw/logs/heartbeat.log` |
+| `com.birdie.scout` | Every 6 hours | `/Users/birdie/logs/scout.log` |
 
 ---
 
-## 9. Tomorrow (2026-03-26) — Pre-Zoom Sprint
+## 9. Key Secrets (GCP Secret Manager — never commit)
 
-- Morning: ROADMAP.md, KNOWN_ISSUES.md, CHANGELOG.md
-- Polish pass on wizard and website
-- Practice run
-- Break ~3–4 PM Pacific
-- Zoom call: **2026-03-27 (Thursday), 7 PM Pacific**
+| Secret | Notes |
+|---|---|
+| `ADMIN_TOKEN` | `b1cb78d33181c705ec838cdfec06912922808a423ebabad056c39450ae84e69e` |
+| `MAGIC_LINK_SECRET` | Set separately — needed after PR #50 merges |
+| `RESEND_API_KEY` | Outbound email |
+| `STRIPE_SECRET_KEY` | Stan Store webhook |
+| `STRIPE_WEBHOOK_SECRET` | Webhook signature |
+| `TELEGRAM_WEBHOOK_SECRET` | Inbound webhook auth |
+| `POSTMARK_WEBHOOK_TOKEN` | Inbound email auth |
 
 ---
 
-## FINAL REMINDER
+## 10. Remaining Work
 
-`CLAUDE.md` contains the non-negotiable product philosophy and engineering constraints. Read it before writing any code.
+### Immediate
+1. Merge #48 → #49, #50, #51, #52 (in order)
+2. Set `MAGIC_LINK_SECRET` in GCP Secret Manager after #50 deploys
+3. Verify `/Users/birdie/logs/scout.log` shows `✅ Purified facts` after #52 deploys
 
-Everything else you need is in `ARCHITECTURE.md`, `STATE_OF_TIGER_CLAW.md`, `specs/`, and `docs/`. Trust the repo, not your base-model memory.
+### Weakness #6 (next session)
+- Add `asia-southeast1` region to Cloud Run for Thai customers
+
+### Sprint 2
+- Anthropic SDK support
+- Reflexion Loop on Cheese Grater
+- Bot pool replenishment (needs physical SIMs + BotFather)
+- Post-observation-window outreach to 7 past customers (~2026-04-03)
+
+---
+
+*Last updated: 2026-03-27 (post-Zoom sprint). Locked. Proceed.*
