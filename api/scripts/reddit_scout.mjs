@@ -3,7 +3,7 @@
 // It fetches all active flavors and harvests data for each one.
 
 const API_URL = process.env.TIGER_CLAW_API_URL || 'http://localhost:4000';
-const USER_AGENT = 'TigerClaw-Cluster-Worker/1.0';
+const USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36';
 
 async function runGlobalScout() {
   console.log(`[scout] Starting Global Multi-Flavor Harvest at ${new Date().toISOString()}`);
@@ -24,7 +24,7 @@ async function runGlobalScout() {
         
         try {
           console.log(`[scout] Searching: "${query}"`);
-          const res = await fetch(url, { headers: { 'User-Agent': USER_AGENT } });
+          const res = await fetch(url, { headers: { 'User-Agent': USER_AGENT, 'Accept': 'application/json' } });
           const data = await res.json();
 
           const posts = data?.data?.children || [];
