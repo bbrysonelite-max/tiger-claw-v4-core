@@ -24,7 +24,7 @@ import { encryptToken } from "../services/pool.js";
 const router = Router();
 
 const VALID_STATUSES: TenantStatus[] = [
-  "pending", "onboarding", "active", "paused", "suspended", "terminated",
+  "pending", "onboarding", "active", "live", "paused", "suspended", "terminated",
 ];
 
 // ---------------------------------------------------------------------------
