@@ -17,6 +17,7 @@ import { Router, type Request, type Response } from "express";
 import Stripe from "stripe";
 import { createHmac } from "crypto";
 import Redis from "ioredis";
+import { rateLimit } from "express-rate-limit";
 import { telegramQueue, lineQueue, emailQueue } from "../services/queue.js";
 import {
   createBYOKUser,
@@ -28,6 +29,35 @@ import {
 import { decryptToken } from "../services/pool.js";
 import { sendAdminAlert } from "./admin.js";
 import { sendStanStoreWelcome } from "../services/email.js";
+
+// ---------------------------------------------------------------------------
+// Rate limiters
+// ---------------------------------------------------------------------------
+
+// Telegram + LINE: limit per tenantId (not IP — all legit traffic shares
+// Telegram/LINE server IPs). 60 messages/minute per tenant is generous for
+// any real user; stops targeted flood attacks against a specific tenant.
+const webhookLimiter = rateLimit({
+  windowMs: 60_000,
+  limit: 60,
+  keyGenerator: (req: Request) => `webhook:${req.params["tenantId"] ?? "unknown"}`,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  handler: (_req, res) => {
+    res.status(429).json({ error: "Too many requests" });
+  },
+});
+
+// Email support: limit per IP — no tenantId in this route.
+const emailLimiter = rateLimit({
+  windowMs: 60_000,
+  limit: 20,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  handler: (_req, res) => {
+    res.status(429).json({ error: "Too many requests" });
+  },
+});
 
 const router = Router();
 
@@ -183,7 +213,7 @@ router.post("/stripe", async (req: Request, res: Response) => {
 // Stateless multi-tenancy routing for all Telegram updates
 // ---------------------------------------------------------------------------
 
-router.post("/telegram/:tenantId", async (req: Request, res: Response) => {
+router.post("/telegram/:tenantId", webhookLimiter, async (req: Request, res: Response) => {
   const { tenantId } = req.params;
 
   if (!tenantId) {
@@ -242,7 +272,7 @@ router.post("/telegram/:tenantId", async (req: Request, res: Response) => {
 // express.json() for this path prefix.
 // ---------------------------------------------------------------------------
 
-router.post("/line/:tenantId", async (req: Request, res: Response) => {
+router.post("/line/:tenantId", webhookLimiter, async (req: Request, res: Response) => {
   const { tenantId } = req.params;
 
   if (!tenantId) {
@@ -325,7 +355,7 @@ router.post("/line/:tenantId", async (req: Request, res: Response) => {
 // Secured by POSTMARK_WEBHOOK_TOKEN env var checked against the
 // X-Postmark-Webhook-Token header Postmark sends with every inbound POST.
 // ---------------------------------------------------------------------------
-router.post("/email", async (req: Request, res: Response) => {
+router.post("/email", emailLimiter, async (req: Request, res: Response) => {
   // Validate Postmark webhook token
   const POSTMARK_WEBHOOK_TOKEN = process.env["POSTMARK_WEBHOOK_TOKEN"];
   if (POSTMARK_WEBHOOK_TOKEN) {
