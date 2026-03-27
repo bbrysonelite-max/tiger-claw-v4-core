@@ -30,6 +30,7 @@ import express, { type Request, type Response, type NextFunction } from "express
 import cors from "cors";
 import rateLimit from "express-rate-limit";
 import { initSchema, listTenants, updateTenantStatus, logAdminEvent } from "./services/db.js";
+import { initMarketIntelSchema } from "./services/market_intel.js";
 import { runMigrations } from "./services/migrate.js";
 import { getPoolStatus } from "./services/pool.js";
 import { sendAdminAlert } from "./routes/admin.js";
@@ -43,6 +44,8 @@ import wizardRouter from "./routes/wizard.js";
 import keysRouter from "./routes/keys.js";
 import subscriptionsRouter from "./routes/subscriptions.js";
 import dashboardRouter from "./routes/dashboard.js";
+import miningRouter from "./routes/mining.js";
+import flavorsRouter from "./routes/flavors.js";
 import { validateAllFlavors } from "./tools/flavorConfig.js";
 import "./services/queue.js"; // Initialize BullMQ Background Workers
 
@@ -99,6 +102,8 @@ app.use("/wizard", wizardRouter);
 app.use("/keys", keysRouter);
 app.use("/subscriptions", subscriptionsRouter);
 app.use("/dashboard", dashboardRouter);
+app.use("/mining", miningRouter);
+app.use("/flavors", flavorsRouter);
 
 // Root ping
 app.get("/", (_req: Request, res: Response) => {
@@ -232,12 +237,15 @@ async function main(): Promise<void> {
   // Initialize PostgreSQL schema (legacy CREATE TABLE IF NOT EXISTS fallback)
   await initSchema();
 
+  // Initialize Market Intelligence schema (v5 Data Moat)
+  await initMarketIntelSchema();
+
   // Validate all 11 flavor JSON files (GAP 1)
   validateAllFlavors();
 
   // Start HTTP server
-  app.listen(PORT, () => {
-    console.log(`[tiger-claw-api] Listening on port ${PORT}`);
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`[tiger-claw-api] Listening on 0.0.0.0 port ${PORT}`);
   });
 
   // Start fleet health monitor (30-second interval)
