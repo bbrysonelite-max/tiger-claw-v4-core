@@ -147,7 +147,7 @@ export async function sendSupportReply(to: string, toName: string, subject: stri
 export async function sendStanStoreWelcome(email: string, name: string, productName: string = "Tiger Claw"): Promise<void> {
   const isMock = process.env["RESEND_API_KEY"] === undefined;
   const frontendUrl = process.env["FRONTEND_URL"] ?? "https://wizard.tigerclaw.io";
-  const claimUrl = `${frontendUrl}/wizard?email=${encodeURIComponent(email)}`;
+  const claimUrl = `${frontendUrl}?email=${encodeURIComponent(email)}`;
   
   if (isMock) {
     console.log(`[Email] MOCK sendStanStoreWelcome to ${email} (URL: ${claimUrl})`);

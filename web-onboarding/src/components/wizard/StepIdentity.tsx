@@ -17,12 +17,11 @@ const NICHES = [
     { id: "health-wellness", name: "Health & Wellness", icon: "🌿" },
     { id: "airbnb-host", name: "Airbnb / STR", icon: "🔑" },
     { id: "baker", name: "Bakery / Food", icon: "🧁" },
-    { id: "doctor", name: "Medical / Clinic", icon: "🩺" },
+    { id: "candle-maker", name: "Candle / Crafts", icon: "🕯️" },
     { id: "gig-economy", name: "Gig / Freelance", icon: "🎸" },
     { id: "lawyer", name: "Legal Services", icon: "⚖️" },
     { id: "plumber", name: "Home Services", icon: "🔧" },
     { id: "sales-tiger", name: "Sales Professional", icon: "📈" },
-    { id: "candle-maker", name: "Candle / Crafts", icon: "🕯️" },
 ];
 
 export default function StepIdentity({ state, updateState, onNext }: IdentityProps) {
@@ -31,7 +30,7 @@ export default function StepIdentity({ state, updateState, onNext }: IdentityPro
     const [localState, setLocalState] = useState(state);
 
     const handleContinue = async () => {
-        if (!localState.yourName || !localState.email || !localState.botName) return;
+        if (!localState.nicheId || !localState.yourName || !localState.email || !localState.botName) return;
         
         setLoading(true);
         setError("");
@@ -166,7 +165,7 @@ export default function StepIdentity({ state, updateState, onNext }: IdentityPro
             <div className="mt-8 flex justify-end">
                 <button
                     onClick={handleContinue}
-                    disabled={!localState.yourName || !localState.email || !localState.botName || loading}
+                    disabled={!localState.nicheId || !localState.yourName || !localState.email || !localState.botName || loading}
                     className="group relative inline-flex h-12 items-center justify-center overflow-hidden rounded-full font-bold px-8 bg-primary text-black transition-all disabled:opacity-50 hover:scale-105 active:scale-95"
                 >
                     <span className="relative z-10 flex items-center gap-2">
