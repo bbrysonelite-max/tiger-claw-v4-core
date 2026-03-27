@@ -1,52 +1,50 @@
 #!/bin/bash
-# Tiger Claw — Deploy to Cloud Run (v4 Multi-Tenant)
-# Run from project root (gcloud must be authenticated)
+# Tiger Claw — Deploy to Cloud Run (v4 Multi-Tenant, Multi-Region)
+# Deploys to us-central1 (primary) and asia-southeast1 (Singapore).
+# Both regions sit behind the Global HTTPS Load Balancer at api.tigerclaw.io.
 #
-# Usage: ./ops/deploy-cloudrun.sh
+# Prerequisites:
+#   - ops/setup-multi-region.sh must have been run once to provision VPC infra + LB
+#   - MULTI_REGION_READY env var set to "true" to also deploy to asia-southeast1
+#   - Otherwise deploys only to us-central1 (safe default before infra is ready)
+#
+# Usage:
+#   GCP_PROJECT_ID=hybrid-matrix-472500-k5 bash ./ops/deploy-cloudrun.sh
+#   MULTI_REGION_READY=true GCP_PROJECT_ID=hybrid-matrix-472500-k5 bash ./ops/deploy-cloudrun.sh
 
 set -euo pipefail
 
 PROJECT_ID="${GCP_PROJECT_ID:?ERROR: GCP_PROJECT_ID must be set}"
-REGION="us-central1"
 SERVICE_NAME="tiger-claw-api"
 IMAGE="gcr.io/${PROJECT_ID}/${SERVICE_NAME}:latest"
 
+DEPLOY_REGIONS=("us-central1")
+VPC_CONNECTORS=("tiger-claw-connector")
+
+# Only deploy to SEA if infra is confirmed provisioned
+if [ "${MULTI_REGION_READY:-false}" = "true" ]; then
+  DEPLOY_REGIONS+=("asia-southeast1")
+  VPC_CONNECTORS+=("tiger-claw-connector-sea")
+  echo "==> Multi-region deploy: us-central1 + asia-southeast1"
+else
+  echo "==> Single-region deploy: us-central1"
+  echo "    (Set MULTI_REGION_READY=true after running ops/setup-multi-region.sh)"
+fi
+
+# ──────────────────────────────────────────────────────────────
+# Build image once — deploy to both regions from the same image
+# ──────────────────────────────────────────────────────────────
+echo ""
 echo "==> Building and pushing Docker image..."
 gcloud builds submit ./api \
   --tag "$IMAGE" \
   --project "$PROJECT_ID" \
   --timeout=600
 
-echo "==> Deploying to Cloud Run..."
-
-# Get current Cloud Run URL (if already deployed) for TIGER_CLAW_API_URL
-CURRENT_URL=$(gcloud run services describe "$SERVICE_NAME" \
-  --region "$REGION" \
-  --project "$PROJECT_ID" \
-  --format "value(status.url)" 2>/dev/null || echo "")
-
-TIGER_CLAW_API_URL="${CURRENT_URL:-https://tiger-claw-api.run.app}"
-
-gcloud run deploy "$SERVICE_NAME" \
-  --image "$IMAGE" \
-  --region "$REGION" \
-  --project "$PROJECT_ID" \
-  --platform managed \
-  --execution-environment gen2 \
-  --allow-unauthenticated \
-  --port 4000 \
-  --memory 2Gi \
-  --cpu 2 \
-  --min-instances 1 \
-  --max-instances 100 \
-  --timeout 300 \
-  --concurrency 100 \
-  --vpc-connector "tiger-claw-connector" \
-  --vpc-egress private-ranges-only \
-  --startup-probe="httpGet.path=/health,httpGet.port=4000,timeoutSeconds=5,periodSeconds=10,failureThreshold=3" \
-  --liveness-probe="httpGet.path=/health,httpGet.port=4000,timeoutSeconds=5,periodSeconds=30,failureThreshold=3" \
-  --update-secrets \
-    "DATABASE_URL=tiger-claw-database-url:latest,\
+# ──────────────────────────────────────────────────────────────
+# Deploy to each region
+# ──────────────────────────────────────────────────────────────
+SECRETS="DATABASE_URL=tiger-claw-database-url:latest,\
 REDIS_URL=tiger-claw-redis-url:latest,\
 GOOGLE_API_KEY=tiger-claw-google-api-key:latest,\
 STRIPE_SECRET_KEY=tiger-claw-stripe-secret-key:latest,\
@@ -65,14 +63,50 @@ SERPER_KEY_1=tiger-claw-serper-key-1:latest,\
 SERPER_KEY_2=tiger-claw-serper-key-2:latest,\
 SERPER_KEY_3=tiger-claw-serper-key-3:latest"
 
+for i in "${!DEPLOY_REGIONS[@]}"; do
+  REGION="${DEPLOY_REGIONS[$i]}"
+  CONNECTOR="${VPC_CONNECTORS[$i]}"
+
+  echo ""
+  echo "==> Deploying to ${REGION} (connector: ${CONNECTOR})..."
+
+  gcloud run deploy "$SERVICE_NAME" \
+    --image "$IMAGE" \
+    --region "$REGION" \
+    --project "$PROJECT_ID" \
+    --platform managed \
+    --execution-environment gen2 \
+    --allow-unauthenticated \
+    --port 4000 \
+    --memory 2Gi \
+    --cpu 2 \
+    --min-instances 1 \
+    --max-instances 100 \
+    --timeout 300 \
+    --concurrency 100 \
+    --vpc-connector "$CONNECTOR" \
+    --vpc-egress private-ranges-only \
+    --startup-probe="httpGet.path=/health,httpGet.port=4000,timeoutSeconds=5,periodSeconds=10,failureThreshold=3" \
+    --liveness-probe="httpGet.path=/health,httpGet.port=4000,timeoutSeconds=5,periodSeconds=30,failureThreshold=3" \
+    --update-secrets "$SECRETS"
+
+  LIVE_URL=$(gcloud run services describe "$SERVICE_NAME" \
+    --region "$REGION" \
+    --project "$PROJECT_ID" \
+    --format "value(status.url)")
+  echo "    ✅ ${REGION}: ${LIVE_URL}"
+done
+
+# ──────────────────────────────────────────────────────────────
+# Health check primary region
+# ──────────────────────────────────────────────────────────────
 echo ""
-echo "==> Deployment complete!"
-LIVE_URL=$(gcloud run services describe "$SERVICE_NAME" \
-  --region "$REGION" \
+echo "==> Verifying health (us-central1)..."
+PRIMARY_URL=$(gcloud run services describe "$SERVICE_NAME" \
+  --region "us-central1" \
   --project "$PROJECT_ID" \
   --format "value(status.url)")
-echo "    URL: $LIVE_URL"
+curl -s "${PRIMARY_URL}/health" || echo "(health check pending — may take a few seconds)"
 echo ""
-echo "==> Verifying health..."
-curl -s "${LIVE_URL}/health" || echo "(health check pending — may take a few seconds)"
+echo "==> Deployment complete."
 echo ""

@@ -27,4 +27,6 @@ jobs:
       - name: Deploy to Cloud Run
         run: |
           chmod +x ./ops/deploy-cloudrun.sh
-          GCP_PROJECT_ID=hybrid-matrix-472500-k5 bash ./ops/deploy-cloudrun.sh
+          GCP_PROJECT_ID=hybrid-matrix-472500-k5 \
+          MULTI_REGION_READY=${{ vars.MULTI_REGION_READY || 'false' }} \
+          bash ./ops/deploy-cloudrun.sh
