@@ -12,6 +12,19 @@ export const NETWORK_MARKETER_FLAVOR: FlavorConfig = {
   key: "network-marketer",
   displayName: "Network Marketer",
   description: "Two-oar AI prospecting engine for network marketing professionals. Recruits business builders and acquires product customers simultaneously.",
+  professionLabel: "network marketing",
+  defaultKeywords: [
+    "side hustle", "extra income", "work from home", "financial freedom",
+    "passive income", "be my own boss", "tired of my job", "need more money"
+  ],
+
+  scoutQueries: [
+    "best side hustle 2026",
+    "how to make passive income from home",
+    "tired of my 9-5 job",
+    "looking for extra income ideas",
+    "work from home opportunities reddit"
+  ],
 
   // -------------------------------------------------------------------------
   // Conversion
@@ -149,6 +162,32 @@ export const NETWORK_MARKETER_FLAVOR: FlavorConfig = {
         `— {botName}`,
       ].join("\n"),
     },
+    {
+      name: "The Who Do You Know Pattern",
+      moments: ["not_interested", "general"],
+      storyTemplate: [
+        `I appreciate the honesty. Totally fine if this isn't for you.`,
+        ``,
+        `I'm actually not calling to sell you anything. I'm expanding {tenantName}'s business and I'm looking for people who are entrepreneurial, open-minded, and looking for more time freedom.`,
+        ``,
+        `Even if this isn't your thing — who do you know that fits that description?`,
+        ``,
+        `— {botName}`,
+      ].join("\n"),
+    },
+    {
+      name: "The International Bridge",
+      moments: ["international", "geographic_expansion"],
+      storyTemplate: [
+        `Quick question: who do you know in {country} who speaks {language} and is entrepreneurial?`,
+        ``,
+        `{tenantName} is expanding there and we're looking for a local champion to lead the launch.`,
+        ``,
+        `Thought you might have a connection.`,
+        ``,
+        `— {botName}`,
+      ].join("\n"),
+    },
   ],
 
   // -------------------------------------------------------------------------
@@ -245,6 +284,7 @@ export const NETWORK_MARKETER_FLAVOR: FlavorConfig = {
       "Never chase. Never beg. One follow-up maximum.",
       "Never pretend to be human. Identify as AI when asked.",
       "Always edify {tenantName} — you are their digital representative.",
+      "Stack 10s with 10s: Ruthlessly prioritize personal attention for Tier-A prospects. Let automated systems handle the rest.",
     ],
     languageDirective: "Always respond to your tenant in their preferredLanguage. Generate outreach messages in the PROSPECT's detected language.",
     neverDoList: [
@@ -259,5 +299,23 @@ export const NETWORK_MARKETER_FLAVOR: FlavorConfig = {
 
   discovery: {
     activeSources: ["reddit", "facebook_groups", "telegram"],
+  },
+
+  // -------------------------------------------------------------------------
+  // Nurture Templates (Block 3.6 — Spec decision #32)
+  // -------------------------------------------------------------------------
+  nurtureTemplates: {
+    value_drop: "Hey {{name}},\n\nI'm {{botName}}, working with {{tenantName}}.\n\nI wanted to share something relevant — no pitch, just something I thought you'd find useful.\n\nThe conversation around AI and work is shifting fast. The middle layer of jobs — management, coordination, routine knowledge work — is compressing. People who own their income stream are going to be in a very different position in 5 years than people who don't.\n\nNot pushing anything. Just something worth thinking about.\n\n— {{botName}}",
+    testimonial: "Hey {{name}},\n\nQuick one — I was talking with {{tenantName}} earlier and they mentioned someone who started exactly where you are now.\n\nSame hesitations. Same \"I'm not sure this is for me\" energy. Six months later — different story entirely.\n\n{{tenantName}} doesn't work with everyone. They're selective. Which is probably why results like that happen.\n\nAnyway, just thought of you. No pressure.\n\n— {{botName}}",
+    authority_transfer: "Hey {{name}},\n\nI realized I haven't properly introduced you to {{tenantName}} — I just told you they were good. Let me be more specific.\n\n{{tenantName}} has been in {{profession}} for {{years}}. {{biggestWin}}. What makes them different: {{differentiator}}.\n\nThey're not trying to be everything to everyone. They work with a specific kind of person: {{icp}}.\n\nIf that's you — even a little — it's worth one conversation.\n\n— {{botName}}",
+    personal_checkin: "Hey {{name}},\n\nJust checking in — how are things going?\n\nNo agenda. {{tenantName}} asked me to stay in touch with people they've been introduced to. They actually care how you're doing.\n\nAnything new on your end?\n\n— {{botName}}",
+    one_to_ten_part1: "Hey {{name}},\n\nQuick question — and I want an honest answer.\n\nOn a scale of 1-10, where are you with {{product}}? 1 = not interested at all. 10 = let's do this right now.\n\nJust give me a number. No judgment either way.\n\n— {{botName}}",
+    one_to_ten_part2: "Okay, I appreciate the honesty.\n\nHere's what I want to know: what would you need to know — or see — to move that to a 10?\n\nNot trying to talk you into anything. I genuinely want to know what's in the gap. Whatever it is, I can either answer it or tell you I can't — and either is fine.\n\nWhat's the thing?\n\n— {{botName}}",
+    gap_closing: "Got it — {{answer}}.\n\nThat's a fair question and {{tenantName}} gets it a lot. Here's the honest answer:\n\n{{tenantName}} has been exactly where you are. They know what it looks like when something's a fit and when it isn't. Their experience with {{biggestWin}} came from deciding to take that question seriously rather than letting it stop them.\n\nWith that in mind — where are you now on the 1-10 scale?\n\n— {{botName}}",
+    scarcity_takeaway: "Hey {{name}},\n\nI'm going to be straight with you — {{tenantName}} is selective about who they spend time with. Most people aren't a fit, and that's fine.\n\nI actually didn't want YOU to feel pressured to buy anything. This is only for people who are serious about building residual income. If you're happy where you are, then we should probably stop here.\n\nIf not, now is the time to say so. Otherwise, no hard feelings at all.\n\n— {{botName}}",
+    pattern_interrupt: "Hey {{name}},\n\nLet me ask you something before I let you go.\n\nIf someone offered you a million dollars to jump out of an airplane without a parachute, would you do it?\n\nMost people say no immediately. But here's the thing — nobody said the airplane was in the air. It's sitting on the runway.\n\nThe lesson: don't say no before you have all the information.\n\nI think you might be doing that with {{product}}. And that's fine — if you've thought it through. But if the no is coming from an incomplete picture, it's worth 10 minutes to complete it.\n\nI'll leave it there. If you want that conversation, just say yes.\n\n— {{botName}}",
+    final_takeaway: "Hey {{name}},\n\nI've enjoyed being in touch. I'm going to step back now — this is the last message I'll send for a while.\n\n{{tenantName}} is doing well and moving forward. We only have a few spots left for direct coaching this month and they are going to the top 20% who are ready to move. \n\nIf the timing ever changes for you, I'm easy to reach. Good luck with everything.\n\n— {{botName}}",
+    slow_drip_value: "Hey {{name}},\n\nChecking in — it's been a bit. Just wanted to share something I thought was worth passing along.\n\n{{tenantName}} has been focused on {{differentiator}}. Things are moving. No pitch — just wanted to stay in touch.\n\nIf anything's changed on your end, I'm always here.\n\n— {{botName}}",
+    default_fallback: "Hey {{name}}, just checking in. — {{botName}}"
   },
 };
