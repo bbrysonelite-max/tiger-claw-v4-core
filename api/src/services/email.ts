@@ -1,7 +1,36 @@
 import { Resend } from "resend";
+import { createHmac, timingSafeEqual } from "crypto";
 
 const resend = new Resend(process.env["RESEND_API_KEY"] ?? "re_mock_key");
 const FROM_EMAIL = "Tiger Claw <hello@tigerclaw.io>";
+
+// ---------------------------------------------------------------------------
+// Magic link token helpers
+// ---------------------------------------------------------------------------
+
+const MAGIC_LINK_TTL_MS = 72 * 60 * 60 * 1000; // 72 hours
+
+function getMagicSecret(): string {
+  return process.env["MAGIC_LINK_SECRET"] ?? process.env["ADMIN_TOKEN"] ?? "dev-secret";
+}
+
+export function generateMagicToken(email: string): { token: string; expires: number } {
+  const expires = Date.now() + MAGIC_LINK_TTL_MS;
+  const payload = `${email}:${expires}`;
+  const token = createHmac("sha256", getMagicSecret()).update(payload).digest("hex");
+  return { token, expires };
+}
+
+export function verifyMagicToken(email: string, token: string, expires: number): boolean {
+  if (Date.now() > expires) return false;
+  const payload = `${email}:${expires}`;
+  const expected = createHmac("sha256", getMagicSecret()).update(payload).digest("hex");
+  try {
+    return timingSafeEqual(Buffer.from(token, "hex"), Buffer.from(expected, "hex"));
+  } catch {
+    return false;
+  }
+}
 
 export async function sendProvisioningReceipt(email: string, botUsername: string, planName: string): Promise<void> {
   const isMock = process.env["RESEND_API_KEY"] === undefined;
@@ -147,7 +176,8 @@ export async function sendSupportReply(to: string, toName: string, subject: stri
 export async function sendStanStoreWelcome(email: string, name: string, productName: string = "Tiger Claw"): Promise<void> {
   const isMock = process.env["RESEND_API_KEY"] === undefined;
   const frontendUrl = process.env["FRONTEND_URL"] ?? "https://wizard.tigerclaw.io";
-  const claimUrl = `${frontendUrl}?email=${encodeURIComponent(email)}`;
+  const { token, expires } = generateMagicToken(email);
+  const claimUrl = `${frontendUrl}?email=${encodeURIComponent(email)}&token=${token}&expires=${expires}`;
   
   if (isMock) {
     console.log(`[Email] MOCK sendStanStoreWelcome to ${email} (URL: ${claimUrl})`);

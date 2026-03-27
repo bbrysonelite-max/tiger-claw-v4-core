@@ -16,6 +16,7 @@
 
 import { Router, type Request, type Response, type NextFunction } from "express";
 import TelegramBot from "node-telegram-bot-api";
+import { generateMagicToken } from "../services/email.js";
 import {
   listTenants,
   getTenant,
@@ -1033,6 +1034,20 @@ router.delete("/skills/:id", async (req: Request, res: Response) => {
   } catch (err) {
     return res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
   }
+});
+
+// ── GET /admin/magic-link?email=... ──────────────────────────────────────────
+// Generate a signed magic link for any email. Use this when manually
+// onboarding a customer or re-sending a link.
+router.get("/magic-link", async (req: Request, res: Response) => {
+  const email = req.query["email"] as string | undefined;
+  if (!email) return res.status(400).json({ error: "email query param is required" });
+
+  const frontendUrl = process.env["FRONTEND_URL"] ?? "https://wizard.tigerclaw.io";
+  const { token, expires } = generateMagicToken(email);
+  const url = `${frontendUrl}?email=${encodeURIComponent(email)}&token=${token}&expires=${expires}`;
+
+  return res.json({ url, expires: new Date(expires).toISOString() });
 });
 
 export default router;
