@@ -619,15 +619,42 @@ export async function buildSystemPrompt(tenant: any): Promise<string> {
     ].join('\n');
 }
 
+// ─── Extract text from Gemini response (safe even when functionCall parts exist) ──
+// The SDK's response.text() THROWS when the response contains functionCall parts.
+// This helper reads text directly from the raw candidates parts array, which always works.
+function extractTextFromResponse(response: any): string {
+    // Method 1: Read from raw candidates parts (most reliable)
+    try {
+        const candidates = response.candidates ?? [];
+        const parts = candidates[0]?.content?.parts ?? [];
+        const textParts = parts
+            .filter((p: any) => typeof p.text === 'string')
+            .map((p: any) => p.text);
+        if (textParts.length > 0) return textParts.join('');
+    } catch {}
+
+    // Method 2: Fallback to SDK .text() for simple text-only responses
+    try {
+        const t = response.text?.();
+        if (t) return t;
+    } catch {}
+
+    return '';
+}
+
 // ─── Tool execution loop ─────────────────────────────────────────────────────
 async function runToolLoop(
     chat: any,
     initialResponse: any,
     toolContext: any,
     logPrefix: string,
-): Promise<any> {
+): Promise<{ accumulatedText: string; finalResponse: any }> {
     let response = initialResponse;
     let toolCallCount = 0;
+    let accumulatedText = '';
+
+    const initialText = extractTextFromResponse(response);
+    if (initialText) accumulatedText += initialText + '\n';
 
     while ((response.functionCalls?.() ?? []).length > 0) {
         // BUG 1 FIX: circuit breaker
@@ -685,9 +712,12 @@ async function runToolLoop(
 
         const nextResult = await chat.sendMessage(functionResponses);
         response = nextResult.response;
+
+        const loopText = extractTextFromResponse(response);
+        if (loopText) accumulatedText += loopText + '\n';
     }
 
-    return response;
+    return { accumulatedText: accumulatedText.trim(), finalResponse: response };
 }
 
 // ─── Exported for testing ─────────────────────────────────────────────────────
@@ -771,13 +801,13 @@ export async function processTelegramMessage(
         const promptBlocked = (initial.response as any).promptFeedback?.blockReason ?? null;
         const rawParts = initCandidates[0]?.content?.parts ?? [];
         console.log(`[AI] Gemini initial response: finishReason=${finishReason}, promptBlocked=${promptBlocked}, text=${!!initial.response.text?.()}, toolCalls=${(initial.response.functionCalls?.() ?? []).length}, rawParts=${JSON.stringify(rawParts).slice(0, 300)}`);
-        const finalResponse = await runToolLoop(chat, initial.response, toolContext, 'AI');
+        const { accumulatedText: replyText, finalResponse } = await runToolLoop(chat, initial.response, toolContext, 'AI');
 
         const updatedHistory = await chat.getHistory();
         await saveChatHistory(tenantId, chatId, updatedHistory);
         console.log(`[AI] History saved: ${updatedHistory.length} entries`);
 
-        const replyText = finalResponse.text?.() ?? '';
+
         console.log(`[AI] Reply text length: ${replyText.trim().length}. Sending to Telegram.`);
         if (replyText.trim().length > 0) {
             await bot.sendMessage(chatId, replyText);
@@ -1135,10 +1165,9 @@ export async function processLINEMessage(
         } else {
             const chat = model!.startChat({ history });
             const initial = await chat.sendMessage(text);
-            const finalResponse = await runToolLoop(chat, initial.response, toolContext, 'AI');
+            const { accumulatedText: replyText, finalResponse } = await runToolLoop(chat, initial.response, toolContext, 'AI');
             const updatedHistory = await chat.getHistory();
             await saveChatHistory(tenantId, chatId, updatedHistory);
-            replyText = finalResponse.text?.() ?? '';
         }
 
         if (replyText.trim().length > 0) {
