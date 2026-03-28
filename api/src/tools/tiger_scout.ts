@@ -27,8 +27,9 @@ import * as https from "https";
 import * as crypto from "crypto";
 import { getLeads, saveLeads as dbsaveLeads, getTenantState, saveTenantState } from "../services/tenant_data.js";
 import { loadFlavorConfig } from "./flavorConfig.js";
-import { getHiveSignalWithFallback } from "../services/db.js";
+import { getHiveSignalWithFallback, getTenant } from "../services/db.js";
 import { emitHiveEvent } from "../services/hiveEmitter.js";
+import { sendFirstLeadNotification } from "../services/email.js";
 
 // ---------------------------------------------------------------------------
 // Scoring constants — LOCKED per spec. Must match tiger_score.ts exactly.
@@ -642,6 +643,37 @@ interface RedditUserAbout {
   };
 }
 
+// Get Reddit OAuth2 bearer token (client_credentials grant).
+// Returns null if credentials are not configured — falls back to unauthenticated.
+let _redditToken: { token: string; expiresAt: number } | null = null;
+async function getRedditBearerToken(): Promise<string | null> {
+  const clientId = process.env["REDDIT_CLIENT_ID"];
+  const clientSecret = process.env["REDDIT_CLIENT_SECRET"];
+  if (!clientId || !clientSecret) return null;
+
+  if (_redditToken && Date.now() < _redditToken.expiresAt - 60_000) {
+    return _redditToken.token;
+  }
+
+  try {
+    const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
+    const res = await httpsPost(
+      "https://www.reddit.com/api/v1/access_token",
+      "grant_type=client_credentials",
+      {
+        "Authorization": `Basic ${credentials}`,
+        "User-Agent": "TigerClaw/1.0 by tigerclaw_io",
+        "Content-Type": "application/x-www-form-urlencoded",
+      }
+    );
+    const json = JSON.parse(res.body);
+    _redditToken = { token: json.access_token, expiresAt: Date.now() + json.expires_in * 1000 };
+    return _redditToken.token;
+  } catch {
+    return null;
+  }
+}
+
 async function fetchRedditPosts(
   keywords: string[],
   limit: number,
@@ -651,15 +683,20 @@ async function fetchRedditPosts(
 
   // Build query from top keywords (Reddit search)
   const query = keywords.slice(0, 5).join(" OR ");
-  const url = `https://www.reddit.com/search.json?q=${encodeURIComponent(query)}&sort=new&t=week&limit=${Math.min(limit, 25)}`;
+  const bearerToken = await getRedditBearerToken();
+  const baseUrl = bearerToken ? "https://oauth.reddit.com" : "https://www.reddit.com";
+  const url = `${baseUrl}/search.json?q=${encodeURIComponent(query)}&sort=new&t=week&limit=${Math.min(limit, 25)}`;
 
-  logger.info("tiger_scout: searching Reddit", { query });
+  logger.info("tiger_scout: searching Reddit", { query, authenticated: !!bearerToken });
+
+  const headers: Record<string, string> = {
+    "User-Agent": "TigerClaw/1.0 by tigerclaw_io",
+  };
+  if (bearerToken) headers["Authorization"] = `Bearer ${bearerToken}`;
 
   let data: { data?: { children?: RedditPost[] } };
   try {
-    const res = await httpsGet(url, {
-      "User-Agent": "TigerClaw/1.0 (automated prospecting bot; contact via tigerclaw.io)",
-    });
+    const res = await httpsGet(url, headers);
     if (res.statusCode !== 200) {
       logger.warn("tiger_scout: Reddit returned non-200", { statusCode: res.statusCode });
       return [];
@@ -1215,10 +1252,21 @@ async function handleHunt(
       : 1;
     scoutState.burstCountDate = today;
   }
+  const isFirstQualifiedLeads = scoutState.totalLeadsQualified === 0 && result.qualified > 0;
   scoutState.totalLeadsDiscovered += result.discovered;
   scoutState.totalLeadsQualified += result.qualified;
   scoutState.lastScanSummary = `${result.qualified} qualified / ${result.discovered} discovered`;
   await saveScoutState(tenantId, scoutState);
+
+  // First-lead notification — email the operator when their agent finds leads for the first time
+  if (isFirstQualifiedLeads) {
+    getTenant(tenantId).then(tenant => {
+      if (tenant?.email) {
+        const displayName = tenant.name ?? tenant.email.split("@")[0];
+        sendFirstLeadNotification(tenant.email, displayName, result.qualified).catch(() => {});
+      }
+    }).catch(() => {});
+  }
 
   const metTarget = result.qualified >= 5; // Daily target: minimum 5 qualified prospects
   const output = formatHuntOutput(result, metTarget);

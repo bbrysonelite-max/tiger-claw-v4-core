@@ -213,3 +213,31 @@ export async function sendStanStoreWelcome(email: string, name: string, productN
   }
 }
 
+export async function sendFirstLeadNotification(email: string, name: string, leadCount: number): Promise<void> {
+  try {
+    await resend.emails.send({
+      from: FROM_EMAIL,
+      to: email,
+      subject: "Your Tiger Claw agent found your first leads! 🎯",
+      html: `
+<div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:24px;">
+  <h2 style="color:#111827;">Your agent is hunting. 🐯</h2>
+  <p style="color:#374151;">Hey ${name},</p>
+  <p style="color:#374151;">
+    Great news — your Tiger Claw agent just completed its first successful scan and found
+    <strong>${leadCount} prospect${leadCount === 1 ? "" : "s"}</strong> that match your ideal customer profile.
+  </p>
+  <p style="color:#374151;">
+    Open your Telegram bot and type <strong>hunt</strong> to see the results and start engaging.
+  </p>
+  <p style="color:#374151;">The agent will continue scanning automatically every 24 hours.</p>
+  <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;">
+  <p style="color:#6b7280;font-size:12px;">Tiger Claw · <a href="https://tigerclaw.io" style="color:#f59e0b;">tigerclaw.io</a></p>
+</div>`,
+    });
+    console.log(`[Email] sendFirstLeadNotification sent to ${email} (${leadCount} leads)`);
+  } catch (error) {
+    console.error(`[Email] sendFirstLeadNotification failed:`, error);
+  }
+}
+
