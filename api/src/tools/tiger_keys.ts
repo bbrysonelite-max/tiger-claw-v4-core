@@ -171,8 +171,15 @@ function defaultState(): KeyState {
 }
 
 async function loadKeyState(workdir: string): Promise<KeyState> {
-  const data = await getBotState(workdir, "key_state.json");
-  return (data as KeyState) ?? defaultState();
+  const data = await getBotState(workdir, "key_state.json") as Partial<KeyState> | null;
+  const def = defaultState();
+  if (!data) return def;
+  
+  return {
+    ...def,
+    ...data,
+    events: data.events ?? def.events,
+  };
 }
 
 async function saveKeyState(workdir: string, state: KeyState): Promise<void> {
@@ -184,6 +191,9 @@ async function saveKeyState(workdir: string, state: KeyState): Promise<void> {
 }
 
 function appendEvent(state: KeyState, event: KeyEvent): void {
+  if (!state.events) {
+    state.events = [];
+  }
   state.events.push(event);
   if (state.events.length > MAX_EVENTS) {
     state.events = state.events.slice(-MAX_EVENTS);
