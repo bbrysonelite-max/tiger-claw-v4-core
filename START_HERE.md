@@ -53,6 +53,11 @@ Stop what you are doing. Read this entire document and `CLAUDE.md`. These are yo
 18. **Webhook Rate Limiting** — 60 req/min per tenant, 20/min per IP email. PR #49.
 19. **HMAC Magic Links** — `MAGIC_LINK_SECRET`-signed, 72h TTL. PR #50.
 20. **CI Type Fixes** — All TypeScript errors post-merge resolved (types.ts, 9 files). PRs #54, #55.
+21. **ICP Null Guard** — `tiger_scout.ts` crash on `idealPerson` undefined fixed. PR #60.
+22. **Double JSON.parse Fix** — `queue.ts` and `ai.ts` were wrapping already-parsed JSONB with `JSON.parse()` → `SyntaxError: "[object Object]" is not valid JSON` every cron minute for all tenants. Fixed. PR #61.
+23. **Tiger Strike Tools** — `tiger_strike_draft.ts`, `tiger_strike_engage.ts`, `tiger_strike_harvest.ts` committed directly (were imported by ai.ts but absent from repo → blocked all CI builds).
+24. **First-Lead Email** — `sendFirstLeadNotification()` in email.ts; tiger_scout sends email to tenant when first qualified leads arrive.
+25. **Incident Log** — `specs/INCIDENT_LOG.md` created, INC-001 through INC-004 documented.
 
 ---
 
@@ -71,10 +76,20 @@ Stop what you are doing. Read this entire document and `CLAUDE.md`. These are yo
 
 ## 4. Open PRs
 
-**None.** All PRs #47–#57 merged. `main` is clean and deployed.
+**None.** All PRs through #61 merged. `main` is clean and deployed. Current revision: `00115`.
 
-**One pending manual step:** Verify `MAGIC_LINK_SECRET` exists in GCP Secret Manager.
+**⚠️ CRITICAL UNFINISHED FIX — Wizard Magic Link Auth (BLOCKING every paying customer):**
 
+`page.tsx` was discarding `token` and `expires` from magic link URL params. API `/wizard/auth` requires all three and returns 401 without them — blocking Stan Store customers from reaching their bots. **Fix is partially complete:**
+- ✅ `web-onboarding/src/app/page.tsx` — now extracts and passes `magicToken`/`magicExpires` to OnboardingModal
+- ❌ `web-onboarding/src/components/OnboardingModal.tsx` — NOT YET updated to accept+pass props
+- ❌ `web-onboarding/src/components/wizard/StepIdentity.tsx` — NOT YET updated to include token/expires in `/wizard/auth` request
+
+**This must be the first thing fixed in the next session before any customer-facing work.**
+
+**Two pending manual steps:**
+
+1. Verify `MAGIC_LINK_SECRET` exists in GCP Secret Manager AND is mounted in Cloud Run:
 ```bash
 gcloud secrets describe tiger-claw-magic-link-secret --project hybrid-matrix-472500-k5
 # If missing:
@@ -82,6 +97,8 @@ echo -n "$(openssl rand -hex 32)" | gcloud secrets create tiger-claw-magic-link-
   --data-file=- --project hybrid-matrix-472500-k5
 # Then add to SECRETS in ops/deploy-cloudrun.sh and redeploy
 ```
+
+2. **Fire test required** — Walk the full Stan Store → magic link → wizard → live bot flow as a real paying customer before any more customers are sent to the platform. The 2026-03-28 demo with hundreds of people failed completely (wizard auth 401, Stan Store flow untested). Do not send anyone to the platform until this passes.
 
 ---
 
@@ -168,6 +185,9 @@ Doctor removed — healthcare compliance risk. Do not re-add it.
 | `debbie-cameron` | justagreatdirector@outlook.com | live | Founding member |
 | `john-thailand` | vijohn@hotmail.com | live | Founding member — John + Noon (Thailand) |
 | `chana-loha` | chana.loh@gmail.com | live | Founding member — Chana |
+| `phaitoon` | phaitoon2010@gmail.com | live | Founding member — Toon (Thailand); scout functional, 23h cooldown; first-lead email will fire when leads arrive |
+
+Cron heartbeat confirms 11 total active tenants (includes additional members not listed above by slug). All processing clean on revision 00115 as of 2026-03-28.
 
 **5-instance cap active until ~2026-04-03.** Do not activate more tenants before then.
 
@@ -227,7 +247,22 @@ Doctor removed — healthcare compliance risk. Do not re-add it.
 3. **Bot pool replenishment** — needs physical SIMs + BotFather (hardware-limited)
 4. **Outreach to 7 past customers** — complimentary re-activation offer (~2026-04-03)
 5. **Feedback loop fix (P1)** — `processSystemRoutine()` doesn't handle `weekly_checkin`, `feedback_reminder`, `feedback_pause` — silent failure
+6. **Reddit OAuth2** — TigerClaw-branded Reddit app credentials needed for scout (403 without OAuth); NOT personal credentials. Paused pending app registration.
 
 ---
 
-*Last updated: 2026-03-27 (post-Zoom SWOT sprint + mine activation — PRs #56 #57 merged, 313 facts in market_intelligence, autonomous cron live). Locked. Proceed.*
+## 13. Known Issues (Must Fix Before Next Demo)
+
+| Priority | Issue | File | Status |
+|---|---|---|---|
+| 🔴 CRITICAL | Wizard auth broken — token/expires not passed to API | `OnboardingModal.tsx`, `StepIdentity.tsx` | PARTIAL (page.tsx done, modal+step NOT done) |
+| 🔴 CRITICAL | `MAGIC_LINK_SECRET` not confirmed in Cloud Run env | GCP Secret Manager | UNVERIFIED |
+| 🔴 HIGH | Fire test not done — full Stan Store→bot flow untested | — | NOT DONE |
+| 🟡 MED | Welcome email says "bot in 60 seconds" — false promise | `email.ts:sendStanStoreWelcome` | NOT FIXED |
+| 🟡 MED | Wizard shows spinner then timeout when provisioning stalls — no real error message | `OnboardingModal.tsx` | NOT FIXED |
+| 🟡 MED | `DATABASE_READ_URL` pinned to secret version 8 (should be latest) | GCP Secret Manager | NOT FIXED |
+| 🟡 LOW | Reddit scout returns 0 results (403 without OAuth) | `tiger_scout.ts` | NOT FIXED |
+
+---
+
+*Last updated: 2026-03-28 (post-demo incident audit — PRs #58-#61 merged, wizard auth bug discovered, 11 tenants clean on revision 00115). CRITICAL WORK REQUIRED BEFORE NEXT DEMO. Proceed.*

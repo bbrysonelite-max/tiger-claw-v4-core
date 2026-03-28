@@ -8,12 +8,18 @@ import OnboardingModal from "@/components/OnboardingModal";
 export default function Home() {
   const [wizardOpen, setWizardOpen] = useState(false);
   const [prefillEmail, setPrefillEmail] = useState<string | undefined>();
+  const [magicToken, setMagicToken] = useState<string | undefined>();
+  const [magicExpires, setMagicExpires] = useState<string | undefined>();
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const email = params.get("email");
+    const token = params.get("token");
+    const expires = params.get("expires");
     if (email) {
       setPrefillEmail(email);
+      if (token) setMagicToken(token);
+      if (expires) setMagicExpires(expires);
       setWizardOpen(true);
     }
   }, []);
@@ -95,7 +101,7 @@ export default function Home() {
       </div>
 
       {wizardOpen && (
-        <OnboardingModal onClose={() => setWizardOpen(false)} initialEmail={prefillEmail} />
+        <OnboardingModal onClose={() => setWizardOpen(false)} initialEmail={prefillEmail} magicToken={magicToken} magicExpires={magicExpires} />
       )}
     </div>
   );
