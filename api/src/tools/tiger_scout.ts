@@ -240,6 +240,12 @@ const INTENT_PATTERNS: IntentPattern[] = [
   { pattern: /\b(health\s*(and\s*)?wellness|lose\s*weight|get\s*fit|feel\s*better|natural\s*(health|remedy|supplement))\b/i, type: "pain_point_post", strength: 55 },
   { pattern: /\b(real\s*estate|investment\s*property|rental\s*income|landlord|flip\s*(houses|homes))\b/i, type: "side_hustle_interest", strength: 60 },
   { pattern: /\b(competitor|alternative\s*to|instead\s*of|switched\s*from|left\s*[a-z]+\s*for)\b/i, type: "competitor_engagement", strength: 50 },
+
+  // College Dorm / Interior Design signals (v5 Mining Niche)
+  { pattern: /\b(son|daughter|kid|child|i|me)\s*(is\s*)?going\s*to\s*college\b/i, type: "college_milestone", strength: 85 },
+  { pattern: /\b(freshman\s*year|starting\s*college|off\s*to\s*college|move\s*in\s*day)\b/i, type: "college_milestone", strength: 80 },
+  { pattern: /\b(dorm\s*decor|dorm\s*room|dorm\s*layout|dorm\s*essentials|lofting\s*my\s*bed)\b/i, type: "design_intent", strength: 90 },
+  { pattern: /\b(college\s*roommate|matching\s*dorm|dorm\s*bedding|dorm\s*storage)\b/i, type: "design_intent", strength: 75 },
 ];
 
 /**
@@ -1033,13 +1039,13 @@ async function runHunt(
   const hasCompleteOnboard = onboardState && onboardState.phase === "complete";
 
   // Extract keywords from appropriate ICP(s)
-  const builderKeywords = (hasCompleteOnboard && flavor === "network-marketer")
+  const builderKeywords = (hasCompleteOnboard && flavor === "network-marketer" && onboardState!.icpBuilder)
     ? extractICPKeywords(onboardState!.icpBuilder)
     : { positive: [], negative: [] };
   const customerKeywords = hasCompleteOnboard
     ? (flavor !== "network-marketer"
-        ? extractICPKeywords(onboardState!.icpSingle)
-        : extractICPKeywords(onboardState!.icpCustomer))
+        ? (onboardState!.icpSingle ? extractICPKeywords(onboardState!.icpSingle) : { positive: [], negative: [] })
+        : (onboardState!.icpCustomer ? extractICPKeywords(onboardState!.icpCustomer) : { positive: [], negative: [] }))
     : { positive: [], negative: [] };
 
   // Merge keywords (for search query — we search broadly and score precisely)
