@@ -404,7 +404,7 @@ export const cronWorker = SHOULD_RUN_WORKERS ? new Worker(
                     // Handle 72hr free trial engine natively using the bot memory states
                     const hoursElapsed = (Date.now() - new Date(tenant.created_at).getTime()) / (1000 * 60 * 60);
 
-                    const botState = JSON.parse(await getBotState(tenant.id, 'key_state.json') || '{}');
+                    const botState: Record<string, any> = (await getBotState<Record<string, any>>(tenant.id, 'key_state.json')) ?? {};
 
                     if (!botState.layer2Key) {
                         botState.trialRemindersSent = botState.trialRemindersSent || {};
