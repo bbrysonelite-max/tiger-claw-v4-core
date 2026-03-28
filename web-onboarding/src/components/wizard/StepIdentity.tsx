@@ -9,6 +9,8 @@ interface IdentityProps {
     state: WizardState;
     updateState: (updates: Partial<WizardState>) => void;
     onNext: () => void;
+    magicToken?: string;
+    magicExpires?: string;
 }
 
 const NICHES = [
@@ -24,7 +26,7 @@ const NICHES = [
     { id: "sales-tiger", name: "Sales Professional", icon: "📈" },
 ];
 
-export default function StepIdentity({ state, updateState, onNext }: IdentityProps) {
+export default function StepIdentity({ state, updateState, onNext, magicToken, magicExpires }: IdentityProps) {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
     const [localState, setLocalState] = useState(state);
@@ -39,7 +41,11 @@ export default function StepIdentity({ state, updateState, onNext }: IdentityPro
             const base = "https://api.tigerclaw.io";
 
             // First: check if they're a returning paid customer
-            const authResponse = await fetch(`${base}/wizard/auth?email=${encodeURIComponent(localState.email)}`);
+            const authUrl = new URL(`${base}/wizard/auth`);
+            authUrl.searchParams.set("email", localState.email);
+            if (magicToken) authUrl.searchParams.set("token", magicToken);
+            if (magicExpires) authUrl.searchParams.set("expires", magicExpires);
+            const authResponse = await fetch(authUrl.toString());
             const authData = await authResponse.json();
 
             let botId: string | undefined;
@@ -50,6 +56,8 @@ export default function StepIdentity({ state, updateState, onNext }: IdentityPro
             } else if (authResponse.status === 404) {
                 // No account found — they need to purchase first
                 throw new Error("No account found for this email. Purchase your agent at stan.store/brentbryson to get started.");
+            } else if (authResponse.status === 401) {
+                throw new Error("Your setup link has expired. Check your email for a fresh link, or reply to your welcome email to get a new one.");
             } else {
                 throw new Error(authData.error || "Authentication failed. Please try again.");
             }

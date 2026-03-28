@@ -1,6 +1,7 @@
 # STATE OF TIGER CLAW — HARD CONTEXT LOCK
-**Timestamp:** 2026-03-27 (post-Zoom SWOT sprint + mine activation)
-**Infrastructure Status:** LIVE. Multi-region. All tests passing. No open PRs.
+**Timestamp:** 2026-03-28 (post-demo incident audit — revision 00115)
+**Infrastructure Status:** LIVE. Multi-region. Cron clean. No open PRs.
+**⚠️ WIZARD AUTH BROKEN — See critical issues below. Do NOT send customers to platform.**
 
 ---
 
@@ -18,7 +19,8 @@ This is the single source of truth for the Tiger Claw repository.
 8. **PROTOCOL:** Read `CLAUDE.md` before writing any code.
 9. **AI PROVIDERS:** Google, OpenAI, Grok, OpenRouter, Kimi. Anthropic absent — Sprint 2.
 10. **5-INSTANCE CAP:** Until ~2026-04-03. Do not bulk-activate more tenants.
-11. **NO OPEN PRS:** All PRs #47–#57 merged and deployed.
+11. **NO OPEN PRS:** All PRs through #61 merged. Current Cloud Run revision: `00115`.
+12. **WIZARD AUTH BROKEN (PARTIAL FIX ONLY):** Magic link `token`/`expires` not flowing through to `/wizard/auth` API call. `page.tsx` fixed. `OnboardingModal.tsx` and `StepIdentity.tsx` NOT YET FIXED. Every Stan Store customer gets 401. Fix these first.
 
 ---
 
@@ -135,15 +137,20 @@ scoutQueries added in PR #52 for all flavors.
 | #55 | ✅ | Missing fields in network-marketer.ts and real-estate.ts |
 | #56 | ✅ | tiger_refine — real Gemini extraction replaces mock |
 | #57 | ✅ | BullMQ daily mining cron + reddit_scout Reddit fixes |
+| #60 | ✅ | ICP null guard — tiger_scout crash on idealPerson undefined |
+| #61 | ✅ | Double JSON.parse fix — queue.ts + ai.ts SyntaxError every cron minute |
+| direct | ✅ | tiger_strike_draft/engage/harvest.ts committed (were missing, blocked all CI) |
 
 ### Tenant Roster
 
-| Slug | Email | Status |
-|---|---|---|
-| `debbie-cameron` | justagreatdirector@outlook.com | live |
-| `john-thailand` | vijohn@hotmail.com | live |
-| `chana-loha` | chana.loh@gmail.com | live |
+| Slug | Email | Status | Notes |
+|---|---|---|---|
+| `debbie-cameron` | justagreatdirector@outlook.com | live | Founding member |
+| `john-thailand` | vijohn@hotmail.com | live | Founding member — John + Noon (Thailand) |
+| `chana-loha` | chana.loh@gmail.com | live | Founding member |
+| `phaitoon` | phaitoon2010@gmail.com | live | Founding member — Toon; scout functional, in 23h cooldown; first-lead email will fire |
 
+Cron heartbeat shows 11 total active tenants. All clean on revision 00115 as of 2026-03-28.
 5-instance cap. 7 past customers in queue for ~2026-04-03 outreach.
 Terminated: walkthrough-test-5, john-browser, sales-scout-demo (2026-03-27).
 
@@ -172,6 +179,26 @@ Terminated: walkthrough-test-5, john-browser, sales-scout-demo (2026-03-27).
 
 ---
 
+## Critical Fixes (Must Complete Before Next Demo)
+
+| Priority | Fix | Files Involved |
+|---|---|---|
+| 🔴 1 | Complete wizard auth: pass token/expires through OnboardingModal → StepIdentity → `/wizard/auth` | `OnboardingModal.tsx`, `StepIdentity.tsx` |
+| 🔴 2 | Confirm `MAGIC_LINK_SECRET` in Cloud Run (not just Secret Manager) | GCP console / deploy script |
+| 🔴 3 | Fire test: full Stan Store → magic link → wizard → bot flow as paying customer | Manual |
+| 🟡 4 | Fix welcome email false "bot in 60 seconds" promise | `email.ts:sendStanStoreWelcome` |
+| 🟡 5 | Real error message when provisioning stalls (not just spinner timeout) | `OnboardingModal.tsx` |
+| 🟡 6 | `DATABASE_READ_URL` secret — unpin from version 8, use latest | GCP Secret Manager |
+| 🟡 7 | Reddit OAuth2 credentials for scout (TigerClaw-branded app, not personal) | `tiger_scout.ts` |
+
+## Incidents
+
+See `specs/INCIDENT_LOG.md` — INC-001 through INC-004 documented.
+- INC-001: tiger_scout idealPerson TypeError (Toon's bot) — RESOLVED PR #60
+- INC-002: SyntaxError double JSON.parse hitting all tenants every cron minute — RESOLVED PR #61
+- INC-003: Missing tiger_strike files blocking all CI builds — RESOLVED (direct commit to main)
+- INC-004: Wizard magic link auth 401 for all Stan Store customers — PARTIALLY RESOLVED (page.tsx fixed; modal + step identity NOT fixed)
+
 ## Sprint 2 (Starting ~2026-04-03)
 
 1. **Feedback loop fix (P1)** — `processSystemRoutine()` silently ignores `weekly_checkin`, `feedback_reminder`, `feedback_pause`
@@ -179,7 +206,8 @@ Terminated: walkthrough-test-5, john-browser, sales-scout-demo (2026-03-27).
 3. **Reflexion Loop** — offline Cheese Grater tool for self-improvement
 4. **Bot pool replenishment** — needs physical SIMs + BotFather (hardware-limited)
 5. **Outreach to 7 past customers** — complimentary re-activation offer
+6. **Reddit OAuth2** — register TigerClaw app at reddit.com/prefs/apps, add credentials to Cloud Run
 
 ---
 
-*Locked. Proceed.*
+*Last updated: 2026-03-28. WIZARD AUTH BROKEN. Fix before demo. Proceed.*
