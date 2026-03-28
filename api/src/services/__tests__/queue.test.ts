@@ -148,9 +148,9 @@ describe('queue.ts workers', () => {
             // getBotState throws for tenant-bad only
             const { getBotState } = await import('../db.js');
             (getBotState as ReturnType<typeof vi.fn>)
-                .mockResolvedValueOnce('{}')         // tenant-ok-1
+                .mockResolvedValueOnce({})           // tenant-ok-1
                 .mockRejectedValueOnce(new Error('DB timeout')) // tenant-bad → throws
-                .mockResolvedValueOnce('{}');        // tenant-ok-2
+                .mockResolvedValueOnce({});          // tenant-ok-2
 
             vi.useFakeTimers();
             vi.setSystemTime(new Date('2024-01-01T10:00:00Z'));
@@ -173,7 +173,7 @@ describe('queue.ts workers', () => {
 
             // No layer2Key, no h24 reminder sent yet
             const { getBotState } = await import('../db.js');
-            (getBotState as ReturnType<typeof vi.fn>).mockResolvedValue(JSON.stringify({ trialRemindersSent: {} }));
+            (getBotState as ReturnType<typeof vi.fn>).mockResolvedValue({ trialRemindersSent: {} });
 
             vi.useFakeTimers();
             vi.setSystemTime(new Date());
@@ -197,7 +197,7 @@ describe('queue.ts workers', () => {
             // h24 already sent
             const { getBotState } = await import('../db.js');
             (getBotState as ReturnType<typeof vi.fn>).mockResolvedValue(
-                JSON.stringify({ trialRemindersSent: { h24: true } })
+                { trialRemindersSent: { h24: true } }
             );
 
             vi.useFakeTimers();
@@ -222,7 +222,7 @@ describe('queue.ts workers', () => {
                 .mockResolvedValueOnce({ rows: [{ 1: 1 }] }); // gap query returns a row
 
             const { getBotState } = await import('../db.js');
-            (getBotState as ReturnType<typeof vi.fn>).mockResolvedValue(JSON.stringify({ layer2Key: 'key', trialRemindersSent: {} }));
+            (getBotState as ReturnType<typeof vi.fn>).mockResolvedValue({ layer2Key: 'key', trialRemindersSent: {} });
 
             vi.useFakeTimers();
             vi.setSystemTime(new Date('2024-01-01T09:00:00Z'));
@@ -246,7 +246,7 @@ describe('queue.ts workers', () => {
                 .mockResolvedValueOnce({ rows: [] }); // no gap
 
             const { getBotState } = await import('../db.js');
-            (getBotState as ReturnType<typeof vi.fn>).mockResolvedValue(JSON.stringify({ layer2Key: 'key', trialRemindersSent: {} }));
+            (getBotState as ReturnType<typeof vi.fn>).mockResolvedValue({ layer2Key: 'key', trialRemindersSent: {} });
 
             vi.useFakeTimers();
             vi.setSystemTime(new Date('2024-01-01T09:00:00Z'));
@@ -265,7 +265,7 @@ describe('queue.ts workers', () => {
                 .mockResolvedValueOnce({ rows: [{ id: 'tenant-gap', created_at: new Date().toISOString() }] });
 
             const { getBotState } = await import('../db.js');
-            (getBotState as ReturnType<typeof vi.fn>).mockResolvedValue(JSON.stringify({ layer2Key: 'key', trialRemindersSent: {} }));
+            (getBotState as ReturnType<typeof vi.fn>).mockResolvedValue({ layer2Key: 'key', trialRemindersSent: {} });
 
             vi.useFakeTimers();
             vi.setSystemTime(new Date('2024-01-01T10:00:00Z')); // 10 AM, not 9
@@ -286,7 +286,7 @@ describe('queue.ts workers', () => {
                 .mockRejectedValueOnce(new Error('DB timeout'));
 
             const { getBotState } = await import('../db.js');
-            (getBotState as ReturnType<typeof vi.fn>).mockResolvedValue(JSON.stringify({ layer2Key: 'key', trialRemindersSent: {} }));
+            (getBotState as ReturnType<typeof vi.fn>).mockResolvedValue({ layer2Key: 'key', trialRemindersSent: {} });
 
             vi.useFakeTimers();
             vi.setSystemTime(new Date('2024-01-01T09:00:00Z'));

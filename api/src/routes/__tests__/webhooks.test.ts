@@ -41,6 +41,7 @@ vi.mock('../../services/db.js', () => ({
   createBYOKBot: mockCreateBYOKBot,
   createBYOKConfig: mockCreateBYOKConfig,
   createBYOKSubscription: mockCreateBYOKSubscription,
+  logAdminEvent: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('../../services/queue.js', () => ({
