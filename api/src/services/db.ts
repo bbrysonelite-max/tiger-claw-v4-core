@@ -55,6 +55,17 @@ export function getReadPool(): Pool {
   return readPool;
 }
 
+export async function closePools(): Promise<void> {
+  if (writePool) {
+    await writePool.end();
+    writePool = null;
+  }
+  if (readPool) {
+    await readPool.end();
+    readPool = null;
+  }
+}
+
 /** Legacy alias for backward compatibility */
 export function getPool(): Pool {
   return getWritePool();
@@ -100,6 +111,7 @@ export type TenantStatus =
   | "waitlisted"
   | "onboarding"
   | "active"
+  | "live"
   | "updating"
   | "paused"
   | "suspended"

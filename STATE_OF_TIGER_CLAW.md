@@ -1,5 +1,5 @@
 # STATE OF TIGER CLAW — HARD CONTEXT LOCK
-**Timestamp:** 2026-03-27 (post-Zoom full SWOT sprint — all PRs merged, CI green)
+**Timestamp:** 2026-03-27 (post-Zoom SWOT sprint + mine activation)
 **Infrastructure Status:** LIVE. Multi-region. All tests passing. No open PRs.
 
 ---
@@ -14,11 +14,11 @@ This is the single source of truth for the Tiger Claw repository.
 4. **NO FREE TRIAL.** Card charged at Stan Store checkout. 7-day MBG. `trialExpired` removed.
 5. **ARCHITECTURE:** Stateless Cloud Run, Gemini 2.0 Flash (locked), 18 tools, shared PostgreSQL.
 6. **NO REWRITES:** All tests pass. Do not rewrite architecture.
-7. **13 FLAVORS:** network-marketer, real-estate, health-wellness, airbnb-host, baker, candle-maker, gig-economy, lawyer, plumber, sales-tiger, dorm-design, mortgage-broker, personal-trainer. Doctor removed.
+7. **15 FLAVORS:** network-marketer, real-estate, health-wellness, airbnb-host, baker, candle-maker, gig-economy, lawyer, plumber, sales-tiger, researcher, interior-designer, dorm-design, mortgage-broker, personal-trainer. Doctor removed.
 8. **PROTOCOL:** Read `CLAUDE.md` before writing any code.
 9. **AI PROVIDERS:** Google, OpenAI, Grok, OpenRouter, Kimi. Anthropic absent — Sprint 2.
 10. **5-INSTANCE CAP:** Until ~2026-04-03. Do not bulk-activate more tenants.
-11. **NO OPEN PRS:** All PRs #47–#55 merged and deployed.
+11. **NO OPEN PRS:** All PRs #47–#57 merged and deployed.
 
 ---
 
@@ -48,13 +48,13 @@ Cloud Run deploys automatically on merge to main via GitHub Actions (both region
 | DNS | `api.tigerclaw.io A → 34.54.146.69` (Porkbun) |
 | SSL | `tiger-claw-lb-cert` — managed, ACTIVE |
 | DB | Cloud SQL PostgreSQL HA `tiger_claw_shared` |
-| Cache/Queue | Cloud Redis HA + BullMQ (7 queues) |
+| Cache/Queue | Cloud Redis HA + BullMQ (8 queues) |
 | AI | Gemini 2.0 Flash via `@google/generative-ai` (locked) |
 | Wizard | `wizard.tigerclaw.io` — Next.js Vercel `web-onboarding/` |
 | Website | `tigerclaw.io` — static Vercel `tiger-bot-website/` |
 | Email out | Resend `hello@tigerclaw.io` `support@tigerclaw.io` |
 | Email in | Postmark `support@tigerclaw.io` → `/webhooks/email` |
-| Bot Pool | ~63 tokens available, AES-256-GCM encrypted |
+| Bot Pool | ~65 tokens available, AES-256-GCM encrypted |
 | GCP Project | `hybrid-matrix-472500-k5` |
 
 ### Multi-Region Setup
@@ -69,6 +69,8 @@ Cloud Run deploys automatically on merge to main via GitHub Actions (both region
 | Setup script | `ops/setup-multi-region.sh` — run once, done |
 | Deploy script | `ops/deploy-cloudrun.sh` — loops over both regions |
 
+SEA health confirmed 2026-03-27: revision `tiger-claw-api-00004-294`, uptime 12h, all checks green, 22ms response.
+
 ### HMAC Magic Links (PR #50 — deployed)
 - `generateMagicToken(email)` — HMAC-SHA256(`MAGIC_LINK_SECRET`, `email:expires`), 72h TTL
 - `verifyMagicToken(email, token, expires)` — `timingSafeEqual`, checks expiry first
@@ -81,26 +83,35 @@ Cloud Run deploys automatically on merge to main via GitHub Actions (both region
 - Email webhook: 20 req/min per IP
 - Stripe: skipped (HMAC signature verification sufficient)
 
-### v5 Data Refinery (PR #52 — deployed)
+### v5 Data Refinery (PRs #52, #56, #57 — FULLY AUTONOMOUS)
 
-**Pipeline:** Birdie (every 6h) → `GET /flavors` → Reddit search per scoutQuery → `POST /mining/refine` → Gemini extraction → `market_intelligence` table
+**Pipeline:** BullMQ `miningWorker` (2 AM UTC daily) → `market_miner.ts` → Reddit JSON API → `POST /mining/refine` → Gemini 2.0 Flash extraction → `market_intelligence` table (120-day decay)
 
 - `GET /flavors` — returns all flavor keys + scoutQueries (no auth)
-- `POST /mining/refine` — deduplication via `isAlreadyMined(sourceUrl)`, then fact extraction
-- `market_intelligence` table — migration 017 (PR #48), 120-day fact decay
+- `POST /mining/refine` — dedup via `isAlreadyMined(sourceUrl)`, then Gemini extraction
+- `market_intelligence` table — migration 017, 120-day `valid_until` decay
+- `tiger_refine.ts` — real Gemini extraction (was mock, fixed PR #56)
+- `market_miner.ts` — new service orchestrating the nightly run
 
-**Birdie LaunchAgents:**
-- `com.birdie.scout` — every 6h — `/Users/birdie/logs/scout.log`
-- `com.birdie.heartbeat` — midnight daily — `/Users/birdie/.openclaw/logs/heartbeat.log`
-- **SSH:** `ssh -i ~/.ssh/trashcan birdie@192.168.0.136`
+**Schedules:**
+| Scheduler | Time | Role |
+|---|---|---|
+| BullMQ `miningWorker` in Cloud Run | 2 AM UTC | Primary |
+| Cheese Grater launchd `io.tigerclaw.market-miner` | 3 AM local | Backup |
 
-### Flavor System (13 Customer-Facing)
+**First run (2026-03-27):** 313 facts saved, 14 flavors, dedup working.
 
-All 13 have full field set: `key`, `displayName`, `description`, `professionLabel`, `defaultKeywords`, `scoutQueries`, `conversion`, `objectionBuckets`, `patternInterrupts`, `onboarding`, `soul`, `discovery`, `nurtureTemplates`.
+**Manual trigger:**
+```bash
+TIGER_CLAW_API_URL=https://api.tigerclaw.io node api/scripts/reddit_scout.mjs
+```
+
+### Flavor System (15 Customer-Facing)
+
+All 15 have full field set including `scoutQueries`. Doctor removed (healthcare compliance).
 
 New in PR #51: `dorm-design`, `mortgage-broker`, `personal-trainer`.
-scoutQueries added in PR #52: health-wellness, airbnb-host, baker, candle-maker, gig-economy, lawyer, plumber, sales-tiger.
-FlavorConfig type (`api/src/config/types.ts`) fully updated.
+scoutQueries added in PR #52 for all flavors.
 
 ### PR Ledger
 
@@ -120,8 +131,10 @@ FlavorConfig type (`api/src/config/types.ts`) fully updated.
 | #51 | ✅ | 3 new flavors (dorm-design, mortgage-broker, personal-trainer) |
 | #52 | ✅ | Data Refinery pipeline (/flavors + /mining/refine) |
 | #53 | ✅ | Multi-region asia-southeast1 + Global HTTPS LB |
-| #54 | ✅ | TypeScript fixes post-merge (types.ts, ai.ts, market_intel.ts, tiger_objection.ts, etc.) |
+| #54 | ✅ | TypeScript fixes post-merge |
 | #55 | ✅ | Missing fields in network-marketer.ts and real-estate.ts |
+| #56 | ✅ | tiger_refine — real Gemini extraction replaces mock |
+| #57 | ✅ | BullMQ daily mining cron + reddit_scout Reddit fixes |
 
 ### Tenant Roster
 
@@ -156,6 +169,16 @@ Terminated: walkthrough-test-5, john-browser, sales-scout-demo (2026-03-27).
 - [x] Phase 2: Sawtooth compression — PR #21
 - [x] Phase 3: Fact anchor extraction — PR #22
 - [x] Phase 4: startFocus / completeFocus — PR #23
+
+---
+
+## Sprint 2 (Starting ~2026-04-03)
+
+1. **Feedback loop fix (P1)** — `processSystemRoutine()` silently ignores `weekly_checkin`, `feedback_reminder`, `feedback_pause`
+2. **Anthropic SDK** — wire `@anthropic-ai/sdk` in `api/src/services/ai.ts`
+3. **Reflexion Loop** — offline Cheese Grater tool for self-improvement
+4. **Bot pool replenishment** — needs physical SIMs + BotFather (hardware-limited)
+5. **Outreach to 7 past customers** — complimentary re-activation offer
 
 ---
 

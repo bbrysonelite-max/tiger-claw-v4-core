@@ -12,12 +12,12 @@ Stop what you are doing. Read this entire document and `CLAUDE.md`. These are yo
 - **Load Balancer:** Global HTTPS LB at `34.54.146.69` — both regions behind Anycast IP
 - **Architecture:** V4 Stateless Serverless — one API process, all tenants, context resolved per-request
 - **Database:** PostgreSQL HA via Cloud SQL Proxy (`tiger_claw_shared`)
-- **Cache/Queue:** Redis HA + BullMQ (7 queues)
+- **Cache/Queue:** Redis HA + BullMQ (8 queues)
 - **AI Engine:** Gemini 2.0 Flash (LOCKED — `gemini-2.5-flash` has a GCP function-calling bug, do not use it)
 - **Tests:** All passing (CI green as of 2026-03-27)
-- **Flavors:** 13 customer-facing industry flavors, all with full field set
+- **Flavors:** 15 customer-facing industry flavors, all with full field set including scoutQueries
 - **Min-instances:** 1 — no cold start
-- **Data Refinery:** v5 pipeline live — `/flavors` + `/mining/refine` deployed. Birdie scout runs every 6h.
+- **Data Refinery:** v5 pipeline FULLY AUTONOMOUS — fires nightly at 2 AM UTC via BullMQ. First run: 313 facts saved across 14 flavors.
 
 **Strict Rule 1:** OpenClaw, Mini-RAG, and per-tenant Docker containers are DEAD. Do not reference or restore them.
 
@@ -46,10 +46,10 @@ Stop what you are doing. Read this entire document and `CLAUDE.md`. These are yo
 11. **Stan Store Webhook** — `POST /webhooks/stripe` provisions user + pending bot + sends magic link email. Idempotent via Redis.
 12. **Zoom Call 2026-03-27** — Went well. Post-call: 5-instance cap, 7-day observation window.
 13. **SWOT Analysis completed** — 6 weaknesses identified, all 6 fixed.
-14. **Birdie Scout Node** — LaunchAgent installed. Runs `reddit_scout.mjs` every 6h against production API.
-15. **13 Flavors** — 3 new niches added (dorm-design, mortgage-broker, personal-trainer). scoutQueries added to all 13.
-16. **Multi-Region Deploy** — asia-southeast1 added. Global HTTPS LB at 34.54.146.69. SSL cert ACTIVE. PR #53.
-17. **v5 Data Refinery** — `/flavors` + `/mining/refine` live. `market_intelligence` table provisioned. PR #52.
+14. **15 Flavors** — 3 new niches added (dorm-design, mortgage-broker, personal-trainer). scoutQueries added to all 15.
+15. **Multi-Region Deploy** — asia-southeast1 added. Global HTTPS LB at 34.54.146.69. SSL cert ACTIVE. PR #53.
+16. **v5 Data Refinery ACTIVATED** — `tiger_refine.ts` replaced mock with real Gemini extraction. PR #56.
+17. **Autonomous Mining Cron** — `miningQueue` + `miningWorker` + `market_miner.ts`. Fires 2 AM UTC daily. PR #57.
 18. **Webhook Rate Limiting** — 60 req/min per tenant, 20/min per IP email. PR #49.
 19. **HMAC Magic Links** — `MAGIC_LINK_SECRET`-signed, 72h TTL. PR #50.
 20. **CI Type Fixes** — All TypeScript errors post-merge resolved (types.ts, 9 files). PRs #54, #55.
@@ -62,16 +62,16 @@ Stop what you are doing. Read this entire document and `CLAUDE.md`. These are yo
 |---|---|---|---|
 | 1 | No rate limiting on webhooks | ✅ Fixed | #49 |
 | 2 | Magic links unsigned | ✅ Fixed | #50 |
-| 3 | Birdie cron not running | ✅ Fixed | LaunchAgent on Birdie |
+| 3 | Birdie cron not running | ✅ Fixed | Mine now runs in Cloud Run (no Birdie dependency) |
 | 4 | 3 missing flavor niches | ✅ Fixed | #51 |
-| 5 | Thin data volume / Refinery undeployed | ✅ Fixed | #52 |
+| 5 | Thin data volume / Refinery undeployed | ✅ Fixed | #52, #56, #57 — 313 facts on first run |
 | 6 | Single-region (us-central1 only) | ✅ Fixed | #53 |
 
 ---
 
 ## 4. Open PRs
 
-**None.** All PRs #47–#55 merged. `main` is clean and deployed.
+**None.** All PRs #47–#57 merged. `main` is clean and deployed.
 
 **One pending manual step:** Verify `MAGIC_LINK_SECRET` exists in GCP Secret Manager.
 
@@ -99,6 +99,8 @@ echo -n "$(openssl rand -hex 32)" | gcloud secrets create tiger-claw-magic-link-
 | CI variable | `MULTI_REGION_READY=true` — deploys both regions on every merge to main |
 | Setup script | `ops/setup-multi-region.sh` — run once, already done |
 
+asia-southeast1 health confirmed 2026-03-27: uptime 12h, PostgreSQL/Redis/pool all green, 22ms response time.
+
 ---
 
 ## 6. Memory Architecture (V4.1 — Fully Shipped)
@@ -120,20 +122,46 @@ All loaded in `Promise.all()` — DB unreachable = static prompt, no crash.
 
 ---
 
-## 7. Product
+## 7. v5 Data Refinery (Fully Autonomous)
+
+**Pipeline:** BullMQ `miningWorker` (2 AM UTC) → `market_miner.ts` → Reddit JSON API → `POST /mining/refine` → Gemini 2.0 Flash extraction → `market_intelligence` table (120-day decay)
+
+**Key files:**
+- `api/src/services/market_miner.ts` — mining orchestration, walks all 15 flavors
+- `api/src/tools/tiger_refine.ts` — Gemini extraction engine (real, not mock)
+- `api/src/routes/mining.ts` — `POST /mining/refine` endpoint
+- `api/src/services/market_intel.ts` — DB schema, `saveMarketFact()`, `isAlreadyMined()`
+- `api/scripts/reddit_scout.mjs` — standalone script (for manual runs or Cheese Grater backup)
+
+**Schedules:**
+| Scheduler | Time | Role |
+|---|---|---|
+| BullMQ `miningWorker` in Cloud Run | 2 AM UTC | Primary — autonomous, no hardware dependency |
+| Cheese Grater launchd `io.tigerclaw.market-miner` | 3 AM local | Backup — `isAlreadyMined()` dedup prevents double-saves |
+
+**First run results (2026-03-27):** 313 facts, 14 flavors, 7 Reddit rate-limit misses (handled gracefully).
+
+**Manual run:**
+```bash
+TIGER_CLAW_API_URL=https://api.tigerclaw.io node api/scripts/reddit_scout.mjs
+```
+
+---
+
+## 8. Product
 
 | Product | Price |
 |---|---|
 | Tiger-Claw Pro (Pre-Flavored) | $147/mo |
 | Industry Agent | $197/mo |
 
-**13 Customer-Facing Flavors:** network-marketer, real-estate, health-wellness, airbnb-host, baker, candle-maker, gig-economy, lawyer, plumber, sales-tiger, dorm-design, mortgage-broker, personal-trainer.
+**15 Customer-Facing Flavors:** network-marketer, real-estate, health-wellness, airbnb-host, baker, candle-maker, gig-economy, lawyer, plumber, sales-tiger, researcher, interior-designer, dorm-design, mortgage-broker, personal-trainer.
 
 Doctor removed — healthcare compliance risk. Do not re-add it.
 
 ---
 
-## 8. Tenant Roster (Active)
+## 9. Tenant Roster (Active)
 
 | Slug | Email | Status | Notes |
 |---|---|---|---|
@@ -147,7 +175,7 @@ Doctor removed — healthcare compliance risk. Do not re-add it.
 
 ---
 
-## 9. Infrastructure
+## 10. Infrastructure
 
 ### Cloud
 | Service | Detail |
@@ -163,25 +191,22 @@ Doctor removed — healthcare compliance risk. Do not re-add it.
 ### Local Mac Cluster
 | Machine | IP | Role |
 |---|---|---|
-| Cheese Grater | 192.168.0.2 | Primary dev — offline Reflexion Loop tool |
-| Birdie | 192.168.0.136 | Scout node — reddit_scout every 6h |
+| Cheese Grater | 192.168.0.2 | Primary dev — offline Reflexion Loop tool + backup mine at 3 AM |
+| Birdie | 192.168.0.136 | Available — mining now runs in Cloud Run, Birdie is standby |
 | Monica | 192.168.0.138 | Compute node (standby) |
 | iMac | 192.168.0.116 | — |
 | MacBook Air | 192.168.0.237 | brents-2020-air.local |
 
-**Birdie SSH:** `ssh -i ~/.ssh/trashcan birdie@192.168.0.136`
-
 **Mac cluster is an OFFLINE ops tool.** Never called by Cloud Run.
 
-### Birdie LaunchAgents
+### Cheese Grater LaunchAgents
 | Label | Schedule | Log |
 |---|---|---|
-| `com.birdie.heartbeat` | Daily midnight | `/Users/birdie/.openclaw/logs/heartbeat.log` |
-| `com.birdie.scout` | Every 6 hours | `/Users/birdie/logs/scout.log` |
+| `io.tigerclaw.market-miner` | Daily 3 AM local | `/Users/brentbryson/Tigerclaw-Anti_Gravity/tiger-claw/logs/market_mining.log` |
 
 ---
 
-## 10. Key Secrets (GCP Secret Manager — never commit)
+## 11. Key Secrets (GCP Secret Manager — never commit)
 
 | Secret | Notes |
 |---|---|
@@ -195,14 +220,14 @@ Doctor removed — healthcare compliance risk. Do not re-add it.
 
 ---
 
-## 11. Sprint 2 (Starting ~2026-04-03)
+## 12. Sprint 2 (Starting ~2026-04-03)
 
 1. **Anthropic SDK** — wire `@anthropic-ai/sdk` in `api/src/services/ai.ts`
 2. **Reflexion Loop** — offline Cheese Grater tool for self-improvement
 3. **Bot pool replenishment** — needs physical SIMs + BotFather (hardware-limited)
 4. **Outreach to 7 past customers** — complimentary re-activation offer (~2026-04-03)
-5. **Monitor Birdie scout** — check `/Users/birdie/logs/scout.log` for `✅ Purified facts`
+5. **Feedback loop fix (P1)** — `processSystemRoutine()` doesn't handle `weekly_checkin`, `feedback_reminder`, `feedback_pause` — silent failure
 
 ---
 
-*Last updated: 2026-03-27 (post-Zoom full SWOT sprint complete, all 6 weaknesses fixed, all PRs #47–#55 merged, CI green, multi-region live). Locked. Proceed.*
+*Last updated: 2026-03-27 (post-Zoom SWOT sprint + mine activation — PRs #56 #57 merged, 313 facts in market_intelligence, autonomous cron live). Locked. Proceed.*

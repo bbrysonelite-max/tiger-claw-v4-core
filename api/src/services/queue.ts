@@ -385,7 +385,7 @@ export const cronWorker = SHOULD_RUN_WORKERS ? new Worker(
             const { rows: tenants } = await pool.query(`
                 SELECT id, created_at, feedback_loop_enabled, feedback_paused,
                        last_feedback_at, feedback_reminder_sent_at, feedback_pause_sent_at
-                FROM tenants WHERE status = 'active'
+                FROM tenants WHERE status IN ('active', 'live')
             `);
 
             const nowHour = new Date().getUTCHours();
@@ -457,7 +457,7 @@ export const cronWorker = SHOULD_RUN_WORKERS ? new Worker(
                                 FROM tenants t
                                 LEFT JOIN tenant_leads l ON l.tenant_id = t.id
                                 WHERE t.id = $1
-                                  AND t.status = 'active'
+                                  AND t.status IN ('active', 'live')
                                 GROUP BY t.id
                                 HAVING COUNT(l.id) = 0
                                     OR MAX(l.created_at) < NOW() - INTERVAL '3 days'

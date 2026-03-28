@@ -235,9 +235,9 @@ router.post("/telegram/:tenantId", webhookLimiter, async (req: Request, res: Res
     console.warn("[webhooks] TELEGRAM_WEBHOOK_SECRET not set — webhook signature validation is DISABLED. Set this env var immediately.");
   }
 
-  // Ensure tenant exists and is active/onboarding
+  // Ensure tenant exists and is active/live/onboarding
   const tenant = await getTenant(tenantId);
-  if (!tenant || (tenant.status !== "active" && tenant.status !== "onboarding")) {
+  if (!tenant || (tenant.status !== "active" && tenant.status !== "live" && tenant.status !== "onboarding")) {
     console.warn(`[webhooks] Telegram update ignored for inactive tenant: ${tenantId}`);
     return res.status(200).send("OK"); // Acknowledge to stop Telegram from retrying
   }
