@@ -60,7 +60,7 @@ function loadPersistedState(): WizardState {
     return initialState;
 }
 
-export default function OnboardingModal({ onClose, initialEmail }: { onClose: () => void; initialEmail?: string }) {
+export default function OnboardingModal({ onClose, initialEmail, magicToken, magicExpires }: { onClose: () => void; initialEmail?: string; magicToken?: string; magicExpires?: string }) {
     const [step, setStep] = useState(1);
     const [state, setState] = useState<WizardState>(() => {
         const persisted = loadPersistedState();
@@ -162,6 +162,8 @@ export default function OnboardingModal({ onClose, initialEmail }: { onClose: ()
                                     state={state}
                                     updateState={updateState}
                                     onNext={handleNext}
+                                    magicToken={magicToken}
+                                    magicExpires={magicExpires}
                                 />
                             )}
                             {step === 2 && (
