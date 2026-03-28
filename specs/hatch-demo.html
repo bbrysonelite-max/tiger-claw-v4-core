@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tiger Claw — Hatch Journey Demo</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #0a0a0a; color: #e5e5e5; min-height: 100vh; }
+
+  /* NAV */
+  .nav { display: flex; justify-content: space-between; align-items: center; padding: 16px 24px; border-bottom: 1px solid #222; }
+  .nav-logo { font-size: 18px; font-weight: 700; color: #fff; letter-spacing: -0.5px; }
+  .nav-logo span { color: #f97316; }
+  .step-pills { display: flex; gap: 6px; }
+  .pill { width: 28px; height: 6px; border-radius: 3px; background: #333; transition: background 0.3s; }
+  .pill.active { background: #f97316; }
+  .pill.done { background: #4ade80; }
+
+  /* STAGE WRAPPER */
+  .stage { display: none; flex-direction: column; align-items: center; justify-content: center; min-height: calc(100vh - 57px); padding: 32px 16px; }
+  .stage.visible { display: flex; }
+
+  /* CARDS */
+  .card { background: #141414; border: 1px solid #2a2a2a; border-radius: 16px; padding: 40px; max-width: 480px; width: 100%; }
+  .card-wide { max-width: 640px; }
+  .card-icon { font-size: 40px; margin-bottom: 16px; }
+  .card h1 { font-size: 24px; font-weight: 700; margin-bottom: 8px; color: #fff; }
+  .card h2 { font-size: 20px; font-weight: 600; margin-bottom: 8px; color: #fff; }
+  .card p { color: #888; font-size: 15px; line-height: 1.6; margin-bottom: 24px; }
+  .card p strong { color: #ccc; }
+
+  /* SKELETON BLOCKS */
+  .skel { background: #222; border-radius: 8px; animation: shimmer 1.4s infinite; }
+  @keyframes shimmer {
+    0%   { opacity: 0.6; }
+    50%  { opacity: 1; }
+    100% { opacity: 0.6; }
+  }
+  .skel-line { height: 14px; margin-bottom: 10px; }
+  .skel-line.w60 { width: 60%; }
+  .skel-line.w80 { width: 80%; }
+  .skel-line.w40 { width: 40%; }
+  .skel-box { height: 48px; border-radius: 10px; margin-bottom: 12px; }
+  .skel-avatar { width: 64px; height: 64px; border-radius: 50%; margin-bottom: 16px; }
+
+  /* INPUTS */
+  .input-group { margin-bottom: 16px; }
+  .input-group label { display: block; font-size: 13px; color: #888; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .input-group input, .input-group select { width: 100%; padding: 12px 14px; background: #1e1e1e; border: 1px solid #333; border-radius: 10px; color: #e5e5e5; font-size: 15px; outline: none; transition: border-color 0.2s; }
+  .input-group input:focus, .input-group select:focus { border-color: #f97316; }
+  .input-group input::placeholder { color: #555; }
+
+  /* BUTTONS */
+  .btn { width: 100%; padding: 14px; border-radius: 10px; font-size: 16px; font-weight: 600; cursor: pointer; border: none; transition: all 0.2s; }
+  .btn-primary { background: #f97316; color: #fff; }
+  .btn-primary:hover { background: #ea6c0a; }
+  .btn-ghost { background: transparent; color: #888; border: 1px solid #333; margin-top: 10px; }
+  .btn-ghost:hover { border-color: #555; color: #ccc; }
+  .btn-green { background: #16a34a; color: #fff; }
+  .btn-green:hover { background: #15803d; }
+  .btn-sm { padding: 8px 16px; font-size: 14px; width: auto; border-radius: 8px; }
+
+  /* BADGES */
+  .badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+  .badge-orange { background: rgba(249,115,22,0.15); color: #f97316; border: 1px solid rgba(249,115,22,0.3); }
+  .badge-green  { background: rgba(74,222,128,0.12); color: #4ade80; border: 1px solid rgba(74,222,128,0.3); }
+  .badge-gray   { background: #222; color: #888; border: 1px solid #333; }
+
+  /* STATUS ROW */
+  .status-row { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; background: #1a1a1a; border-radius: 10px; margin-bottom: 10px; border: 1px solid #2a2a2a; }
+  .status-row .label { font-size: 14px; color: #aaa; }
+  .status-row .value { font-size: 14px; color: #fff; font-weight: 500; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+  .dot-green { background: #4ade80; box-shadow: 0 0 6px #4ade80; }
+  .dot-orange { background: #f97316; }
+  .dot-gray   { background: #555; }
+
+  /* EMAIL MOCK */
+  .email-mock { background: #111; border: 1px solid #2a2a2a; border-radius: 12px; padding: 24px; margin-bottom: 24px; }
+  .email-from { font-size: 12px; color: #555; margin-bottom: 4px; }
+  .email-subject { font-size: 15px; font-weight: 600; color: #ccc; margin-bottom: 16px; }
+  .email-body { font-size: 14px; color: #888; line-height: 1.7; }
+  .email-link { display: block; margin-top: 16px; background: #f97316; color: #fff; text-align: center; padding: 12px; border-radius: 8px; font-weight: 600; font-size: 14px; cursor: pointer; text-decoration: none; }
+
+  /* DASHBOARD GRID */
+  .dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+  .dash-tile { background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 12px; padding: 16px; }
+  .dash-tile .tile-label { font-size: 11px; color: #555; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+  .dash-tile .tile-val { font-size: 22px; font-weight: 700; color: #fff; }
+  .dash-tile .tile-sub { font-size: 12px; color: #555; margin-top: 2px; }
+
+  /* CHAT MOCK */
+  .chat-window { background: #111; border: 1px solid #2a2a2a; border-radius: 12px; overflow: hidden; margin-bottom: 20px; }
+  .chat-header { display: flex; align-items: center; gap: 10px; padding: 12px 16px; background: #1a1a1a; border-bottom: 1px solid #222; }
+  .chat-avatar { width: 32px; height: 32px; border-radius: 50%; background: #f97316; display: flex; align-items: center; justify-content: center; font-size: 14px; }
+  .chat-name { font-size: 14px; font-weight: 600; color: #fff; }
+  .chat-body { padding: 16px; min-height: 120px; }
+  .msg { max-width: 75%; padding: 10px 14px; border-radius: 12px; font-size: 14px; line-height: 1.5; margin-bottom: 8px; }
+  .msg-bot { background: #1e1e1e; color: #ddd; border-bottom-left-radius: 4px; }
+  .msg-user { background: #f97316; color: #fff; margin-left: auto; border-bottom-right-radius: 4px; }
+
+  /* DIVIDER */
+  .divider { border: none; border-top: 1px solid #222; margin: 20px 0; }
+
+  /* PROGRESS */
+  .progress-bar { background: #222; border-radius: 4px; height: 6px; margin-bottom: 20px; }
+  .progress-fill { height: 100%; border-radius: 4px; background: #f97316; transition: width 0.5s ease; }
+
+  /* ANNOTATIONS */
+  .annotation { font-size: 12px; color: #555; text-align: center; margin-top: 12px; font-style: italic; }
+
+  /* BACK BUTTON */
+  .back-btn { position: fixed; bottom: 24px; left: 24px; background: #1a1a1a; border: 1px solid #333; color: #888; padding: 10px 18px; border-radius: 8px; font-size: 14px; cursor: pointer; }
+  .back-btn:hover { color: #ccc; border-color: #555; }
+
+  /* SUCCESS ANIMATION */
+  .checkmark { font-size: 64px; margin-bottom: 20px; animation: pop 0.4s ease; }
+  @keyframes pop { 0% { transform: scale(0.5); opacity: 0; } 80% { transform: scale(1.1); } 100% { transform: scale(1); opacity: 1; } }
+
+  /* STEP LABEL */
+  .step-label { font-size: 11px; color: #555; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 8px; text-align: center; }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="nav">
+  <div class="nav-logo">Tiger<span>Claw</span></div>
+  <div class="step-pills" id="pills"></div>
+</nav>
+
+<!-- ════════════════════════════════════════════
+     SCREEN 0 — EMAIL INBOX (magic link arrives)
+═════════════════════════════════════════════ -->
+<div class="stage visible" id="s0">
+  <div class="step-label">Step 0 — Email Inbox</div>
+  <div class="card">
+    <div class="card-icon">📬</div>
+    <h1>Your access link just arrived.</h1>
+    <p>After checkout, <strong>hello@tigerclaw.io</strong> sends a signed magic link. No password. One click.</p>
+
+    <div class="email-mock">
+      <div class="email-from">From: hello@tigerclaw.io</div>
+      <div class="email-subject">🐯 Your Tiger Claw bot is ready — click to enter</div>
+      <div class="email-body">
+        Hey John,<br><br>
+        Your AI sales agent is configured and waiting. Click the button below to access your dashboard. This link is valid for <strong>72 hours</strong>.
+      </div>
+      <a class="email-link" onclick="go(1)">Open My Dashboard →</a>
+    </div>
+    <div class="annotation">HMAC-signed · 72-hour TTL · no password required</div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════
+     SCREEN 1 — AUTH / VERIFYING LINK
+═════════════════════════════════════════════ -->
+<div class="stage" id="s1">
+  <div class="step-label">Step 1 — Verifying Link</div>
+  <div class="card" style="text-align:center;">
+    <div style="font-size:48px; margin-bottom:16px; animation: shimmer 1.4s infinite;">🔐</div>
+    <h1>Verifying your link…</h1>
+    <p>Checking signature and expiry. This takes under a second.</p>
+    <div class="progress-bar"><div class="progress-fill" id="auth-progress" style="width:0%"></div></div>
+    <div class="skel skel-line w80" style="margin: 0 auto 8px;"></div>
+    <div class="skel skel-line w60" style="margin: 0 auto;"></div>
+    <div class="annotation">GET /wizard/auth?email=&token=&expires= → 200 OK → redirect</div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════
+     SCREEN 2 — DASHBOARD (main screen)
+═════════════════════════════════════════════ -->
+<div class="stage" id="s2">
+  <div class="step-label">Step 2 — Your Dashboard</div>
+  <div class="card card-wide">
+    <div style="display:flex; align-items:center; gap:12px; margin-bottom:24px;">
+      <div style="width:48px; height:48px; border-radius:50%; background:#f97316; display:flex; align-items:center; justify-content:center; font-size:22px;">🐯</div>
+      <div>
+        <div style="font-size:18px; font-weight:700; color:#fff;">John &amp; Noon</div>
+        <div style="font-size:13px; color:#555;">@tc_62g6al77_bot · network-marketer · SEA</div>
+      </div>
+      <span class="badge badge-green" style="margin-left:auto;"><span class="dot dot-green"></span>Live</span>
+    </div>
+
+    <div class="dash-grid">
+      <div class="dash-tile">
+        <div class="tile-label">Leads Scouted</div>
+        <div class="tile-val">0</div>
+        <div class="tile-sub">Start a conversation to begin</div>
+      </div>
+      <div class="dash-tile">
+        <div class="tile-label">Bot Status</div>
+        <div class="tile-val" style="color:#4ade80;">Active</div>
+        <div class="tile-sub">Telegram connected</div>
+      </div>
+      <div class="dash-tile">
+        <div class="tile-label">AI Provider</div>
+        <div class="tile-val" style="font-size:16px; margin-top:4px;">Platform Key</div>
+        <div class="tile-sub">Gemini 2.0 Flash</div>
+      </div>
+      <div class="dash-tile">
+        <div class="tile-label">Member Since</div>
+        <div class="tile-val" style="font-size:16px; margin-top:4px;">Mar 24</div>
+        <div class="tile-sub">Founding member</div>
+      </div>
+    </div>
+
+    <hr class="divider">
+
+    <div class="status-row">
+      <span class="label">Telegram Bot</span>
+      <span class="value"><span class="dot dot-green"></span>@tc_62g6al77_bot</span>
+    </div>
+    <div class="status-row">
+      <span class="label">LINE Channel</span>
+      <span class="value"><span class="dot dot-gray"></span>Not configured</span>
+    </div>
+    <div class="status-row">
+      <span class="label">AI Key</span>
+      <span class="value"><span class="dot dot-green"></span>Platform key active</span>
+    </div>
+
+    <hr class="divider">
+
+    <button class="btn btn-primary" onclick="go(3)">Open Bot Setup Wizard →</button>
+    <button class="btn btn-ghost" onclick="go(5)">Go to Telegram bot</button>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════
+     SCREEN 3 — WIZARD / HATCH FLOW
+═════════════════════════════════════════════ -->
+<div class="stage" id="s3">
+  <div class="step-label">Step 3 — Bot Setup Wizard</div>
+  <div class="card">
+    <div class="card-icon">⚙️</div>
+    <h2>Tell your bot about your business</h2>
+    <p>This takes 2 minutes. Your answers train the agent to sell for you.</p>
+
+    <div class="input-group">
+      <label>Your Name</label>
+      <input type="text" placeholder="John" value="John">
+    </div>
+    <div class="input-group">
+      <label>Your Business / Product</label>
+      <input type="text" placeholder="What do you sell?" value="Health &amp; wellness products">
+    </div>
+    <div class="input-group">
+      <label>Your Market</label>
+      <input type="text" placeholder="Who's your ideal customer?" value="Thai moms 25–45">
+    </div>
+    <div class="input-group">
+      <label>Language</label>
+      <select><option>English</option><option>Thai</option><option>Thai + English</option></select>
+    </div>
+    <div class="input-group">
+      <label>Timezone</label>
+      <select><option>Asia/Bangkok (UTC+7)</option><option>UTC</option></select>
+    </div>
+
+    <button class="btn btn-primary" onclick="go(4)">Save &amp; Activate →</button>
+    <div class="annotation">/wizard/:slug/save · writes to tenant_states.onboard_state</div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════
+     SCREEN 4 — HATCH COMPLETE / SUCCESS
+═════════════════════════════════════════════ -->
+<div class="stage" id="s4">
+  <div class="step-label">Step 4 — Bot Activated</div>
+  <div class="card" style="text-align:center;">
+    <div class="checkmark">🎉</div>
+    <h1>Your bot is live.</h1>
+    <p>The agent has been trained with your business context. It's ready to start conversations in Telegram right now.</p>
+
+    <div class="status-row" style="text-align:left; margin-bottom:10px;">
+      <span class="label">Agent identity</span>
+      <span class="value"><span class="dot dot-green"></span>Loaded</span>
+    </div>
+    <div class="status-row" style="text-align:left; margin-bottom:10px;">
+      <span class="label">Hive signals</span>
+      <span class="value"><span class="dot dot-green"></span>Connected</span>
+    </div>
+    <div class="status-row" style="text-align:left; margin-bottom:20px;">
+      <span class="label">Telegram webhook</span>
+      <span class="value"><span class="dot dot-green"></span>Registered</span>
+    </div>
+
+    <button class="btn btn-green" onclick="go(5)">Open Telegram Bot →</button>
+    <button class="btn btn-ghost" onclick="go(2)">Back to Dashboard</button>
+    <div class="annotation">POST /wizard/hatch → provision → bot registered</div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════
+     SCREEN 5 — TELEGRAM CHAT (first message)
+═════════════════════════════════════════════ -->
+<div class="stage" id="s5">
+  <div class="step-label">Step 5 — First Conversation</div>
+  <div class="card card-wide">
+    <p style="margin-bottom:16px; color:#555; font-size:13px;">User opens @tc_62g6al77_bot in Telegram and sends their first message.</p>
+
+    <div class="chat-window">
+      <div class="chat-header">
+        <div class="chat-avatar">🐯</div>
+        <div>
+          <div class="chat-name">@tc_62g6al77_bot</div>
+          <div style="font-size:11px; color:#4ade80;">● online</div>
+        </div>
+      </div>
+      <div class="chat-body" id="chat-body">
+        <div class="msg msg-user">Hi! I want to learn more about your health products.</div>
+        <div class="msg msg-bot" id="bot-typing" style="display:none">
+          <span style="color:#555; font-style:italic;">typing…</span>
+        </div>
+        <div class="msg msg-bot" id="bot-reply" style="display:none;">
+          Sawadee krap! 🙏 Great to hear from you. We have some amazing health and wellness products that are perfect for busy moms. Can I ask — are you looking for something for energy, weight management, or general wellness?
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex; gap:8px; margin-bottom:20px;">
+      <input type="text" placeholder="Type a message…" style="flex:1; padding:12px 14px; background:#1e1e1e; border:1px solid #333; border-radius:10px; color:#e5e5e5; font-size:14px; outline:none;" id="chat-input" onkeydown="if(event.key==='Enter') triggerReply()">
+      <button class="btn btn-primary btn-sm" onclick="triggerReply()" style="flex-shrink:0;">Send</button>
+    </div>
+
+    <hr class="divider">
+    <div style="font-size:12px; color:#555; margin-bottom:12px; text-align:center;">Message routed through</div>
+    <div style="display:flex; gap:8px; flex-wrap:wrap; justify-content:center;">
+      <span class="badge badge-gray">Telegram Webhook</span>
+      <span class="badge badge-gray">→ BullMQ</span>
+      <span class="badge badge-gray">→ Gemini 2.0 Flash</span>
+      <span class="badge badge-gray">→ 19 Tools</span>
+      <span class="badge badge-orange">→ Response</span>
+    </div>
+    <div class="annotation" style="margin-top:16px;">Latency target: &lt;2s end-to-end</div>
+  </div>
+</div>
+
+<!-- BACK BUTTON -->
+<button class="back-btn" id="back-btn" onclick="back()" style="display:none">← Back</button>
+
+<script>
+const SCREENS = ['s0','s1','s2','s3','s4','s5'];
+const LABELS  = ['Email','Auth','Dashboard','Wizard','Activated','Chat'];
+const TOTAL   = SCREENS.length;
+let current = 0;
+
+// Build pills
+const pillEl = document.getElementById('pills');
+SCREENS.forEach((_, i) => {
+  const p = document.createElement('div');
+  p.className = 'pill';
+  p.id = 'pill-' + i;
+  p.title = LABELS[i];
+  pillEl.appendChild(p);
+});
+
+function updatePills() {
+  SCREENS.forEach((_, i) => {
+    const p = document.getElementById('pill-' + i);
+    p.className = 'pill' + (i < current ? ' done' : i === current ? ' active' : '');
+  });
+  document.getElementById('back-btn').style.display = current > 0 ? 'block' : 'none';
+}
+
+function go(n) {
+  document.getElementById(SCREENS[current]).classList.remove('visible');
+  current = n;
+  document.getElementById(SCREENS[current]).classList.add('visible');
+  updatePills();
+  if (n === 1) runAuthAnim();
+  if (n === 5) runChatAnim();
+}
+
+function back() { if (current > 0) go(current - 1); }
+
+function runAuthAnim() {
+  const bar = document.getElementById('auth-progress');
+  bar.style.width = '0%';
+  let w = 0;
+  const iv = setInterval(() => {
+    w += Math.random() * 18 + 5;
+    if (w >= 100) { w = 100; clearInterval(iv); setTimeout(() => go(2), 400); }
+    bar.style.width = w + '%';
+  }, 120);
+}
+
+function runChatAnim() {
+  const typing = document.getElementById('bot-typing');
+  const reply  = document.getElementById('bot-reply');
+  typing.style.display = 'none';
+  reply.style.display   = 'none';
+  setTimeout(() => { typing.style.display = 'block'; }, 800);
+  setTimeout(() => { typing.style.display = 'none'; reply.style.display = 'block'; }, 2600);
+}
+
+function triggerReply() {
+  const input = document.getElementById('chat-input');
+  const body  = document.getElementById('chat-body');
+  const text  = input.value.trim();
+  if (!text) return;
+  input.value = '';
+
+  const userMsg = document.createElement('div');
+  userMsg.className = 'msg msg-user';
+  userMsg.textContent = text;
+  body.appendChild(userMsg);
+
+  const typing = document.createElement('div');
+  typing.className = 'msg msg-bot';
+  typing.innerHTML = '<span style="color:#555; font-style:italic;">typing…</span>';
+  body.appendChild(typing);
+  body.scrollTop = body.scrollHeight;
+
+  setTimeout(() => {
+    body.removeChild(typing);
+    const botReply = document.createElement('div');
+    botReply.className = 'msg msg-bot';
+    botReply.textContent = "Great question! Let me pull up the best options for you. Our top sellers right now are in the energy and immunity line. Would you like me to send you more details?";
+    body.appendChild(botReply);
+    body.scrollTop = body.scrollHeight;
+  }, 1800);
+}
+
+updatePills();
+</script>
+</body>
+</html>
