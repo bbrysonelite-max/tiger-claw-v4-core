@@ -34,6 +34,9 @@ import { tiger_score_1to10 } from '../tools/tiger_score_1to10.js';
 import { tiger_search }      from '../tools/tiger_search.js';
 import { tiger_settings }    from '../tools/tiger_settings.js';
 import { tiger_gmail_send, tiger_drive_list } from '../tools/tiger_google_workspace.js';
+import { tiger_strike_harvest } from "../tools/tiger_strike_harvest.js";
+import { tiger_strike_draft } from "../tools/tiger_strike_draft.js";
+import { tiger_strike_engage } from "../tools/tiger_strike_engage.js";
 
 // ─── Safety constants ────────────────────────────────────────────────────────
 // BUG 1 FIX: circuit breaker — prevents infinite tool loop if Gemini misbehaves
@@ -67,6 +70,9 @@ const toolsMap = {
     tiger_settings,
     tiger_gmail_send,
     tiger_drive_list,
+    tiger_strike_harvest,
+    tiger_strike_draft,
+    tiger_strike_engage,
 };
 // Fix: Use STRICT @google/generative-ai Type enums to prevent silent JSON stripping
 // standard OpenClaw JSON schema uses lowercase 'object', 'string'. We recursively map it here.
@@ -529,6 +535,11 @@ export async function buildSystemPrompt(tenant: any): Promise<string> {
     }
 
     return [
+        // MASTER DIRECTIVES FIRST
+        ...(approvedSkills.length > 0
+            ? [`━━━━ MASTER STRATEGIC DIRECTIVES ━━━━`, ...approvedSkills, ``]
+            : []
+        ),
         `You are ${botName}, an elite, highly intelligent, and autonomous AI sales and recruiting consulting partner.`,
         `You are currently deployed to serve: ${operatorName}.`,
         `Industry flavor: ${flavor.displayName} (${flavor.professionLabel}).`,
@@ -577,14 +588,10 @@ export async function buildSystemPrompt(tenant: any): Promise<string> {
         `Never tell the operator to talk to friends, family, or their "warm market". That is permanently banned.`,
         `Instead: acknowledge the gap, tell them you are recalibrating search parameters and scanning new channels, then use tiger_scout to act on it immediately.`,
         ``,
+        ``,
         `CRITICAL TELEMETRY (silent, always):`,
         `- After every outbound prospect message or significant tool result, call tiger_keys(action="record_message").`,
         `- If an API errors out, call tiger_keys(action="report_error", httpStatus=<the HTTP status code>).`,
-        // Dynamic approved skills (injected at runtime, curated by platform/admin)
-        ...(approvedSkills.length > 0
-            ? [``, `━━━━ DYNAMIC SKILLS (PLATFORM-APPROVED) ━━━━`, ...approvedSkills]
-            : []
-        ),
         // Hive benchmarks — cross-tenant intelligence (anonymized, PII-stripped)
         ...(hiveBenchmarks.length > 0
             ? [
@@ -597,6 +604,18 @@ export async function buildSystemPrompt(tenant: any): Promise<string> {
         ),
         // FITFO operating protocol (agent self-improvement and persistence rules)
         ...(fitfao ? [``, `━━━━ OPERATING PROTOCOL ━━━━`, fitfao] : []),
+        ``,
+        `━━━━ TIGER STRIKE — SOCIAL ENGAGEMENT PIPELINE ━━━━`,
+        `You have three Tiger Strike tools for social media engagement:`,
+        ``,
+        `1. tiger_strike_harvest — Pulls high-confidence leads from the data refinery. Use this when the operator asks to find new engagement opportunities or when running the daily pipeline.`,
+        ``,
+        `2. tiger_strike_draft — Drafts contextual replies in the operator's voice. Always present drafts for review before sending. Never auto-approve.`,
+        ``,
+        `3. tiger_strike_engage — Generates zero-cost Web Intent URLs for approved drafts. The operator clicks the link to post. After posting, ask them to confirm so the learning loop can track results.`,
+        ``,
+        `Pipeline order: harvest → draft → review → engage → confirm.`,
+        `Never skip the review step. The operator must see and approve every reply before it goes out.`,
     ].join('\n');
 }
 
@@ -928,7 +947,7 @@ export async function processSystemRoutine(tenantId: string, routineType: string
                     );
                 }
                 if (routineType === 'trial_reminder_72h') {
-                    const botState = JSON.parse(await getBotState(tenantId, 'key_state.json') || '{}');
+                    const botState: Record<string, any> = (await getBotState<Record<string, any>>(tenantId, 'key_state.json')) ?? {};
                     botState.tenantPaused = true;
                     await setBotState(tenantId, 'key_state.json', botState);
                 }
