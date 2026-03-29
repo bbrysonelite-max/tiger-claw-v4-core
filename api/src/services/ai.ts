@@ -94,8 +94,8 @@ export async function validateAIKey(provider: string, key: string): Promise<{ va
             const testUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(key)}`;
             const response = await fetch(testUrl);
             return { valid: response.ok, error: response.ok ? undefined : `HTTP ${response.status}` };
-        } 
-        
+        }
+
         if (provider === "openai" || provider === "grok" || provider === "openrouter" || provider === "kimi") {
             let baseUrl = "https://api.openai.com/v1/models";
             // Auto-detect specific provider if generic "openai" is passed but key has specific prefix
@@ -399,9 +399,9 @@ export async function resolveAIProvider(tenantId: string): Promise<AIProvider | 
                 const { provider, baseURL } = resolveCompatInfo(rawKey, state.layer2Model);
                 if (!circuitTripped || provider !== 'google') {
                     console.log(`[AI] resolveAIProvider: tenant=${tenantId} source=key_state.json provider=${provider}${baseURL ? ' compat=' + baseURL : ''}`);
-                    return { 
-                        key: rawKey, 
-                        provider, 
+                    return {
+                        key: rawKey,
+                        provider,
                         model: state.layer2Model ?? defaultModel(provider),
                         baseURL
                     };
@@ -427,7 +427,7 @@ export async function resolveAIProvider(tenantId: string): Promise<AIProvider | 
                 const { provider, model, encrypted_key } = row;
                 if (encrypted_key) {
                     const key = decryptToken(encrypted_key);
-                    
+
                     // OpenAI-compatible providers (kimi, grok, openrouter) — route through OpenAI SDK
                     const compat = OPENAI_COMPAT[provider as string];
                     if (compat) {
@@ -443,9 +443,9 @@ export async function resolveAIProvider(tenantId: string): Promise<AIProvider | 
                     }
 
                     console.log(`[AI] resolveAIProvider: tenant=${tenantId} source=bot_ai_config provider=${resolvedProvider}${baseURL ? ' compat=' + baseURL : ''}`);
-                    return { 
-                        key, 
-                        provider: resolvedProvider, 
+                    return {
+                        key,
+                        provider: resolvedProvider,
                         model: model ?? defaultModel(resolvedProvider),
                         baseURL
                     };
