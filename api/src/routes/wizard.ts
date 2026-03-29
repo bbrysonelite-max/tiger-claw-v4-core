@@ -13,6 +13,7 @@ import Stripe from "stripe";
 import {
   getTenantBySlug,
   getTenantByEmail,
+  getTenant,
   getTenantBotUsername,
   updateTenantChannelConfig,
   upsertBYOKConfig,
@@ -135,7 +136,9 @@ router.post("/hatch", async (req: Request, res: Response) => {
   const { botId, name, email, flavor, language, timezone, preferredChannel, region, hiveOptIn, botToken } = parsed.data;
 
   try {
-    const tenant = await getTenantByEmail(email);
+    // Look up by botId (UUID from verify-purchase) — Stan Store tenants have email=NULL
+    // so getTenantByEmail fails. botId is the tenant's UUID, always reliable.
+    const tenant = await getTenant(botId);
     if (!tenant) return res.status(404).json({ error: "Tenant not found" });
 
     const slug = tenant.slug || name.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 30);
@@ -296,6 +299,17 @@ router.post("/validate-key", async (req: Request, res: Response) => {
   });
 });
 
+// ── GET /wizard/auth ─────────────────────────────────────────────────────────
+// Compatibility shim: old wizard frontend calls GET /wizard/auth on step 1 Next click.
+// Auth is already validated by POST /auth/verify-purchase before the wizard opens.
+// Return success so old StepIdentity code calls onNext() and advances to step 2.
+// Must be declared BEFORE /:slug so it isn't swallowed by the wildcard.
+router.get("/auth", (req: Request, res: Response) => {
+  const email = req.query["email"] as string | undefined;
+  if (!email) return res.status(400).json({ error: "Email is required." });
+  return res.json({ ok: true, email });
+});
+
 // ── GET /wizard/:slug ────────────────────────────────────────────────────────
 
 router.get("/:slug", async (req: Request, res: Response) => {
@@ -303,7 +317,7 @@ router.get("/:slug", async (req: Request, res: Response) => {
     const slug = req.params["slug"]!;
     const tenant = await getTenantBySlug(slug);
     if (!tenant) {
-      return res.status(404).send("Tenant not found.");
+      return res.status(404).json({ error: "Tenant not found." });
     }
 
     const botUsername = await getTenantBotUsername(tenant.id);

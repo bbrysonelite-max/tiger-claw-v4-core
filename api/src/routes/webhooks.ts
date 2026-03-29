@@ -188,7 +188,7 @@ router.post("/stripe", async (req: Request, res: Response) => {
 
       // 2. Create a 'pending' bot record for this purchase so the wizard can find it
       const preBotId = meta["botId"] && meta["botId"] !== "pending" ? meta["botId"] : null;
-      const botId = preBotId ?? await createBYOKBot(userId, meta["botName"] ?? name, flavor, "pending");
+      const botId = preBotId ?? await createBYOKBot(userId, meta["botName"] ?? name, flavor, "pending", email);
 
       // 3. Create Subscription record — pending_setup until wizard is completed
       if (session.subscription || session.payment_status === "paid") {
@@ -498,7 +498,7 @@ router.post("/stan-store", async (req: Request, res: Response) => {
       const userId = await createBYOKUser(email, name, undefined);
 
       // Create pending bot — customer completes setup in the Wizard
-      const botId = await createBYOKBot(userId, name, flavor, "pending");
+      const botId = await createBYOKBot(userId, name, flavor, "pending", email);
 
       // Create subscription as pending_setup — activated when customer completes wizard
       await createBYOKSubscription({
