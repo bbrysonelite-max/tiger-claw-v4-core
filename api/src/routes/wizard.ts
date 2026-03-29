@@ -10,6 +10,7 @@
 
 import { Router, type Request, type Response } from "express";
 import Stripe from "stripe";
+import { verifySessionToken } from "./auth.js";
 import {
   getTenantBySlug,
   getTenantByEmail,
@@ -53,7 +54,7 @@ const HatchSchema = z.object({
 });
 
 const ValidateKeySchema = z.object({
-  botId: z.string(),
+  botId: z.string().optional(), // Optional: can be resolved from session token if not provided
   keys: z.array(z.object({
     provider: z.string(),
     key: z.string(),
@@ -228,9 +229,33 @@ router.get("/status", async (req: Request, res: Response) => {
 router.post("/validate-key", async (req: Request, res: Response) => {
   const parsed = ValidateKeySchema.safeParse(req.body);
   if (!parsed.success) {
-    return res.status(400).json({ valid: false, error: "Invalid payload format.", details: parsed.error.format() });
+    // Always return details as an array so the frontend's .find() doesn't crash.
+    return res.status(400).json({
+      valid: false,
+      error: "Invalid payload format.",
+      details: [{ provider: "unknown", status: "error", error: "Invalid payload format. Please refresh and try again." }]
+    });
   }
-  const { botId, keys } = parsed.data;
+
+  // Resolve botId: prefer body, fall back to session token.
+  let botId = parsed.data.botId;
+  if (!botId) {
+    const authHeader = req.headers["authorization"];
+    const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : undefined;
+    if (token) {
+      const session = verifySessionToken(token);
+      if (session) botId = session.botId;
+    }
+  }
+  if (!botId) {
+    return res.status(400).json({
+      valid: false,
+      error: "Session expired or bot ID missing. Please refresh the page and try again.",
+      details: [{ provider: "unknown", status: "error", error: "Session expired. Please refresh." }]
+    });
+  }
+
+  const { keys } = parsed.data;
 
   const results: any[] = [];
 
