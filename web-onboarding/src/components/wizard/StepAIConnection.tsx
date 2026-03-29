@@ -18,7 +18,6 @@ const PROVIDERS = [
     { id: "openai",      name: "OpenAI",       icon: "🧠", url: "https://platform.openai.com/api-keys",            model: "gpt-4o-mini",           free: false, help: "Industry standard. Needs credits loaded on your account." },
     { id: "grok",        name: "Grok",         icon: "✖️", url: "https://console.x.ai/",                           model: "grok-2-1212",           free: false, help: "Real-time X/Twitter data access. Great for social selling." },
     { id: "openrouter",  name: "OpenRouter",   icon: "🌐", url: "https://openrouter.ai/keys",                      model: "openai/gpt-4o-mini",    free: true,  help: "One key unlocks Llama, Mistral, and 50+ models. Free tier available." },
-    { id: "kimi",        name: "Kimi",         icon: "🌙", url: "https://platform.moonshot.cn/console/api-keys",   model: "moonshot-v1-8k",        free: false, help: "Moonshot AI — optimized for Asian markets and long context." },
 ] as const;
 
 type ProviderId = typeof PROVIDERS[number]["id"];
@@ -138,7 +137,7 @@ export default function StepAIConnection({ state, updateState, onNext }: AIConne
                 {/* Left: Provider Selection & Key Input */}
                 <div className="space-y-4">
                     {/* Provider tiles — click to select + open key page */}
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="grid grid-cols-2 gap-2">
                         {PROVIDERS.map((p) => (
                             <button
                                 key={p.id}
