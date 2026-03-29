@@ -299,6 +299,17 @@ router.post("/validate-key", async (req: Request, res: Response) => {
   });
 });
 
+// ── GET /wizard/auth ─────────────────────────────────────────────────────────
+// Compatibility shim: old wizard frontend calls GET /wizard/auth on step 1 Next click.
+// Auth is already validated by POST /auth/verify-purchase before the wizard opens.
+// Return success so old StepIdentity code calls onNext() and advances to step 2.
+// Must be declared BEFORE /:slug so it isn't swallowed by the wildcard.
+router.get("/auth", (req: Request, res: Response) => {
+  const email = req.query["email"] as string | undefined;
+  if (!email) return res.status(400).json({ error: "Email is required." });
+  return res.json({ ok: true, email });
+});
+
 // ── GET /wizard/:slug ────────────────────────────────────────────────────────
 
 router.get("/:slug", async (req: Request, res: Response) => {
