@@ -63,7 +63,8 @@ export interface ProvisionJobData {
     region: string;
     language: string;
     preferredChannel: string;
-    botToken?: string; // optional — provisioner assigns from pool if not provided
+    botToken?: string; // BYOB: Telegram tenants must provide their own token
+    botUsername?: string;
     timezone?: string;
 }
 
@@ -86,23 +87,12 @@ export const provisionWorker = SHOULD_RUN_WORKERS ? new Worker(
                 language: job.data.language,
                 preferredChannel: job.data.preferredChannel,
                 botToken: job.data.botToken,
+                botUsername: job.data.botUsername,
                 timezone: job.data.timezone,
             });
 
             if (!result.success) {
                 throw new Error(`Tenant provisioning failed for ${job.data.slug}: ${result.error}`);
-            }
-
-            // Waitlisted: pool was empty — bot is pending, NOT live. Do not mark as live.
-            if (result.waitlisted) {
-                console.warn(`[Worker] Tenant ${job.data.slug} provisioned but waitlisted (pool empty). Bot stays pending.`);
-                const pool = getPool();
-                await pool.query("UPDATE bots SET status = 'pending' WHERE id = $1", [job.data.botId]);
-                await sendAdminAlert(
-                    `⏳ Tenant provisioned but WAITLISTED (pool empty): ${job.data.name} (${job.data.slug})\n` +
-                    `Add bot tokens via ops/botpool to activate.`
-                );
-                return result;
             }
 
             console.log(`[Worker] Succeeded provisioning job ${job.id}. Tenant live.`);

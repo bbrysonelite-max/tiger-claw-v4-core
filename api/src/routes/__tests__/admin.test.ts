@@ -128,19 +128,6 @@ describe('POST /admin/provision', () => {
     expect(res.body.success).toBe(true)
     expect(mockProvisioner.provisionTenant).toHaveBeenCalledOnce()
   })
-
-  it('returns waitlisted:true when bot pool is empty', async () => {
-    const app = await buildApp()
-    mockProvisioner.provisionTenant.mockResolvedValue({ success: true, waitlisted: true })
-
-    const res = await request(app)
-      .post('/admin/provision')
-      .set('Authorization', `Bearer ${VALID_TOKEN}`)
-      .send({ slug: 'acme', name: 'Acme Corp', flavor: 'default', region: 'us', language: 'en', preferredChannel: 'telegram' })
-
-    expect(res.status).toBe(201)
-    expect(res.body.waitlisted).toBe(true)
-  })
 })
 
 // ---------------------------------------------------------------------------

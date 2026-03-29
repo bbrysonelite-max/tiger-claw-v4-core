@@ -32,6 +32,7 @@ export default function StepReviewPayment({ state, isDeploying, setIsDeploying, 
                     name: state.botName || state.yourName, // Bot Display Name
                     email: state.email,
                     flavor: state.nicheId,
+                    botToken: state.telegramBotToken || undefined,
                 })
             });
 

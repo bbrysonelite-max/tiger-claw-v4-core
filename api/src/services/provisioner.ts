@@ -7,16 +7,13 @@ import {
   getTenantBySlug,
   updateTenantStatus,
   logAdminEvent,
-  listBotPool,
-  assignBotToken,
-  getPoolStats,
   getPool,
   getBotState,
   setBotState,
   checkAndGrantFoundingMember,
   type Tenant,
 } from "./db.js";
-import { releaseBot, decryptToken } from "./pool.js";
+import { decryptToken } from "./pool.js";
 import { sendAdminAlert } from "../routes/admin.js";
 import { logLearning } from "./self-improvement.js";
 import { VALID_FLAVOR_KEYS } from "../tools/flavorConfig.js";
@@ -53,6 +50,7 @@ export interface ProvisionInput {
   language: string;
   preferredChannel: string;
   botToken?: string;
+  botUsername?: string;
   timezone?: string;
   vertical?: string;
   hiveOptIn?: boolean;
@@ -60,7 +58,6 @@ export interface ProvisionInput {
 
 export interface ProvisionResult {
   success: boolean;
-  waitlisted?: boolean;
   tenant?: Tenant;
   error?: string;
   steps: string[];
@@ -90,51 +87,18 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
     steps.push(`No pre-existing tenant found for slug ${input.slug}, will create new.`);
   }
 
-  if (!resolvedBotToken) {
-    const stats = await getPoolStats();
-    if (stats.unassigned === 0) {
-      // Pool empty — put tenant on waitlist, do NOT fail payment
-      steps.push("Pool empty — tenant added to waitlist");
+  // BYOB: Telegram tenants must supply their own bot token from @BotFather.
+  // The wizard collects and validates the token before calling /wizard/hatch.
+  if (!resolvedBotToken && input.preferredChannel === "telegram") {
+    return {
+      success: false,
+      error: "Telegram botToken is required (BYOB). Tenant must provide their own bot token from @BotFather.",
+      steps,
+    };
+  }
 
-      let waitlistTenant: Tenant;
-      try {
-        if (tenant) {
-          await getPool().query(
-            `UPDATE tenants SET flavor = $1, region = $2, language = $3, preferred_channel = $4, status = 'waitlisted' WHERE id = $5`,
-            [input.flavor, input.region, input.language, input.preferredChannel, tenant.id]
-          );
-          const refreshed = await getTenantBySlug(input.slug);
-          if (!refreshed) throw new Error("Tenant disappeared during update");
-          waitlistTenant = refreshed;
-        } else {
-          waitlistTenant = await createTenant({
-            slug: input.slug,
-            name: input.name,
-            email: input.email,
-            flavor: input.flavor,
-            region: input.region,
-            language: input.language,
-            preferredChannel: input.preferredChannel,
-            botToken: undefined,
-          });
-          await updateTenantStatus(waitlistTenant.id, "waitlisted");
-        }
-      } catch (err) {
-        return { success: false, error: `DB error: ${err instanceof Error ? err.message : String(err)}`, steps };
-      }
-
-      await sendAdminAlert("Bot token pool is empty. Add tokens via ops/botpool/create_bots.ts before provisioning.");
-      await logAdminEvent("waitlist", waitlistTenant.id, { reason: "pool_empty", slug: input.slug });
-      return {
-        success: true,
-        waitlisted: true,
-        tenant: waitlistTenant,
-        steps,
-        error: undefined,
-      };
-    }
-  } else {
-    steps.push("Bot token provided directly (admin override)");
+  if (resolvedBotToken) {
+    steps.push("Bot token provided (BYOB)");
   }
 
   // 2. Create or Update tenant record
@@ -144,9 +108,19 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
       // Just update it with the final configs
       await getPool().query(
         `UPDATE tenants SET 
-            flavor = $1, region = $2, language = $3, preferred_channel = $4, bot_token = COALESCE($5, bot_token)
-           WHERE id = $6`,
-        [input.flavor, input.region, input.language, input.preferredChannel, resolvedBotToken || null, tenant.id]
+            flavor = $1, region = $2, language = $3, preferred_channel = $4, 
+            bot_token = COALESCE($5, bot_token),
+            bot_username = COALESCE($6, bot_username)
+           WHERE id = $7`,
+        [
+          input.flavor, 
+          input.region, 
+          input.language, 
+          input.preferredChannel, 
+          resolvedBotToken || null, 
+          input.botUsername || null,
+          tenant.id
+        ]
       );
       // Refresh the object in memory
       const refreshed = await getTenantBySlug(input.slug);
@@ -162,33 +136,13 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
         language: input.language,
         preferredChannel: input.preferredChannel,
         botToken: resolvedBotToken,
+        botUsername: input.botUsername,
         port: undefined,
       });
       steps.push(`New Tenant record created: ${tenant.id}`);
     }
   } catch (err) {
     return { success: false, error: `DB error: ${err instanceof Error ? err.message : String(err)}`, steps };
-  }
-
-  // Assign bot token from pool 
-  if (!input.botToken) {
-    const assigned = await assignBotToken(tenant.id);
-    if (!assigned) {
-      await updateTenantStatus(tenant.id, "pending");
-      await sendAdminAlert("Bot token pool is empty. Add tokens via ops/botpool/create_bots.ts before provisioning.");
-      return { success: true, waitlisted: true, tenant, steps: [...steps, "Pool emptied during assignment — waitlisted"], error: undefined };
-    }
-    resolvedBotToken = decryptToken(assigned.botToken);
-
-    // Update tenant record with the assigned bot token
-    await getPool().query("UPDATE tenants SET bot_token = $1, updated_at = NOW() WHERE id = $2", [resolvedBotToken, tenant.id]);
-    steps.push(`Bot assigned from pool: @${assigned.botUsername}`);
-
-    // Low-pool alert
-    const postStats = await getPoolStats();
-    if (postStats.unassigned < 50) {
-      await sendAdminAlert(`Bot token pool low: ${postStats.unassigned} tokens remaining. Add more via ops/botpool.`);
-    }
   }
 
   // 3. Multi-Tenant Activation! No Docker containers to spin up. 
@@ -261,27 +215,6 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
     await updateTenantStatus(tenant.id, "suspended", {
       suspendedReason: `Webhook attachment failed: ${errMsg}`,
     });
-
-    // Release the pool bot back to available so it isn't leaked on BullMQ retry.
-    // On retry, provisionTenant() will assign a fresh bot from the pool.
-    // Only release if the bot was drawn from the pool (not a direct admin override).
-    if (!input.botToken) {
-      try {
-        const poolBots = await listBotPool("assigned");
-        const assignedBot = poolBots.find((b) => b.tenantId === tenant.id);
-        if (assignedBot) {
-          await releaseBot(assignedBot.id);
-          // Clear bot_token on tenant record so retry gets a clean pool assignment
-          await getPool().query(
-            `UPDATE tenants SET bot_token = NULL WHERE id = $1`,
-            [tenant.id]
-          );
-          steps.push(`Pool bot @${assignedBot.botUsername} released for retry`);
-        }
-      } catch (releaseErr) {
-        console.warn(`[provisioner] Failed to release pool bot after webhook failure for ${tenant.id}:`, releaseErr);
-      }
-    }
 
     return {
       success: false,
@@ -401,17 +334,6 @@ export async function terminateTenant(tenant: Tenant): Promise<void> {
     await tgFetch(`https://api.telegram.org/bot${tenant.botToken}/deleteWebhook`).catch(() => {});
   }
 
-  // Release the pool bot back so it can be reassigned to a future tenant
-  try {
-    const poolBots = await listBotPool("assigned");
-    const assignedBot = poolBots.find((b) => b.tenantId === tenant.id);
-    if (assignedBot) {
-      await releaseBot(assignedBot.id);
-    }
-  } catch (err) {
-    console.error(`[provisioner] terminateTenant: failed to release pool bot for ${tenant.id}:`, err);
-  }
-
   await updateTenantStatus(tenant.id, "terminated");
   await logAdminEvent("terminate", tenant.id, {});
 }
@@ -425,24 +347,10 @@ export async function deprovisionTenant(tenant: Tenant): Promise<{ steps: string
 
   if (tenant.botToken) {
     await tgFetch(`https://api.telegram.org/bot${tenant.botToken}/deleteWebhook`).catch(() => {});
-    steps.push("Telegram webhook deleted for Bot Token");
+    steps.push("Telegram webhook deleted");
   }
 
-  // 2. Find assigned pool bot for this tenant and release it
-  try {
-    const poolBots = await listBotPool("assigned");
-    const assignedBot = poolBots.find((b) => b.tenantId === tenant.id);
-    if (assignedBot) {
-      await releaseBot(assignedBot.id);
-      steps.push(`Pool bot @${assignedBot.botUsername} released and reset`);
-    } else {
-      steps.push("No pool bot found for tenant (may have been manually assigned)");
-    }
-  } catch (err) {
-    steps.push(`Bot release warning: ${err instanceof Error ? err.message : String(err)}`);
-  }
-
-  // 3. Update status
+  // 2. Update status
   await updateTenantStatus(tenant.id, "terminated");
   steps.push("Tenant status: terminated");
 

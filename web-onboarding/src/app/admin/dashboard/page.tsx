@@ -106,7 +106,7 @@ function flavorLabel(flavor: string): string {
 
 function computeAlarms(pool: PoolHealth | null, tenants: TenantRow[]): string[] {
   const alarms: string[] = [];
-  if (pool?.status === "empty")    alarms.push("🚨 Bot pool is EMPTY — new signups will be waitlisted");
+  if (pool?.status === "empty")    alarms.push("ℹ️ Bot pool is EMPTY — all new signups must be BYOB");
   if (pool?.status === "critical") alarms.push(`⚠️ Bot pool critical — only ${pool.available} tokens left`);
   if (pool?.status === "low")      alarms.push(`⚠️ Bot pool low — ${pool.available} tokens remaining`);
 

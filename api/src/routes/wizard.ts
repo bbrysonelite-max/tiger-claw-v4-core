@@ -47,6 +47,7 @@ const HatchSchema = z.object({
   timezone: z.string().optional(),
   preferredChannel: z.string().optional(),
   region: z.string().optional(),
+  botToken: z.string().optional(), // BYOB: Telegram tenants provide their own BotFather token
   hiveOptIn: z.boolean().optional()
 });
 
@@ -166,7 +167,7 @@ router.post("/hatch", async (req: Request, res: Response) => {
   if (!parsed.success) {
     return res.status(400).json({ error: "Invalid payload.", details: parsed.error.format() });
   }
-  const { botId, name, email, flavor, language, timezone, preferredChannel, region, hiveOptIn } = parsed.data;
+  const { botId, name, email, flavor, language, timezone, preferredChannel, region, hiveOptIn, botToken } = parsed.data;
 
   try {
     const tenant = await getTenantByEmail(email);
@@ -177,7 +178,7 @@ router.post("/hatch", async (req: Request, res: Response) => {
 
     // Enqueue the heavy lifting
     await provisionQueue.add('tenant-provisioning', {
-      userId: tenant.id, // Assuming legacy map
+      userId: tenant.id,
       botId: botId,
       slug,
       name: name || tenant.name,
@@ -187,7 +188,8 @@ router.post("/hatch", async (req: Request, res: Response) => {
       language: language || "en",
       preferredChannel: preferredChannel || "telegram",
       timezone: timezone || "UTC",
-      hiveOptIn: hiveOptIn ?? true
+      hiveOptIn: hiveOptIn ?? true,
+      botToken: botToken || undefined,
     }, {
       attempts: 5,
       backoff: { type: 'exponential', delay: 10000 },
