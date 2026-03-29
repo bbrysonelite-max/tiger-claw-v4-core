@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   Activity, AlertTriangle, Bot, CheckCircle2, ChevronDown, ChevronRight,
-  Database, Eye, LogOut, Pause, Play, RefreshCw, Shield, Zap,
+  Database, Eye, LogOut, MessageSquare, Pause, Play, RefreshCw, Shield, Zap,
 } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://api.tigerclaw.io";
@@ -35,6 +35,19 @@ interface TenantRow {
   suspendedAt: string | null;
   suspendedReason: string | null;
   createdAt: string;
+}
+
+interface TenantConversationStat {
+  tenantId: string;
+  messagesLast24h: number;
+  messagesToday: number;
+  lastMessageAt: string | null;
+}
+
+interface ConversationStats {
+  totalLast24h: number;
+  totalToday: number;
+  byTenant: TenantConversationStat[];
 }
 
 // ---------------------------------------------------------------------------
@@ -125,6 +138,7 @@ export default function FleetDashboard() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [pool, setPool] = useState<PoolHealth | null>(null);
   const [tenants, setTenants] = useState<TenantRow[]>([]);
+  const [conversations, setConversations] = useState<ConversationStats | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
@@ -140,9 +154,10 @@ export default function FleetDashboard() {
     setLoading(true);
     setError("");
     try {
-      const [poolRes, fleetRes] = await Promise.all([
+      const [poolRes, fleetRes, convoRes] = await Promise.all([
         fetch(`${API_URL}/admin/pool/health`, { headers: { Authorization: `Bearer ${tok}` } }),
         fetch(`${API_URL}/admin/fleet`, { headers: { Authorization: `Bearer ${tok}` } }),
+        fetch(`${API_URL}/admin/conversations`, { headers: { Authorization: `Bearer ${tok}` } }),
       ]);
 
       if (poolRes.status === 401 || fleetRes.status === 401) {
@@ -157,6 +172,7 @@ export default function FleetDashboard() {
         const data = await fleetRes.json();
         setTenants(data.tenants ?? []);
       }
+      if (convoRes.ok) setConversations(await convoRes.json());
       setLastRefreshed(new Date());
     } catch {
       setError("Connection error — is the API reachable?");
@@ -300,7 +316,7 @@ export default function FleetDashboard() {
         )}
 
         {/* Stats row */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           {/* Pool health */}
           <div className={`rounded-xl border p-4 ${pool ? poolStatusBg(pool.status) : "bg-zinc-900 border-zinc-800"}`}>
             <div className="flex items-center gap-2 mb-2">
@@ -329,6 +345,20 @@ export default function FleetDashboard() {
             </div>
             <div className="text-2xl font-bold text-emerald-400">{activeTenants}</div>
             <div className="text-xs text-zinc-500 mt-1">{tenants.length} total tenants</div>
+          </div>
+
+          {/* Messages 24h — heartbeat metric */}
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <MessageSquare className="w-4 h-4 text-zinc-400" />
+              <span className="text-xs text-zinc-400 font-medium">Messages 24h</span>
+            </div>
+            <div className={`text-2xl font-bold ${(conversations?.totalLast24h ?? 0) > 0 ? "text-orange-400" : "text-zinc-600"}`}>
+              {conversations?.totalLast24h ?? "—"}
+            </div>
+            <div className="text-xs text-zinc-500 mt-1">
+              {conversations ? `${conversations.totalToday} today` : "loading..."}
+            </div>
           </div>
 
           {/* Onboarding */}
@@ -461,38 +491,51 @@ export default function FleetDashboard() {
                     </div>
 
                     {/* Expanded detail */}
-                    {isExpanded && (
-                      <div className="px-14 pb-4 pt-1 bg-zinc-800/30 text-xs text-zinc-400 grid grid-cols-2 md:grid-cols-4 gap-3">
-                        <div>
-                          <div className="text-zinc-600 mb-0.5">Tenant ID</div>
-                          <div className="font-mono text-zinc-300 truncate">{t.id}</div>
-                        </div>
-                        <div>
-                          <div className="text-zinc-600 mb-0.5">Slug</div>
-                          <div className="font-mono text-zinc-300">{t.slug}</div>
-                        </div>
-                        <div>
-                          <div className="text-zinc-600 mb-0.5">Region / Language</div>
-                          <div className="text-zinc-300">{t.region} / {t.language}</div>
-                        </div>
-                        <div>
-                          <div className="text-zinc-600 mb-0.5">Created</div>
-                          <div className="text-zinc-300">{relativeTime(t.createdAt)}</div>
-                        </div>
-                        {t.suspendedReason && (
-                          <div className="col-span-2 md:col-span-4">
-                            <div className="text-zinc-600 mb-0.5">Suspension Reason</div>
-                            <div className="text-red-400">{t.suspendedReason}</div>
-                          </div>
-                        )}
-                        {t.canaryGroup && (
+                    {isExpanded && (() => {
+                      const convoStat = conversations?.byTenant.find((c) => c.tenantId === t.id);
+                      return (
+                        <div className="px-14 pb-4 pt-1 bg-zinc-800/30 text-xs text-zinc-400 grid grid-cols-2 md:grid-cols-4 gap-3">
                           <div>
-                            <div className="text-zinc-600 mb-0.5">Canary Group</div>
-                            <div className="text-purple-400">{t.canaryGroup}</div>
+                            <div className="text-zinc-600 mb-0.5">Tenant ID</div>
+                            <div className="font-mono text-zinc-300 truncate">{t.id}</div>
                           </div>
-                        )}
-                      </div>
-                    )}
+                          <div>
+                            <div className="text-zinc-600 mb-0.5">Slug</div>
+                            <div className="font-mono text-zinc-300">{t.slug}</div>
+                          </div>
+                          <div>
+                            <div className="text-zinc-600 mb-0.5">Region / Language</div>
+                            <div className="text-zinc-300">{t.region} / {t.language}</div>
+                          </div>
+                          <div>
+                            <div className="text-zinc-600 mb-0.5">Created</div>
+                            <div className="text-zinc-300">{relativeTime(t.createdAt)}</div>
+                          </div>
+                          <div>
+                            <div className="text-zinc-600 mb-0.5">Messages (24h / today)</div>
+                            <div className={`font-medium ${(convoStat?.messagesLast24h ?? 0) > 0 ? "text-orange-300" : "text-zinc-500"}`}>
+                              {convoStat ? `${convoStat.messagesLast24h} / ${convoStat.messagesToday}` : "—"}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-zinc-600 mb-0.5">Last Message</div>
+                            <div className="text-zinc-300">{relativeTime(convoStat?.lastMessageAt ?? t.lastActivityAt)}</div>
+                          </div>
+                          {t.suspendedReason && (
+                            <div className="col-span-2 md:col-span-4">
+                              <div className="text-zinc-600 mb-0.5">Suspension Reason</div>
+                              <div className="text-red-400">{t.suspendedReason}</div>
+                            </div>
+                          )}
+                          {t.canaryGroup && (
+                            <div>
+                              <div className="text-zinc-600 mb-0.5">Canary Group</div>
+                              <div className="text-purple-400">{t.canaryGroup}</div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
                 );
               })}
