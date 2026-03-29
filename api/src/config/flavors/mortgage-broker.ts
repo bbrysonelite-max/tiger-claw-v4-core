@@ -11,11 +11,11 @@ export const MORTGAGE_BROKER_FLAVOR: FlavorConfig = {
   professionLabel: "Mortgage Broker",
   defaultKeywords: ["first time home buyer", "mortgage pre-approval", "home loan", "refinance", "buying a house", "mortgage rates", "FHA loan", "down payment assistance"],
   scoutQueries: [
-    "first time home buyer questions reddit",
-    "how to get pre-approved for a mortgage",
-    "should I refinance my mortgage now",
-    "how much house can I afford",
-    "FHA loan requirements first time buyer",
+    "subreddit:FirstTimeHomeBuyer first time home buyer mortgage questions advice",
+    "subreddit:Mortgages OR subreddit:FirstTimeHomeBuyer how to get pre-approved for mortgage",
+    "subreddit:Mortgages OR subreddit:personalfinance should I refinance mortgage now rates 2026",
+    "subreddit:FirstTimeHomeBuyer how much house can I afford income calculation",
+    "subreddit:Mortgages FHA loan requirements first time buyer credit score minimum",
   ],
 
   conversion: {

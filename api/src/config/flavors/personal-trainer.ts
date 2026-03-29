@@ -11,11 +11,11 @@ export const PERSONAL_TRAINER_FLAVOR: FlavorConfig = {
   professionLabel: "Personal Trainer",
   defaultKeywords: ["personal trainer", "weight loss coach", "fitness transformation", "gym coach", "online training", "workout plan", "fat loss", "strength training"],
   scoutQueries: [
-    "how do I find a good personal trainer",
-    "online personal trainer worth it reddit",
-    "how to lose weight with a coach",
-    "personal trainer vs gym membership",
-    "fitness accountability coach results",
+    "subreddit:fitness OR subreddit:xxfitness how do I find a good personal trainer hire",
+    "subreddit:loseit OR subreddit:fitness online personal trainer worth it results experience",
+    "subreddit:fitness OR subreddit:loseit personal trainer helped me lose weight transformation",
+    "subreddit:fitness personal trainer vs gym membership alone which is better",
+    "subreddit:xxfitness OR subreddit:bodyweightfitness fitness accountability coach hiring worth it",
   ],
 
   conversion: {

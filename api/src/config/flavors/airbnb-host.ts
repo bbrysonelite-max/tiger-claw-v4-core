@@ -18,11 +18,11 @@ export const AIRBNB_HOST_FLAVOR: FlavorConfig = {
     "airbnb host tips"
   ],
   scoutQueries: [
-    "should I start an airbnb reddit",
-    "airbnb vs long term rental which is better",
-    "how to get more bookings on airbnb",
-    "airbnb co-hosting worth it",
-    "short term rental investing first property advice",
+    "subreddit:airbnb should I start an airbnb short term rental worth it",
+    "subreddit:airbnb OR subreddit:realestateinvesting airbnb vs long term rental income",
+    "subreddit:airbnb how to get more bookings host tips strategy",
+    "subreddit:airbnb co-hosting short term rental worth it revenue split",
+    "subreddit:realestateinvesting OR subreddit:airbnb short term rental investing first property",
   ],
 
   conversion: {

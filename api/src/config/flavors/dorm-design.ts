@@ -11,11 +11,11 @@ export const DORM_DESIGN_FLAVOR: FlavorConfig = {
   professionLabel: "Interior Designer",
   defaultKeywords: ["dorm room", "small space", "studio apartment", "dorm decor", "room makeover", "small apartment", "college room", "micro living"],
   scoutQueries: [
-    "dorm room makeover ideas reddit",
-    "how to decorate a small dorm room",
-    "studio apartment design tips",
-    "dorm room storage solutions college",
-    "small space interior design help",
+    "subreddit:college OR subreddit:Dorms dorm room makeover small space ideas",
+    "subreddit:femalelivingspace OR subreddit:malelivingspace how to decorate small dorm room",
+    "subreddit:college OR subreddit:Dorms studio apartment design tips first apartment",
+    "subreddit:Dorms OR subreddit:college dorm room storage solutions organization hacks",
+    "subreddit:InteriorDesign OR subreddit:malelivingspace small space design consultation worth it",
   ],
 
   conversion: {

@@ -11,11 +11,11 @@ export const GIG_ECONOMY_FLAVOR: FlavorConfig = {
   professionLabel: "Gig Economy Guide",
   defaultKeywords: ["side hustle", "extra income", "flexible work", "gig work", "work from home", "earn extra money", "delivery driver tips"],
   scoutQueries: [
-    "best side hustle to start with no money reddit",
-    "how to make extra money working flexible hours",
-    "is doordash worth it 2024",
-    "how to start earning with gig apps tips",
-    "side hustle ideas for busy people reddit",
+    "subreddit:sidehustle best gig economy side hustle start no money",
+    "subreddit:gigworkers OR subreddit:sidehustle how to make extra money flexible hours",
+    "subreddit:doordash_drivers OR subreddit:UberDrivers is delivery driving worth it 2026",
+    "subreddit:sidehustle OR subreddit:gigworkers start earning gig apps sign up tips",
+    "subreddit:sidehustle side hustle ideas busy people flexible schedule income",
   ],
 
   conversion: {
