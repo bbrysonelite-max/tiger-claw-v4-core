@@ -10,11 +10,11 @@ export const CANDLE_MAKER_FLAVOR: FlavorConfig = {
   professionLabel: "Candle Maker / Artisan",
   defaultKeywords: ["soy candles", "handmade candles", "artisan candles", "small batch candles", "custom scented candles", "wholesale candles"],
   scoutQueries: [
-    "best handmade candles reddit recommendations",
-    "artisan candle brands worth buying",
-    "soy candle small business support",
-    "where to buy unique scented candles online",
-    "small batch home goods indie brands",
+    "subreddit:Etsy OR subreddit:GiftIdeas best handmade soy candles recommendations buy",
+    "subreddit:GiftIdeas OR subreddit:Frugal artisan candle brands worth buying reviews",
+    "subreddit:Etsy small business soy candle artisan support buy indie",
+    "subreddit:GiftIdeas unique scented candles small batch shop online",
+    "subreddit:HomeDecorating OR subreddit:DIY artisan hand poured candle home goods",
   ],
 
   conversion: {

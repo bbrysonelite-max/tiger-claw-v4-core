@@ -11,11 +11,11 @@ export const PLUMBER_FLAVOR: FlavorConfig = {
   professionLabel: "Plumber / Trades Professional",
   defaultKeywords: ["plumber recommendation", "plumbing repair", "burst pipe", "water heater replacement", "drain clog", "plumbing estimate"],
   scoutQueries: [
-    "need a plumber recommendation reddit",
-    "how to find a trustworthy plumber",
-    "water heater repair or replace advice",
-    "plumbing emergency who to call",
-    "drain clog professional vs diy reddit",
+    "subreddit:HomeImprovement OR subreddit:Plumbing licensed plumber recommendation water heater",
+    "subreddit:HomeImprovement plumbing emergency drain clog who to call",
+    "subreddit:Plumbing OR subreddit:homeowners water heater repair replace cost estimate",
+    "subreddit:DIY OR subreddit:HomeImprovement drain clog professional plumber vs diy fix",
+    "subreddit:HomeImprovement OR subreddit:Plumbing trustworthy plumber quote licensed insured",
   ],
 
   conversion: {

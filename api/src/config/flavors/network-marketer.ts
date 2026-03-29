@@ -19,11 +19,11 @@ export const NETWORK_MARKETER_FLAVOR: FlavorConfig = {
   ],
 
   scoutQueries: [
-    "best side hustle 2026",
-    "how to make passive income from home",
-    "tired of my 9-5 job",
-    "looking for extra income ideas",
-    "work from home opportunities reddit"
+    "subreddit:Entrepreneur OR subreddit:sidehustle best side hustle 2026 extra income business",
+    "subreddit:WorkFromHome OR subreddit:sidehustle passive income from home legitimate ideas",
+    "subreddit:Entrepreneur OR subreddit:personalfinance tired of 9-5 want own business income",
+    "subreddit:sidehustle looking for extra income flexible work from home opportunity",
+    "subreddit:Entrepreneur OR subreddit:WorkFromHome network marketing direct sales home business",
   ],
 
   // -------------------------------------------------------------------------
