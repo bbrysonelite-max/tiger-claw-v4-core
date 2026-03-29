@@ -1,13 +1,24 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { Zap, Bot, Lock, ArrowRight, Loader2 } from "lucide-react";
 import OnboardingModal from "@/components/OnboardingModal";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "https://api.tigerclaw.io";
 
+// Suspense boundary required by Next.js App Router for useSearchParams
 export default function Home() {
+  return (
+    <Suspense>
+      <HomeContent />
+    </Suspense>
+  );
+}
+
+function HomeContent() {
+  const searchParams = useSearchParams();
   const [wizardOpen, setWizardOpen] = useState(false);
   const [verifiedEmail, setVerifiedEmail] = useState<string | undefined>();
   const [verifiedBotId, setVerifiedBotId] = useState<string | undefined>();
@@ -19,32 +30,46 @@ export default function Home() {
   const [verifying, setVerifying] = useState(false);
   const [verifyError, setVerifyError] = useState<string | undefined>();
 
-  const handleVerifyPurchase = async () => {
-    setVerifyError(undefined);
-    if (!purchaseEmail.trim()) {
-      setVerifyError("Please enter your email.");
-      return;
+  // Auto-populate email from ?email= query param (linked from Stan Store receipt).
+  // If present, pre-fills the input AND auto-triggers verify so the customer lands
+  // directly in the wizard without any manual step.
+  const autoTriggered = useRef(false);
+  const pendingAutoEmail = useRef<string | null>(null);
+
+  useEffect(() => {
+    const emailParam = searchParams.get("email");
+    if (emailParam && !autoTriggered.current) {
+      autoTriggered.current = true;
+      const clean = emailParam.toLowerCase();
+      pendingAutoEmail.current = clean;
+      setPurchaseEmail(clean);
     }
+  }, [searchParams]);
+
+  // Core verify logic — accepts email explicitly so it can be called from effects
+  // or from the button handler without depending on state timing.
+  const handleVerifyPurchaseWithEmail = async (email: string) => {
+    setVerifyError(undefined);
     setVerifying(true);
     try {
       const res = await fetch(`${API_BASE}/auth/verify-purchase`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: purchaseEmail.trim().toLowerCase() }),
+        body: JSON.stringify({ email }),
       });
       const data = await res.json();
       if (!res.ok) {
         setVerifyError(data.error ?? "Verification failed. Please try again.");
         return;
       }
-      // Store session token in sessionStorage for subsequent wizard API calls.
-      // Clear any stale wizard state so the fresh botId is never shadowed by old data.
+      // Store session token for subsequent wizard API calls.
+      // Clear any stale wizard state so fresh botId is never shadowed by old data.
       try {
         sessionStorage.removeItem("tiger_wizard_state");
         sessionStorage.setItem("tc_session", data.sessionToken);
       } catch { /* ignore */ }
       setSessionToken(data.sessionToken);
-      setVerifiedEmail(purchaseEmail.trim().toLowerCase());
+      setVerifiedEmail(email);
       setVerifiedBotId(data.botId);
       setVerifiedName(data.name);
       setWizardOpen(true);
@@ -53,6 +78,25 @@ export default function Home() {
     } finally {
       setVerifying(false);
     }
+  };
+
+  // Fire verify-purchase once the auto-populated email lands in state
+  useEffect(() => {
+    if (pendingAutoEmail.current && purchaseEmail === pendingAutoEmail.current) {
+      pendingAutoEmail.current = null;
+      handleVerifyPurchaseWithEmail(purchaseEmail);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [purchaseEmail]);
+
+  const handleVerifyPurchase = async () => {
+    const email = purchaseEmail.trim().toLowerCase();
+    if (!email) {
+      setVerifyError("Please enter your email.");
+      return;
+    }
+    setPurchaseEmail(email);
+    await handleVerifyPurchaseWithEmail(email);
   };
 
   return (
