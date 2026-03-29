@@ -7,14 +7,14 @@ Stop what you are doing. Read this entire document and `CLAUDE.md`. These are yo
 
 ## 1. The Current State of the Universe
 
-**Tiger Claw is LIVE and fully deployed. CI is green. PRs #62–#68 merged. Phase 3 BYOB pivot COMPLETE.**
+**Tiger Claw is LIVE and fully deployed. CI is green. PRs #62–#71 merged. Phase 3 BYOB pivot COMPLETE. Phase 5 #15 DONE. Mine Quality Audit complete (Task #18).**
 - **API:** `https://api.tigerclaw.io` — Cloud Run `tiger-claw-api`, multi-region (us-central1 + asia-southeast1)
 - **Load Balancer:** Global HTTPS LB at `34.54.146.69` — both regions behind Anycast IP
 - **Architecture:** V4 Stateless Serverless — one API process, all tenants, context resolved per-request
 - **Database:** PostgreSQL HA via Cloud SQL Proxy (`tiger_claw_shared`)
 - **Cache/Queue:** Redis HA + BullMQ (8 queues)
 - **AI Engine:** Gemini 2.0 Flash (LOCKED — `gemini-2.5-flash` has a GCP function-calling bug, do not use it)
-- **Tests:** 396 passing
+- **Tests:** 395 passing
 - **Flavors:** 15 customer-facing industry flavors, all with full field set including scoutQueries
 - **Min-instances:** 1 — no cold start
 - **Data Refinery:** v5 pipeline FULLY AUTONOMOUS — fires nightly at 2 AM UTC via BullMQ. First run: 313 facts saved across 14 flavors.
@@ -69,6 +69,8 @@ Stop what you are doing. Read this entire document and `CLAUDE.md`. These are yo
 32. **Admin Pool Utilities** — `GET /admin/pool/tokens?limit=N` (decrypted tokens for wizard use), `POST /admin/pool/retire-batch` (bulk retire). PR #68.
 33. **Website Content Audit Fixed** — All CTAs route through `tigerclaw.io/#pricing`. AI provider list corrected everywhere (Google Gemini, OpenAI, Grok, OpenRouter, Kimi — Anthropic removed). `tiger-bot-website` pushed directly to main and live. PRs #69, #70.
 34. **Gemini Rate Limit Hardening** — `geminiGateway.ts`: process-level semaphore (default 10 concurrent, tunable via `GEMINI_CONCURRENCY` env var) + exponential backoff on 429s (up to 3 retries, ~1s/2s/4s + jitter). All 10 Gemini call sites hardened. PR #71.
+35. **Mine Quality Audit** — `specs/MINE_QUALITY_AUDIT.md` (Task #18, PR #72). 7,872 facts audited. Overall quality 65% — 35% junk from mismapped subreddits. Actionability 55% (BAD). Root cause: Reddit global search hits unrelated subs (r/HFY sci-fi for Plumber, r/40kLore for Interior Designer, r/AnimalCrossingNewLeaf for Dorm Design).
+36. **Scout Query Tightening** — All 14 active flavor `scoutQueries` rewritten with `subreddit:NAME` operators (PR #73). Restricts Reddit mining to commercially relevant communities. Eliminates off-topic junk at the source.
 
 ---
 
@@ -89,9 +91,12 @@ Stop what you are doing. Read this entire document and `CLAUDE.md`. These are yo
 
 | PR | Branch | Description |
 |----|--------|-------------|
-| #71 | `feat/gemini-rate-limit-hardening` | Phase 5 #15 — Gemini semaphore + exponential backoff |
+| #72 | `feat/mine-quality-audit` | Phase 6 #18 — Mine quality audit spec + findings |
+| #73 | `feat/scout-query-tightening` | Phase 6 #19 — Scout query tightening, all 14 flavors |
+| #70 | `feat/gemini-circuit-breaker` | Phase 5 #13/#14 — Circuit breaker + AI unit economics |
+| #69 | `feat/unify-cta-buttons` | Fix — CTA routing to `#pricing` page |
 
-All other PRs through #70 are merged and live.
+PRs #62–#71 merged and live.
 
 ---
 
@@ -141,6 +146,8 @@ All loaded in `Promise.all()` — DB unreachable = static prompt, no crash.
 |---|---|---|
 | BullMQ `miningWorker` in Cloud Run | 2 AM UTC | Primary — autonomous |
 | Cheese Grater launchd `io.tigerclaw.market-miner` | 3 AM local | Backup — `isAlreadyMined()` dedup prevents double-saves |
+
+**Mine state (2026-03-29):** 7,872 facts across 16 domains. Quality audit (Task #18): 65% overall, 55% actionable. Root cause fixed in PR #73 — subreddit-scoped queries now prevent off-topic fact pollution. Next nightly run expected to raise actionability to 80%+.
 
 **First run results (2026-03-27):** 313 facts, 14 flavors, 7 Reddit rate-limit misses (handled gracefully).
 
@@ -249,18 +256,22 @@ To tune: set `GEMINI_CONCURRENCY=20` in Cloud Run for high-throughput instances.
 
 ---
 
-## 14. What's Next (Phase 4 in progress, Phase 5 open)
+## 14. What's Next (Phase 4 in progress, Phase 5/6 open)
 
 ### Phase 4 — Activation (Brent's lane, in progress)
 - John & Noon (LINE) — Brent contacting
 - Toon (LINE) — Brent contacting
-- Debbie (Telegram BYOB) — tomorrow (she's asleep, Spain)
+- Debbie (Telegram BYOB) — Brent contacting (Spain)
 
 ### Phase 5 — Hardening for 50-seat release
-- #13 Model-level circuit breaker — GEMINI task
-- #14 Gemini unit economics — GEMINI task
-- #15 Gemini rate limit hardening — ✅ DONE (PR #71, pending merge)
+- #13 Model-level circuit breaker — GEMINI task (PR #70 open)
+- #14 Gemini unit economics — GEMINI task (PR #70 open)
+- #15 Gemini rate limit hardening — ✅ DONE (PR #71 merged 2026-03-29)
 - #16 Activation playbook — BRENT + CLAUDE, next
+
+### Phase 6 — Growth (in progress)
+- #18 Mine quality audit — ✅ DONE (PR #72, `specs/MINE_QUALITY_AUDIT.md`)
+- #19 Scout query tightening — ✅ DONE (PR #73 open, all 14 flavors)
 
 ### Phase 6 — Growth
 See `STATE_OF_THE_TIGER_PATH_FORWARD.md` for full task list.
@@ -275,6 +286,7 @@ See `STATE_OF_THE_TIGER_PATH_FORWARD.md` for full task list.
 | 🔴 HIGH | Full fire test (Stan Store → wizard → live BYOB bot) not done | NOT DONE — use `/admin/pool/tokens` + magic link |
 | 🟡 MED | Welcome email says "bot in 60 seconds" — false for BYOB wizard flow | NOT FIXED |
 | 🟡 MED | `DATABASE_READ_URL` pinned to secret version 8 (should be latest) | NOT FIXED |
+| 🟡 MED | Mine actionability at 55% — 35% junk facts from off-topic subreddits | FIX IN PR #73 — subreddit-scoped queries |
 | 🟡 LOW | Reddit scout returns 0 results (403 without OAuth) | NOT FIXED — needs TigerClaw-branded Reddit app |
 
 ---
@@ -299,4 +311,4 @@ Full report: `specs/RELIABILITY_AUDIT.md`
 
 ---
 
-*Last updated: 2026-03-29 (Phase 3 BYOB pivot SHIPPED — PR #68 merged. Phase 4 activation in progress. Phase 5 #15 done — PR #71 pending merge. 396 tests passing.)*
+*Last updated: 2026-03-29 23:45 UTC (PRs #62–#71 merged. Phase 4 activation in progress. Phase 5 #15 DONE. Phase 6 #18 mine audit complete, #19 scout query tightening PR #73 open. 395 tests passing.)*
