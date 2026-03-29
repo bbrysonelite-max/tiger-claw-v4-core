@@ -10,11 +10,11 @@ export const BAKER_FLAVOR: FlavorConfig = {
   professionLabel: "Baker / Pastry Chef",
   defaultKeywords: ["custom cake", "custom cookies", "wedding cake", "cake order", "baked goods", "artisan bakery", "gluten free baked goods"],
   scoutQueries: [
-    "where to find custom cakes near me reddit",
-    "custom wedding cake recommendations",
-    "homemade cookies small business local",
-    "best custom bakery reviews reddit",
-    "how to order a custom birthday cake",
+    "subreddit:weddingplanning custom wedding cake recommendations local bakery",
+    "subreddit:weddingplanning OR subreddit:Baking where to find custom cakes near me",
+    "subreddit:Baking OR subreddit:cakedecorating custom birthday cake small business order",
+    "subreddit:weddingplanning best custom bakery wedding cake reviews experience",
+    "subreddit:Baking OR subreddit:weddingplanning how to order custom cake process",
   ],
 
   conversion: {

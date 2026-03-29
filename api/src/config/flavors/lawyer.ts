@@ -13,11 +13,11 @@ export const LAWYER_FLAVOR: FlavorConfig = {
   professionLabel: "Lawyer / Attorney",
   defaultKeywords: ["need a lawyer", "legal consultation", "free legal advice", "attorney near me", "legal help", "law firm recommendation"],
   scoutQueries: [
-    "do I need a lawyer for this situation reddit",
-    "how to find a good attorney recommendations",
-    "free legal consultation near me worth it",
-    "lawyer referral advice reddit",
-    "how to choose the right attorney for my case",
+    "subreddit:legaladvice do I need a lawyer for this situation",
+    "subreddit:legaladvice OR subreddit:AskLawyers how to find a good attorney recommendation",
+    "subreddit:legaladvice free legal consultation worth it attorney near me",
+    "subreddit:legaladvice lawyer referral recommendation how to choose practice area",
+    "subreddit:legaladvice OR subreddit:AskLawyers how to choose right attorney for my case",
   ],
 
   conversion: {

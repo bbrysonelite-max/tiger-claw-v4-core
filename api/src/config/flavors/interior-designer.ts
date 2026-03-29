@@ -15,11 +15,11 @@ export const INTERIOR_DESIGNER_FLAVOR: FlavorConfig = {
   ],
 
   scoutQueries: [
-    "going to college in the fall",
-    "freshman year dorm room",
-    "dorm decor ideas 2026",
-    "matching dorm with roommate",
-    "lofting my bed college"
+    "subreddit:college OR subreddit:Dorms dorm room interior design tips setup move in",
+    "subreddit:college OR subreddit:femalelivingspace freshman dorm room decor ideas",
+    "subreddit:Dorms OR subreddit:CollegeLife dorm move in day furniture layout design",
+    "subreddit:malelivingspace OR subreddit:femalelivingspace matching dorm roommate decor aesthetic",
+    "subreddit:college OR subreddit:Dorms loft bed dorm layout maximize small space",
   ],
 
   conversion: {

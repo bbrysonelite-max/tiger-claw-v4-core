@@ -20,11 +20,11 @@ export const REAL_ESTATE_FLAVOR: FlavorConfig = {
   ],
 
   scoutQueries: [
-    "relocating to a new city",
-    "tips for first time home buyers",
-    "how to sell my house fast",
-    "best neighborhoods in Austin",
-    "mortgage rate predictions 2026"
+    "subreddit:FirstTimeHomeBuyer relocating to new city buying a home realtor advice",
+    "subreddit:FirstTimeHomeBuyer tips first time home buyer mistakes avoid",
+    "subreddit:RealEstate OR subreddit:FirstTimeHomeSeller how to sell my house fast agent",
+    "subreddit:RealEstate OR subreddit:FirstTimeHomeBuyer need realtor recommendation buyer agent",
+    "subreddit:Mortgages OR subreddit:FirstTimeHomeBuyer mortgage affordability rates 2026 budget",
   ],
 
   conversion: {
