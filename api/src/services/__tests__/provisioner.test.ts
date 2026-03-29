@@ -337,8 +337,8 @@ describe('suspendTenant', () => {
   it('calls deleteWebhook on Telegram when tenant has a botToken', async () => {
     await suspendTenant(MOCK_TENANT as any, 'Test suspension');
 
-    expect(mockFetch).toHaveBeenCalledWith(expect.stringContaining('deleteWebhook'));
-    expect(mockFetch).toHaveBeenCalledWith(expect.stringContaining(MOCK_TENANT.botToken!));
+    expect(mockFetch).toHaveBeenCalledWith(expect.stringContaining('deleteWebhook'), expect.anything());
+    expect(mockFetch).toHaveBeenCalledWith(expect.stringContaining(MOCK_TENANT.botToken!), expect.anything());
   });
 
   it('skips Telegram call when tenant has no botToken', async () => {
@@ -434,7 +434,7 @@ describe('terminateTenant', () => {
   it('calls deleteWebhook then sets status to terminated', async () => {
     await terminateTenant(MOCK_TENANT as any);
 
-    expect(mockFetch).toHaveBeenCalledWith(expect.stringContaining('deleteWebhook'));
+    expect(mockFetch).toHaveBeenCalledWith(expect.stringContaining('deleteWebhook'), expect.anything());
     expect(mockUpdateTenantStatus).toHaveBeenCalledWith(MOCK_TENANT.id, 'terminated');
   });
 
@@ -489,6 +489,6 @@ describe('deprovisionTenant', () => {
 
     await deprovisionTenant(MOCK_TENANT as any);
 
-    expect(mockFetch).toHaveBeenCalledWith(expect.stringContaining('deleteWebhook'));
+    expect(mockFetch).toHaveBeenCalledWith(expect.stringContaining('deleteWebhook'), expect.anything());
   });
 });
