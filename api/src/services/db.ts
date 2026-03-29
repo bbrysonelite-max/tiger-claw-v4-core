@@ -800,15 +800,16 @@ export async function createBYOKSubscription(data: {
   );
 }
 
-// Look up a pending_setup subscription created within the last 72 hours for an email.
-// Used by POST /auth/verify-purchase — the purchase IS the authentication.
+// Look up the most recent subscription for an email — used by POST /auth/verify-purchase.
+// Accepts pending_setup OR active/onboarding (in case the provisioning worker auto-activated
+// before the customer finished the wizard). 72-hour window prevents stale re-entry.
 export async function lookupPurchaseByEmail(email: string): Promise<{ userId: string; botId: string; name: string } | null> {
   const result = await getReadPool().query(
     `SELECT u.id AS user_id, s.tenant_id AS bot_id, u.name
      FROM subscriptions s
      JOIN users u ON u.id = s.user_id
      WHERE u.email = $1
-       AND s.status = 'pending_setup'
+       AND s.status IN ('pending_setup', 'active', 'onboarding')
        AND s.created_at > NOW() - INTERVAL '72 hours'
      ORDER BY s.created_at DESC
      LIMIT 1`,
