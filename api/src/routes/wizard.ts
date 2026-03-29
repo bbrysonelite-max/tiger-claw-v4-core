@@ -335,15 +335,23 @@ router.post("/validate-key", async (req: Request, res: Response) => {
         });
 
         // 2. Backward compatibility: Store the first key in the legacy bot_ai_config
+        // This is the table resolveAIProvider reads at runtime — failure here means
+        // the key will never resolve and the customer's bot silently uses platform quota.
         if (i === 0) {
-          await upsertBYOKConfig({
-            botId,
-            connectionType: "byok",
-            provider: k.provider,
-            model: k.model,
-            encryptedKey: encrypted,
-            keyPreview: preview,
-          });
+          try {
+            await upsertBYOKConfig({
+              botId,
+              connectionType: "byok",
+              provider: k.provider,
+              model: k.model,
+              encryptedKey: encrypted,
+              keyPreview: preview,
+            });
+          } catch (upsertErr: any) {
+            console.error(`[wizard] CRITICAL: upsertBYOKConfig failed for bot ${botId}:`, upsertErr.message);
+            results.push({ provider: k.provider, status: "error", error: "Failed to persist key — please try again." });
+            continue;
+          }
         }
 
         results.push({ provider: k.provider, status: "success" });
