@@ -15,11 +15,11 @@ export const INTERIOR_DESIGNER_FLAVOR: FlavorConfig = {
   ],
 
   scoutQueries: [
-    "going to college in the fall",
-    "freshman year dorm room",
-    "dorm decor ideas 2026",
-    "matching dorm with roommate",
-    "lofting my bed college"
+    "going to college in the fall dorm essentials reddit",
+    "freshman year dorm room layout help reddit",
+    "dorm decor ideas for small spaces 2026 reddit",
+    "matching dorm decor with roommate reddit",
+    "lofting my bed college dorm advice reddit"
   ],
 
   conversion: {

@@ -21,11 +21,11 @@ export const HEALTH_WELLNESS_FLAVOR: FlavorConfig = {
     "mental health"
   ],
   scoutQueries: [
-    "looking for health coach recommendations reddit",
-    "how to find a good wellness coach",
-    "anyone tried functional medicine for chronic issues",
-    "natural remedies for chronic pain reddit",
-    "holistic health coaching worth it",
+    "health coach recommendations for chronic issues reddit -gaming",
+    "how to find a good wellness coach for weight loss reddit",
+    "functional medicine for chronic autoimmune issues reddit",
+    "natural remedies for chronic pain relief advice reddit",
+    "holistic health coaching worth it for busy professionals reddit",
   ],
 
   conversion: {

@@ -11,11 +11,11 @@ export const PLUMBER_FLAVOR: FlavorConfig = {
   professionLabel: "Plumber / Trades Professional",
   defaultKeywords: ["plumber recommendation", "plumbing repair", "burst pipe", "water heater replacement", "drain clog", "plumbing estimate"],
   scoutQueries: [
-    "need a plumber recommendation reddit",
-    "how to find a trustworthy plumber",
-    "water heater repair or replace advice",
-    "plumbing emergency who to call",
-    "drain clog professional vs diy reddit",
+    "need a local plumber recommendation reddit -gaming",
+    "trustworthy plumber for home repair reddit",
+    "water heater repair or replace advice homeowners reddit",
+    "plumbing emergency who to call residential reddit",
+    "drain clog professional plumber vs diy advice reddit",
   ],
 
   conversion: {

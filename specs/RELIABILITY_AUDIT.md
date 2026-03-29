@@ -148,15 +148,15 @@ All five critical queues are correctly configured:
 
 ### Sprint 1 (Before Next Demo)
 
-1. **Add 'onboarding' to cron status filter** — `queue.ts:410-413` and `:485` — one-line fix, zero risk.
-2. **Fix Stripe Redis idempotency to fail closed** — `webhooks.ts:123` — prevents duplicate provisioning.
-3. **Add webhook validation in resumeTenant** — `provisioner.ts:355-359` — check `tgData.ok`, add secret.
-4. **Add [ALERT] to LINE webhook error handler** — `webhooks.ts:345` — log + admin alert.
+1. **Add 'onboarding' to cron status filter** — ✅ FIXED (PR #67)
+2. **Fix Stripe Redis idempotency to fail closed** — ✅ FIXED (PR #67)
+3. **Add webhook validation in resumeTenant** — ✅ FIXED (PR #67)
+4. **Add [ALERT] to LINE webhook error handler** — ✅ FIXED (PR #67)
 
 ### Sprint 2
 
 5. **ICP validation before phase=complete** — `tiger_onboard.ts` — prevents empty-profile completions.
-6. **setWebhook re-registration on activation** — `provisioner.ts + tiger_onboard.ts` — closes silent-deaf-bot risk.
+6. **setWebhook re-registration on activation** — ✅ FIXED (PR #67)
 7. **Replace status negation with allowlist** — `webhooks.ts:240` — defensive coding, no breaking change.
 
 ---

@@ -11,11 +11,11 @@ export const MORTGAGE_BROKER_FLAVOR: FlavorConfig = {
   professionLabel: "Mortgage Broker",
   defaultKeywords: ["first time home buyer", "mortgage pre-approval", "home loan", "refinance", "buying a house", "mortgage rates", "FHA loan", "down payment assistance"],
   scoutQueries: [
-    "first time home buyer questions reddit",
-    "how to get pre-approved for a mortgage",
-    "should I refinance my mortgage now",
-    "how much house can I afford",
-    "FHA loan requirements first time buyer",
+    "first time home buyer mortgage questions reddit -game",
+    "how to get pre-approved for a home loan reddit",
+    "should I refinance my mortgage now advice reddit",
+    "how much house can I afford budget reddit",
+    "FHA loan requirements for first time buyers reddit",
   ],
 
   conversion: {

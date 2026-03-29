@@ -20,11 +20,11 @@ export const REAL_ESTATE_FLAVOR: FlavorConfig = {
   ],
 
   scoutQueries: [
-    "relocating to a new city",
-    "tips for first time home buyers",
-    "how to sell my house fast",
-    "best neighborhoods in Austin",
-    "mortgage rate predictions 2026"
+    "relocating to a new city for work reddit",
+    "tips for first time home buyers budget reddit",
+    "how to sell my house fast recommendations reddit",
+    "best neighborhoods in Austin for families reddit",
+    "mortgage rate predictions for home buyers 2026 reddit"
   ],
 
   conversion: {
