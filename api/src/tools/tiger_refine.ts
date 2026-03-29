@@ -1,6 +1,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { ToolContext, ToolResult } from "./ToolContext.js";
 import { saveMarketFact } from "../services/market_intel.js";
+import { callGemini } from "../services/geminiGateway.js";
 
 // ---------------------------------------------------------------------------
 // Types for High-Value Data
@@ -100,7 +101,7 @@ Return a JSON array of facts. Each fact must have exactly these fields:
 
 Return an empty array [] if no meaningful facts are present. Do not invent facts not present in the content. Aim for 1-5 high-quality facts per piece of content.`;
 
-    const result = await model.generateContent(prompt);
+    const result = await callGemini(() => model.generateContent(prompt));
     const responseText = result.response.text();
 
     try {

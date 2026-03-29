@@ -567,7 +567,8 @@ export const cronWorker = SHOULD_RUN_WORKERS ? new Worker(
                         const { GoogleGenerativeAI } = await import('@google/generative-ai');
                         const genAI = new GoogleGenerativeAI(platformKey);
                         const healthModel = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
-                        await healthModel.generateContent('ping');
+                        const { callGemini } = await import('./geminiGateway.js');
+                        await callGemini(() => healthModel.generateContent('ping'));
                         console.log('[Cron] Platform key health check passed.');
                     }
                 } catch (keyErr: any) {

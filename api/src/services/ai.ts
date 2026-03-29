@@ -82,6 +82,11 @@ async function isGeminiCircuitTripped(tenantId: string): Promise<boolean> {
     return !!tripped;
 }
 
+// Phase 5 Task #15: Gemini rate limit hardening — semaphore + backoff
+// Implementation lives in geminiGateway.ts (no tool imports = no circular deps).
+// Re-exported here so existing callers that import from ai.ts keep working.
+export { callGemini } from './geminiGateway.js';
+
 // Phase 5 Task #14: Model Gemini unit economics
 async function trackAICalls(tenantId: string, provider: string, calls: number) {
     const today = new Date().toISOString().split('T')[0];
@@ -837,7 +842,7 @@ async function runToolLoop(
         }
 
         apiCalls++;
-        const nextResult = await chat.sendMessage(functionResponses);
+        const nextResult = await callGemini(() => chat.sendMessage(functionResponses));
         response = nextResult.response;
 
         const loopText = extractTextFromResponse(response);
@@ -930,7 +935,7 @@ export async function processTelegramMessage(
 
             const chat = model.startChat({ history });
             console.log(`[AI] Sending message to Gemini: "${effectiveText.slice(0, 80)}"`);
-            const initial = await chat.sendMessage(effectiveText);
+            const initial = await callGemini(() => chat.sendMessage(effectiveText));
             const initCandidates = (initial.response as any).candidates ?? [];
             const finishReason = initCandidates[0]?.finishReason ?? 'unknown';
             const promptBlocked = (initial.response as any).promptFeedback?.blockReason ?? null;
@@ -1040,7 +1045,7 @@ export async function processSystemRoutine(tenantId: string, routineType: string
             if (!model) return '';
             try {
                 const chat = model.startChat({ history: [] });
-                const initial = await chat.sendMessage(prompt);
+                const initial = await callGemini(() => chat.sendMessage(prompt));
                 // For tool-loop routines, run the loop
                 if (routineType === 'daily_scout' || routineType === 'nurture_check') {
                     const { apiCalls } = await runToolLoop(chat, initial.response, toolContext, `AI Routine:${routineType}`);
@@ -1252,7 +1257,7 @@ Use your exact personality. Be specific to what they said, not generic. Do NOT e
                 model: aiProvider.model,
                 systemInstruction: await buildSystemPrompt(tenant),
             });
-            const result = await model.generateContent(coachingPrompt);
+            const result = await callGemini(() => model.generateContent(coachingPrompt));
             coachingReply = result.response.text() ?? '';
         }
     } catch (err: any) {
@@ -1351,7 +1356,7 @@ export async function processLINEMessage(
         } else {
             try {
                 const chat = model!.startChat({ history });
-                const initial = await chat.sendMessage(text);
+                const initial = await callGemini(() => chat.sendMessage(text));
                 const { accumulatedText: geminiReply, finalResponse, apiCalls } = await runToolLoop(chat, initial.response, toolContext, 'AI');
                 const updatedHistory = await chat.getHistory();
                 await saveChatHistory(tenantId, chatId, updatedHistory);
@@ -1431,9 +1436,9 @@ Your job:
             model: 'gemini-2.0-flash',
             systemInstruction: systemPrompt,
         });
-        const result = await model.generateContent(
+        const result = await callGemini(() => model.generateContent(
             `Subject: ${subject}\n\nMessage:\n${body}`
-        );
+        ));
         const replyText = result.response.text?.() ?? '';
 
         if (replyText.trim()) {
