@@ -1,6 +1,6 @@
 # STATE OF THE TIGER — PATH FORWARD
 
-**Timestamp:** 2026-03-29 01:45 UTC (post-Phase 3 BYOB pivot session)
+**Timestamp:** 2026-03-29 16:00 UTC (post-fire-test session)
 **Status:** ACTIVE DIRECTIVES. All agents must comply.
 **Supersedes:** Any prior sprint plans or roadmaps not in the repo.
 
@@ -112,9 +112,30 @@ Max runs his own distribution network and wants a white-labeled Tiger Claw insta
 |---|------|-------|--------|-------|
 | 10 | Activate John & Noon (LINE) | BRENT | 🔄 In progress | Brent contacting 2026-03-29 |
 | 11 | Activate Toon (LINE) | BRENT | 🔄 In progress | Brent contacting 2026-03-29 |
-| 12 | Activate Debbie (Telegram BYOB) — acid test for BYOB wizard | BRENT | ⏳ Tomorrow | Debbie in Spain, asleep 2026-03-29 |
+| 12 | Activate Debbie (Telegram BYOB) | BRENT | ⏳ Pending | Debbie in Spain |
 
-**Fire test required before Debbie:** Full wizard flow using a pool token from `GET /admin/pool/tokens` → magic link → 4-step wizard → live bot.
+**🔥 FIRE TEST PASSED 2026-03-29.** Full flow: Stan Store purchase → Zapier webhook → `/auth/verify-purchase` → wizard → hatch → live Telegram bot. Bot responded to `/start` and began calibration at 07:25 AM.
+
+**Current blocker for Debbie activation:** Bot calibration (`tiger_onboard`) is too complex. User's exact words: *"The bot's having a really hard time with the onboarding. This onboarding needs to be more simple."* Simplify BEFORE activating additional paying customers.
+
+**Stan Store receipt links** should be updated in Zapier email template to: `https://wizard.tigerclaw.io?email={{email}}` — the wizard now pre-fills the email and auto-verifies. Zero manual steps for the customer.
+
+---
+
+### PHASE 4.5: CALIBRATION SIMPLIFICATION — 🔴 NEXT PRIORITY
+
+Must ship BEFORE activating any more paying customers. The current `tiger_onboard` tool asks 11+ questions across 5 phases, most of which are redundant with the wizard.
+
+| # | Task | Agent | Status | Notes |
+|---|------|-------|--------|-------|
+| 4.5a | Simplify `tiger_onboard` — reduce to 2-3 focused ICP questions | CLAUDE | ⬜ Next | Identity (name, product) already in wizard. Keys already in DB. Only ICP is new. |
+| 4.5b | Post-hatch wizard screen — show `@botusername` as a tappable Telegram link | CLAUDE | ⬜ Next | User had to hunt for their bot after hatch |
+| 4.5c | Update Zapier email template to use `?email={{email}}` on setup link | BRENT | ⬜ Next | One-line change in Zapier; auto-populates email in wizard |
+
+**Simplified calibration target:** Bot should ask at most:
+1. "Who is your ideal customer/recruit? Describe them in one sentence."
+2. "What problem are you solving for them?"
+3. Then name it and go live. Everything else can be learned from conversations.
 
 ---
 
@@ -124,8 +145,8 @@ Max runs his own distribution network and wants a white-labeled Tiger Claw insta
 |---|------|-------|--------|-----|-------|
 | 13 | Model-level circuit breaker (Gemini 429/5xx → OpenRouter fallover) | GEMINI | ⬜ Not started | — | Already partially exists in ai.ts — needs Gemini agent |
 | 14 | Gemini unit economics (API calls per message, cost per tenant/month) | GEMINI | ⬜ Not started | — | Instrumentation in place, needs analysis |
-| 15 | Gemini rate limit hardening — semaphore + exponential backoff | CLAUDE | ✅ Done | #71 | 2026-03-29 22:57 UTC — 396 tests |
-| 16 | Write activation playbook | BRENT + CLAUDE | ⬜ Next | — | First message → first hunt → first lead → first conversion |
+| 15 | Gemini rate limit hardening — semaphore + exponential backoff | CLAUDE | ✅ Done | #71 | 2026-03-29 — 395 tests |
+| 16 | Write activation playbook | BRENT + CLAUDE | ⬜ After 4.5 | — | First message → first hunt → first lead → first conversion |
 
 ---
 
@@ -147,13 +168,13 @@ Max runs his own distribution network and wants a white-labeled Tiger Claw insta
 ## AGENT ASSIGNMENT SUMMARY
 
 ### Claude (Terminal) — Application Code & Architecture
-Primary tasks: #15 ✅, #16, #20, #21, #22, #23, #24
+Primary tasks: #4.5a ⬜ (NEXT), #4.5b ⬜, #15 ✅, #16, #20, #21, #22, #23, #24
 
 ### Gemini (Terminal) — Infrastructure & GCP
 Primary tasks: #6, #13, #14, #18
 
 ### Brent — Strategy, Humans & Activation
-Primary tasks: #10 🔄, #11 🔄, #12 ⏳, #16, #17, #19, #24
+Primary tasks: #4.5c ⬜ (Zapier email template), #10 🔄, #11 🔄, #12 ⏳, #16, #17, #19, #24
 
 ---
 
@@ -184,4 +205,4 @@ Do not trust base-model memory. Trust the repo.
 
 ---
 
-*Last updated: 2026-03-29 23:00 UTC. Phases 1–3 complete. Phase 4 activation in progress (John/Noon/Toon/Brent contacting; Debbie tomorrow). Phase 5 #15 done (PR #71 pending merge). 396 tests passing. Proceed.*
+*Last updated: 2026-03-29 16:00 UTC. Phases 1–3 complete. FIRE TEST PASSED. Phase 4.5 (calibration simplification) is the next code task. Phase 4 activation blocked on 4.5a (tiger_onboard simplification). PRs #79–#87 merged. 395 tests passing. Proceed.*

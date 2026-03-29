@@ -1,6 +1,6 @@
 # Tiger Claw V4 — Core Architecture
 
-**Last updated:** 2026-03-24
+**Last updated:** 2026-03-29
 **Status:** LIVE. Locked. Do not rewrite.
 
 ---
@@ -19,14 +19,14 @@ The entire platform operates as a shared-nothing Node.js Google Cloud Run API (`
 |---|---|---|
 | Compute | Google Cloud Run | Node.js/Express, port 4000 |
 | Database | Google Cloud SQL (PostgreSQL HA) | `tiger_claw_shared` |
-| Cache & Queues | Google Cloud Redis HA + BullMQ | 5 queues |
-| AI Provider | Google Gemini 2.0 Flash | `@google/generative-ai` SDK — LOCKED |
-| Frontend (wizard) | Next.js on Vercel | `wizard.tigerclaw.io` — `web-onboarding/` subdirectory |
+| Cache & Queues | Google Cloud Redis HA + BullMQ | 8 queues |
+| AI Provider | Google Gemini 2.0 Flash | `@google/generative-ai` SDK — LOCKED. gemini-2.5-flash has a GCP function-calling bug. |
+| Frontend (wizard) | Next.js on **Vercel** | `wizard.tigerclaw.io` — `web-onboarding/` subdirectory. NOT Cloud Run. Deploy via `npx vercel --prod`. |
 | Frontend (website) | Static HTML on Vercel | `tigerclaw.io` — `tiger-bot-website` repo |
-| Payments | Stan Store + Stripe | Stan Store gates access; Stripe handles subscriptions |
+| Payments | Stan Store | Stan Store webhook → Zapier → `POST /webhooks/stan-store`. `X-Zapier-Secret` header required. |
 | Email | Resend | Provisioning receipts, notifications |
 | GCP Project | `hybrid-matrix-472500-k5` | |
-| Cloud Run Service | `tiger-claw-api` | Region: `us-central1` |
+| Cloud Run Services | `tiger-claw-api` | Multi-region: `us-central1` (primary) + `asia-southeast1`. Global HTTPS LB at `34.54.146.69`. |
 
 ---
 

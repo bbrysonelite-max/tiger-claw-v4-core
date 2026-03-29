@@ -7,14 +7,14 @@ Stop what you are doing. Read this entire document and `CLAUDE.md`. These are yo
 
 ## 1. The Current State of the Universe
 
-**Tiger Claw is LIVE and fully deployed. CI is green. PRs #62–#68 merged. Phase 3 BYOB pivot COMPLETE.**
+**Tiger Claw is LIVE. CI is green. PRs #79–#87 merged. Fire test PASSED 2026-03-29. Phase 3 BYOB pivot COMPLETE.**
 - **API:** `https://api.tigerclaw.io` — Cloud Run `tiger-claw-api`, multi-region (us-central1 + asia-southeast1)
 - **Load Balancer:** Global HTTPS LB at `34.54.146.69` — both regions behind Anycast IP
 - **Architecture:** V4 Stateless Serverless — one API process, all tenants, context resolved per-request
 - **Database:** PostgreSQL HA via Cloud SQL Proxy (`tiger_claw_shared`)
 - **Cache/Queue:** Redis HA + BullMQ (8 queues)
 - **AI Engine:** Gemini 2.0 Flash (LOCKED — `gemini-2.5-flash` has a GCP function-calling bug, do not use it)
-- **Tests:** 396 passing
+- **Tests:** 395 passing (2 added, 2 updated for onboard gate)
 - **Flavors:** 15 customer-facing industry flavors, all with full field set including scoutQueries
 - **Min-instances:** 1 — no cold start
 - **Data Refinery:** v5 pipeline FULLY AUTONOMOUS — fires nightly at 2 AM UTC via BullMQ. First run: 313 facts saved across 14 flavors.
@@ -69,6 +69,14 @@ Stop what you are doing. Read this entire document and `CLAUDE.md`. These are yo
 32. **Admin Pool Utilities** — `GET /admin/pool/tokens?limit=N` (decrypted tokens for wizard use), `POST /admin/pool/retire-batch` (bulk retire). PR #68.
 33. **Website Content Audit Fixed** — All CTAs route through `tigerclaw.io/#pricing`. AI provider list corrected everywhere (Google Gemini, OpenAI, Grok, OpenRouter, Kimi — Anthropic removed). `tiger-bot-website` pushed directly to main and live. PRs #69, #70.
 34. **Gemini Rate Limit Hardening** — `geminiGateway.ts`: process-level semaphore (default 10 concurrent, tunable via `GEMINI_CONCURRENCY` env var) + exponential backoff on 429s (up to 3 retries, ~1s/2s/4s + jitter). All 10 Gemini call sites hardened. PR #71.
+35. **Purchase-Based Wizard Auth** — Replaced magic link with `POST /auth/verify-purchase`. Email → subscription lookup → HMAC session token → wizard. PR #79.
+36. **Wizard Hatch by BotId + JSON Errors** — `hatch` uses `getTenant(botId)`. 404s are JSON. Auth shim for wizard/auth route. PR #80.
+37. **Validate-Key Self-Heal** — `botId` optional in schema; healed from session token. `details` always an array. PR #81.
+38. **Stale Wizard State Clear** — `tiger_wizard_state` cleared on fresh verify-purchase so old botId never shadows. PR #82.
+39. **Subscriptions FK Fix** — Migration 020: every subscription insert was silently failing since migration 002 (FK pointed to bots, not tenants). Fixed 2026-03-29. PR #83.
+40. **verify-purchase Status Filter Widened** — Accepts `pending_setup`/`active`/`onboarding` within 72h. Queue auto-activation no longer locks customers out. PR #84.
+41. **Email Pre-Fill from URL** — `wizard.tigerclaw.io?email=customer@example.com` pre-fills and auto-fires verify-purchase. Stan Store receipt links should use `?email={{email}}`. PR #85.
+42. **nurture_check Gated on Onboarding** — AI routines skip tenants still in `tiger_onboard` calibration. Prevents background AI from trampling calibration and burning API quota. PR #86, #87.
 
 ---
 
@@ -271,11 +279,16 @@ See `STATE_OF_THE_TIGER_PATH_FORWARD.md` for full task list.
 
 | Priority | Issue | Status |
 |---|---|---|
-| 🔴 CRITICAL | `MAGIC_LINK_SECRET` not confirmed mounted in Cloud Run | UNVERIFIED — Brent's lane |
-| 🔴 HIGH | Full fire test (Stan Store → wizard → live BYOB bot) not done | NOT DONE — use `/admin/pool/tokens` + magic link |
+| ✅ RESOLVED | Full fire test (Stan Store → wizard → live bot) | PASSED 2026-03-29 |
+| ✅ RESOLVED | Subscriptions FK constraint broken since migration 002 | Fixed migration 020, PR #83 |
+| 🔴 HIGH | Bot calibration (tiger_onboard) is too complex — user feedback | OPEN — needs simplification |
+| 🔴 HIGH | Post-hatch UX doesn't clearly direct user to their Telegram bot | OPEN — wizard completion screen needs a direct link |
+| 🟡 MED | Zapier sends `test@tigerclaw.io` test data — real purchase emails may not flow | Check Zapier field mapping: should send real customer email |
+| 🟡 MED | Stan Store receipt email link doesn't use `?email=` yet | Zapier/Stan Store email template needs `?email={{email}}` on the setup link |
 | 🟡 MED | Welcome email says "bot in 60 seconds" — false for BYOB wizard flow | NOT FIXED |
 | 🟡 MED | `DATABASE_READ_URL` pinned to secret version 8 (should be latest) | NOT FIXED |
 | 🟡 LOW | Reddit scout returns 0 results (403 without OAuth) | NOT FIXED — needs TigerClaw-branded Reddit app |
+| 🟡 LOW | Duplicate tenant/subscription records for bbryson@me.com from multiple failed provisions | Clean up when convenient |
 
 ---
 
@@ -299,4 +312,4 @@ Full report: `specs/RELIABILITY_AUDIT.md`
 
 ---
 
-*Last updated: 2026-03-29 (Phase 3 BYOB pivot SHIPPED — PR #68 merged. Phase 4 activation in progress. Phase 5 #15 done — PR #71 pending merge. 396 tests passing.)*
+*Last updated: 2026-03-29 (PRs #79–#87 merged. FIRE TEST PASSED. First bot live in Telegram. nurture_check blocks onboarding fix live. Bot calibration simplification is next priority.)*
