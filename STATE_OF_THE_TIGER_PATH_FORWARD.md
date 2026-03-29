@@ -1,6 +1,6 @@
 # STATE OF THE TIGER — PATH FORWARD
 
-**Timestamp:** 2026-03-28 (post-strategic evaluation session)
+**Timestamp:** 2026-03-29 (post-reliability-hardening session)
 **Status:** ACTIVE DIRECTIVES. All agents must comply.
 **Supersedes:** Any prior sprint plans or roadmaps not in the repo.
 
@@ -10,7 +10,7 @@
 
 Read this file AFTER reading START_HERE.md, STATE_OF_TIGER_CLAW.md, and CLAUDE.md.
 
-This document contains the strategic decisions and priority execution list resulting from the 2026-03-28 planning session. These are not suggestions. These are directives. If a directive in this file conflicts with an assumption from a prior session, this file wins.
+This document contains the strategic decisions and priority execution list resulting from the 2026-03-28 planning session and subsequent work. These are not suggestions. These are directives. If a directive in this file conflicts with an assumption from a prior session, this file wins.
 
 ---
 
@@ -36,10 +36,6 @@ The Telegram bot pool is **permanently removed from the provisioning path.** No 
 
 The ~65 tokens currently in the pool are repurposed for Brent's personal agent fleet (Nu Skin rebuild, prospecting agents, internal tooling). They are NOT deleted. `pool.ts` continues to exist for token storage and encryption but is no longer called by the provisioning flow.
 
-### Migration of Founding Members
-
-All current tenants (debbie-cameron, john-thailand, chana-loha, phaitoon) are being migrated to BYOB personally by Brent this weekend. None have an established relationship with their pool-assigned bot (INC-001 means they never received a single message). John and Toon prefer LINE (already BYOB). Debbie will be walked through BotFather.
-
 ---
 
 ## CRITICAL CONTEXT: DEMAND LANDSCAPE
@@ -48,64 +44,50 @@ All current tenants (debbie-cameron, john-thailand, chana-loha, phaitoon) are be
 
 John and Noon have direct influence over 21,000+ active distributors across Bangkok (8,000+), Vietnam (6,000), and Malaysia (7,000). If John endorses Tiger Claw, hundreds of people will want agents simultaneously. This is not linear SaaS growth — it is a distribution-network launch. The platform must be ready to handle wave demand.
 
-### Ring 2 — Max Steingard White Label
+### Ring 2 — Nu Skin Corporate (Craig Bryson)
 
-Max Steingard wants to white-label Tiger Claw for the entire network marketing vertical. This requires a web chat interface and org-level multi-tenancy (design now, build Sprint 3).
+Craig Bryson is Brent's contact at Nu Skin corporate. Nu Skin has 2.9M+ independent distributors globally. A corporate deal here means potential for thousands of enterprise tenants. This requires white-label BYOB (agents look like Nu Skin products, not Tiger Claw). Phase 5.
 
-### Ring 3 — Nu Skin Corporate (via Craig Bryson)
+### Ring 3 — Max Steingard's White-Label Interest
 
-Craig Bryson is the lead Nu Skin distributor with a direct company relationship. Nu Skin is exploring AI training. A company-wide deal is possible. This would require enterprise-grade data isolation and compliance (Sprint 4+).
-
-### Supply Constraint Strategy
-
-Controlled release: 50 seats, hard cap, observation period, then 50 more. No exceptions. Quality over speed.
+Max runs his own distribution network and wants a white-labeled Tiger Claw instance. BYOB is the prerequisite.
 
 ---
 
-## KNOWN RISKS
+## PRIORITY EXECUTION LIST
 
-### Gemini Multiplier Problem (CRITICAL)
+### PHASE 1: FOUNDATION (Complete ✅)
 
-A single user message triggers `runToolLoop()` which generates 5-12 Gemini API calls through the function-calling chain. 50 concurrent users = 250-600 API calls in a burst window. The 4-layer key fallback does NOT protect against a platform-wide Gemini rate limit hit. A model-level circuit breaker and rate limit hardening are required before the 50-seat release.
+| # | Task | Status |
+|---|------|--------|
+| 1 | GCP Secret Manager audit — verify all secrets mounted | ✅ Done |
+| 2 | Wizard auth end-to-end test | ✅ Done (PR #62) |
+| 3 | Founding member activation | ✅ Done (4 live tenants) |
 
-### Unit Economics Unknown
+### PHASE 2: RELIABILITY + INTELLIGENCE (Complete ✅)
 
-Per-tenant AI cost has not been modeled. Must instrument the tool loop and calculate cost per tenant per month before scaling.
+| # | Task | Status |
+|---|------|--------|
+| 4 | **Conversation counter — admin dashboard.** Total messages 24h, per-tenant breakdown, last message timestamp. | ✅ Done (PR #66) |
+| 5 | **Reliability audit — application layer.** Catch blocks, status filtering, ICP validation, queue retry, webhook registration. | ✅ Done (specs/RELIABILITY_AUDIT.md) |
+| 6 | **Reliability audit — infrastructure layer.** Redis AOF, maxmemory, Cloud Run scaling, Gemini quota. | GEMINI task |
+| 7 | **Fix feedback loop P1.** `processSystemRoutine()` handles `weekly_checkin`, `feedback_reminder`, `feedback_pause` for both Telegram and LINE tenants. | ✅ Done (PR #66) |
 
-### Silent Failure Pattern
+**Phase 2 reliability hardening (all audit CRITICAL + HIGH + MED findings):**
 
-INC-001 through INC-004 were all silent failures. The platform must scream when something breaks, not swallow errors. Every `catch` block in the message path must log with `[ALERT]` severity and notify the admin channel when the error affects a tenant's message delivery.
-
----
-
-## MASTER PRIORITY LIST
-
-**Attack in order. Do not skip ahead. Each phase gates the next.**
-
----
-
-### PHASE 1: VERIFY BEFORE CALLING ANYONE
-
-*Goal: Confirm LINE and Telegram actually work post-INC-001.*
-
-| # | Task | Agent | Effort |
-|---|------|-------|--------|
-| 1 | **Verify LINE end-to-end message flow.** Query DB for john-thailand's LINE credentials. Check Cloud Run logs for LINE webhook activity. Confirm INC-001 fix covers LINE handler. Report: LINE works yes/no. | GEMINI | 30 min |
-| 2 | **Verify Telegram end-to-end message flow.** Send test message to a pool-assigned bot. Check Cloud Run logs. Confirm INC-001 fix is deployed. Report: Telegram works yes/no. | GEMINI | 30 min |
-| 3 | **Verify MAGIC_LINK_SECRET in GCP Secret Manager.** `gcloud secrets describe tiger-claw-magic-link-secret --project hybrid-matrix-472500-k5`. If missing, create it. | GEMINI | 5 min |
-| 4 | **Add conversation counter to admin dashboard.** Total messages processed in last 24 hours. Messages per tenant. Last message timestamp per tenant. Data from chat_history Redis keys or a counter in the message pipeline. This is the heartbeat metric. | CLAUDE | 2-3 hours |
-
----
-
-### PHASE 2: RELIABILITY HARDENING (Parallel Tracks)
-
-*Claude handles application layer. Gemini handles infrastructure layer. Run simultaneously.*
-
-| # | Task | Agent | Effort |
-|---|------|-------|--------|
-| 5 | **Reliability audit — application layer.** Audit every `catch` block in message path for swallowed errors. Verify tenant status matching uses full set (`active`, `live`, `onboarding`) in ALL queries. Verify onboarding field validation (idealPerson required before phase = complete). Verify queue failure/retry behavior. Verify setWebhook fires on status change to active. Produce report. | CLAUDE | 1-2 days |
-| 6 | **Reliability audit — infrastructure layer.** Verify Redis AOF persistence on Cloud Memorystore. Verify maxmemory policy. Verify BullMQ retry/backoff for all 8 queues. Verify Cloud Run concurrency and auto-scaling. Verify min-instances = 1. Check Gemini API quota. Verify both regions healthy. Produce report. | GEMINI | 1 day |
-| 7 | **Fix feedback loop P1.** `processSystemRoutine()` must handle `weekly_checkin`, `feedback_reminder`, `feedback_pause`. Write handlers, add tests, open PR. | CLAUDE | 30 min - 1 hour |
+| Finding | Severity | PR | Status |
+|---|---|---|---|
+| Stripe Redis idempotency fails open | CRITICAL | #67 | ✅ |
+| LINE webhook error swallowed | HIGH | #67 | ✅ |
+| Cron/value-gap exclude 'onboarding' | CRITICAL | #67 | ✅ |
+| setWebhook gap on activation | CRITICAL | #67 | ✅ |
+| resumeTenant webhook validation + secret | HIGH | #67 | ✅ |
+| ICP validation before phase=complete | CRITICAL | #67 | ✅ |
+| ICP confirmation empty profile guard | HIGH | #67 | ✅ |
+| Telegram enqueue failure not alerted | HIGH | #67 | ✅ |
+| Email webhook unknown sender processed | HIGH | #67 | ✅ |
+| Status negation → explicit allowlist | MED | #67 | ✅ |
+| SOUL.md with — placeholders | MED | #67 | ✅ (blocked by ICP guard) |
 
 ---
 
@@ -158,13 +140,13 @@ INC-001 through INC-004 were all silent failures. The platform must scream when 
 
 ### Claude (Terminal) — Application Code & Architecture
 
-Primary tasks: #4, #5, #7, #8, #9, #15, #16, #20, #21, #22, #23, #24
+Primary tasks: #8, #9, #15, #16, #20, #21, #22, #23, #24
 
 Claude handles all TypeScript code changes, Next.js wizard work, new feature implementation, test writing, reliability fixes in application code, and architecture design.
 
 ### Gemini (Terminal) — Infrastructure & GCP
 
-Primary tasks: #1, #2, #3, #6, #13, #14, #18
+Primary tasks: #6, #13, #14, #18
 
 Gemini handles all GCP verification (Secret Manager, Cloud Run, Redis, Memorystore), infrastructure reliability auditing, Gemini API-specific work (circuit breaker, unit economics), and evaluation of its own extraction output in the mine.
 
@@ -203,4 +185,4 @@ Do not trust base-model memory. Trust the repo.
 
 ---
 
-*Last updated: 2026-03-28. These are active directives. The BYOB pivot is non-negotiable. The priority list is attack-in-order. Locked. Proceed.*
+*Last updated: 2026-03-29. Phase 2 complete. Phase 3 (BYOB pivot) is next. PRs #66 + #67 pending review. Proceed.*
