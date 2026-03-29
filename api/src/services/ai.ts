@@ -46,6 +46,61 @@ const MAX_TOOL_CALLS = 10;
 // Each turn = 2 entries (user + model). 20 turns = 40 entries.
 const MAX_HISTORY_TURNS = 20;
 
+// Phase 5 Task #13: Model-level circuit breaker for Gemini
+const GEMINI_CIRCUIT_LIMIT = 3;
+const GEMINI_CIRCUIT_TTL = 3600; // 1 hour trip duration
+
+// ─── Circuit Breaker ──────────────────────────────────────────────────────────
+
+async function trackGeminiError(tenantId: string, err: any) {
+    const errorType = classifyAIError(err);
+    if (errorType !== 'rate' && errorType !== 'server') return;
+
+    const errorCountKey = `circuit_breaker:gemini:errors:${tenantId}`;
+    const tripKey = `circuit_breaker:gemini:tripped:${tenantId}`;
+
+    const count = await redis.incr(errorCountKey);
+    await redis.expire(errorCountKey, 3600); // Reset error window after 1 hour
+
+    if (count >= GEMINI_CIRCUIT_LIMIT) {
+        console.error(`[AI] [CIRCUIT BREAKER] Tripping Gemini circuit for tenant ${tenantId} after ${count} consecutive errors.`);
+        await redis.set(tripKey, '1', 'EX', GEMINI_CIRCUIT_TTL);
+        await redis.del(errorCountKey);
+        
+        // Notify admin
+        const { sendAdminAlert } = await import('./db.js');
+        await sendAdminAlert(`🚨 Gemini Circuit Tripped for tenant ${tenantId}\nFailover to OpenRouter activated for 1 hour.`);
+    }
+}
+
+async function trackGeminiSuccess(tenantId: string) {
+    await redis.del(`circuit_breaker:gemini:errors:${tenantId}`);
+}
+
+async function isGeminiCircuitTripped(tenantId: string): Promise<boolean> {
+    const tripped = await redis.get(`circuit_breaker:gemini:tripped:${tenantId}`);
+    return !!tripped;
+}
+
+// Phase 5 Task #14: Model Gemini unit economics
+async function trackAICalls(tenantId: string, provider: string, calls: number) {
+    const today = new Date().toISOString().split('T')[0];
+    const tenantKey = `ai_metrics:calls:tenant:${tenantId}:${today}`;
+    const platformKey = `ai_metrics:calls:platform:${provider}:${today}`;
+
+    try {
+        await redis.hincrby(tenantKey, provider, calls);
+        await redis.expire(tenantKey, 86400 * 30); // Keep for 30 days
+
+        await redis.incrby(platformKey, calls);
+        await redis.expire(platformKey, 86400 * 30);
+
+        console.log(`[AI Metrics] Tracked ${calls} calls for tenant ${tenantId} (${provider})`);
+    } catch (err: any) {
+        console.error(`[AI Metrics] Failed to track calls:`, err.message);
+    }
+}
+
 // ─── Tool registry ───────────────────────────────────────────────────────────
 const toolsMap = {
     tiger_onboard,
@@ -260,6 +315,8 @@ function defaultModel(provider: 'google' | 'openai'): string {
  *   3. Platform fallback (Google)
  */
 export async function resolveAIProvider(tenantId: string): Promise<AIProvider | undefined> {
+    const circuitTripped = await isGeminiCircuitTripped(tenantId);
+
     // Step 1 — key_state.json (Primary = layer2Key, Backup = layer3Key)
     try {
         const state = await getBotState<any>(tenantId, 'key_state.json');
@@ -278,7 +335,10 @@ export async function resolveAIProvider(tenantId: string): Promise<AIProvider | 
             }
             if (rawKey) {
                 const provider = detectProvider(rawKey) ?? 'google';
-                return { key: rawKey, provider, model: state.layer2Model ?? defaultModel(provider) };
+                if (!circuitTripped || provider !== 'google') {
+                    return { key: rawKey, provider, model: state.layer2Model ?? defaultModel(provider) };
+                }
+                console.log(`[AI] Gemini circuit tripped for ${tenantId}. Skipping Gemini in key_state.`);
             }
         }
     } catch (err: any) {
@@ -288,21 +348,30 @@ export async function resolveAIProvider(tenantId: string): Promise<AIProvider | 
     // Step 2 — bot_ai_config DB (BYOK, any provider)
     try {
         const pool = getPool();
-        const res = await pool.query(
-            `SELECT provider, model, encrypted_key FROM bot_ai_config WHERE tenant_id = $1`,
-            [tenantId],
-        );
+        // If circuit is tripped, prefer openrouter
+        const query = circuitTripped
+            ? `SELECT provider, model, encrypted_key FROM bot_ai_config WHERE tenant_id = $1 ORDER BY (provider = 'openrouter') DESC`
+            : `SELECT provider, model, encrypted_key FROM bot_ai_config WHERE tenant_id = $1`;
+
+        const res = await pool.query(query, [tenantId]);
         if (res.rows.length > 0) {
-            const { provider, model, encrypted_key } = res.rows[0];
-            if (encrypted_key) {
-                const key = decryptToken(encrypted_key);
-                // OpenAI-compatible providers (kimi, grok, openrouter) — route through OpenAI SDK
-                const compat = OPENAI_COMPAT[provider as string];
-                if (compat) {
-                    return { key, provider: 'openai', model: model ?? compat.defaultModel, baseURL: compat.baseURL };
+            for (const row of res.rows) {
+                const { provider, model, encrypted_key } = row;
+                if (encrypted_key) {
+                    const key = decryptToken(encrypted_key);
+                    const resolvedProvider = (provider as 'google' | 'openai') ?? detectProvider(key) ?? 'google';
+
+                    if (circuitTripped && resolvedProvider === 'google') {
+                        continue; // Skip Gemini if tripped
+                    }
+
+                    // OpenAI-compatible providers (kimi, grok, openrouter) — route through OpenAI SDK
+                    const compat = OPENAI_COMPAT[provider as string];
+                    if (compat) {
+                        return { key, provider: 'openai', model: model ?? compat.defaultModel, baseURL: compat.baseURL };
+                    }
+                    return { key, provider: resolvedProvider, model: model ?? defaultModel(resolvedProvider) };
                 }
-                const resolvedProvider = (provider as 'google' | 'openai') ?? detectProvider(key) ?? 'google';
-                return { key, provider: resolvedProvider, model: model ?? defaultModel(resolvedProvider) };
             }
         }
     } catch (err: any) {
@@ -310,6 +379,9 @@ export async function resolveAIProvider(tenantId: string): Promise<AIProvider | 
     }
 
     // Step 3 — Platform fallback key
+    if (circuitTripped) {
+        console.warn(`[AI] Gemini circuit tripped for ${tenantId} and no secondary provider found. Falling back to platform default (Gemini) but it will likely fail.`);
+    }
     const fallbackKey = process.env.PLATFORM_ONBOARDING_KEY ?? process.env.GOOGLE_API_KEY;
     if (fallbackKey) return { key: fallbackKey, provider: 'google', model: 'gemini-2.0-flash' };
 
@@ -353,7 +425,7 @@ async function runToolLoopOpenAI(
     history: OpenAI.ChatCompletionMessageParam[],
     toolContext: any,
     logPrefix: string,
-): Promise<{ reply: string; updatedHistory: OpenAI.ChatCompletionMessageParam[] }> {
+): Promise<{ reply: string; updatedHistory: OpenAI.ChatCompletionMessageParam[]; apiCalls: number }> {
     const messages: OpenAI.ChatCompletionMessageParam[] = [
         { role: 'system', content: systemPrompt },
         ...history,
@@ -361,10 +433,12 @@ async function runToolLoopOpenAI(
     ];
 
     let iterations = 0;
+    let apiCalls = 0;
     const MAX_ITERATIONS = 10;
 
     while (iterations < MAX_ITERATIONS) {
         iterations++;
+        apiCalls++;
         const response = await openai.chat.completions.create({
             model,
             messages,
@@ -378,7 +452,7 @@ async function runToolLoopOpenAI(
         if (!msg.tool_calls || msg.tool_calls.length === 0) {
             // No more tool calls — final text response
             const updatedHistory = messages.slice(1); // drop system prompt
-            return { reply: msg.content ?? '', updatedHistory };
+            return { reply: msg.content ?? '', updatedHistory, apiCalls };
         }
 
         // Execute each tool call
@@ -699,9 +773,10 @@ async function runToolLoop(
     initialResponse: any,
     toolContext: any,
     logPrefix: string,
-): Promise<{ accumulatedText: string; finalResponse: any }> {
+): Promise<{ accumulatedText: string; finalResponse: any; apiCalls: number }> {
     let response = initialResponse;
     let toolCallCount = 0;
+    let apiCalls = 1; // initial sendMessage call
     let accumulatedText = '';
 
     const initialText = extractTextFromResponse(response);
@@ -761,6 +836,7 @@ async function runToolLoop(
             } as any);
         }
 
+        apiCalls++;
         const nextResult = await chat.sendMessage(functionResponses);
         response = nextResult.response;
 
@@ -768,7 +844,7 @@ async function runToolLoop(
         if (loopText) accumulatedText += loopText + '\n';
     }
 
-    return { accumulatedText: accumulatedText.trim(), finalResponse: response };
+    return { accumulatedText: accumulatedText.trim(), finalResponse: response, apiCalls };
 }
 
 // ─── Exported for testing ─────────────────────────────────────────────────────
@@ -824,47 +900,61 @@ export async function processTelegramMessage(
             const openai = new OpenAI({ apiKey: aiProvider.key, ...(aiProvider.baseURL ? { baseURL: aiProvider.baseURL } : {}) });
             const history = await getOpenAIChatHistory(tenantId, chatId);
             const systemPrompt = await buildSystemPrompt(tenant);
-            const { reply, updatedHistory } = await runToolLoopOpenAI(
+            const { reply, updatedHistory, apiCalls } = await runToolLoopOpenAI(
                 openai, aiProvider.model, systemPrompt, effectiveText, history, toolContext, 'AI',
             );
             await saveOpenAIChatHistory(tenantId, chatId, updatedHistory);
-            if (reply.trim()) await bot.sendMessage(chatId, reply);
-            else console.warn(`[AI] [ALERT] OpenAI returned empty reply for tenant ${tenantId}`);
+            await trackAICalls(tenantId, aiProvider.baseURL ? 'openrouter' : 'openai', apiCalls);
+            
+            if (reply.trim()) {
+                await bot.sendMessage(chatId, reply);
+                // Success resets the Gemini error counter (circuit state has its own TTL)
+                await trackGeminiSuccess(tenantId);
+            } else {
+                console.warn(`[AI] [ALERT] OpenAI returned empty reply for tenant ${tenantId}`);
+            }
             return;
         }
 
         // ── Gemini path ────────────────────────────────────────────────────────
-        const history = await getChatHistory(tenantId, chatId);
-        console.log(`[AI] History loaded: ${history.length} entries`);
+        try {
+            const history = await getChatHistory(tenantId, chatId);
+            console.log(`[AI] History loaded: ${history.length} entries`);
 
-        const genAI = new GoogleGenerativeAI(aiProvider.key);
-        const model = genAI.getGenerativeModel({
-            model: aiProvider.model,
-            systemInstruction: await buildSystemPrompt(tenant),
-            tools: geminiTools as any,
-        });
+            const genAI = new GoogleGenerativeAI(aiProvider.key);
+            const model = genAI.getGenerativeModel({
+                model: aiProvider.model,
+                systemInstruction: await buildSystemPrompt(tenant),
+                tools: geminiTools as any,
+            });
 
-        const chat = model.startChat({ history });
-        console.log(`[AI] Sending message to Gemini: "${effectiveText.slice(0, 80)}"`);
-        const initial = await chat.sendMessage(effectiveText);
-        const initCandidates = (initial.response as any).candidates ?? [];
-        const finishReason = initCandidates[0]?.finishReason ?? 'unknown';
-        const promptBlocked = (initial.response as any).promptFeedback?.blockReason ?? null;
-        const rawParts = initCandidates[0]?.content?.parts ?? [];
-        console.log(`[AI] Gemini initial response: finishReason=${finishReason}, promptBlocked=${promptBlocked}, text=${!!initial.response.text?.()}, toolCalls=${(initial.response.functionCalls?.() ?? []).length}, rawParts=${JSON.stringify(rawParts).slice(0, 300)}`);
-        const { accumulatedText: replyText, finalResponse } = await runToolLoop(chat, initial.response, toolContext, 'AI');
+            const chat = model.startChat({ history });
+            console.log(`[AI] Sending message to Gemini: "${effectiveText.slice(0, 80)}"`);
+            const initial = await chat.sendMessage(effectiveText);
+            const initCandidates = (initial.response as any).candidates ?? [];
+            const finishReason = initCandidates[0]?.finishReason ?? 'unknown';
+            const promptBlocked = (initial.response as any).promptFeedback?.blockReason ?? null;
+            const rawParts = initCandidates[0]?.content?.parts ?? [];
+            console.log(`[AI] Gemini initial response: finishReason=${finishReason}, promptBlocked=${promptBlocked}, text=${!!initial.response.text?.()}, toolCalls=${(initial.response.functionCalls?.() ?? []).length}, rawParts=${JSON.stringify(rawParts).slice(0, 300)}`);
+            const { accumulatedText: replyText, finalResponse, apiCalls } = await runToolLoop(chat, initial.response, toolContext, 'AI');
 
-        const updatedHistory = await chat.getHistory();
-        await saveChatHistory(tenantId, chatId, updatedHistory);
-        console.log(`[AI] History saved: ${updatedHistory.length} entries`);
+            const updatedHistory = await chat.getHistory();
+            await saveChatHistory(tenantId, chatId, updatedHistory);
+            console.log(`[AI] History saved: ${updatedHistory.length} entries`);
+            await trackAICalls(tenantId, 'google', apiCalls);
 
-
-        console.log(`[AI] Reply text length: ${replyText.trim().length}. Sending to Telegram.`);
-        if (replyText.trim().length > 0) {
-            await bot.sendMessage(chatId, replyText);
-            console.log(`[AI] Message sent to chat ${chatId}`);
-        } else {
-            console.warn(`[AI] [ALERT] Gemini returned empty reply for tenant ${tenantId} chat ${chatId}`);
+            console.log(`[AI] Reply text length: ${replyText.trim().length}. Sending to Telegram.`);
+            if (replyText.trim().length > 0) {
+                await bot.sendMessage(chatId, replyText);
+                console.log(`[AI] Message sent to chat ${chatId}`);
+                await trackGeminiSuccess(tenantId);
+            } else {
+                console.warn(`[AI] [ALERT] Gemini returned empty reply for tenant ${tenantId} chat ${chatId}`);
+            }
+        } catch (geminiErr: any) {
+            console.error(`[AI] [ALERT] Gemini path failed for tenant ${tenantId}:`, geminiErr.message);
+            await trackGeminiError(tenantId, geminiErr);
+            throw geminiErr; // Rethrow to outer catch for user notification
         }
     } catch (err: any) {
         console.error(`[AI] [ALERT] processTelegramMessage failed for tenant ${tenantId}:`, err.message);
@@ -884,10 +974,11 @@ export async function processTelegramMessage(
  * Classifies an AI API error into a user-facing category.
  * Used to send differentiated, actionable error messages instead of a generic "something went wrong".
  */
-function classifyAIError(err: any): 'key' | 'rate' | 'network' | 'general' {
+function classifyAIError(err: any): 'key' | 'rate' | 'server' | 'network' | 'general' {
     const msg = (err?.message ?? String(err)).toLowerCase();
     if (/401|403|api.?key.?invalid|invalid.?key|authentication|permission.?denied|api_key/i.test(msg)) return 'key';
     if (/429|quota|rate.?limit|resource.*exhausted|too many requests/i.test(msg)) return 'rate';
+    if (/500|502|503|504|internal.?error|server.?error/i.test(msg)) return 'server';
     if (/econnreset|etimedout|fetch.*failed|network|timeout|socket hang up/i.test(msg)) return 'network';
     return 'general';
 }
@@ -941,17 +1032,31 @@ export async function processSystemRoutine(tenantId: string, routineType: string
                         { role: 'user', content: prompt },
                     ],
                 });
+                await trackAICalls(tenantId, aiProvider.baseURL ? 'openrouter' : 'openai', 1);
+                await trackGeminiSuccess(tenantId);
                 return res.choices[0].message.content ?? '';
             }
+
             if (!model) return '';
-            const chat = model.startChat({ history: [] });
-            const initial = await chat.sendMessage(prompt);
-            // For tool-loop routines, run the loop
-            if (routineType === 'daily_scout' || routineType === 'nurture_check') {
-                await runToolLoop(chat, initial.response, toolContext, `AI Routine:${routineType}`);
-                return '';
+            try {
+                const chat = model.startChat({ history: [] });
+                const initial = await chat.sendMessage(prompt);
+                // For tool-loop routines, run the loop
+                if (routineType === 'daily_scout' || routineType === 'nurture_check') {
+                    const { apiCalls } = await runToolLoop(chat, initial.response, toolContext, `AI Routine:${routineType}`);
+                    await trackAICalls(tenantId, 'google', apiCalls);
+                    await trackGeminiSuccess(tenantId);
+                    return '';
+                }
+                const resultText = initial.response.text?.() ?? '';
+                await trackAICalls(tenantId, 'google', 1);
+                await trackGeminiSuccess(tenantId);
+                return resultText;
+            } catch (geminiErr: any) {
+                console.error(`[AI Routine] [ALERT] Gemini path failed for routine ${routineType} (tenant ${tenantId}):`, geminiErr.message);
+                await trackGeminiError(tenantId, geminiErr);
+                throw geminiErr;
             }
-            return initial.response.text?.() ?? '';
         };
 
         // ── Value-gap diagnostic (CLAUDE.md mandate) ──────────────────────────
@@ -1236,17 +1341,28 @@ export async function processLINEMessage(
         if (aiProvider.provider === 'openai') {
             const openai = new OpenAI({ apiKey: aiProvider.key, ...(aiProvider.baseURL ? { baseURL: aiProvider.baseURL } : {}) });
             const oaiHistory = await getOpenAIChatHistory(tenantId, chatId);
-            const { reply, updatedHistory: newHist } = await runToolLoopOpenAI(
+            const { reply, updatedHistory: newHist, apiCalls } = await runToolLoopOpenAI(
                 openai, aiProvider.model, await buildSystemPrompt(tenant), text, oaiHistory, toolContext, 'AI LINE',
             );
             await saveOpenAIChatHistory(tenantId, chatId, newHist);
             replyText = reply;
+            await trackAICalls(tenantId, aiProvider.baseURL ? 'openrouter' : 'openai', apiCalls);
+            await trackGeminiSuccess(tenantId);
         } else {
-            const chat = model!.startChat({ history });
-            const initial = await chat.sendMessage(text);
-            const { accumulatedText: replyText, finalResponse } = await runToolLoop(chat, initial.response, toolContext, 'AI');
-            const updatedHistory = await chat.getHistory();
-            await saveChatHistory(tenantId, chatId, updatedHistory);
+            try {
+                const chat = model!.startChat({ history });
+                const initial = await chat.sendMessage(text);
+                const { accumulatedText: geminiReply, finalResponse, apiCalls } = await runToolLoop(chat, initial.response, toolContext, 'AI');
+                const updatedHistory = await chat.getHistory();
+                await saveChatHistory(tenantId, chatId, updatedHistory);
+                replyText = geminiReply;
+                await trackAICalls(tenantId, 'google', apiCalls);
+                await trackGeminiSuccess(tenantId);
+            } catch (geminiErr: any) {
+                console.error(`[AI] [ALERT] Gemini path failed for LINE tenant ${tenantId}:`, geminiErr.message);
+                await trackGeminiError(tenantId, geminiErr);
+                throw geminiErr;
+            }
         }
 
         if (replyText.trim().length > 0) {

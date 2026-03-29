@@ -45,6 +45,7 @@ gcloud builds submit ./api \
 # Deploy to each region
 # ──────────────────────────────────────────────────────────────
 SECRETS="DATABASE_URL=tiger-claw-database-url:latest,\
+DATABASE_READ_URL=tiger-claw-database-url:latest,\
 REDIS_URL=tiger-claw-redis-url:latest,\
 GOOGLE_API_KEY=tiger-claw-google-api-key:latest,\
 STRIPE_SECRET_KEY=tiger-claw-stripe-secret-key:latest,\
@@ -61,7 +62,8 @@ FRONTEND_URL=FRONTEND_URL:latest,\
 TIGER_CLAW_API_URL=TIGER_CLAW_API_URL:latest,\
 SERPER_KEY_1=tiger-claw-serper-key-1:latest,\
 SERPER_KEY_2=tiger-claw-serper-key-2:latest,\
-SERPER_KEY_3=tiger-claw-serper-key-3:latest"
+SERPER_KEY_3=tiger-claw-serper-key-3:latest,\
+MAGIC_LINK_SECRET=tiger-claw-magic-link-secret:latest"
 
 for i in "${!DEPLOY_REGIONS[@]}"; do
   REGION="${DEPLOY_REGIONS[$i]}"
