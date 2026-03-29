@@ -67,9 +67,18 @@ export default function StepAIConnection({ state, updateState, onNext }: AIConne
         setInstallError("");
 
         try {
+            // Read session token stored by verify-purchase; send as Authorization header
+            // so the API can self-heal botId if the wizard state was loaded from an older
+            // Vercel-cached chunk that didn't carry initialBotId.
+            let sessionToken: string | undefined;
+            try { sessionToken = sessionStorage.getItem("tc_session") ?? undefined; } catch { /* ignore */ }
+
             const response = await fetch(`${API_BASE}/wizard/validate-key`, {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: {
+                    "Content-Type": "application/json",
+                    ...(sessionToken ? { "Authorization": `Bearer ${sessionToken}` } : {}),
+                },
                 body: JSON.stringify({
                     botId: state.botId,
                     keys: [{ provider: selectedProvider, key, model: currentProvider.model }],
