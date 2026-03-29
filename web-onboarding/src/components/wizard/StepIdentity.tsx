@@ -55,7 +55,7 @@ export default function StepIdentity({ state, updateState, onNext, magicToken, m
                 botId = authData.botId;
             } else if (authResponse.status === 404) {
                 // No account found — they need to purchase first
-                throw new Error("No account found for this email. Purchase your agent at stan.store/brentbryson to get started.");
+                throw new Error("No account found for this email. Purchase your agent at tigerclaw.io/#pricing to get started.");
             } else if (authResponse.status === 401) {
                 throw new Error("Your setup link has expired. Check your email for a fresh link, or reply to your welcome email to get a new one.");
             } else {
@@ -81,10 +81,10 @@ export default function StepIdentity({ state, updateState, onNext, magicToken, m
 
             {error && (
                 <div className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 text-sm font-medium">
-                    {error.includes("stan.store") ? (
+                    {error.includes("tigerclaw.io") ? (
                         <>
                             No account found for this email.{" "}
-                            <a href="https://stan.store/brentbryson" target="_blank" rel="noopener noreferrer" className="underline font-bold text-primary">
+                            <a href="https://tigerclaw.io/#pricing" target="_blank" rel="noopener noreferrer" className="underline font-bold text-primary">
                                 Purchase your agent here →
                             </a>
                         </>
