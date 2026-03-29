@@ -43,6 +43,7 @@ async function buildApp() {
 
 beforeEach(() => {
   vi.resetAllMocks()
+  vi.stubGlobal('fetch', mockFetch)
   process.env['STRIPE_SECRET_KEY'] = 'sk_test_abc'
   process.env['ENCRYPTION_KEY'] = 'a'.repeat(32)
 })

@@ -16,6 +16,7 @@ async function buildApp() {
 
 beforeEach(() => {
   vi.resetAllMocks()
+  vi.stubGlobal('fetch', mockFetch)
 })
 
 // ---------------------------------------------------------------------------
