@@ -1,28 +1,55 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { motion } from "framer-motion";
-import { Zap, Bot, Lock, Code2, ArrowRight } from "lucide-react";
+import { Zap, Bot, Lock, ArrowRight, Loader2 } from "lucide-react";
 import OnboardingModal from "@/components/OnboardingModal";
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "https://api.tigerclaw.io";
 
 export default function Home() {
   const [wizardOpen, setWizardOpen] = useState(false);
-  const [prefillEmail, setPrefillEmail] = useState<string | undefined>();
-  const [magicToken, setMagicToken] = useState<string | undefined>();
-  const [magicExpires, setMagicExpires] = useState<string | undefined>();
+  const [verifiedEmail, setVerifiedEmail] = useState<string | undefined>();
+  const [verifiedBotId, setVerifiedBotId] = useState<string | undefined>();
+  const [verifiedName, setVerifiedName] = useState<string | undefined>();
+  const [sessionToken, setSessionToken] = useState<string | undefined>();
 
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const email = params.get("email");
-    const token = params.get("token");
-    const expires = params.get("expires");
-    if (email) {
-      setPrefillEmail(email);
-      if (token) setMagicToken(token);
-      if (expires) setMagicExpires(expires);
-      setWizardOpen(true);
+  // Purchase verification state
+  const [purchaseEmail, setPurchaseEmail] = useState("");
+  const [verifying, setVerifying] = useState(false);
+  const [verifyError, setVerifyError] = useState<string | undefined>();
+
+  const handleVerifyPurchase = async () => {
+    setVerifyError(undefined);
+    if (!purchaseEmail.trim()) {
+      setVerifyError("Please enter your email.");
+      return;
     }
-  }, []);
+    setVerifying(true);
+    try {
+      const res = await fetch(`${API_BASE}/auth/verify-purchase`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: purchaseEmail.trim().toLowerCase() }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setVerifyError(data.error ?? "Verification failed. Please try again.");
+        return;
+      }
+      // Store session token in sessionStorage for subsequent wizard API calls
+      try { sessionStorage.setItem("tc_session", data.sessionToken); } catch { /* ignore */ }
+      setSessionToken(data.sessionToken);
+      setVerifiedEmail(purchaseEmail.trim().toLowerCase());
+      setVerifiedBotId(data.botId);
+      setVerifiedName(data.name);
+      setWizardOpen(true);
+    } catch {
+      setVerifyError("Network error. Please check your connection and try again.");
+    } finally {
+      setVerifying(false);
+    }
+  };
 
   return (
     <div className="relative min-h-[calc(100vh-64px)] overflow-hidden flex flex-col justify-center">
@@ -60,20 +87,41 @@ export default function Home() {
           Bring Your Own Key (BYOK) architecture. Secure, compliant, and highly available agents on edge computing. Stop wiring tools, start selling.
         </motion.p>
 
+        {/* Purchase verification form */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.3 }}
-          className="flex flex-col sm:flex-row items-center justify-center gap-4"
+          className="flex flex-col items-center gap-3 max-w-md mx-auto"
         >
-          <button
-            onClick={() => setWizardOpen(true)}
-            className="group relative inline-flex h-14 items-center justify-center overflow-hidden rounded-full font-bold px-8 bg-primary text-black transition-all hover:scale-105 active:scale-95 w-full sm:w-auto"
-          >
-            <span className="relative z-10 flex items-center gap-2">
-              Launch My Agent <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-            </span>
-          </button>
+          <p className="text-white/60 text-sm font-medium mb-1">Already purchased? Enter your email to set up your agent.</p>
+          <div className="flex w-full gap-2">
+            <input
+              type="email"
+              value={purchaseEmail}
+              onChange={(e) => { setPurchaseEmail(e.target.value); setVerifyError(undefined); }}
+              onKeyDown={(e) => e.key === "Enter" && handleVerifyPurchase()}
+              placeholder="your@email.com"
+              className="flex-1 h-12 rounded-full px-5 bg-white/10 border border-white/20 text-white placeholder-white/40 focus:outline-none focus:border-primary text-sm"
+              disabled={verifying}
+            />
+            <button
+              onClick={handleVerifyPurchase}
+              disabled={verifying}
+              className="group relative inline-flex h-12 items-center justify-center overflow-hidden rounded-full font-bold px-6 bg-primary text-black transition-all hover:scale-105 active:scale-95 disabled:opacity-70 disabled:scale-100 whitespace-nowrap"
+            >
+              {verifying ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <span className="flex items-center gap-2">
+                  Set Up My Agent <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                </span>
+              )}
+            </button>
+          </div>
+          {verifyError && (
+            <p className="text-red-400 text-sm text-center">{verifyError}</p>
+          )}
         </motion.div>
 
         <motion.div
@@ -84,24 +132,30 @@ export default function Home() {
         >
           <FeatureCard
             icon={<Lock className="w-6 h-6 text-primary" />}
-            title="BYOK Enabled"
-            description="Use your own Google AI API key securely. AES-256-GCM encrypted at rest. Never shared."
+            title="BYOB Enabled"
+            description="Bring Your Own Bot — connect your own Telegram bot token and AI API key. Your credentials, your control."
           />
           <FeatureCard
             icon={<Zap className="w-6 h-6 text-primary" />}
-            title="Instant Provisioning"
-            description="Stateless multi-tenant architecture means zero wait time from payment to live bot."
+            title="18 Built-In Tools"
+            description="Prospecting, objection handling, nurture sequences, hive intelligence — running the moment you connect."
           />
           <FeatureCard
             icon={<Bot className="w-6 h-6 text-primary" />}
-            title="Pre-trained Flavors"
-            description="Agents hit the ground running with industry specific nurture sequences."
+            title="15 Industry Flavors"
+            description="Pre-trained agents for network marketing, real estate, sales, fitness, trades, and more. Ready in 60 seconds."
           />
         </motion.div>
       </div>
 
       {wizardOpen && (
-        <OnboardingModal onClose={() => setWizardOpen(false)} initialEmail={prefillEmail} magicToken={magicToken} magicExpires={magicExpires} />
+        <OnboardingModal
+          onClose={() => setWizardOpen(false)}
+          initialEmail={verifiedEmail}
+          initialBotId={verifiedBotId}
+          initialName={verifiedName}
+          sessionToken={sessionToken}
+        />
       )}
     </div>
   );

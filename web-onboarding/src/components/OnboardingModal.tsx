@@ -62,11 +62,16 @@ function loadPersistedState(): WizardState {
     return initialState;
 }
 
-export default function OnboardingModal({ onClose, initialEmail, magicToken, magicExpires }: { onClose: () => void; initialEmail?: string; magicToken?: string; magicExpires?: string }) {
+export default function OnboardingModal({ onClose, initialEmail, initialBotId, initialName, sessionToken: _sessionToken }: { onClose: () => void; initialEmail?: string; initialBotId?: string; initialName?: string; sessionToken?: string }) {
     const [step, setStep] = useState(1);
     const [state, setState] = useState<WizardState>(() => {
         const persisted = loadPersistedState();
-        return initialEmail ? { ...persisted, email: initialEmail } : persisted;
+        return {
+            ...persisted,
+            ...(initialEmail ? { email: initialEmail } : {}),
+            ...(initialBotId ? { botId: initialBotId } : {}),
+            ...(initialName ? { yourName: initialName } : {}),
+        };
     });
     const [isDeploying, setIsDeploying] = useState(false);
     const [deploymentComplete, setDeploymentComplete] = useState(false);
@@ -164,8 +169,6 @@ export default function OnboardingModal({ onClose, initialEmail, magicToken, mag
                                     state={state}
                                     updateState={updateState}
                                     onNext={handleNext}
-                                    magicToken={magicToken}
-                                    magicExpires={magicExpires}
                                 />
                             )}
                             {step === 2 && (

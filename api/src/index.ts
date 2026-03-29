@@ -35,6 +35,7 @@ import { runMigrations } from "./services/migrate.js";
 import { getPoolStatus } from "./services/pool.js";
 import { sendAdminAlert } from "./routes/admin.js";
 import healthRouter from "./routes/health.js";
+import authRouter from "./routes/auth.js";
 import webhooksRouter from "./routes/webhooks.js";
 import adminRouter from "./routes/admin.js";
 import opsRouter from "./routes/ops.js";
@@ -93,6 +94,7 @@ app.use(express.json());
 // ---------------------------------------------------------------------------
 
 app.use("/health", healthRouter);
+app.use("/auth", authRouter);
 app.use("/webhooks/ops", opsRouter); // Ops bot intercepts here specifically
 app.use("/webhooks", webhooksRouter); // Stripe, LINE, and Tenant Telegrams
 app.use("/admin", adminRouter);

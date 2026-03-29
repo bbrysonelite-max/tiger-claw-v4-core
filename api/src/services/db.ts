@@ -791,11 +791,42 @@ export async function createBYOKSubscription(data: {
   botId: string; // now representing tenant_id
   stripeSubscriptionId: string;
   planTier: string;
+  status?: string;
 }): Promise<void> {
   await getPool().query(
     `INSERT INTO subscriptions (user_id, tenant_id, stripe_subscription_id, plan_tier, status)
-     VALUES ($1, $2, $3, $4, 'active')`,
-    [data.userId, data.botId, data.stripeSubscriptionId, data.planTier]
+     VALUES ($1, $2, $3, $4, $5)`,
+    [data.userId, data.botId, data.stripeSubscriptionId, data.planTier, data.status ?? "active"]
+  );
+}
+
+// Look up a pending_setup subscription created within the last 72 hours for an email.
+// Used by POST /auth/verify-purchase — the purchase IS the authentication.
+export async function lookupPurchaseByEmail(email: string): Promise<{ userId: string; botId: string; name: string } | null> {
+  const result = await getReadPool().query(
+    `SELECT u.id AS user_id, s.tenant_id AS bot_id, u.name
+     FROM subscriptions s
+     JOIN users u ON u.id = s.user_id
+     WHERE u.email = $1
+       AND s.status = 'pending_setup'
+       AND s.created_at > NOW() - INTERVAL '72 hours'
+     ORDER BY s.created_at DESC
+     LIMIT 1`,
+    [email]
+  );
+  if (!result.rows[0]) return null;
+  return {
+    userId: result.rows[0]["user_id"] as string,
+    botId: result.rows[0]["bot_id"] as string,
+    name: result.rows[0]["name"] as string,
+  };
+}
+
+// Mark a subscription active after wizard completion.
+export async function activateSubscription(botId: string): Promise<void> {
+  await getPool().query(
+    `UPDATE subscriptions SET status = 'active' WHERE tenant_id = $1 AND status = 'pending_setup'`,
+    [botId]
   );
 }
 
