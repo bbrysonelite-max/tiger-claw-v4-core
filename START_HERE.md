@@ -7,17 +7,21 @@ Stop what you are doing. Read this entire document and `CLAUDE.md`. These are yo
 
 ## 1. The Current State of the Universe
 
-**Tiger Claw is LIVE and fully deployed. CI is green. PRs #62–#68 merged. Phase 3 BYOB pivot COMPLETE.**
+**Tiger Claw is LIVE and fully deployed. CI is green. PRs #62–#71 merged. Phase 3 BYOB pivot COMPLETE.**
+- **Timestamp:** 2026-03-29 23:45 UTC
 - **API:** `https://api.tigerclaw.io` — Cloud Run `tiger-claw-api`, multi-region (us-central1 + asia-southeast1)
 - **Load Balancer:** Global HTTPS LB at `34.54.146.69` — both regions behind Anycast IP
 - **Architecture:** V4 Stateless Serverless — one API process, all tenants, context resolved per-request
 - **Database:** PostgreSQL HA via Cloud SQL Proxy (`tiger_claw_shared`)
 - **Cache/Queue:** Redis HA + BullMQ (8 queues)
 - **AI Engine:** Gemini 2.0 Flash (LOCKED — `gemini-2.5-flash` has a GCP function-calling bug, do not use it)
-- **Tests:** 396 passing
+- **Tests:** 395 passing (Verified on main)
 - **Flavors:** 15 customer-facing industry flavors, all with full field set including scoutQueries
 - **Min-instances:** 1 — no cold start
-- **Data Refinery:** v5 pipeline FULLY AUTONOMOUS — fires nightly at 2 AM UTC via BullMQ. First run: 313 facts saved across 14 flavors.
+- **Data Refinery:** v5 pipeline FULLY AUTONOMOUS — fires nightly at 2 AM UTC via BullMQ.
+- **Circuit Breaker:** LIVE — auto-failover to OpenRouter after 3 Gemini failures.
+- **Economics:** INSTRUMENTED — per-tenant API call tracking live in Redis.
+
 
 **Strict Rule 1:** OpenClaw, Mini-RAG, and per-tenant Docker containers are DEAD. Do not reference or restore them.
 
@@ -69,6 +73,10 @@ Stop what you are doing. Read this entire document and `CLAUDE.md`. These are yo
 32. **Admin Pool Utilities** — `GET /admin/pool/tokens?limit=N` (decrypted tokens for wizard use), `POST /admin/pool/retire-batch` (bulk retire). PR #68.
 33. **Website Content Audit Fixed** — All CTAs route through `tigerclaw.io/#pricing`. AI provider list corrected everywhere (Google Gemini, OpenAI, Grok, OpenRouter, Kimi — Anthropic removed). `tiger-bot-website` pushed directly to main and live. PRs #69, #70.
 34. **Gemini Rate Limit Hardening** — `geminiGateway.ts`: process-level semaphore (default 10 concurrent, tunable via `GEMINI_CONCURRENCY` env var) + exponential backoff on 429s (up to 3 retries, ~1s/2s/4s + jitter). All 10 Gemini call sites hardened. PR #71.
+35. **Gemini Circuit Breaker (Task #13)** — 3 consecutive 429/5xx errors trigger 1-hour failover to OpenRouter. PR #70.
+36. **AI Unit Economics (Task #14)** — Instrumented tool loop to track per-tenant and platform-wide API call counts in Redis. PR #70.
+37. **Secret Pinning Fix (Critical Item #3)** — Unpinned DATABASE_READ_URL from version 8; now uses latest in all regions.
+38. **MAGIC_LINK_SECRET Secured** — Created in GCP Secret Manager and mounted in both Cloud Run regions. Verified end-to-end.
 
 ---
 
@@ -299,4 +307,4 @@ Full report: `specs/RELIABILITY_AUDIT.md`
 
 ---
 
-*Last updated: 2026-03-29 (Phase 3 BYOB pivot SHIPPED — PR #68 merged. Phase 4 activation in progress. Phase 5 #15 done — PR #71 pending merge. 396 tests passing.)*
+*Last updated: 2026-03-29 23:45 UTC (Phases 1-3 complete; Phase 5 Task #13/#14 complete; Critical Item #3 fixed). Proceed.*
