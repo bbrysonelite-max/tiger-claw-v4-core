@@ -128,6 +128,7 @@ export interface Tenant {
   language: string;
   preferredChannel: string;
   botToken?: string;
+  botUsername?: string;
   port?: number;
   containerId?: string;
   containerName?: string;
@@ -156,6 +157,7 @@ function rowToTenant(row: Record<string, unknown>): Tenant {
     language: row["language"] as string,
     preferredChannel: row["preferred_channel"] as string,
     botToken: row["bot_token"] as string | undefined,
+    botUsername: row["bot_username"] as string | undefined,
     port: row["port"] as number | undefined,
     containerId: row["container_id"] as string | undefined,
     containerName: row["container_name"] as string | undefined,
@@ -235,16 +237,17 @@ export async function createTenant(data: {
   language: string;
   preferredChannel: string;
   botToken?: string;
+  botUsername?: string;
   port?: number;
 }): Promise<Tenant> {
   const containerName = `tiger-claw-${data.slug}`;
   const result = await getPool().query(
     `INSERT INTO tenants
-       (slug, name, email, flavor, region, language, preferred_channel, bot_token, port, container_name)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+       (slug, name, email, flavor, region, language, preferred_channel, bot_token, bot_username, port, container_name)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
      RETURNING *`,
     [data.slug, data.name, data.email ?? null, data.flavor, data.region,
-    data.language, data.preferredChannel, data.botToken ?? null, data.port, containerName]
+    data.language, data.preferredChannel, data.botToken ?? null, data.botUsername ?? null, data.port, containerName]
   );
   
   const tenant = result.rows[0];
@@ -598,18 +601,38 @@ export async function assignBotToken(
   });
 }
 
-/** Return the bot_token assigned to a tenant, or null. */
+/** Return the bot_token assigned to a tenant, or null. Supports BYOB. */
 export async function getTenantBotToken(tenantId: string): Promise<string | null> {
-  const result = await getPool().query(
+  // 1. Check BYOB token on the tenant record first (v4 path)
+  const tRes = await getReadPool().query(
+    "SELECT bot_token FROM tenants WHERE id = $1",
+    [tenantId]
+  );
+  if (tRes.rows[0]?.bot_token) {
+    return tRes.rows[0].bot_token as string;
+  }
+
+  // 2. Fallback to legacy bot pool (migration path)
+  const result = await getReadPool().query(
     "SELECT bot_token FROM bot_pool WHERE tenant_id = $1 AND status = 'assigned' LIMIT 1",
     [tenantId],
   );
   return result.rows[0] ? (result.rows[0]["bot_token"] as string) : null;
 }
 
-/** Return the bot username assigned to a tenant, or null. */
+/** Return the bot username assigned to a tenant, or null. Supports BYOB. */
 export async function getTenantBotUsername(tenantId: string): Promise<string | null> {
-  const result = await getPool().query(
+  // 1. Check BYOB username on the tenant record first (v4 path)
+  const tRes = await getReadPool().query(
+    "SELECT bot_username FROM tenants WHERE id = $1",
+    [tenantId]
+  );
+  if (tRes.rows[0]?.bot_username) {
+    return tRes.rows[0].bot_username as string;
+  }
+
+  // 2. Fallback to legacy bot pool (migration path)
+  const result = await getReadPool().query(
     "SELECT bot_username FROM bot_pool WHERE tenant_id = $1 AND status = 'assigned' LIMIT 1",
     [tenantId],
   );

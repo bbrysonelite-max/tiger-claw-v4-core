@@ -63,7 +63,8 @@ export interface ProvisionJobData {
     region: string;
     language: string;
     preferredChannel: string;
-    botToken?: string; // optional — provisioner assigns from pool if not provided
+    botToken?: string; // BYOB: Telegram tenants must provide their own token
+    botUsername?: string;
     timezone?: string;
 }
 
@@ -86,6 +87,7 @@ export const provisionWorker = SHOULD_RUN_WORKERS ? new Worker(
                 language: job.data.language,
                 preferredChannel: job.data.preferredChannel,
                 botToken: job.data.botToken,
+                botUsername: job.data.botUsername,
                 timezone: job.data.timezone,
             });
 

@@ -50,6 +50,7 @@ export interface ProvisionInput {
   language: string;
   preferredChannel: string;
   botToken?: string;
+  botUsername?: string;
   timezone?: string;
   vertical?: string;
   hiveOptIn?: boolean;
@@ -107,9 +108,19 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
       // Just update it with the final configs
       await getPool().query(
         `UPDATE tenants SET 
-            flavor = $1, region = $2, language = $3, preferred_channel = $4, bot_token = COALESCE($5, bot_token)
-           WHERE id = $6`,
-        [input.flavor, input.region, input.language, input.preferredChannel, resolvedBotToken || null, tenant.id]
+            flavor = $1, region = $2, language = $3, preferred_channel = $4, 
+            bot_token = COALESCE($5, bot_token),
+            bot_username = COALESCE($6, bot_username)
+           WHERE id = $7`,
+        [
+          input.flavor, 
+          input.region, 
+          input.language, 
+          input.preferredChannel, 
+          resolvedBotToken || null, 
+          input.botUsername || null,
+          tenant.id
+        ]
       );
       // Refresh the object in memory
       const refreshed = await getTenantBySlug(input.slug);
@@ -125,6 +136,7 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
         language: input.language,
         preferredChannel: input.preferredChannel,
         botToken: resolvedBotToken,
+        botUsername: input.botUsername,
         port: undefined,
       });
       steps.push(`New Tenant record created: ${tenant.id}`);

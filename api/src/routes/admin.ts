@@ -702,13 +702,13 @@ router.get("/pool/health", async (_req: Request, res: Response) => {
 
     if (available === 0) {
       status = "empty";
-      action = "URGENT: Run 'npx tsx ops/botpool/create_bots.ts --mtproto --sessions ./sessions.json --count 50' immediately. New signups will be waitlisted.";
+      action = "Agent pool is empty. New signups are unaffected (BYOB required). Refill pool only if adding more platform-managed agents.";
     } else if (available < 10) {
       status = "critical";
-      action = "Create at least 20 bots. Run: npx tsx ops/botpool/create_bots.ts --mtproto --sessions ./sessions.json --count 20";
+      action = "Agent pool critical. Add bots only if platform-managed agents are needed.";
     } else if (available < 50) {
       status = "low";
-      action = "Schedule a pool refill soon. Run: npx tsx ops/botpool/create_bots.ts --mtproto --sessions ./sessions.json --count 50";
+      action = "Agent pool low.";
     } else {
       status = "healthy";
       action = "No action needed.";
@@ -741,35 +741,6 @@ router.post("/pool/add", async (req: Request, res: Response) => {
       const status = (result.error ?? "").includes("already in pool") ? 409 : 422;
       return res.status(status).json(result);
     }
-
-    // Background waitlist sweep: if a tenant was waitlisted due to empty pool,
-    // automatically try to provision them now that a bot is available.
-    setImmediate(async () => {
-      try {
-        const pool = getPool();
-        const { rows } = await pool.query(
-          `SELECT id, slug, name, email, flavor, region, language, preferred_channel
-           FROM tenants WHERE status = 'waitlisted'
-           ORDER BY updated_at ASC LIMIT 1`
-        );
-        if (rows.length > 0) {
-          console.log(`[admin] Waitlist sweep: found tenant ${rows[0].id} (${rows[0].slug}). Enqueuing provision.`);
-          const { provisionQueue } = await import("../services/queue.js");
-          await provisionQueue.add("tenant-provisioning", {
-            botId: rows[0].id,
-            slug: rows[0].slug,
-            name: rows[0].name,
-            email: rows[0].email,
-            flavor: rows[0].flavor,
-            region: rows[0].region,
-            language: rows[0].language,
-            preferredChannel: rows[0].preferred_channel || "telegram",
-          }, { attempts: 3, backoff: { type: "exponential", delay: 5000 } });
-        }
-      } catch (sweepErr) {
-        console.error("[admin] Waitlist sweep error:", sweepErr);
-      }
-    });
 
     return res.json({ ok: true, username: result.username, telegramBotId: result.telegramBotId });
   } catch (err) {

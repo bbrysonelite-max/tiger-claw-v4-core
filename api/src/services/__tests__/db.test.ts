@@ -26,7 +26,68 @@ import {
   listBotPool,
   releaseBotToPool,
   assignBotToken,
+  getTenantBotToken,
+  getTenantBotUsername,
 } from '../../services/db.js'
+
+// ... rest of imports and mocks ...
+
+describe('getTenantBotToken', () => {
+  it('returns token from tenants table if present (BYOB path)', async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [{ bot_token: 'byob-token' }] })
+
+    const result = await getTenantBotToken('t1')
+
+    expect(result).toBe('byob-token')
+    expect(mockQuery).toHaveBeenCalledWith(
+      expect.stringContaining('FROM tenants WHERE id = $1'),
+      ['t1']
+    )
+  })
+
+  it('falls back to bot_pool if not in tenants table', async () => {
+    mockQuery
+      .mockResolvedValueOnce({ rows: [] }) // tenants check
+      .mockResolvedValueOnce({ rows: [{ bot_token: 'pool-token' }] }) // pool fallback
+
+    const result = await getTenantBotToken('t1')
+
+    expect(result).toBe('pool-token')
+    expect(mockQuery).toHaveBeenCalledWith(
+      expect.stringContaining('FROM bot_pool WHERE tenant_id = $1'),
+      ['t1']
+    )
+  })
+})
+
+describe('getTenantBotUsername', () => {
+  it('returns username from tenants table if present (BYOB path)', async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [{ bot_username: 'byob-user' }] })
+
+    const result = await getTenantBotUsername('t1')
+
+    expect(result).toBe('byob-user')
+    expect(mockQuery).toHaveBeenCalledWith(
+      expect.stringContaining('FROM tenants WHERE id = $1'),
+      ['t1']
+    )
+  })
+
+  it('falls back to bot_pool if not in tenants table', async () => {
+    mockQuery
+      .mockResolvedValueOnce({ rows: [] }) // tenants check
+      .mockResolvedValueOnce({ rows: [{ bot_username: 'pool-user' }] }) // pool fallback
+
+    const result = await getTenantBotUsername('t1')
+
+    expect(result).toBe('pool-user')
+    expect(mockQuery).toHaveBeenCalledWith(
+      expect.stringContaining('FROM bot_pool WHERE tenant_id = $1'),
+      ['t1']
+    )
+  })
+})
+
 
 beforeEach(() => {
   vi.resetAllMocks()
