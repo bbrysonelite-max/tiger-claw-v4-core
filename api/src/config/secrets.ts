@@ -3,8 +3,13 @@
 //
 // Reads secrets from /secrets/* (mounted via GCP Secret Manager)
 // and populates process.env to maintain backward compatibility.
+//
+// FIX 2026-03-29: Cloud Run mounts each secret as a DIRECTORY
+// (e.g. /secrets/DATABASE_URL/ containing a version file),
+// not as a plain file. We now detect directories and read
+// the first non-hidden file inside them.
 
-import { readFileSync, readdirSync, existsSync } from "fs";
+import { readFileSync, readdirSync, existsSync, statSync } from "fs";
 import { join } from "path";
 
 const SECRETS_DIR = "/secrets";
@@ -16,20 +21,33 @@ export function loadSecrets(): void {
   }
 
   try {
-    const files = readdirSync(SECRETS_DIR);
-    console.log(`[secrets] Found ${files.length} mounted secrets in ${SECRETS_DIR}.`);
+    const entries = readdirSync(SECRETS_DIR);
+    console.log(`[secrets] Found ${entries.length} mounted secrets in ${SECRETS_DIR}.`);
 
-    for (const filename of files) {
-      // Skip hidden files/directories (like ..data, ..2026_03_15_...)
-      if (filename.startsWith(".")) continue;
+    for (const name of entries) {
+      if (name.startsWith(".")) continue;
 
-      const fullPath = join(SECRETS_DIR, filename);
+      const fullPath = join(SECRETS_DIR, name);
       try {
-        const content = readFileSync(fullPath, "utf8").trim();
-        process.env[filename] = content;
-        // console.log(`[secrets] Injected process.env["${filename}"] from volume.`);
+        const stat = statSync(fullPath);
+        let content: string;
+
+        if (stat.isDirectory()) {
+          // Cloud Run volume mounts: secret is a directory containing version file(s)
+          const inner = readdirSync(fullPath).filter(f => !f.startsWith("."));
+          if (inner.length === 0) {
+            console.warn(`[secrets] Secret directory "${name}" is empty — skipping.`);
+            continue;
+          }
+          content = readFileSync(join(fullPath, inner[0]), "utf8").trim();
+        } else {
+          content = readFileSync(fullPath, "utf8").trim();
+        }
+
+        process.env[name] = content;
+        console.log(`[secrets] Loaded secret "${name}" into process.env.`);
       } catch (err) {
-        console.warn(`[secrets] Failed to read secret file "${filename}":`, err);
+        console.warn(`[secrets] Failed to read secret "${name}":`, (err as Error).message);
       }
     }
     console.log("[secrets] Volume mount secret injection complete.");
