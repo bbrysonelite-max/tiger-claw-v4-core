@@ -419,6 +419,115 @@ router.post("/email", emailLimiter, async (req: Request, res: Response) => {
 });
 
 // ---------------------------------------------------------------------------
+// POST /webhooks/stan-store
+// Zapier bridge: Stan Store "New Customer" trigger → Tiger Claw provisioning.
+//
+// Stan Store does not support custom webhook URLs and uses a proprietary
+// managed Stripe account — direct Stripe webhooks are impossible.
+// Workaround: Zapier "New Customer" trigger → Webhooks by Zapier → POST here.
+//
+// Auth: X-Zapier-Secret header must match ZAPIER_WEBHOOK_SECRET env var.
+//
+// Zapier field mapping (configure in Zapier action):
+//   email        → Stan customer email
+//   name         → Stan customer name (or first_name + last_name)
+//   product_name → Stan product name (optional, for logging)
+//   flavor       → Tiger Claw flavor key (optional, default: network-marketer)
+//
+// On first deploy, this endpoint logs the raw Zapier payload so you can
+// inspect actual field names. Check Cloud Run logs after the first real
+// purchase fires.
+// ---------------------------------------------------------------------------
+
+router.post("/stan-store", async (req: Request, res: Response) => {
+  // Authenticate via shared secret
+  const ZAPIER_SECRET = process.env["ZAPIER_WEBHOOK_SECRET"];
+  if (ZAPIER_SECRET) {
+    const incoming = req.headers["x-zapier-secret"] as string | undefined;
+    if (incoming !== ZAPIER_SECRET) {
+      console.warn("[stan-store-webhook] Auth failed — X-Zapier-Secret mismatch");
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+  } else {
+    console.warn("[stan-store-webhook] ZAPIER_WEBHOOK_SECRET not set — endpoint is unprotected. Set this env var.");
+  }
+
+  // Log the raw payload on every call so we can inspect Stan Store's field schema
+  const body = req.body as Record<string, unknown>;
+  console.log("[stan-store-webhook] Raw Zapier payload:", JSON.stringify(body));
+
+  // Extract email — try all common Zapier/Stan field name variants
+  const email = (
+    body["email"] ??
+    body["Email"] ??
+    body["customer_email"] ??
+    body["CustomerEmail"] ??
+    body["buyer_email"] ??
+    body["contact_email"]
+  ) as string | undefined;
+
+  if (!email || typeof email !== "string") {
+    console.error("[stan-store-webhook] No email found in payload. Check field mapping in Zapier.");
+    await sendAdminAlert(`🚨 Stan Store Zapier webhook: no email in payload\nRaw: ${JSON.stringify(body)}`);
+    return res.status(400).json({ error: "email field missing — check Zapier field mapping" });
+  }
+
+  // Extract name
+  const firstName = (body["first_name"] ?? body["FirstName"] ?? "") as string;
+  const lastName  = (body["last_name"]  ?? body["LastName"]  ?? "") as string;
+  const name = (
+    body["name"] ??
+    body["Name"] ??
+    body["customer_name"] ??
+    body["CustomerName"] ??
+    body["full_name"] ??
+    (firstName || lastName ? `${firstName} ${lastName}`.trim() : undefined)
+  ) as string | undefined ?? email.split("@")[0]!;
+
+  const productName = (body["product_name"] ?? body["ProductName"] ?? body["product"] ?? "Tiger Claw") as string;
+  const flavor      = (body["flavor"] ?? "network-marketer") as string;
+
+  console.log(`[stan-store-webhook] Processing Stan Store purchase: ${name} (${email}) — product: ${productName}`);
+
+  // Respond immediately to Zapier (must be fast)
+  res.status(200).json({ received: true });
+
+  // Provision async
+  setImmediate(async () => {
+    try {
+      // Create user record
+      const userId = await createBYOKUser(email, name, undefined);
+
+      // Create pending bot — customer completes setup in the Wizard
+      const botId = await createBYOKBot(userId, name, flavor, "pending");
+
+      // Create subscription record keyed to Stan Store
+      await createBYOKSubscription({
+        userId,
+        botId,
+        stripeSubscriptionId: `stan_store_zapier_${Date.now()}`,
+        planTier: "byok_basic",
+      });
+
+      await logAdminEvent("stan_store_zapier_purchase", botId, { email, productName });
+
+      // Send magic link email to customer
+      await sendStanStoreWelcome(email, name, productName);
+
+      console.log(`[stan-store-webhook] ✅ Provisioned Stan Store customer: ${email} (botId: ${botId})`);
+      await sendAdminAlert(`✅ Stan Store purchase provisioned\nCustomer: ${name} (${email})\nProduct: ${productName}`);
+
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      console.error(`[stan-store-webhook] 🚨 PROVISIONING FAILED for ${email}:`, errMsg);
+      await sendAdminAlert(
+        `❌ Stan Store Zapier webhook provisioning FAILED\nCustomer: ${name} (${email})\nError: ${errMsg}`
+      );
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
