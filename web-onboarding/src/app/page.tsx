@@ -37,8 +37,12 @@ export default function Home() {
         setVerifyError(data.error ?? "Verification failed. Please try again.");
         return;
       }
-      // Store session token in sessionStorage for subsequent wizard API calls
-      try { sessionStorage.setItem("tc_session", data.sessionToken); } catch { /* ignore */ }
+      // Store session token in sessionStorage for subsequent wizard API calls.
+      // Clear any stale wizard state so the fresh botId is never shadowed by old data.
+      try {
+        sessionStorage.removeItem("tiger_wizard_state");
+        sessionStorage.setItem("tc_session", data.sessionToken);
+      } catch { /* ignore */ }
       setSessionToken(data.sessionToken);
       setVerifiedEmail(purchaseEmail.trim().toLowerCase());
       setVerifiedBotId(data.botId);
