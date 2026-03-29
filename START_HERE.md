@@ -7,17 +7,20 @@ Stop what you are doing. Read this entire document and `CLAUDE.md`. These are yo
 
 ## 1. The Current State of the Universe
 
-**Tiger Claw is LIVE and fully deployed. CI is green. PRs #62–#67 merged (pending review).**
+**Tiger Claw is LIVE and fully deployed. CI is green. PRs #62–#67 merged. PRs #68 & #70 open.**
+- **Timestamp:** 2026-03-29 23:45 UTC
 - **API:** `https://api.tigerclaw.io` — Cloud Run `tiger-claw-api`, multi-region (us-central1 + asia-southeast1)
 - **Load Balancer:** Global HTTPS LB at `34.54.146.69` — both regions behind Anycast IP
 - **Architecture:** V4 Stateless Serverless — one API process, all tenants, context resolved per-request
 - **Database:** PostgreSQL HA via Cloud SQL Proxy (`tiger_claw_shared`)
 - **Cache/Queue:** Redis HA + BullMQ (8 queues)
 - **AI Engine:** Gemini 2.0 Flash (LOCKED — `gemini-2.5-flash` has a GCP function-calling bug, do not use it)
-- **Tests:** 394 passing (3 pre-existing failures in provisioner WIP on `feat/reliability-hardening` branch — NOT on main)
+- **Tests:** 396 passing (Verified on main and PR #70)
 - **Flavors:** 15 customer-facing industry flavors, all with full field set including scoutQueries
 - **Min-instances:** 1 — no cold start
-- **Data Refinery:** v5 pipeline FULLY AUTONOMOUS — fires nightly at 2 AM UTC via BullMQ. First run: 313 facts saved across 14 flavors.
+- **Data Refinery:** v5 pipeline FULLY AUTONOMOUS — fires nightly at 2 AM UTC via BullMQ.
+- **Circuit Breaker:** LIVE — auto-failover to OpenRouter after 3 Gemini failures.
+- **Economics:** INSTRUMENTED — per-tenant API call tracking live in Redis.
 
 **Strict Rule 1:** OpenClaw, Mini-RAG, and per-tenant Docker containers are DEAD. Do not reference or restore them.
 
@@ -65,6 +68,12 @@ Stop what you are doing. Read this entire document and `CLAUDE.md`. These are yo
 28. **Feedback Loop LINE Fix** — `processSystemRoutine()` now delivers `weekly_checkin`, `feedback_reminder`, `feedback_pause` to LINE tenants via LINE push API. `getTenantLineUserIds()` extracts non-integer Redis key suffixes. PR #66.
 29. **Reliability Audit** — `specs/RELIABILITY_AUDIT.md` — 4 CRITICAL, 7 HIGH, 3 MED findings. PR #66.
 30. **Reliability Hardening** — 5 critical/high findings fixed: cron 'onboarding' status gap, Stripe Redis fail-closed, LINE webhook alert, resumeTenant response check, setWebhook on activation. PR #67.
+31. **BYOB Pivot (Task #8 & #9)** — Bot pool stripped from provisioning path. Telegram BYOB wizard step added with real-time validation. PR #68.
+32. **GCP Infrastructure Audit** — Verified multi-region health, SSL certs, Gemini quotas, and identified Redis persistence/eviction risks.
+33. **MAGIC_LINK_SECRET Secured** — Created in GCP Secret Manager and mounted in both Cloud Run regions. Verified end-to-end.
+34. **Gemini Circuit Breaker (Task #13)** — 3 consecutive 429/5xx errors trigger 1-hour failover to OpenRouter. PR #70.
+35. **AI Unit Economics (Task #14)** — Instrumented tool loop to track per-tenant and platform-wide API call counts in Redis. PR #70.
+36. **Secret Pinning Fix** — Unpinned DATABASE_READ_URL from version 8; now uses latest in all regions.
 
 ---
 
@@ -298,4 +307,4 @@ Full report: `specs/RELIABILITY_AUDIT.md`
 
 ---
 
-*Last updated: 2026-03-28 (Phase 2 complete — PRs #66, #67 open; BYOB pivot in effect; Phases 1–2 done; Phase 3 BYOB build next). Proceed.*
+*Last updated: 2026-03-29 23:45 UTC (Phase 1-3 complete; Phase 5 Task #13/#14 complete — PR #70). Proceed.*

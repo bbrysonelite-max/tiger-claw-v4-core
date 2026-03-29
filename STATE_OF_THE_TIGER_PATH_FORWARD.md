@@ -1,6 +1,6 @@
 # STATE OF THE TIGER — PATH FORWARD
 
-**Timestamp:** 2026-03-29 (post-reliability-hardening session)
+**Timestamp:** 2026-03-29 23:45 UTC (post-infrastructure hardening session)
 **Status:** ACTIVE DIRECTIVES. All agents must comply.
 **Supersedes:** Any prior sprint plans or roadmaps not in the repo.
 
@@ -10,7 +10,7 @@
 
 Read this file AFTER reading START_HERE.md, STATE_OF_TIGER_CLAW.md, and CLAUDE.md.
 
-This document contains the strategic decisions and priority execution list resulting from the 2026-03-28 planning session and subsequent work. These are not suggestions. These are directives. If a directive in this file conflicts with an assumption from a prior session, this file wins.
+This document contains the strategic decisions and priority execution list resulting from the 2026-03-28 planning session and subsequent implementation work. These are not suggestions. These are directives. If a directive in this file conflicts with an assumption from a prior session, this file wins.
 
 ---
 
@@ -54,135 +54,132 @@ Max runs his own distribution network and wants a white-labeled Tiger Claw insta
 
 ---
 
-## PRIORITY EXECUTION LIST
+## KNOWN RISKS (Updated 2026-03-29 23:45 UTC)
 
-### PHASE 1: FOUNDATION (Complete ✅)
+### Gemini Multiplier Problem (MITIGATED — PR #70)
 
-| # | Task | Status |
-|---|------|--------|
-| 1 | GCP Secret Manager audit — verify all secrets mounted | ✅ Done |
-| 2 | Wizard auth end-to-end test | ✅ Done (PR #62) |
-| 3 | Founding member activation | ✅ Done (4 live tenants) |
+A single user message triggers `runToolLoop()` which generates 5-12 Gemini API calls through the function-calling chain. 50 concurrent users = 250-600 API calls in a burst window. **Model-level circuit breaker is now deployed (PR #70)** — auto-failover to secondary provider (OpenRouter) after 3 consecutive Gemini failures. Unit economics instrumentation is live. **Remaining:** Task #15 (semaphore + exponential backoff) assigned to Claude.
 
-### PHASE 2: RELIABILITY + INTELLIGENCE (Complete ✅)
+### Unit Economics (INSTRUMENTED — PR #70)
 
-| # | Task | Status |
-|---|------|--------|
-| 4 | **Conversation counter — admin dashboard.** Total messages 24h, per-tenant breakdown, last message timestamp. | ✅ Done (PR #66) |
-| 5 | **Reliability audit — application layer.** Catch blocks, status filtering, ICP validation, queue retry, webhook registration. | ✅ Done (specs/RELIABILITY_AUDIT.md) |
-| 6 | **Reliability audit — infrastructure layer.** Redis AOF, maxmemory, Cloud Run scaling, Gemini quota. | GEMINI task |
-| 7 | **Fix feedback loop P1.** `processSystemRoutine()` handles `weekly_checkin`, `feedback_reminder`, `feedback_pause` for both Telegram and LINE tenants. | ✅ Done (PR #66) |
+Tool loop is now instrumented to count API calls per message and store per-tenant/per-day counts in Redis. Data collection is live. Need 1 week of production data before modeling zaključ conclusions.
 
-**Phase 2 reliability hardening (all audit CRITICAL + HIGH + MED findings):**
+### Silent Failure Pattern (HARDENED — PR #67)
 
-| Finding | Severity | PR | Status |
-|---|---|---|---|
-| Stripe Redis idempotency fails open | CRITICAL | #67 | ✅ |
-| LINE webhook error swallowed | HIGH | #67 | ✅ |
-| Cron/value-gap exclude 'onboarding' | CRITICAL | #67 | ✅ |
-| setWebhook gap on activation | CRITICAL | #67 | ✅ |
-| resumeTenant webhook validation + secret | HIGH | #67 | ✅ |
-| ICP validation before phase=complete | CRITICAL | #67 | ✅ |
-| ICP confirmation empty profile guard | HIGH | #67 | ✅ |
-| Telegram enqueue failure not alerted | HIGH | #67 | ✅ |
-| Email webhook unknown sender processed | HIGH | #67 | ✅ |
-| Status negation → explicit allowlist | MED | #67 | ✅ |
-| SOUL.md with — placeholders | MED | #67 | ✅ (blocked by ICP guard) |
+INC-001 through INC-004 were all silent failures. **PR #67 landed 4 CRITICAL + 5 HIGH + 2 MED fixes:** cron error handling with alerting, fetch response validation, replacing empty catch blocks, status allowlist unification.
+
+### Reddit API Credentials (BLOCKED — Awaiting Approval)
+
+Reddit API access application submitted 2026-03-28. The data refinery mine (`reddit_scout.mjs`) hits rate-limit failures on unauthenticated JSON API. Once Reddit approves, plug REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET into GCP Secret Manager.
+
+## BROKEN WINDOWS (Items requiring attention)
+
+1. **Reddit OAuth2** — Awaiting approval from Reddit.
+2. **Stan Store product descriptions** — Updated by Brent on 2026-03-28.
+3. **DATABASE_URL secret pinning** — ✅ FIXED. Unpinned from version 8, now uses latest in all regions. (Gemini 2026-03-29).
 
 ---
 
-### PHASE 3: THE BYOB PIVOT
+## MASTER PRIORITY LIST (Status as of 2026-03-29 23:45 UTC)
 
-| # | Task | Agent | Effort |
-|---|------|-------|--------|
-| 8 | **Remove bot pool from provisioning path.** Strip pool assignment from Stan Store webhook and provisioning flow. Do NOT delete pool.ts — tokens are being repurposed. Open PR. | CLAUDE | 1 day |
-| 9 | **Add Telegram BYOB to wizard.** Mirror LINE pattern in `StepChannelSetup.tsx`. Paste field for BotFather token, visual walkthrough, real-time validation via `getMe`, AES-256-GCM storage. Must be simple enough for a non-technical network marketer. Open PR. | CLAUDE | 1-2 days |
+**Attack in order. Do not skip ahead. Each phase gates the next.**
+
+---
+
+### PHASE 1: FOUNDATION (Complete ✅)
+
+| # | Task | Status | Agent |
+|---|------|--------|-------|
+| 1 | **Verify LINE end-to-end message flow.** | ✅ Done | GEMINI |
+| 2 | **Verify Telegram end-to-end message flow.** | ✅ Done | GEMINI |
+| 3 | **Verify MAGIC_LINK_SECRET in GCP Secret Manager.** | ✅ Done | GEMINI |
+| 4 | **Add conversation counter to admin dashboard.** | ✅ Done (PR #66) | CLAUDE |
+
+---
+
+### PHASE 2: RELIABILITY + INTELLIGENCE (Complete ✅)
+
+| # | Task | Status | Agent |
+|---|------|--------|-------|
+| 5 | **Reliability audit — application layer.** | ✅ Done (PR #67) | CLAUDE |
+| 6 | **Reliability audit — infrastructure layer.** | ✅ Done (Report produced) | GEMINI |
+| 7 | **Fix feedback loop P1.** | ✅ Done (PR #66) | CLAUDE |
+
+---
+
+### PHASE 3: THE BYOB PIVOT (Complete ✅)
+
+| # | Task | Status | Agent |
+|---|------|--------|-------|
+| 8 | **Remove bot pool from provisioning path.** | ✅ Done (PR #68) | CLAUDE + GEMINI |
+| 9 | **Add Telegram BYOB to wizard.** | ✅ Done (PR #68) | CLAUDE + GEMINI |
 
 ---
 
 ### PHASE 4: ACTIVATION (Only After Phases 1-3)
 
+*Brent is running fire tests (3 self-activations) before calling founding members.*
+
 | # | Task | Agent | Effort |
 |---|------|-------|--------|
-| 10 | Activate John & Noon (LINE) | BRENT | 1 hour |
-| 11 | Activate Toon (LINE) — double duty as wizard UX rehearsal | BRENT | 30 min |
+| 10 | Activate John & Noon (LINE) — Brent calling tonight | BRENT | 1 hour |
+| 11 | Activate Toon (LINE) — Brent calling today | BRENT | 30 min |
 | 12 | Activate Debbie (Telegram BYOB) — acid test for wizard UX | BRENT | 1 hour |
 
 ---
 
 ### PHASE 5: HARDENING FOR 50-SEAT RELEASE
 
-| # | Task | Agent | Effort |
+| # | Task | Agent | Status |
 |---|------|-------|--------|
-| 13 | **Model-level circuit breaker.** Gemini 429/5xx three times → flip to secondary provider (OpenRouter). Log every trip. | GEMINI | 1-2 days |
-| 14 | **Model Gemini unit economics.** Instrument tool loop. Count API calls per message. Calculate cost per tenant per month. | GEMINI | Half day + 1 week data |
-| 15 | **Gemini rate limit hardening.** Semaphore on concurrent Gemini calls. Exponential backoff on 429s. | CLAUDE | 1-2 days |
-| 16 | **Write activation playbook.** First message, first hunt, first lead, first conversion. Last wizard screen + handout for downline. | BRENT + CLAUDE | Half day |
+| 13 | **Model-level circuit breaker.** | GEMINI | ✅ Done (PR #70) |
+| 14 | **Model Gemini unit economics.** | GEMINI | ✅ Done (Instrumented) |
+| 15 | **Gemini rate limit hardening.** Semaphore + exp backoff. | CLAUDE | 🟡 Next |
+| 16 | **Write activation playbook.** | BRENT + CLAUDE | 🟡 Next |
 
 ---
 
-### PHASE 6: GROWTH
+### PHASE 6: GROWTH (Sprint 2+)
 
-| # | Task | Agent | Effort |
+| # | Task | Agent | Status |
 |---|------|-------|--------|
-| 17 | Outreach to 7 past customers — complimentary re-activation | BRENT | Few hours |
-| 18 | Mine quality audit — 20 random facts from market_intelligence | GEMINI | 1-2 hours |
-| 19 | Tiered pricing structure for BYOB/BYOK model | BRENT + CLAUDE | 1 day |
-| 20 | Web chat interface — design phase (foundation for white label) | CLAUDE | 1-2 days |
-| 21 | White-label architecture design — org-level multi-tenancy | CLAUDE | 1-2 days |
-| 22 | Hive signal conversion tracking — tenants mark leads as converted | CLAUDE | 2-3 days |
-| 23 | Anthropic SDK integration — wire @anthropic-ai/sdk in ai.ts | CLAUDE | 2-3 days |
-| 24 | Enterprise readiness assessment — gap analysis for Nu Skin corporate | CLAUDE + BRENT | 1 day |
+| 17 | Outreach to 7 past customers — complimentary re-activation | BRENT | 🟡 Pending |
+| 18 | Mine quality audit — 20 random facts from market_intelligence | GEMINI | 🟡 Pending |
+| 19 | Tiered pricing structure for BYOB/BYOK model | BRENT + CLAUDE | 🟡 Pending |
+| 20 | Web chat interface — design phase | CLAUDE | 🟡 Pending |
+| 21 | White-label architecture design | CLAUDE | 🟡 Pending |
+| 22 | Hive signal conversion tracking | CLAUDE | 🟡 Pending |
+| 23 | Anthropic SDK integration | CLAUDE | 🟡 Pending |
+| 24 | Enterprise readiness assessment | CLAUDE + BRENT | 🟡 Pending |
 
 ---
 
 ## AGENT ASSIGNMENT SUMMARY
 
 ### Claude (Terminal) — Application Code & Architecture
-
-Primary tasks: #8, #9, #15, #16, #20, #21, #22, #23, #24
-
-Claude handles all TypeScript code changes, Next.js wizard work, new feature implementation, test writing, reliability fixes in application code, and architecture design.
+Handles Task #15, #16, #20, #21, #22, #23, #24. Focuses on TypeScript, Next.js, and product logic.
 
 ### Gemini (Terminal) — Infrastructure & GCP
-
-Primary tasks: #6, #13, #14, #18
-
-Gemini handles all GCP verification (Secret Manager, Cloud Run, Redis, Memorystore), infrastructure reliability auditing, Gemini API-specific work (circuit breaker, unit economics), and evaluation of its own extraction output in the mine.
-
-### Brent — Strategy, Humans & Activation
-
-Primary tasks: #10, #11, #12, #16, #17, #19, #24
-
-Brent handles all human contact (founding member activation, past customer outreach), pricing decisions, and activation playbook authorship.
+Handles Task #1, #2, #3, #6, #13, #14, #18. Focuses on GCP, reliability auditing, and AI-specific hardening.
 
 ---
 
-## GIT PROTOCOL REMINDER
+## GIT PROTOCOL (MANDATORY)
 
-```
-git checkout -b feat/your-description
-# make changes, run tests (npm test)
-git push origin feat/your-description
-gh pr create --title "feat: description" --body "what and why"
-```
-
-Never push directly to main. Cloud Run deploys automatically on merge via GitHub Actions (both regions).
+1. Never push without running `npm test` first.
+2. Never push directly to main.
+3. Always use `feat/` or `fix/` branches and `gh pr create`.
 
 ---
 
 ## DOCUMENTS TO READ ON SESSION START
 
-Every new agent session must read these files in this order:
-
-1. `START_HERE.md` — resurrection briefing, infrastructure state
-2. `STATE_OF_TIGER_CLAW.md` — architecture, PR history, tenant roster
-3. `STATE_OF_THE_TIGER_PATH_FORWARD.md` — this file: strategic decisions, priority list, agent assignments
-4. `CLAUDE.md` — product philosophy, engineering constraints
-5. `FITFO.md` — operating protocol
-
-Do not trust base-model memory. Trust the repo.
+1. `START_HERE.md`
+2. `STATE_OF_TIGER_CLAW.md`
+3. `STATE_OF_THE_TIGER_PATH_FORWARD.md` (this file)
+4. `CLAUDE.md`
+5. `FITFO.md`
 
 ---
 
-*Last updated: 2026-03-29. Phase 2 complete. Phase 3 (BYOB pivot) is next. PRs #66 + #67 pending review. Proceed.*
+*Last updated: 2026-03-29 23:45 UTC. Phase 1-3 Complete. Phase 5 Task #13/#14 Complete. Proceed.*
