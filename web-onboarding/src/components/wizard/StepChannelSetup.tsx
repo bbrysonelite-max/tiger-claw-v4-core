@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { MessageSquare, MessageCircle, ArrowRight, ShieldCheck, ExternalLink, Send, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
+import { MessageCircle, ArrowRight, ShieldCheck, ExternalLink, Send, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 import type { WizardState } from "../OnboardingModal";
 import { cn } from "@/lib/utils";
 
@@ -135,33 +135,7 @@ export default function StepChannelSetup({ state, updateState, onNext }: Channel
                 </div>
 
                 {/* Optional channels */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* WhatsApp */}
-                    <div className={cn(
-                        "flex flex-col p-5 rounded-2xl border transition-all",
-                        state.whatsappEnabled ? "bg-primary/5 border-primary" : "bg-black/40 border-white/10 hover:border-white/20"
-                    )}>
-                        <div className="flex items-start justify-between mb-3">
-                            <div className="h-10 w-10 bg-[#25D366]/10 rounded-xl flex items-center justify-center border border-[#25D366]/20">
-                                <MessageSquare className="h-5 w-5 text-[#25D366]" />
-                            </div>
-                            <label className="relative inline-flex items-center cursor-pointer">
-                                <input
-                                    type="checkbox"
-                                    className="sr-only peer"
-                                    checked={state.whatsappEnabled}
-                                    onChange={(e) => updateState({ whatsappEnabled: e.target.checked })}
-                                />
-                                <div className="w-11 h-6 bg-white/5 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white/20 after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#25D366]/40 peer-checked:after:bg-[#25D366]"></div>
-                            </label>
-                        </div>
-                        <h4 className="text-sm font-bold text-white mb-1">WhatsApp <span className="text-[10px] text-white/30 font-normal">Optional</span></h4>
-                        <p className="text-xs text-white/40 leading-relaxed">Agent syncs your WhatsApp via QR code sent to Telegram.</p>
-                        <div className="mt-auto pt-3 border-t border-white/5 flex items-center gap-2 text-[10px] text-white/20 uppercase tracking-widest font-bold">
-                            <ShieldCheck className="w-3 h-3 text-[#25D366]" /> Session Persistent
-                        </div>
-                    </div>
-
+                <div className="grid grid-cols-1 gap-4">
                     {/* LINE */}
                     <div className={cn(
                         "flex flex-col p-5 rounded-2xl border transition-all",

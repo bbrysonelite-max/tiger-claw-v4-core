@@ -6,6 +6,7 @@ const mockPoolQuery = vi.hoisted(() => vi.fn().mockResolvedValue({ rows: [] }));
 
 const mockDb = vi.hoisted(() => ({
   getTenantByBotId: vi.fn(),
+  getTenant: vi.fn(),
   addAIKey: vi.fn(),
   upsertBYOKConfig: vi.fn(),
   getSession: vi.fn(),
@@ -128,6 +129,56 @@ describe('POST /wizard/validate-key', () => {
     expect(res.status).toBe(400)
   })
 
+  it('accepts a valid Grok key (200 from x.ai)', async () => {
+    const app = await buildApp()
+    mockFetch.mockResolvedValueOnce({ ok: true, status: 200 })
+    mockDb.addAIKey.mockResolvedValue(undefined)
+
+    const res = await request(app)
+      .post('/wizard/validate-key')
+      .send({ botId: 'b1', keys: [{ provider: 'grok', key: 'xai-validkey', model: 'grok-2-1212' }] })
+
+    expect(res.status).toBe(200)
+    expect(res.body.valid).toBe(true)
+  })
+
+  it('rejects an invalid Grok key (401 from x.ai)', async () => {
+    const app = await buildApp()
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 401 })
+
+    const res = await request(app)
+      .post('/wizard/validate-key')
+      .send({ botId: 'b1', keys: [{ provider: 'grok', key: 'xai-badkey', model: 'grok-2-1212' }] })
+
+    expect(res.status).toBe(200)
+    expect(res.body.valid).toBe(false)
+  })
+
+  it('accepts a valid OpenRouter key (200 from openrouter.ai)', async () => {
+    const app = await buildApp()
+    mockFetch.mockResolvedValueOnce({ ok: true, status: 200 })
+    mockDb.addAIKey.mockResolvedValue(undefined)
+
+    const res = await request(app)
+      .post('/wizard/validate-key')
+      .send({ botId: 'b1', keys: [{ provider: 'openrouter', key: 'sk-or-validkey', model: 'openai/gpt-4o-mini' }] })
+
+    expect(res.status).toBe(200)
+    expect(res.body.valid).toBe(true)
+  })
+
+  it('rejects an invalid OpenRouter key (401 from openrouter.ai)', async () => {
+    const app = await buildApp()
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 401 })
+
+    const res = await request(app)
+      .post('/wizard/validate-key')
+      .send({ botId: 'b1', keys: [{ provider: 'openrouter', key: 'sk-or-badkey', model: 'openai/gpt-4o-mini' }] })
+
+    expect(res.status).toBe(200)
+    expect(res.body.valid).toBe(false)
+  })
+
   it('stores an encrypted key (not plaintext) in the database', async () => {
     const app = await buildApp()
     mockFetch.mockResolvedValueOnce({ ok: true, status: 200 })
@@ -150,3 +201,51 @@ describe('POST /wizard/validate-key', () => {
 })
 
 // ---------------------------------------------------------------------------
+// GET /wizard/bot-status
+// ---------------------------------------------------------------------------
+describe('GET /wizard/bot-status', () => {
+  it('returns 400 when botId is missing', async () => {
+    const app = await buildApp()
+    const res = await request(app).get('/wizard/bot-status')
+    expect(res.status).toBe(400)
+  })
+
+  it('returns 404 when tenant not found', async () => {
+    const app = await buildApp()
+    mockDb.getTenant.mockResolvedValueOnce(null)
+    const res = await request(app).get('/wizard/bot-status?botId=unknown-uuid')
+    expect(res.status).toBe(404)
+  })
+
+  it('returns pending when tenant status is pending', async () => {
+    const app = await buildApp()
+    mockDb.getTenant.mockResolvedValueOnce({ id: 'tid', status: 'pending', slug: 'slug1' })
+    const res = await request(app).get('/wizard/bot-status?botId=tid')
+    expect(res.status).toBe(200)
+    expect(res.body.status).toBe('pending')
+    expect(res.body.botUsername).toBeNull()
+  })
+
+  it('returns live with botUsername when tenant is active', async () => {
+    const app = await buildApp()
+    mockDb.getTenant.mockResolvedValueOnce({ id: 'tid', status: 'active', slug: 'slug1' })
+    mockDb.getTenantBotUsername.mockResolvedValueOnce('mytigerbot')
+    const res = await request(app).get('/wizard/bot-status?botId=tid')
+    expect(res.status).toBe(200)
+    expect(res.body.status).toBe('live')
+    expect(res.body.botUsername).toBe('mytigerbot')
+    expect(res.body.telegramLink).toBe('https://t.me/mytigerbot')
+    expect(res.body.tenantSlug).toBe('slug1')
+  })
+
+  it('returns live with null botUsername when username not yet set', async () => {
+    const app = await buildApp()
+    mockDb.getTenant.mockResolvedValueOnce({ id: 'tid', status: 'onboarding', slug: 'slug1' })
+    mockDb.getTenantBotUsername.mockResolvedValueOnce(null)
+    const res = await request(app).get('/wizard/bot-status?botId=tid')
+    expect(res.status).toBe(200)
+    expect(res.body.status).toBe('live')
+    expect(res.body.botUsername).toBeNull()
+    expect(res.body.telegramLink).toBeNull()
+  })
+})

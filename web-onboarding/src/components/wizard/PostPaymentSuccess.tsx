@@ -17,66 +17,55 @@ export default function PostPaymentSuccess({ state, onClose }: PostPaymentSucces
     const [telegramLink, setTelegramLink] = useState<string | null>(null);
     const [dashboardUrl, setDashboardUrl] = useState<string | null>(null);
 
-    // On mount, check for session_id from Stripe redirect and poll for bot status
+    // Poll /wizard/bot-status using botId (Stan Store flow — no Stripe session_id).
     useEffect(() => {
-        const params = new URLSearchParams(window.location.search);
-        const sessionId = params.get("session_id");
-
-        if (sessionId) {
-            // Poll the API for provisioning status — max 30 retries (90 seconds)
-            let retries = 0;
-            const MAX_RETRIES = 30;
-            let isMounted = true;
-            let pollTimer: ReturnType<typeof setTimeout>;
-
-            const poll = async () => {
-                if (!isMounted) return;
-                try {
-                    const res = await fetch(`${API_BASE}/wizard/status?session_id=${encodeURIComponent(sessionId)}`);
-                    if (!isMounted) return;
-                    const data = await res.json();
-                    if (data.status === "live" && data.botUsername) {
-                        setBotUsername(data.botUsername);
-                        setTelegramLink(data.telegramLink ?? `https://t.me/${data.botUsername}`);
-                        if (data.tenantSlug) {
-                            setDashboardUrl(`/dashboard?slug=${encodeURIComponent(data.tenantSlug)}`);
-                        }
-
-                        setStatus("live");
-                        return; // Stop polling
-                    }
-                    if (data.status === "error") {
-                        setStatus("error");
-                        return; // Stop polling — invalid session
-                    }
-                } catch {
-                    // Keep polling on network errors
-                }
-                if (!isMounted) return;
-                retries++;
-                if (retries < MAX_RETRIES) {
-                    pollTimer = setTimeout(poll, 3000);
-                } else {
-                    // Provisioning taking longer than expected — don't falsely show "live"
-                    setStatus("timeout");
-                }
-            };
-            poll();
-            return () => {
-                isMounted = false;
-                clearTimeout(pollTimer);
-            };
-        } else {
-            // No session_id — simulate for dev/demo
-            const timer = setTimeout(() => {
-                setStatus("live");
-                const devUsername = state.botName?.replace(/\s/g, "_") || "tiger_claw_bot";
-                setBotUsername(devUsername);
-                setTelegramLink(`https://t.me/${devUsername}`);
-            }, 4000);
-            return () => clearTimeout(timer);
+        const botId = state.botId;
+        if (!botId) {
+            setStatus("error");
+            return;
         }
-    }, [state.botName]);
+
+        let retries = 0;
+        const MAX_RETRIES = 40; // 2 minutes
+        let isMounted = true;
+        let pollTimer: ReturnType<typeof setTimeout>;
+
+        const poll = async () => {
+            if (!isMounted) return;
+            try {
+                const res = await fetch(`${API_BASE}/wizard/bot-status?botId=${encodeURIComponent(botId)}`);
+                if (!isMounted) return;
+                const data = await res.json();
+                if (data.status === "live") {
+                    setBotUsername(data.botUsername ?? null);
+                    setTelegramLink(data.telegramLink ?? (data.botUsername ? `https://t.me/${data.botUsername}` : null));
+                    if (data.tenantSlug) {
+                        setDashboardUrl(`/dashboard?slug=${encodeURIComponent(data.tenantSlug)}`);
+                    }
+                    setStatus("live");
+                    return;
+                }
+                if (data.status === "error") {
+                    setStatus("error");
+                    return;
+                }
+            } catch {
+                // Keep polling on network errors
+            }
+            if (!isMounted) return;
+            retries++;
+            if (retries < MAX_RETRIES) {
+                pollTimer = setTimeout(poll, 3000);
+            } else {
+                setStatus("timeout");
+            }
+        };
+        poll();
+        return () => {
+            isMounted = false;
+            clearTimeout(pollTimer);
+        };
+    }, [state.botId]);
 
     return (
         <div className="flex flex-col items-center justify-center p-12 text-center relative overflow-hidden">
@@ -114,7 +103,7 @@ export default function PostPaymentSuccess({ state, onClose }: PostPaymentSucces
                 {status === "deploying"
                     ? `Setting up ${state.botName || "your agent"} on our infrastructure. This usually takes 10-30 seconds.`
                     : status === "live"
-                    ? `Your agent is live and connected via Google Gemini.`
+                    ? `Your agent is live and ready to start prospecting.`
                     : status === "timeout"
                     ? `Your payment was received. Your agent is still being set up — check your email for confirmation or refresh this page in a minute.`
                     : `We couldn't verify your payment session. Please contact support if you were charged.`}

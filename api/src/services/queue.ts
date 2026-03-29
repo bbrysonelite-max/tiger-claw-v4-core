@@ -9,7 +9,7 @@ import TelegramBot from 'node-telegram-bot-api';
 // Provide a stable connection to our newly provisioned Memorystore Redis
 const redisUrl = process.env.REDIS_URL;
 if (!redisUrl) throw new Error("[FATAL] REDIS_URL environment variable is required");
-const connection = new IORedis(redisUrl, {
+export const connection = new IORedis(redisUrl, {
     maxRetriesPerRequest: null,
 });
 
