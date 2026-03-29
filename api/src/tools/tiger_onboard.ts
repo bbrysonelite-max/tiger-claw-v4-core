@@ -315,6 +315,14 @@ async function handleICP(
     const confirmed = normalized === "yes" || normalized === "y" || normalized.startsWith("yes");
 
     if (confirmed) {
+      // Guard: don't confirm an empty ICP — ideal customer profile is required for scout to function
+      if (!icpData.idealPerson?.trim()) {
+        return {
+          ok: true,
+          output: `⚠️ Please describe your ideal ${oarLabel(state.flavor, isSingle ? "single" : isBuilder ? "builder" : "customer")} before confirming. This is required for your scout to work.`,
+          data: { phase, progressPercent: 35 },
+        };
+      }
       icpData.confirmed = true;
       return await transitionAfterICPConfirm(state, tenantId);
     }
@@ -763,6 +771,21 @@ async function handleNaming(
 
   const botName = response.trim();
   state.botName = botName;
+
+  // CRITICAL: ICP must be non-empty before we mark onboarding complete.
+  // A blank idealPerson means the system prompt says "ideal customer: —" forever
+  // and the scout targets nobody. Block here as a last-resort safety net.
+  const customerICP = state.icpSingle ?? state.icpCustomer;
+  const builderICP = state.icpBuilder;
+  const hasCustomerICP = !!customerICP?.idealPerson?.trim();
+  const hasBuilderICP = !builderICP || !!builderICP?.idealPerson?.trim();
+  if (!hasCustomerICP || !hasBuilderICP) {
+    return {
+      ok: true,
+      output: `⚠️ We need to complete your Ideal Customer Profile before I can go live. Who is your ideal customer? (Describe them in a few sentences.)`,
+      data: { phase: "icp_single", progressPercent: 30 },
+    };
+  }
 
   // Generate and write SOUL.md
   const soulContent = await generateSOULmd(state);

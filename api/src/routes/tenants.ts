@@ -17,9 +17,10 @@ import {
   updateTenantStatus,
   updateTenantChannelConfig,
   logAdminEvent,
+  getTenantBotToken,
   type TenantStatus,
 } from "../services/db.js";
-import { encryptToken } from "../services/pool.js";
+import { encryptToken, decryptToken } from "../services/pool.js";
 
 const router = Router();
 
@@ -54,6 +55,34 @@ router.patch("/:tenantId/status", async (req: Request, res: Response) => {
       action: "status_change",
       details: { from: tenant.status, to: status, source: "tenant_api" },
     });
+
+    // Re-register Telegram webhook on activation — guards against the window where
+    // Telegram may have dropped the webhook set during provisioning.
+    if (status === "active" && tenant.preferredChannel === "telegram") {
+      setImmediate(async () => {
+        try {
+          const encryptedToken = await getTenantBotToken(tenant.id);
+          if (!encryptedToken) return;
+          const botToken = decryptToken(encryptedToken);
+          const baseUrl = (process.env["TIGER_CLAW_API_URL"] ?? "").replace(/\/$/, "");
+          const webhookUrl = `${baseUrl}/webhooks/telegram/${tenant.id}`;
+          const webhookSecret = process.env["TELEGRAM_WEBHOOK_SECRET"];
+          const r = await fetch(`https://api.telegram.org/bot${botToken}/setWebhook`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ url: webhookUrl, ...(webhookSecret ? { secret_token: webhookSecret } : {}) }),
+          });
+          const d = await r.json() as { ok: boolean; description?: string };
+          if (d.ok) {
+            console.log(`[tenants] Telegram webhook re-registered on activation for ${tenant.slug}`);
+          } else {
+            console.error(`[tenants] [ALERT] Telegram webhook re-registration failed on activation for ${tenant.slug}: ${d.description}`);
+          }
+        } catch (err: any) {
+          console.error(`[tenants] [ALERT] Webhook re-registration threw on activation for ${tenant.id}:`, err.message);
+        }
+      });
+    }
 
     res.json({ ok: true, tenantId: tenant.id, status });
   } catch (err) {

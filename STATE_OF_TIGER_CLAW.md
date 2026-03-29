@@ -1,7 +1,7 @@
 # STATE OF TIGER CLAW — HARD CONTEXT LOCK
-**Timestamp:** 2026-03-28 (post-demo incident audit — revision 00115)
-**Infrastructure Status:** LIVE. Multi-region. Cron clean. No open PRs.
-**⚠️ WIZARD AUTH BROKEN — See critical issues below. Do NOT send customers to platform.**
+**Timestamp:** 2026-03-29 (post-reliability-hardening — revision 00115)
+**Infrastructure Status:** LIVE. Multi-region. Cron clean. PRs #66 + #67 pending merge.
+**⚠️ See open PRs section below before starting any new work.**
 
 ---
 
@@ -17,10 +17,10 @@ This is the single source of truth for the Tiger Claw repository.
 6. **NO REWRITES:** All tests pass. Do not rewrite architecture.
 7. **15 FLAVORS:** network-marketer, real-estate, health-wellness, airbnb-host, baker, candle-maker, gig-economy, lawyer, plumber, sales-tiger, researcher, interior-designer, dorm-design, mortgage-broker, personal-trainer. Doctor removed.
 8. **PROTOCOL:** Read `CLAUDE.md` before writing any code.
-9. **AI PROVIDERS:** Google, OpenAI, Grok, OpenRouter, Kimi. Anthropic absent — Sprint 2.
+9. **AI PROVIDERS:** Google, OpenAI, Grok, OpenRouter, Kimi. Anthropic absent — Phase 5.
 10. **5-INSTANCE CAP:** Until ~2026-04-03. Do not bulk-activate more tenants.
-11. **NO OPEN PRS:** All PRs through #61 merged. Current Cloud Run revision: `00115`.
-12. **WIZARD AUTH BROKEN (PARTIAL FIX ONLY):** Magic link `token`/`expires` not flowing through to `/wizard/auth` API call. `page.tsx` fixed. `OnboardingModal.tsx` and `StepIdentity.tsx` NOT YET FIXED. Every Stan Store customer gets 401. Fix these first.
+11. **BYOB PIVOT:** Bot pool removed from provisioning path. All new Telegram tenants bring their own token via wizard. `pool.ts` retained for encryption only.
+12. **OPEN PRs:** PRs #66 and #67 are pending review. Do not re-implement their changes.
 
 ---
 
@@ -39,7 +39,7 @@ Cloud Run deploys automatically on merge to main via GitHub Actions (both region
 
 ---
 
-## Current State (2026-03-27)
+## Current State (2026-03-29)
 
 ### Core Infrastructure
 | Service | Detail |
@@ -56,7 +56,6 @@ Cloud Run deploys automatically on merge to main via GitHub Actions (both region
 | Website | `tigerclaw.io` — static Vercel `tiger-bot-website/` |
 | Email out | Resend `hello@tigerclaw.io` `support@tigerclaw.io` |
 | Email in | Postmark `support@tigerclaw.io` → `/webhooks/email` |
-| Bot Pool | ~65 tokens available, AES-256-GCM encrypted |
 | GCP Project | `hybrid-matrix-472500-k5` |
 
 ### Multi-Region Setup
@@ -78,7 +77,7 @@ SEA health confirmed 2026-03-27: revision `tiger-claw-api-00004-294`, uptime 12h
 - `verifyMagicToken(email, token, expires)` — `timingSafeEqual`, checks expiry first
 - `GET /wizard/auth` — requires `?email=&token=&expires=` — 401 if missing/expired
 - `GET /admin/magic-link?email=` — admin generates signed links
-- ⚠️ **Verify `MAGIC_LINK_SECRET` exists in GCP Secret Manager**
+- ⚠️ **Verify `MAGIC_LINK_SECRET` exists in GCP Secret Manager and is mounted in Cloud Run**
 
 ### Rate Limiting (PR #49 — deployed)
 - Telegram/LINE: 60 req/min per tenantId (not per-IP)
@@ -89,12 +88,6 @@ SEA health confirmed 2026-03-27: revision `tiger-claw-api-00004-294`, uptime 12h
 
 **Pipeline:** BullMQ `miningWorker` (2 AM UTC daily) → `market_miner.ts` → Reddit JSON API → `POST /mining/refine` → Gemini 2.0 Flash extraction → `market_intelligence` table (120-day decay)
 
-- `GET /flavors` — returns all flavor keys + scoutQueries (no auth)
-- `POST /mining/refine` — dedup via `isAlreadyMined(sourceUrl)`, then Gemini extraction
-- `market_intelligence` table — migration 017, 120-day `valid_until` decay
-- `tiger_refine.ts` — real Gemini extraction (was mock, fixed PR #56)
-- `market_miner.ts` — new service orchestrating the nightly run
-
 **Schedules:**
 | Scheduler | Time | Role |
 |---|---|---|
@@ -103,42 +96,50 @@ SEA health confirmed 2026-03-27: revision `tiger-claw-api-00004-294`, uptime 12h
 
 **First run (2026-03-27):** 313 facts saved, 14 flavors, dedup working.
 
-**Manual trigger:**
-```bash
-TIGER_CLAW_API_URL=https://api.tigerclaw.io node api/scripts/reddit_scout.mjs
-```
-
 ### Flavor System (15 Customer-Facing)
 
 All 15 have full field set including `scoutQueries`. Doctor removed (healthcare compliance).
+New in PR #51: `dorm-design`, `mortgage-broker`, `personal-trainer`. scoutQueries added in PR #52.
 
-New in PR #51: `dorm-design`, `mortgage-broker`, `personal-trainer`.
-scoutQueries added in PR #52 for all flavors.
+### Redis Key Inventory
+| Key | TTL | Purpose |
+|---|---|---|
+| `chat_history:{tenantId}:{chatId}` | 7 days | Conversation history (Telegram int chatId OR LINE string userId) |
+| `chat_memory:{tenantId}:{chatId}` | 30 days | Compressed memory |
+| `focus_state:{tenantId}:{chatId}` | 24 hours | Active focus session |
+| `msg_count:{tenantId}:{YYYYMMDD}` | 48 hours | Per-tenant daily message counter |
+| `stripe:processed:{sessionId}` | 24 hours | Stripe idempotency guard |
 
 ### PR Ledger
 
 | PR | Status | Description |
 |---|---|---|
-| #20–#24 | ✅ | Memory Architecture V4.1 |
-| #26 | ✅ | Value-gap cron |
-| #27–#36 | ✅ | Dead code, flavor cleanup, fleet dashboard, customer fixes |
-| #37–#40 | ✅ | Launch readiness, session docs |
-| #41–#44 | ✅ | Beta hardening |
-| #45 | ✅ | Email support agent |
-| #46 | ✅ | Multi-provider AI, wizard hardening |
-| #47 | ✅ | next.config.ts build fix (admin dashboard 404) |
-| #48 | ✅ | Migration 017 — market_intelligence table |
-| #49 | ✅ | Webhook rate limiting |
-| #50 | ✅ | HMAC magic links |
-| #51 | ✅ | 3 new flavors (dorm-design, mortgage-broker, personal-trainer) |
-| #52 | ✅ | Data Refinery pipeline (/flavors + /mining/refine) |
-| #53 | ✅ | Multi-region asia-southeast1 + Global HTTPS LB |
-| #54 | ✅ | TypeScript fixes post-merge |
-| #55 | ✅ | Missing fields in network-marketer.ts and real-estate.ts |
-| #56 | ✅ | tiger_refine — real Gemini extraction replaces mock |
-| #57 | ✅ | BullMQ daily mining cron + reddit_scout Reddit fixes |
-| #60 | ✅ | ICP null guard — tiger_scout crash on idealPerson undefined |
-| #61 | ✅ | Double JSON.parse fix — queue.ts + ai.ts SyntaxError every cron minute |
+| #20–#24 | ✅ merged | Memory Architecture V4.1 |
+| #26 | ✅ merged | Value-gap cron |
+| #27–#36 | ✅ merged | Dead code, flavor cleanup, fleet dashboard, customer fixes |
+| #37–#40 | ✅ merged | Launch readiness, session docs |
+| #41–#44 | ✅ merged | Beta hardening |
+| #45 | ✅ merged | Email support agent |
+| #46 | ✅ merged | Multi-provider AI, wizard hardening |
+| #47 | ✅ merged | next.config.ts build fix (admin dashboard 404) |
+| #48 | ✅ merged | Migration 017 — market_intelligence table |
+| #49 | ✅ merged | Webhook rate limiting |
+| #50 | ✅ merged | HMAC magic links |
+| #51 | ✅ merged | 3 new flavors (dorm-design, mortgage-broker, personal-trainer) |
+| #52 | ✅ merged | Data Refinery pipeline (/flavors + /mining/refine) |
+| #53 | ✅ merged | Multi-region asia-southeast1 + Global HTTPS LB |
+| #54 | ✅ merged | TypeScript fixes post-merge |
+| #55 | ✅ merged | Missing fields in network-marketer.ts and real-estate.ts |
+| #56 | ✅ merged | tiger_refine — real Gemini extraction replaces mock |
+| #57 | ✅ merged | BullMQ daily mining cron + reddit_scout Reddit fixes |
+| #60 | ✅ merged | ICP null guard — tiger_scout crash on idealPerson undefined |
+| #61 | ✅ merged | Double JSON.parse fix — queue.ts + ai.ts SyntaxError every cron minute |
+| #62 | ✅ merged | Wizard magic link auth — pass token+expires through to API |
+| #63 | ✅ merged | Safe Gemini text extraction + KeyState defensive merge |
+| #64 | ✅ merged | Update test mocks to match post-PR61 getBotState behavior |
+| #65 | ✅ merged | State of the Tiger — Path Forward doc |
+| #66 | 🔄 pending | Conversation counter (#4), feedback loop LINE fix (#7), reliability audit (#5) |
+| #67 | 🔄 pending | Reliability hardening — 4 CRITICAL + 3 HIGH + 2 MED findings from audit |
 | direct | ✅ | tiger_strike_draft/engage/harvest.ts committed (were missing, blocked all CI) |
 
 ### Tenant Roster
@@ -148,28 +149,21 @@ scoutQueries added in PR #52 for all flavors.
 | `debbie-cameron` | justagreatdirector@outlook.com | live | Founding member |
 | `john-thailand` | vijohn@hotmail.com | live | Founding member — John + Noon (Thailand) |
 | `chana-loha` | chana.loh@gmail.com | live | Founding member |
-| `phaitoon` | phaitoon2010@gmail.com | live | Founding member — Toon; scout functional, in 23h cooldown; first-lead email will fire |
+| `phaitoon` | phaitoon2010@gmail.com | live | Founding member — Toon |
 
-Cron heartbeat shows 11 total active tenants. All clean on revision 00115 as of 2026-03-28.
-5-instance cap. 7 past customers in queue for ~2026-04-03 outreach.
+Cron heartbeat shows 11 total active tenants. 5-instance cap. ~2026-04-03 outreach window.
 Terminated: walkthrough-test-5, john-browser, sales-scout-demo (2026-03-27).
 
 ---
 
 ## Memory Architecture (V4.1 — Complete)
 
-### Redis Keys
-| Key | TTL |
-|---|---|
-| `chat_history:{tenantId}:{chatId}` | 7 days |
-| `chat_memory:{tenantId}:{chatId}` | 30 days |
-| `focus_state:{tenantId}:{chatId}` | 24 hours |
-
 ### tenant_states Keys
 | state_key | Purpose |
 |---|---|
 | `onboard_state` | Onboarding answers |
 | `fact_anchors` | Extracted business facts |
+| `SOUL.md` | System prompt source |
 
 ### Phases
 - [x] Phase 1: Dynamic prompt enrichment — PR #20
@@ -179,17 +173,33 @@ Terminated: walkthrough-test-5, john-browser, sales-scout-demo (2026-03-27).
 
 ---
 
-## Critical Fixes (Must Complete Before Next Demo)
+## Critical Items (Before Phase 3 Launch)
 
-| Priority | Fix | Files Involved |
+| Priority | Fix | Status |
 |---|---|---|
-| 🔴 1 | Complete wizard auth: pass token/expires through OnboardingModal → StepIdentity → `/wizard/auth` | `OnboardingModal.tsx`, `StepIdentity.tsx` |
-| 🔴 2 | Confirm `MAGIC_LINK_SECRET` in Cloud Run (not just Secret Manager) | GCP console / deploy script |
-| 🔴 3 | Fire test: full Stan Store → magic link → wizard → bot flow as paying customer | Manual |
-| 🟡 4 | Fix welcome email false "bot in 60 seconds" promise | `email.ts:sendStanStoreWelcome` |
-| 🟡 5 | Real error message when provisioning stalls (not just spinner timeout) | `OnboardingModal.tsx` |
-| 🟡 6 | `DATABASE_READ_URL` secret — unpin from version 8, use latest | GCP Secret Manager |
-| 🟡 7 | Reddit OAuth2 credentials for scout (TigerClaw-branded app, not personal) | `tiger_scout.ts` |
+| 🔴 1 | Verify `MAGIC_LINK_SECRET` in Cloud Run (not just Secret Manager) | Manual — Brent's lane |
+| 🔴 2 | Fire test: full Stan Store → magic link → wizard → bot as paying customer | Manual — Brent's lane |
+| 🟡 3 | `DATABASE_READ_URL` secret — unpin from version 8, use latest | GCP Secret Manager |
+| 🟡 4 | Reddit OAuth2 credentials for scout (TigerClaw-branded app, not personal) | `tiger_scout.ts` |
+
+## Reliability Audit Findings (specs/RELIABILITY_AUDIT.md)
+
+| Finding | Severity | Status |
+|---|---|---|
+| Stripe Redis idempotency fails open | CRITICAL | ✅ Fixed PR #67 |
+| LINE webhook error swallowed | HIGH | ✅ Fixed PR #67 |
+| Cron excludes 'onboarding' tenants | CRITICAL | ✅ Fixed PR #67 |
+| Value-gap query excludes 'onboarding' | HIGH | ✅ Fixed PR #67 |
+| setWebhook gap on activation | CRITICAL | ✅ Fixed PR #67 |
+| resumeTenant webhook validation | HIGH | ✅ Fixed PR #67 |
+| Feedback loop LINE/Telegram split | HIGH | ✅ Fixed PR #66 |
+| ICP validation before phase=complete | CRITICAL | ✅ Fixed PR #67 |
+| ICP confirmation empty guard | HIGH | ✅ Fixed PR #67 |
+| Telegram enqueue failure not alerted | HIGH | ✅ Fixed PR #67 |
+| Email webhook processes unknown senders | HIGH | ✅ Fixed PR #67 |
+| Status negation not allowlist | MED | ✅ Fixed PR #67 |
+| SOUL.md written with — placeholders | MED | ✅ Blocked by ICP guard (PR #67) |
+| Webhook idempotency check on activation | MED | ⬜ Deferred — low risk |
 
 ## Incidents
 
@@ -197,17 +207,15 @@ See `specs/INCIDENT_LOG.md` — INC-001 through INC-004 documented.
 - INC-001: tiger_scout idealPerson TypeError (Toon's bot) — RESOLVED PR #60
 - INC-002: SyntaxError double JSON.parse hitting all tenants every cron minute — RESOLVED PR #61
 - INC-003: Missing tiger_strike files blocking all CI builds — RESOLVED (direct commit to main)
-- INC-004: Wizard magic link auth 401 for all Stan Store customers — PARTIALLY RESOLVED (page.tsx fixed; modal + step identity NOT fixed)
+- INC-004: Wizard magic link auth 401 for all Stan Store customers — RESOLVED PR #62
 
-## Sprint 2 (Starting ~2026-04-03)
+## Phase 3 (Next Sprint — Starting ~2026-04-03)
 
-1. **Feedback loop fix (P1)** — `processSystemRoutine()` silently ignores `weekly_checkin`, `feedback_reminder`, `feedback_pause`
-2. **Anthropic SDK** — wire `@anthropic-ai/sdk` in `api/src/services/ai.ts`
-3. **Reflexion Loop** — offline Cheese Grater tool for self-improvement
-4. **Bot pool replenishment** — needs physical SIMs + BotFather (hardware-limited)
-5. **Outreach to 7 past customers** — complimentary re-activation offer
-6. **Reddit OAuth2** — register TigerClaw app at reddit.com/prefs/apps, add credentials to Cloud Run
+1. **Remove bot pool from provisioning path** — strip pool assignment from Stan Store webhook + provisioner. Keep `pool.ts`.
+2. **Add Telegram BYOB to wizard** — mirror LINE pattern in `StepChannelSetup.tsx`. Paste field, `getMe` validation, AES-256-GCM storage.
+3. **Activate founding members** — John & Noon (LINE), Toon (LINE), Debbie (Telegram BYOB).
+4. **Outreach to 7 past customers** — complimentary re-activation offer.
 
 ---
 
-*Last updated: 2026-03-28. WIZARD AUTH BROKEN. Fix before demo. Proceed.*
+*Last updated: 2026-03-29. PRs #66 + #67 pending review. Phase 3 queued. Proceed.*

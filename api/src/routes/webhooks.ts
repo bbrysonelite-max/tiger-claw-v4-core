@@ -24,6 +24,7 @@ import {
   createBYOKBot,
   createBYOKSubscription,
   getTenant,
+  getTenantByEmail,
   logAdminEvent,
 } from "../services/db.js";
 import { decryptToken } from "../services/pool.js";
@@ -115,12 +116,21 @@ router.post("/stripe", async (req: Request, res: Response) => {
     }
   }
 
-  // Idempotency guard — prevent duplicate provisioning on Stripe retries
+  // Idempotency guard — prevent duplicate provisioning on Stripe retries.
+  // Fail closed: if Redis is unavailable, return 503 so Stripe retries later.
+  // This is safer than proceeding, which would create duplicate tenants for the same session.
   const sessionObj = event.data?.object as { id?: string } | undefined;
   const sessionId = sessionObj?.id;
   if (sessionId) {
     const idempotencyKey = `stripe:processed:${sessionId}`;
-    const alreadyProcessed = await redis.get(idempotencyKey).catch(() => null);
+    let alreadyProcessed: string | null;
+    try {
+      alreadyProcessed = await redis.get(idempotencyKey);
+    } catch (redisErr) {
+      console.error(`[stripe-webhook] [ALERT] Redis unavailable for idempotency check (session: ${sessionId}):`, redisErr);
+      sendAdminAlert(`🚨 Stripe webhook Redis failure — session ${sessionId} held for retry\nRedis error: ${redisErr instanceof Error ? redisErr.message : String(redisErr)}`).catch(() => {});
+      return res.status(503).json({ error: "Service temporarily unavailable — please retry" });
+    }
     if (alreadyProcessed) {
         console.log(`[stripe-webhook] Duplicate delivery for session ${sessionId} — skipping.`);
         return res.status(200).json({ received: true, duplicate: true });
@@ -237,7 +247,7 @@ router.post("/telegram/:tenantId", webhookLimiter, async (req: Request, res: Res
 
   // Ensure tenant exists and is active/live/onboarding
   const tenant = await getTenant(tenantId);
-  if (!tenant || (tenant.status !== "active" && tenant.status !== "live" && tenant.status !== "onboarding")) {
+  if (!tenant || !["active", "live", "onboarding"].includes(tenant.status)) {
     console.warn(`[webhooks] Telegram update ignored for inactive tenant: ${tenantId}`);
     return res.status(200).send("OK"); // Acknowledge to stop Telegram from retrying
   }
@@ -259,7 +269,8 @@ router.post("/telegram/:tenantId", webhookLimiter, async (req: Request, res: Res
     // Respond quickly to Telegram
     res.status(200).send("OK");
   } catch (err) {
-    console.error(`[webhooks] Failed to enqueue Telegram message for ${tenantId}:`, err);
+    console.error(`[webhooks] [ALERT] Failed to enqueue Telegram message for ${tenantId}:`, err);
+    sendAdminAlert(`⚠️ Telegram enqueue failure — message lost for tenant ${tenantId}\nError: ${err instanceof Error ? err.message : String(err)}`).catch(() => {});
     res.status(500).send("Internal Server Error");
   }
 });
@@ -343,7 +354,8 @@ router.post("/line/:tenantId", webhookLimiter, async (req: Request, res: Respons
         }
       }
     } catch (err) {
-      console.error(`[webhooks] LINE event processing failed for tenant ${tenantId}:`, err);
+      console.error(`[webhooks] [ALERT] LINE event processing failed for tenant ${tenantId}:`, err);
+      sendAdminAlert(`⚠️ LINE webhook processing error\nTenant: ${tenantId}\nError: ${err instanceof Error ? err.message : String(err)}`).catch(() => {});
     }
   });
 });
@@ -381,6 +393,14 @@ router.post("/email", emailLimiter, async (req: Request, res: Response) => {
 
   // Acknowledge immediately — AI reply is async
   res.status(200).json({ received: true });
+
+  // Only run AI processing for known tenants — prevents arbitrary senders from
+  // consuming AI quota. Non-tenant support emails are logged for human review.
+  const senderTenant = await getTenantByEmail(fromEmail).catch(() => null);
+  if (!senderTenant) {
+    console.warn(`[webhooks] Inbound email from unknown sender ${fromEmail} — skipping AI queue. Subject: "${subject}"`);
+    return;
+  }
 
   await emailQueue.add("email-support", {
     fromEmail,
