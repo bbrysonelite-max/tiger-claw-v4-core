@@ -23,6 +23,24 @@ import { VALID_FLAVOR_KEYS } from "../tools/flavorConfig.js";
 // Proactive initiation disabled temporarily during CORS testing
 
 // ---------------------------------------------------------------------------
+// Telegram fetch with timeout
+// Every Telegram API call uses this. Without a timeout, a slow or unreachable
+// Telegram API hangs the provisioner indefinitely, exhausting BullMQ job locks
+// and causing retries that drain the bot pool.
+// ---------------------------------------------------------------------------
+const TG_TIMEOUT_MS = 10_000;
+
+async function tgFetch(url: string, options?: RequestInit): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TG_TIMEOUT_MS);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Provision input
 // ---------------------------------------------------------------------------
 
@@ -183,7 +201,7 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
 
     // Call Telegram API to set the webhook (Use POST with JSON to avoid URL encoding issues)
     const webhookSecret = process.env["TELEGRAM_WEBHOOK_SECRET"];
-    const tgResponse = await fetch(`https://api.telegram.org/bot${resolvedBotToken}/setWebhook`, {
+    const tgResponse = await tgFetch(`https://api.telegram.org/bot${resolvedBotToken}/setWebhook`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ url: webhookUrl, ...(webhookSecret ? { secret_token: webhookSecret } : {}) })
@@ -206,11 +224,11 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
       console.log(`[provisioner] Rebranding Telegram profile...`);
       
       // Update Display Name
-      await fetch(`https://api.telegram.org/bot${resolvedBotToken}/setMyName?name=${encodeURIComponent(tenant.name)}`);
-      
+      await tgFetch(`https://api.telegram.org/bot${resolvedBotToken}/setMyName?name=${encodeURIComponent(tenant.name)}`);
+
       // Update Description/Bio
       const description = `AI-powered ${input.flavor} agent for ${tenant.name}. Managed by Tiger Claw.`;
-      await fetch(`https://api.telegram.org/bot${resolvedBotToken}/setMyDescription?description=${encodeURIComponent(description)}`);
+      await tgFetch(`https://api.telegram.org/bot${resolvedBotToken}/setMyDescription?description=${encodeURIComponent(description)}`);
       
       steps.push(`Telegram profile rebranded to: ${tenant.name}`);
     } catch (rebrandErr) {
@@ -309,7 +327,7 @@ export async function suspendTenant(
 ): Promise<void> {
   // Drop Telegram webhook so it stops receiving messages
   if (tenant.botToken) {
-    await fetch(`https://api.telegram.org/bot${tenant.botToken}/deleteWebhook`);
+    await tgFetch(`https://api.telegram.org/bot${tenant.botToken}/deleteWebhook`).catch(() => {});
   }
   // Set tenantPaused in key_state so LINE and any other channel also stop consuming API keys
   try {
@@ -334,11 +352,21 @@ export async function resumeTenant(tenant: Tenant): Promise<"active" | "onboardi
     const webhookUrl = `${baseUrl}/webhooks/telegram/${tenant.id}`;
 
     const webhookSecret = process.env["TELEGRAM_WEBHOOK_SECRET"];
-    await fetch(`https://api.telegram.org/bot${tenant.botToken}/setWebhook`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url: webhookUrl, ...(webhookSecret ? { secret_token: webhookSecret } : {}) })
-    });
+    try {
+      const tgResponse = await tgFetch(`https://api.telegram.org/bot${tenant.botToken}/setWebhook`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: webhookUrl, ...(webhookSecret ? { secret_token: webhookSecret } : {}) })
+      });
+      const tgData = await tgResponse.json() as { ok: boolean; description?: string };
+      if (!tgData.ok) {
+        console.error(`[provisioner] [ALERT] resumeTenant: Telegram setWebhook failed for ${tenant.id}: ${tgData.description}`);
+        await sendAdminAlert(`⚠️ Telegram webhook re-registration FAILED on resume\nTenant: ${tenant.slug}\nError: ${tgData.description ?? "unknown"}`).catch(() => {});
+      }
+    } catch (err: any) {
+      console.error(`[provisioner] [ALERT] resumeTenant: setWebhook threw for ${tenant.id}:`, err.message);
+      await sendAdminAlert(`⚠️ Telegram webhook re-registration ERROR on resume\nTenant: ${tenant.slug}\nError: ${err.message}`).catch(() => {});
+    }
   }
   // Clear tenantPaused so LINE and other channels resume consuming API keys
   try {
@@ -370,7 +398,7 @@ export async function resumeTenant(tenant: Tenant): Promise<"active" | "onboardi
 
 export async function terminateTenant(tenant: Tenant): Promise<void> {
   if (tenant.botToken) {
-    await fetch(`https://api.telegram.org/bot${tenant.botToken}/deleteWebhook`);
+    await tgFetch(`https://api.telegram.org/bot${tenant.botToken}/deleteWebhook`).catch(() => {});
   }
 
   // Release the pool bot back so it can be reassigned to a future tenant
@@ -396,7 +424,7 @@ export async function deprovisionTenant(tenant: Tenant): Promise<{ steps: string
   const steps: string[] = [];
 
   if (tenant.botToken) {
-    await fetch(`https://api.telegram.org/bot${tenant.botToken}/deleteWebhook`);
+    await tgFetch(`https://api.telegram.org/bot${tenant.botToken}/deleteWebhook`).catch(() => {});
     steps.push("Telegram webhook deleted for Bot Token");
   }
 

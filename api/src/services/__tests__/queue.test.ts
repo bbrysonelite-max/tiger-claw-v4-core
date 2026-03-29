@@ -111,8 +111,10 @@ describe('queue.ts workers', () => {
 
             await processors.cron();
 
-            // Should have queried active tenants
+            // Should have queried active tenants — must include 'onboarding' so paying customers
+            // in the onboarding window receive scouts, value-gap check-ins, and feedback routines.
             expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining("SELECT id, created_at"));
+            expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining("'onboarding'"));
             
             expect(routineQueue.add).toHaveBeenCalledTimes(2);
             expect(routineQueue.add).toHaveBeenCalledWith('nurture_check', expect.objectContaining({ tenantId: 'tenant-1' }), expect.any(Object));

@@ -28,6 +28,31 @@ console.log('[Queue] BullMQ global-cron queue configured.');
 export const miningQueue = new Queue('market-mining', { connection: connection as any });
 console.log('[Queue] BullMQ market-mining queue configured.');
 
+export const marketIntelligenceQueue = new Queue('market-intelligence-batch', { connection: connection as any });
+console.log('[Queue] BullMQ market-intelligence-batch queue configured.');
+
+// Stan Store pre-sale setup queue — creates DB records + sends magic link email.
+// Kept separate from tenant-provisioning (which attaches the Telegram webhook)
+// because the customer triggers provisioning later via the wizard.
+export const onboardingQueue = new Queue('stan-store-onboarding', { connection: connection as any });
+console.log('[Queue] BullMQ stan-store-onboarding queue configured.');
+
+export interface OnboardingJobData {
+    email: string;
+    name: string;
+    slug: string;
+    flavor: string;
+    language: string;
+    region: string;
+    timezone: string;
+    preferredChannel: string;
+    stripeSessionId: string;
+    stripeSubscriptionId?: string;
+    preBotId?: string | null;
+    preUserId?: string | null;
+    stripeCustomerId?: string | null;
+}
+
 export interface ProvisionJobData {
     userId: string;
     botId: string;
@@ -385,7 +410,7 @@ export const cronWorker = SHOULD_RUN_WORKERS ? new Worker(
             const { rows: tenants } = await pool.query(`
                 SELECT id, created_at, feedback_loop_enabled, feedback_paused,
                        last_feedback_at, feedback_reminder_sent_at, feedback_pause_sent_at
-                FROM tenants WHERE status IN ('active', 'live')
+                FROM tenants WHERE status IN ('active', 'live', 'onboarding')
             `);
 
             const nowHour = new Date().getUTCHours();
@@ -457,7 +482,7 @@ export const cronWorker = SHOULD_RUN_WORKERS ? new Worker(
                                 FROM tenants t
                                 LEFT JOIN tenant_leads l ON l.tenant_id = t.id
                                 WHERE t.id = $1
-                                  AND t.status IN ('active', 'live')
+                                  AND t.status IN ('active', 'live', 'onboarding')
                                 GROUP BY t.id
                                 HAVING COUNT(l.id) = 0
                                     OR MAX(l.created_at) < NOW() - INTERVAL '3 days'
@@ -590,6 +615,80 @@ if (miningWorker) {
     miningWorker.on('failed', (job, err) => {
         console.error(`[Mining] Job ${job?.id} failed:`, err?.message ?? err);
         sendAdminAlert(`⚠️ Market mining job failed\nJob: ${job?.id}\nError: ${err?.message ?? String(err)}`).catch(() => {});
+    });
+}
+
+// Stan Store pre-sale setup worker
+// Creates user + bot + subscription DB records, then sends magic link email.
+// Runs in us-central1 only (ENABLE_WORKERS=true). Retries 5x with exponential backoff
+// so a transient DB blip or Resend API hiccup doesn't orphan a paying customer.
+export const onboardingWorker = SHOULD_RUN_WORKERS ? new Worker(
+    'stan-store-onboarding',
+    async (job: Job<OnboardingJobData>) => {
+        const { email, name, slug, flavor, stripeSessionId, stripeSubscriptionId, preBotId, stripeCustomerId } = job.data;
+        console.log(`[Onboarding] Processing Stan Store setup for ${email} (session: ${stripeSessionId})`);
+
+        const { createBYOKUser, createBYOKBot, createBYOKSubscription, logAdminEvent } = await import('./db.js');
+        const { sendStanStoreWelcome } = await import('./email.js');
+
+        const userId = await createBYOKUser(email, name, stripeCustomerId ?? undefined);
+        const botId = (preBotId && preBotId !== 'pending') ? preBotId : await createBYOKBot(userId, name, flavor, 'pending');
+
+        if (stripeSubscriptionId) {
+            await createBYOKSubscription({
+                userId,
+                botId,
+                stripeSubscriptionId,
+                planTier: 'byok_basic',
+            });
+        }
+
+        await logAdminEvent('stan_store_purchase', botId, { email, slug, sessionId: stripeSessionId });
+        await sendStanStoreWelcome(email, name);
+
+        console.log(`[Onboarding] ✅ Stan Store setup complete for ${email} — botId: ${botId}`);
+        return { botId };
+        },
+        { connection: connection as any, concurrency: 5 }
+        ) : null;
+
+        export const marketIntelligenceWorker = SHOULD_RUN_WORKERS ? new Worker(
+        'market-intelligence-batch',
+        async (job: Job) => {
+        const fact = job.data;
+        const { saveMarketFactBulk } = await import('./market_intel.js');
+        // We process individually for now as BullMQ 5.x bulk is complex, 
+        // but it's now async and decoupled from the main chat loop.
+        await saveMarketFactBulk([fact]);
+        return { success: true };
+        },
+        { 
+        connection: connection as any, 
+        concurrency: 10,
+        limiter: {
+            max: 100,
+            duration: 1000
+        }
+        }
+        ) : null;
+
+        if (marketIntelligenceWorker) {
+        marketIntelligenceWorker.on('failed', (job, err) => {
+        console.error(`[Worker] Market Intelligence batch job ${job?.id} failed:`, err);
+        });
+        }
+
+        if (cronWorker) {
+
+    onboardingWorker.on('failed', (job, err) => {
+        console.error(`[Onboarding] Job ${job?.id} failed (attempt ${job?.attemptsMade}):`, err?.message ?? err);
+        // Alert only on terminal failure (all retries exhausted)
+        if ((job?.attemptsMade ?? 0) >= 5) {
+            const data = job?.data as OnboardingJobData | undefined;
+            sendAdminAlert(
+                `🚨 Stan Store onboarding TERMINAL FAILURE — customer has no account\nEmail: ${data?.email}\nSession: ${data?.stripeSessionId}\nError: ${err?.message ?? String(err)}`
+            ).catch(() => {});
+        }
     });
 }
 

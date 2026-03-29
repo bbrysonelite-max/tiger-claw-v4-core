@@ -115,12 +115,21 @@ router.post("/stripe", async (req: Request, res: Response) => {
     }
   }
 
-  // Idempotency guard — prevent duplicate provisioning on Stripe retries
+  // Idempotency guard — prevent duplicate provisioning on Stripe retries.
+  // Fail closed: if Redis is unavailable, return 503 so Stripe retries later.
+  // This is safer than proceeding, which would create duplicate tenants for the same session.
   const sessionObj = event.data?.object as { id?: string } | undefined;
   const sessionId = sessionObj?.id;
   if (sessionId) {
     const idempotencyKey = `stripe:processed:${sessionId}`;
-    const alreadyProcessed = await redis.get(idempotencyKey).catch(() => null);
+    let alreadyProcessed: string | null;
+    try {
+      alreadyProcessed = await redis.get(idempotencyKey);
+    } catch (redisErr) {
+      console.error(`[stripe-webhook] [ALERT] Redis unavailable for idempotency check (session: ${sessionId}):`, redisErr);
+      sendAdminAlert(`🚨 Stripe webhook Redis failure — session ${sessionId} held for retry\nRedis error: ${redisErr instanceof Error ? redisErr.message : String(redisErr)}`).catch(() => {});
+      return res.status(503).json({ error: "Service temporarily unavailable — please retry" });
+    }
     if (alreadyProcessed) {
         console.log(`[stripe-webhook] Duplicate delivery for session ${sessionId} — skipping.`);
         return res.status(200).json({ received: true, duplicate: true });
@@ -343,7 +352,8 @@ router.post("/line/:tenantId", webhookLimiter, async (req: Request, res: Respons
         }
       }
     } catch (err) {
-      console.error(`[webhooks] LINE event processing failed for tenant ${tenantId}:`, err);
+      console.error(`[webhooks] [ALERT] LINE event processing failed for tenant ${tenantId}:`, err);
+      sendAdminAlert(`⚠️ LINE webhook processing error\nTenant: ${tenantId}\nError: ${err instanceof Error ? err.message : String(err)}`).catch(() => {});
     }
   });
 });

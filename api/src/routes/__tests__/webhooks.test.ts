@@ -362,4 +362,27 @@ describe('POST /webhooks/stripe — Phase 1 hardening', () => {
     expect(res.status).toBe(200);
     expect(res.body.ignored).toBe(true);
   });
+
+  it('returns 503 when Redis is unavailable for idempotency check (fail closed)', async () => {
+    // Redis GET throws — must NOT proceed with provisioning (duplicate tenant risk)
+    mockConstructEvent.mockReturnValue({
+      type: 'checkout.session.completed',
+      id: 'evt_redis_down',
+      data: { object: { id: 'cs_redis_down_001', metadata: {}, customer_details: { name: 'Test', email: 'test@example.com' } } },
+    });
+    mockRedisGet.mockRejectedValue(new Error('ECONNREFUSED Redis unavailable'));
+
+    const payload = JSON.stringify({ type: 'checkout.session.completed', data: { object: { id: 'cs_redis_down_001' } } });
+    const res = await request(app)
+      .post('/webhooks/stripe')
+      .set('Content-Type', 'application/octet-stream')
+      .set('stripe-signature', 'valid-sig')
+      .send(Buffer.from(payload));
+
+    expect(res.status).toBe(503);
+    // Should alert ops so the session can be manually reviewed
+    expect(mockSendAdminAlert).toHaveBeenCalledWith(expect.stringContaining('cs_redis_down_001'));
+    // Must NOT have attempted to create a user (no duplicate provisioning)
+    expect(mockCreateBYOKUser).not.toHaveBeenCalled();
+  });
 });
