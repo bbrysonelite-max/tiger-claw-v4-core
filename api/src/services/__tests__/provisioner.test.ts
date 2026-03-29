@@ -8,15 +8,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 process.env['TIGER_CLAW_API_URL'] = 'http://localhost:8080';
 
 const mockGetTenantBySlug = vi.hoisted(() => vi.fn());
-const mockGetPoolStats = vi.hoisted(() => vi.fn());
 const mockCreateTenant = vi.hoisted(() => vi.fn());
 const mockUpdateTenantStatus = vi.hoisted(() => vi.fn());
 const mockLogAdminEvent = vi.hoisted(() => vi.fn());
-const mockListBotPool = vi.hoisted(() => vi.fn());
-const mockAssignBotToken = vi.hoisted(() => vi.fn());
 const mockGetPoolQuery = vi.hoisted(() => vi.fn());
 const mockDecryptToken = vi.hoisted(() => vi.fn((s: string) => `plaintext-${s}`));
-const mockReleaseBot = vi.hoisted(() => vi.fn());
 const mockSendAdminAlert = vi.hoisted(() => vi.fn());
 const mockFetch = vi.hoisted(() => vi.fn());
 const mockGetBotState = vi.hoisted(() => vi.fn());
@@ -25,21 +21,15 @@ const mockGetBotState = vi.hoisted(() => vi.fn());
 
 vi.mock('../db.js', () => ({
   getTenantBySlug: mockGetTenantBySlug,
-  getPoolStats: mockGetPoolStats,
   createTenant: mockCreateTenant,
   updateTenantStatus: mockUpdateTenantStatus,
   logAdminEvent: mockLogAdminEvent,
-  listBotPool: mockListBotPool,
-  assignBotToken: mockAssignBotToken,
   getBotState: mockGetBotState,
   getPool: vi.fn(() => ({ query: mockGetPoolQuery })),
   checkAndGrantFoundingMember: vi.fn().mockResolvedValue(true),
 }));
 
 vi.mock('../pool.js', () => ({
-  getNextAvailable: vi.fn(),
-  assignToTenant: vi.fn(),
-  releaseBot: mockReleaseBot,
   decryptToken: mockDecryptToken,
 }));
 
@@ -92,27 +82,32 @@ const MOCK_TENANT = {
 describe('provisionTenant', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Default: no existing tenant with this slug
     mockGetTenantBySlug.mockResolvedValue(null);
-    // Default: pool has tokens
-    mockGetPoolStats.mockResolvedValue({ total: 31, assigned: 5, unassigned: 26 });
-    // Default: tenant created successfully
     mockCreateTenant.mockResolvedValue(MOCK_TENANT);
-    // Default: bot token assigned successfully
-    mockAssignBotToken.mockResolvedValue({ botToken: 'enc:bot-token', botUsername: 'TestBot' });
-    // Default: pool stats after assignment (still above 50)
     mockGetPoolQuery.mockResolvedValue({ rows: [] });
-    // Default: Telegram webhook call succeeds
-    mockFetch.mockResolvedValue({
-      json: () => Promise.resolve({ ok: true }),
-    });
+    mockFetch.mockResolvedValue({ json: () => Promise.resolve({ ok: true }) });
     vi.stubGlobal('fetch', mockFetch);
+  });
+
+  it('returns error for Telegram tenant with no botToken (BYOB required)', async () => {
+    const result = await provisionTenant(BASE_INPUT); // no botToken
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('botToken is required');
+    expect(mockCreateTenant).not.toHaveBeenCalled();
+  });
+
+  it('LINE tenant can provision without botToken', async () => {
+    const result = await provisionTenant({ ...BASE_INPUT, preferredChannel: 'line' });
+
+    expect(result.success).toBe(true);
+    expect(result.steps.some(s => s.includes('onboarding'))).toBe(true);
   });
 
   it('updates existing tenant when slug is already in use (Stan Store presale)', async () => {
     mockGetTenantBySlug.mockResolvedValue(MOCK_TENANT);
 
-    const result = await provisionTenant(BASE_INPUT);
+    const result = await provisionTenant({ ...BASE_INPUT, botToken: 'byob-token-123' });
 
     expect(result.success).toBe(true);
     expect(mockGetPoolQuery).toHaveBeenCalledWith(
@@ -122,32 +117,18 @@ describe('provisionTenant', () => {
     expect(result.steps.some(s => s.includes('Found pre-existing tenant record'))).toBe(true);
   });
 
-  it('waitlists tenant when bot pool is empty (success=true, waitlisted=true)', async () => {
-    mockGetPoolStats.mockResolvedValue({ total: 0, assigned: 0, unassigned: 0 });
-
-    const result = await provisionTenant(BASE_INPUT);
-
-    expect(result.success).toBe(true);
-    expect(result.waitlisted).toBe(true);
-    expect(result.tenant).toBeDefined();
-    expect(mockSendAdminAlert).toHaveBeenCalledWith(expect.stringContaining('pool is empty'));
-    expect(mockLogAdminEvent).toHaveBeenCalledWith('waitlist', expect.any(String), expect.objectContaining({ reason: 'pool_empty' }));
-  });
-
-  it('succeeds with direct botToken (admin override — skips pool)', async () => {
+  it('succeeds with BYOB botToken (Telegram)', async () => {
     const result = await provisionTenant({
       ...BASE_INPUT,
-      botToken: 'admin-provided-token-123',
+      botToken: 'byob-token-123',
     });
 
     expect(result.success).toBe(true);
-    expect(result.waitlisted).toBeFalsy();
-    expect(mockAssignBotToken).not.toHaveBeenCalled();
-    expect(result.steps).toContain('Bot token provided directly (admin override)');
+    expect(result.steps).toContain('Bot token provided (BYOB)');
   });
 
   it('sets Telegram webhook and moves status to onboarding on success', async () => {
-    const result = await provisionTenant({ ...BASE_INPUT, botToken: 'direct-token' });
+    const result = await provisionTenant({ ...BASE_INPUT, botToken: 'byob-token' });
 
     expect(result.success).toBe(true);
     expect(mockFetch).toHaveBeenCalledWith(expect.stringContaining('setWebhook'), expect.anything());
@@ -161,7 +142,7 @@ describe('provisionTenant', () => {
       json: () => Promise.resolve({ ok: false, description: 'Bad webhook url' }),
     });
 
-    const result = await provisionTenant({ ...BASE_INPUT, botToken: 'direct-token' });
+    const result = await provisionTenant({ ...BASE_INPUT, botToken: 'byob-token' });
 
     expect(result.success).toBe(false);
     expect(result.error).toContain('Webhook attach failed');
@@ -175,95 +156,31 @@ describe('provisionTenant', () => {
   it('returns DB error when createTenant throws', async () => {
     mockCreateTenant.mockRejectedValue(new Error('unique constraint violated'));
 
-    const result = await provisionTenant({ ...BASE_INPUT, botToken: 'direct-token' });
+    const result = await provisionTenant({ ...BASE_INPUT, botToken: 'byob-token' });
 
     expect(result.success).toBe(false);
     expect(result.error).toContain('DB error');
     expect(result.error).toContain('unique constraint violated');
   });
-
-  it('waitlists when pool runs out during assignment (race condition)', async () => {
-    mockAssignBotToken.mockResolvedValue(null); // pool emptied between check and assign
-
-    const result = await provisionTenant(BASE_INPUT);
-
-    expect(result.success).toBe(true);
-    expect(result.waitlisted).toBe(true);
-    expect(mockSendAdminAlert).toHaveBeenCalled();
-  });
 });
 
-// ─── provisionTenant — Phase 2: pool bot release on webhook failure ───────────
+// ─── provisionTenant — webhook failure diagnostics ───────────────────────────
 
-describe('provisionTenant — pool bot release on Telegram webhook failure', () => {
+describe('provisionTenant — webhook failure diagnostics', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetTenantBySlug.mockResolvedValue(null);
-    mockGetPoolStats.mockResolvedValue({ total: 10, assigned: 0, unassigned: 10 });
     mockCreateTenant.mockResolvedValue(MOCK_TENANT);
-    mockAssignBotToken.mockResolvedValue({ botToken: 'enc:pool-token', botUsername: 'PoolBot' });
     mockGetPoolQuery.mockResolvedValue({ rows: [] });
     vi.stubGlobal('fetch', mockFetch);
-  });
-
-  it('releases pool bot when Telegram setWebhook fails (prevents token leak on retry)', async () => {
-    // Telegram API rejects our webhook
-    mockFetch.mockResolvedValue({
-      json: () => Promise.resolve({ ok: false, description: 'Webhook URL is not allowed' }),
-    });
-    // Pool has the assigned bot available for release
-    mockListBotPool.mockResolvedValue([{
-      id: 'pool-bot-uuid',
-      botUsername: 'PoolBot',
-      tenantId: MOCK_TENANT.id,
-    }]);
-
-    const result = await provisionTenant(BASE_INPUT); // no botToken = pool assignment
-
-    expect(result.success).toBe(false);
-    expect(result.error).toContain('Webhook attach failed');
-    // Pool bot must be released so the NEXT retry can get a fresh token
-    expect(mockReleaseBot).toHaveBeenCalledWith('pool-bot-uuid');
-  });
-
-  it('clears bot_token from tenant when pool bot is released after webhook failure', async () => {
-    mockFetch.mockResolvedValue({
-      json: () => Promise.resolve({ ok: false, description: 'Bad webhook url' }),
-    });
-    mockListBotPool.mockResolvedValue([{
-      id: 'pool-bot-uuid',
-      botUsername: 'PoolBot',
-      tenantId: MOCK_TENANT.id,
-    }]);
-
-    await provisionTenant(BASE_INPUT);
-
-    // Tenant bot_token must be cleared so retry gets a clean pool assignment
-    expect(mockGetPoolQuery).toHaveBeenCalledWith(
-      expect.stringContaining('UPDATE tenants SET bot_token = NULL'),
-      [MOCK_TENANT.id]
-    );
-  });
-
-  it('does NOT release pool bot when botToken was directly provided (admin override)', async () => {
-    mockFetch.mockResolvedValue({
-      json: () => Promise.resolve({ ok: false, description: 'Bad webhook url' }),
-    });
-
-    const result = await provisionTenant({ ...BASE_INPUT, botToken: 'admin-direct-token' });
-
-    expect(result.success).toBe(false);
-    // No pool bot to release — admin provided the token directly
-    expect(mockReleaseBot).not.toHaveBeenCalled();
   });
 
   it('includes webhook error in steps for diagnostics', async () => {
     mockFetch.mockResolvedValue({
       json: () => Promise.resolve({ ok: false, description: 'Webhook URL is not allowed' }),
     });
-    mockListBotPool.mockResolvedValue([]);
 
-    const result = await provisionTenant(BASE_INPUT);
+    const result = await provisionTenant({ ...BASE_INPUT, botToken: 'byob-token' });
 
     expect(result.steps.some(s => s.includes('Webhook attachment FAILED'))).toBe(true);
   });
@@ -308,10 +225,7 @@ describe('provisionTenant — flavor validation', () => {
     'network-marketer', 'real-estate', 'health-wellness', 'airbnb-host',
     'baker', 'candle-maker', 'gig-economy', 'lawyer', 'plumber', 'sales-tiger',
   ])('accepts valid flavor key: %s', async (flavor) => {
-    // Set up minimal mocks so the flow doesn't crash past the guard
-    mockGetPoolStats.mockResolvedValue({ total: 10, assigned: 0, unassigned: 10 });
     mockCreateTenant.mockResolvedValue({ ...MOCK_TENANT, flavor });
-    mockAssignBotToken.mockResolvedValue({ botToken: 'enc:token', botUsername: 'Bot' });
     mockGetPoolQuery.mockResolvedValue({ rows: [] });
     vi.stubGlobal('fetch', mockFetch);
     mockFetch.mockResolvedValue({ json: () => Promise.resolve({ ok: true }) });
@@ -428,7 +342,6 @@ describe('terminateTenant', () => {
     mockFetch.mockResolvedValue({ json: () => Promise.resolve({ ok: true }) });
     mockUpdateTenantStatus.mockResolvedValue(undefined);
     mockLogAdminEvent.mockResolvedValue(undefined);
-    mockListBotPool.mockResolvedValue([]);
   });
 
   it('calls deleteWebhook then sets status to terminated', async () => {
@@ -454,41 +367,24 @@ describe('deprovisionTenant', () => {
     mockFetch.mockResolvedValue({ json: () => Promise.resolve({ ok: true }) });
     mockUpdateTenantStatus.mockResolvedValue(undefined);
     mockLogAdminEvent.mockResolvedValue(undefined);
-    mockReleaseBot.mockResolvedValue(undefined);
-  });
-
-  it('finds the assigned pool bot and releases it', async () => {
-    const poolBot = { id: 'pool-bot-id', botUsername: 'PoolBot', tenantId: MOCK_TENANT.id };
-    mockListBotPool.mockResolvedValue([poolBot]);
-
-    const result = await deprovisionTenant(MOCK_TENANT as any);
-
-    expect(mockReleaseBot).toHaveBeenCalledWith('pool-bot-id');
-    expect(result.steps.some((s) => s.includes('@PoolBot'))).toBe(true);
-  });
-
-  it('records step when no pool bot is found for tenant', async () => {
-    mockListBotPool.mockResolvedValue([]); // no assigned bots
-
-    const result = await deprovisionTenant(MOCK_TENANT as any);
-
-    expect(mockReleaseBot).not.toHaveBeenCalled();
-    expect(result.steps.some((s) => s.includes('No pool bot found'))).toBe(true);
   });
 
   it('sets tenant status to terminated', async () => {
-    mockListBotPool.mockResolvedValue([]);
-
     await deprovisionTenant(MOCK_TENANT as any);
 
     expect(mockUpdateTenantStatus).toHaveBeenCalledWith(MOCK_TENANT.id, 'terminated');
   });
 
   it('deletes Telegram webhook before termination', async () => {
-    mockListBotPool.mockResolvedValue([]);
-
     await deprovisionTenant(MOCK_TENANT as any);
 
     expect(mockFetch).toHaveBeenCalledWith(expect.stringContaining('deleteWebhook'), expect.anything());
+  });
+
+  it('logs a deprovision admin event with steps', async () => {
+    const { steps } = await deprovisionTenant(MOCK_TENANT as any);
+
+    expect(mockLogAdminEvent).toHaveBeenCalledWith('deprovision', MOCK_TENANT.id, expect.objectContaining({ steps }));
+    expect(steps.some(s => s.includes('terminated'))).toBe(true);
   });
 });
