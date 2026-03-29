@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI, Content, Part } from '@google/generative-ai';
+import { GoogleGenerativeAI, Content, Part, GenerateContentResult } from '@google/generative-ai';
 import OpenAI from 'openai';
 import { getTenant, getPool, getBotState, setBotState, getTenantBotToken, getHiveSignalWithFallback, queryHivePatterns } from './db.js';
 import TelegramBot from 'node-telegram-bot-api';
@@ -68,7 +68,7 @@ async function trackGeminiError(tenantId: string, err: any) {
         await redis.del(errorCountKey);
         
         // Notify admin
-        const { sendAdminAlert } = await import('./db.js');
+        const { sendAdminAlert } = await import('../routes/admin.js');
         await sendAdminAlert(`🚨 Gemini Circuit Tripped for tenant ${tenantId}\nFailover to OpenRouter activated for 1 hour.`);
     }
 }
@@ -85,7 +85,8 @@ async function isGeminiCircuitTripped(tenantId: string): Promise<boolean> {
 // Phase 5 Task #15: Gemini rate limit hardening — semaphore + backoff
 // Implementation lives in geminiGateway.ts (no tool imports = no circular deps).
 // Re-exported here so existing callers that import from ai.ts keep working.
-export { callGemini } from './geminiGateway.js';
+import { callGemini } from './geminiGateway.js';
+export { callGemini };
 
 // Phase 5 Task #14: Model Gemini unit economics
 async function trackAICalls(tenantId: string, provider: string, calls: number) {
@@ -488,7 +489,7 @@ async function runToolLoopOpenAI(
     }
 
     console.warn(`[${logPrefix}] Max tool iterations reached for OpenAI loop.`);
-    return { reply: 'I hit my reasoning limit. Please try again.', updatedHistory: messages.slice(1) };
+    return { reply: 'I hit my reasoning limit. Please try again.', updatedHistory: messages.slice(1), apiCalls };
 }
 
 function tenantId(toolContext: any): string {
@@ -842,7 +843,7 @@ async function runToolLoop(
         }
 
         apiCalls++;
-        const nextResult = await callGemini(() => chat.sendMessage(functionResponses));
+        const nextResult = await callGemini<GenerateContentResult>(() => chat.sendMessage(functionResponses));
         response = nextResult.response;
 
         const loopText = extractTextFromResponse(response);
