@@ -425,7 +425,7 @@ async function runToolLoopOpenAI(
     history: OpenAI.ChatCompletionMessageParam[],
     toolContext: any,
     logPrefix: string,
-): Promise<{ reply: string; updatedHistory: OpenAI.ChatCompletionMessageParam[]; apiCalls: number }> {
+): Promise<{ reply: string; updatedHistory: OpenAI.ChatCompletionMessageParam[]; apiCalls?: number }> {
     const messages: OpenAI.ChatCompletionMessageParam[] = [
         { role: 'system', content: systemPrompt },
         ...history,
@@ -773,7 +773,7 @@ async function runToolLoop(
     initialResponse: any,
     toolContext: any,
     logPrefix: string,
-): Promise<{ accumulatedText: string; finalResponse: any; apiCalls: number }> {
+): Promise<{ accumulatedText: string; finalResponse: any; apiCalls?: number }> {
     let response = initialResponse;
     let toolCallCount = 0;
     let apiCalls = 1; // initial sendMessage call
@@ -904,7 +904,7 @@ export async function processTelegramMessage(
                 openai, aiProvider.model, systemPrompt, effectiveText, history, toolContext, 'AI',
             );
             await saveOpenAIChatHistory(tenantId, chatId, updatedHistory);
-            await trackAICalls(tenantId, aiProvider.baseURL ? 'openrouter' : 'openai', apiCalls);
+            await trackAICalls(tenantId, aiProvider.baseURL ? 'openrouter' : 'openai', apiCalls ?? 0);
             
             if (reply.trim()) {
                 await bot.sendMessage(chatId, reply);
@@ -941,7 +941,7 @@ export async function processTelegramMessage(
             const updatedHistory = await chat.getHistory();
             await saveChatHistory(tenantId, chatId, updatedHistory);
             console.log(`[AI] History saved: ${updatedHistory.length} entries`);
-            await trackAICalls(tenantId, 'google', apiCalls);
+            await trackAICalls(tenantId, 'google', apiCalls ?? 0);
 
             console.log(`[AI] Reply text length: ${replyText.trim().length}. Sending to Telegram.`);
             if (replyText.trim().length > 0) {
@@ -1044,7 +1044,7 @@ export async function processSystemRoutine(tenantId: string, routineType: string
                 // For tool-loop routines, run the loop
                 if (routineType === 'daily_scout' || routineType === 'nurture_check') {
                     const { apiCalls } = await runToolLoop(chat, initial.response, toolContext, `AI Routine:${routineType}`);
-                    await trackAICalls(tenantId, 'google', apiCalls);
+                    await trackAICalls(tenantId, 'google', apiCalls ?? 0);
                     await trackGeminiSuccess(tenantId);
                     return '';
                 }
@@ -1346,7 +1346,7 @@ export async function processLINEMessage(
             );
             await saveOpenAIChatHistory(tenantId, chatId, newHist);
             replyText = reply;
-            await trackAICalls(tenantId, aiProvider.baseURL ? 'openrouter' : 'openai', apiCalls);
+            await trackAICalls(tenantId, aiProvider.baseURL ? 'openrouter' : 'openai', apiCalls ?? 0);
             await trackGeminiSuccess(tenantId);
         } else {
             try {
@@ -1356,7 +1356,7 @@ export async function processLINEMessage(
                 const updatedHistory = await chat.getHistory();
                 await saveChatHistory(tenantId, chatId, updatedHistory);
                 replyText = geminiReply;
-                await trackAICalls(tenantId, 'google', apiCalls);
+                await trackAICalls(tenantId, 'google', apiCalls ?? 0);
                 await trackGeminiSuccess(tenantId);
             } catch (geminiErr: any) {
                 console.error(`[AI] [ALERT] Gemini path failed for LINE tenant ${tenantId}:`, geminiErr.message);
