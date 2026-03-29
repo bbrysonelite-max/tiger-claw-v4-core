@@ -68,7 +68,7 @@ async function trackGeminiError(tenantId: string, err: any) {
         await redis.del(errorCountKey);
         
         // Notify admin
-        const { sendAdminAlert } = await import('./db.js');
+        const { sendAdminAlert } = await import('../routes/admin.js');
         await sendAdminAlert(`🚨 Gemini Circuit Tripped for tenant ${tenantId}\nFailover to OpenRouter activated for 1 hour.`);
     }
 }
@@ -483,7 +483,7 @@ async function runToolLoopOpenAI(
     }
 
     console.warn(`[${logPrefix}] Max tool iterations reached for OpenAI loop.`);
-    return { reply: 'I hit my reasoning limit. Please try again.', updatedHistory: messages.slice(1) };
+    return { reply: 'I hit my reasoning limit. Please try again.', updatedHistory: messages.slice(1), apiCalls };
 }
 
 function tenantId(toolContext: any): string {
