@@ -656,10 +656,9 @@ export const onboardingWorker = SHOULD_RUN_WORKERS ? new Worker(
         'market-intelligence-batch',
         async (job: Job) => {
         const fact = job.data;
-        const { saveMarketFactBulk } = await import('./market_intel.js');
-        // We process individually for now as BullMQ 5.x bulk is complex, 
-        // but it's now async and decoupled from the main chat loop.
-        await saveMarketFactBulk([fact]);
+        const { saveMarketFact } = await import('./market_intel.js');
+        // Async and decoupled from the main chat loop — processes one fact per job.
+        await saveMarketFact(fact);
         return { success: true };
         },
         { 
@@ -678,8 +677,7 @@ export const onboardingWorker = SHOULD_RUN_WORKERS ? new Worker(
         });
         }
 
-        if (cronWorker) {
-
+if (onboardingWorker) {
     onboardingWorker.on('failed', (job, err) => {
         console.error(`[Onboarding] Job ${job?.id} failed (attempt ${job?.attemptsMade}):`, err?.message ?? err);
         // Alert only on terminal failure (all retries exhausted)
