@@ -342,6 +342,7 @@ export async function resolveAIProvider(tenantId: string): Promise<AIProvider | 
             if (rawKey) {
                 const provider = detectProvider(rawKey) ?? 'google';
                 if (!circuitTripped || provider !== 'google') {
+                    console.log(`[AI] resolveAIProvider: tenant=${tenantId} source=key_state.json provider=${provider}`);
                     return { key: rawKey, provider, model: state.layer2Model ?? defaultModel(provider) };
                 }
                 console.log(`[AI] Gemini circuit tripped for ${tenantId}. Skipping Gemini in key_state.`);
@@ -374,8 +375,10 @@ export async function resolveAIProvider(tenantId: string): Promise<AIProvider | 
                     // OpenAI-compatible providers (kimi, grok, openrouter) — route through OpenAI SDK
                     const compat = OPENAI_COMPAT[provider as string];
                     if (compat) {
+                        console.log(`[AI] resolveAIProvider: tenant=${tenantId} source=bot_ai_config provider=${provider} (openai-compat)`);
                         return { key, provider: 'openai', model: model ?? compat.defaultModel, baseURL: compat.baseURL };
                     }
+                    console.log(`[AI] resolveAIProvider: tenant=${tenantId} source=bot_ai_config provider=${resolvedProvider}`);
                     return { key, provider: resolvedProvider, model: model ?? defaultModel(resolvedProvider) };
                 }
             }
@@ -389,7 +392,10 @@ export async function resolveAIProvider(tenantId: string): Promise<AIProvider | 
         console.warn(`[AI] Gemini circuit tripped for ${tenantId} and no secondary provider found. Falling back to platform default (Gemini) but it will likely fail.`);
     }
     const fallbackKey = process.env.PLATFORM_ONBOARDING_KEY ?? process.env.GOOGLE_API_KEY;
-    if (fallbackKey) return { key: fallbackKey, provider: 'google', model: 'gemini-2.0-flash' };
+    if (fallbackKey) {
+        console.warn(`[AI] WARN: tenant=${tenantId} using platform fallback key — BYOK key not found. Check bot_ai_config and key_state.json.`);
+        return { key: fallbackKey, provider: 'google', model: 'gemini-2.0-flash' };
+    }
 
     console.error(`[AI] [ALERT] resolveAIProvider: no key found for tenant ${tenantId} — all resolution paths exhausted.`);
     return undefined;
