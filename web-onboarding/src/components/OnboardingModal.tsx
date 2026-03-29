@@ -192,7 +192,16 @@ export default function OnboardingModal({ onClose, initialEmail, initialBotId, i
                                     setIsDeploying={setIsDeploying}
                                     onLaunch={handleLaunch}
                                     onNext={() => {
+                                        // Clear all wizard-related session storage on successful hatch.
+                                        // tc_session holds the purchase session token — must be cleared so
+                                        // a stale token cannot be replayed into a new wizard session.
                                         try { sessionStorage.removeItem(SESSION_KEY); } catch { /* ignore */ }
+                                        try { sessionStorage.removeItem("tc_session"); } catch { /* ignore */ }
+                                        // Reset React state to initial values. Preserve only botId and
+                                        // botName — PostPaymentSuccess needs botId for polling and botName
+                                        // for the deploying message. All other sensitive fields (keys,
+                                        // tokens, email) are wiped immediately.
+                                        setState({ ...initialState, botId: state.botId, botName: state.botName });
                                         setDeploymentComplete(true);
                                     }}
                                 />
