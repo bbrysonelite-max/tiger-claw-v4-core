@@ -1,6 +1,6 @@
 # STATE OF TIGER CLAW — HARD CONTEXT LOCK
-**Timestamp:** 2026-03-29 (post-reliability-hardening — revision 00115)
-**Infrastructure Status:** LIVE. Multi-region. Cron clean. PRs #66 + #67 pending merge.
+**Timestamp:** 2026-03-29 (post-Circuit Breaker implementation — revision 00115)
+**Infrastructure Status:** LIVE. Multi-region. Cron clean. PRs #66 + #67 merged. PRs #68 + #70 open.
 **⚠️ See open PRs section below before starting any new work.**
 
 ---
@@ -20,7 +20,8 @@ This is the single source of truth for the Tiger Claw repository.
 9. **AI PROVIDERS:** Google, OpenAI, Grok, OpenRouter, Kimi. Anthropic absent — Phase 5.
 10. **5-INSTANCE CAP:** Until ~2026-04-03. Do not bulk-activate more tenants.
 11. **BYOB PIVOT:** Bot pool removed from provisioning path. All new Telegram tenants bring their own token via wizard. `pool.ts` retained for encryption only.
-12. **OPEN PRs:** PRs #66 and #67 are pending review. Do not re-implement their changes.
+12. **OPEN PRs:** PRs #68 and #70 are pending review. Do not re-implement their changes. PR #66 and #67 are merged.
+13. **HARDENING:** Model-level circuit breaker for Gemini + AI unit economics tracking implemented and verified (PR #70). Unpinned DATABASE_URL (Task #3 fixed).
 
 ---
 
@@ -138,8 +139,10 @@ New in PR #51: `dorm-design`, `mortgage-broker`, `personal-trainer`. scoutQuerie
 | #63 | ✅ merged | Safe Gemini text extraction + KeyState defensive merge |
 | #64 | ✅ merged | Update test mocks to match post-PR61 getBotState behavior |
 | #65 | ✅ merged | State of the Tiger — Path Forward doc |
-| #66 | 🔄 pending | Conversation counter (#4), feedback loop LINE fix (#7), reliability audit (#5) |
-| #67 | 🔄 pending | Reliability hardening — 4 CRITICAL + 3 HIGH + 2 MED findings from audit |
+| #66 | ✅ merged | Conversation counter (#4), feedback loop LINE fix (#7), reliability audit (#5) |
+| #67 | ✅ merged | Reliability hardening — 4 CRITICAL + 3 HIGH + 2 MED findings from audit |
+| #68 | 🔄 pending | Phase 3 BYOB pivot — remove bot pool + Telegram BYOB wizard |
+| #70 | 🔄 pending | Phase 5 Task #13/#14: Gemini circuit breaker + AI economics |
 | direct | ✅ | tiger_strike_draft/engage/harvest.ts committed (were missing, blocked all CI) |
 
 ### Tenant Roster
@@ -177,9 +180,9 @@ Terminated: walkthrough-test-5, john-browser, sales-scout-demo (2026-03-27).
 
 | Priority | Fix | Status |
 |---|---|---|
-| 🔴 1 | Verify `MAGIC_LINK_SECRET` in Cloud Run (not just Secret Manager) | Manual — Brent's lane |
+| ✅ 1 | Verify `MAGIC_LINK_SECRET` in Cloud Run (not just Secret Manager) | ✅ Verified and Mounted |
 | 🔴 2 | Fire test: full Stan Store → magic link → wizard → bot as paying customer | Manual — Brent's lane |
-| 🟡 3 | `DATABASE_READ_URL` secret — unpin from version 8, use latest | GCP Secret Manager |
+| ✅ 3 | `DATABASE_READ_URL` secret — unpin from version 8, use latest | ✅ Unpinned and Deployed |
 | 🟡 4 | Reddit OAuth2 credentials for scout (TigerClaw-branded app, not personal) | `tiger_scout.ts` |
 
 ## Reliability Audit Findings (specs/RELIABILITY_AUDIT.md)
@@ -209,13 +212,13 @@ See `specs/INCIDENT_LOG.md` — INC-001 through INC-004 documented.
 - INC-003: Missing tiger_strike files blocking all CI builds — RESOLVED (direct commit to main)
 - INC-004: Wizard magic link auth 401 for all Stan Store customers — RESOLVED PR #62
 
-## Phase 3 (Next Sprint — Starting ~2026-04-03)
+## Phase 3 (BYOB Pivot — Task #8/#9 COMPLETED)
 
-1. **Remove bot pool from provisioning path** — strip pool assignment from Stan Store webhook + provisioner. Keep `pool.ts`.
-2. **Add Telegram BYOB to wizard** — mirror LINE pattern in `StepChannelSetup.tsx`. Paste field, `getMe` validation, AES-256-GCM storage.
+1. **Remove bot pool from provisioning path** — ✅ DONE (PR #68)
+2. **Add Telegram BYOB to wizard** — ✅ DONE (PR #68)
 3. **Activate founding members** — John & Noon (LINE), Toon (LINE), Debbie (Telegram BYOB).
 4. **Outreach to 7 past customers** — complimentary re-activation offer.
 
 ---
 
-*Last updated: 2026-03-29. PRs #66 + #67 pending review. Phase 3 queued. Proceed.*
+*Last updated: 2026-03-29. PRs #66 + #67 merged. PRs #68 + #70 open. Proceed.*

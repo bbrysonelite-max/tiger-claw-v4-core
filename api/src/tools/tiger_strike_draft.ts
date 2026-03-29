@@ -20,6 +20,7 @@ import { getReadPool, getWritePool } from "../services/db.js";
 import { getTenantState } from "../services/tenant_data.js";
 import { loadFlavorConfig } from "./flavorConfig.js";
 import type { ToolContext, ToolResult } from "./ToolContext.js";
+import { callGemini } from "../services/geminiGateway.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -143,7 +144,7 @@ async function scoreEngagement(
     `- Is the platform appropriate for a reply? (10%)\n\n` +
     `Output ONLY valid JSON: { "score": <number>, "reason": "<one sentence>" }`;
 
-  const result = await model.generateContent(prompt);
+  const result = await callGemini(() => model.generateContent(prompt));
   const raw = result.response.text?.() ?? "";
   const jsonStr = raw.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/\s*```$/i, "").trim();
 
@@ -193,7 +194,7 @@ async function draftReply(
     `5. If you have relevant personal experience, share it briefly.\n\n` +
     `Output ONLY the reply text. No quotes, no labels, no explanation.`;
 
-  const result = await model.generateContent(prompt);
+  const result = await callGemini(() => model.generateContent(prompt));
   let reply = result.response.text?.() ?? "";
 
   // Enforce platform length limits

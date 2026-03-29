@@ -13,6 +13,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { getTenantState, saveTenantState } from './tenant_data.js';
 import { getChatHistory } from './ai.js';
+import { callGemini } from './geminiGateway.js';
 
 export interface FactAnchorEntry {
     value: string;
@@ -79,13 +80,13 @@ export async function extractFactAnchors(
         const genAI = new GoogleGenerativeAI(platformKey);
         const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
-        const result = await model.generateContent(
+        const result = await callGemini(() => model.generateContent(
             `Extract any stated facts about the operator's business from this conversation. ` +
             `Output ONLY valid JSON with these optional fields (omit fields with no data):\n` +
             `{ "productMentioned": "string", "icpUpdate": "string", "objectionRaised": "string", ` +
             `"preferenceStated": "string", "hotLeadMentioned": "string" }\n\n` +
             `Conversation:\n${plainText}`,
-        );
+        ));
 
         const raw = result.response.text?.() ?? '';
         // Strip any markdown code fences before parsing

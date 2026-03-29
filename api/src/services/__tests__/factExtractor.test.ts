@@ -15,6 +15,10 @@ vi.mock('../ai.js', () => ({
     getChatHistory: mockGetChatHistory,
 }));
 
+vi.mock('../geminiGateway.js', () => ({
+    callGemini: (fn: () => Promise<unknown>) => fn(),
+}));
+
 vi.mock('@google/generative-ai', () => ({
     GoogleGenerativeAI: vi.fn(function() {
         return {
