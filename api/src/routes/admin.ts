@@ -831,6 +831,49 @@ router.post("/pool/:ref/release", async (req: Request, res: Response) => {
   }
 });
 
+// GET /admin/pool/tokens — export decrypted tokens for available pool bots
+// Used to grab pool tokens for use as BYOB tokens in the wizard (Brent's personal fleet).
+// Returns up to ?limit= available bots with their plaintext token.
+router.get("/pool/tokens", async (req: Request, res: Response) => {
+  try {
+    const limit = Math.min(parseInt((req.query["limit"] as string) || "10", 10), 50);
+    const all = await listBotPool("available");
+    const slice = all.slice(0, limit);
+    const { decryptToken } = await import("../services/pool.js");
+    const tokens = slice.map((b) => ({
+      id: b.id,
+      username: b.botUsername,
+      token: decryptToken(b.botToken),
+    }));
+    return res.json({ count: tokens.length, tokens });
+  } catch (err) {
+    return res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+// POST /admin/pool/retire-batch — bulk-retire pool bots by ID array
+// Body: { ids: string[] }
+router.post("/pool/retire-batch", async (req: Request, res: Response) => {
+  const { ids } = req.body as { ids?: string[] };
+  if (!Array.isArray(ids) || ids.length === 0) {
+    return res.status(400).json({ error: "ids array is required" });
+  }
+  try {
+    const results: { id: string; ok: boolean; error?: string }[] = [];
+    for (const id of ids) {
+      try {
+        await retireBot(id);
+        results.push({ id, ok: true });
+      } catch (err) {
+        results.push({ id, ok: false, error: err instanceof Error ? err.message : String(err) });
+      }
+    }
+    return res.json({ retired: results.filter((r) => r.ok).length, results });
+  } catch (err) {
+    return res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
 // DELETE /admin/pool/:ref — retire a bot (token revoked/problematic)
 router.delete("/pool/:ref", async (req: Request, res: Response) => {
   const ref = req.params["ref"]!;
