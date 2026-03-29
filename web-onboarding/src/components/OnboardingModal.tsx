@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 
 // Wizard Steps
 import StepIdentity from "./wizard/StepIdentity";
+import StepChannelSetup from "./wizard/StepChannelSetup";
 import StepAIConnection from "./wizard/StepAIConnection";
 import StepReviewPayment from "./wizard/StepReviewPayment";
 import PostPaymentSuccess from "./wizard/PostPaymentSuccess";
@@ -29,6 +30,7 @@ export interface WizardState {
     connectionType: "byok" | "managed";
     aiKeys: AIKeyConfig[];
     whatsappEnabled: boolean;
+    telegramBotToken?: string;
     lineToken?: string;
     contactsRaw: string;
     botId?: string;
@@ -69,7 +71,7 @@ export default function OnboardingModal({ onClose, initialEmail, magicToken, mag
     const [isDeploying, setIsDeploying] = useState(false);
     const [deploymentComplete, setDeploymentComplete] = useState(false);
 
-    const totalSteps = 3;
+    const totalSteps = 4;
 
 
     const handleNext = () => {
@@ -167,13 +169,20 @@ export default function OnboardingModal({ onClose, initialEmail, magicToken, mag
                                 />
                             )}
                             {step === 2 && (
-                                <StepAIConnection
+                                <StepChannelSetup
                                     state={state}
                                     updateState={updateState}
                                     onNext={handleNext}
                                 />
                             )}
                             {step === 3 && (
+                                <StepAIConnection
+                                    state={state}
+                                    updateState={updateState}
+                                    onNext={handleNext}
+                                />
+                            )}
+                            {step === 4 && (
                                 <StepReviewPayment
                                     state={state}
                                     isDeploying={isDeploying}
