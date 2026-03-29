@@ -447,6 +447,13 @@ export const cronWorker = SHOULD_RUN_WORKERS ? new Worker(
                         }
                     }
 
+                    // Skip AI routines for tenants still in bot calibration (onboarding).
+                    // nurture_check / daily_scout calling tiger_onboard mid-calibration
+                    // corrupts the onboarding state and burns the user's API quota.
+                    const onboardState = await getBotState<{ phase?: string }>(tenant.id, 'onboard_state.json');
+                    const onboardComplete = !onboardState || onboardState.phase === 'complete';
+                    if (!onboardComplete) continue;
+
                     // Nurture check — runs every cron cycle (jobId dedup prevents parallel runs)
                     await routineQueue.add('nurture_check', {
                         tenantId: tenant.id,
