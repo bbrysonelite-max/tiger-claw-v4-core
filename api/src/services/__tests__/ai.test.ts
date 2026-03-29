@@ -8,6 +8,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 // ─── Hoist mock factories so vi.mock factories can reference them ─────────────
 const mockRedisGet = vi.hoisted(() => vi.fn());
 const mockRedisSet = vi.hoisted(() => vi.fn());
+const mockRedisKeys = vi.hoisted(() => vi.fn());
+const mockRedisIncr = vi.hoisted(() => vi.fn());
+const mockRedisExpire = vi.hoisted(() => vi.fn());
 const mockFsExistsSync = vi.hoisted(() => vi.fn());
 const mockFsReadFileSync = vi.hoisted(() => vi.fn());
 const mockFsMkdirSync = vi.hoisted(() => vi.fn());
@@ -19,7 +22,7 @@ const mockDecryptToken = vi.hoisted(() => vi.fn((s: string) => `decrypted:${s}`)
 
 vi.mock('ioredis', () => ({
   default: vi.fn().mockImplementation(function () {
-    return { get: mockRedisGet, set: mockRedisSet };
+    return { get: mockRedisGet, set: mockRedisSet, keys: mockRedisKeys, incr: mockRedisIncr, expire: mockRedisExpire };
   }),
 }));
 
@@ -91,7 +94,7 @@ vi.mock('@google/generative-ai', () => ({
 }));
 
 // Import AFTER all mocks are defined
-import { getChatHistory, saveChatHistory, buildSystemPrompt, buildFirstMessageText } from '../ai.js';
+import { getChatHistory, saveChatHistory, buildSystemPrompt, buildFirstMessageText, getTenantLineUserIds, getConversationStats, incrementMessageCounter } from '../ai.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -174,6 +177,8 @@ describe('saveChatHistory', () => {
   beforeEach(() => {
     mockRedisGet.mockReset();
     mockRedisSet.mockReset().mockResolvedValue('OK');
+    mockRedisIncr.mockReset().mockResolvedValue(1);
+    mockRedisExpire.mockReset().mockResolvedValue(1);
   });
 
   it('calls Redis set with 7-day TTL', async () => {
@@ -337,5 +342,119 @@ describe('buildFirstMessageText', () => {
   it('returns plain text when both onboarding complete and not first message', () => {
     const result = buildFirstMessageText('scan for leads', true, false);
     expect(result).toBe('scan for leads');
+  });
+});
+
+// ─── getTenantLineUserIds ─────────────────────────────────────────────────────
+// Validates that LINE userIds (non-integer key suffixes) are correctly extracted.
+
+describe('getTenantLineUserIds', () => {
+  beforeEach(() => {
+    mockRedisKeys.mockReset();
+  });
+
+  it('returns LINE userIds (non-integer key suffixes)', async () => {
+    mockRedisKeys.mockResolvedValue([
+      'chat_history:tenant-1:Uabc123def456',
+      'chat_history:tenant-1:U9999999999ab',
+    ]);
+    const result = await getTenantLineUserIds('tenant-1');
+    expect(result).toEqual(['Uabc123def456', 'U9999999999ab']);
+  });
+
+  it('filters out Telegram integer chatIds', async () => {
+    mockRedisKeys.mockResolvedValue([
+      'chat_history:tenant-1:12345678',
+      'chat_history:tenant-1:Uabc123',
+      'chat_history:tenant-1:98765',
+    ]);
+    const result = await getTenantLineUserIds('tenant-1');
+    expect(result).toEqual(['Uabc123']);
+  });
+
+  it('returns empty array when no LINE keys exist', async () => {
+    mockRedisKeys.mockResolvedValue([
+      'chat_history:tenant-1:11111',
+      'chat_history:tenant-1:22222',
+    ]);
+    const result = await getTenantLineUserIds('tenant-1');
+    expect(result).toEqual([]);
+  });
+
+  it('returns empty array when no keys at all', async () => {
+    mockRedisKeys.mockResolvedValue([]);
+    const result = await getTenantLineUserIds('tenant-1');
+    expect(result).toEqual([]);
+  });
+});
+
+// ─── getConversationStats ─────────────────────────────────────────────────────
+
+describe('getConversationStats', () => {
+  beforeEach(() => {
+    mockRedisGet.mockReset().mockResolvedValue(null);
+  });
+
+  it('returns zero counts when no Redis keys exist', async () => {
+    const result = await getConversationStats(['tenant-1']);
+    expect(result).toHaveLength(1);
+    expect(result[0]!.messagesToday).toBe(0);
+    expect(result[0]!.messagesLast24h).toBe(0);
+  });
+
+  it('sums today + yesterday for last24h', async () => {
+    const now = new Date();
+    const today = now.toISOString().slice(0, 10).replace(/-/g, '');
+    const yesterday = new Date(now.getTime() - 86400000).toISOString().slice(0, 10).replace(/-/g, '');
+
+    mockRedisGet.mockImplementation((key: string) => {
+      if (key.includes(today)) return Promise.resolve('5');
+      if (key.includes(yesterday)) return Promise.resolve('3');
+      return Promise.resolve(null);
+    });
+
+    const result = await getConversationStats(['tenant-1']);
+    expect(result[0]!.messagesToday).toBe(5);
+    expect(result[0]!.messagesLast24h).toBe(8);
+  });
+
+  it('handles multiple tenants independently', async () => {
+    mockRedisGet.mockImplementation((key: string) => {
+      if (key.includes('tenant-a')) return Promise.resolve('10');
+      if (key.includes('tenant-b')) return Promise.resolve('2');
+      return Promise.resolve(null);
+    });
+
+    const result = await getConversationStats(['tenant-a', 'tenant-b']);
+    const a = result.find((r) => r.tenantId === 'tenant-a')!;
+    const b = result.find((r) => r.tenantId === 'tenant-b')!;
+    expect(a.messagesLast24h).toBe(20); // 10 today + 10 yesterday
+    expect(b.messagesLast24h).toBe(4);
+  });
+});
+
+// ─── incrementMessageCounter ──────────────────────────────────────────────────
+
+describe('incrementMessageCounter', () => {
+  beforeEach(() => {
+    mockRedisIncr.mockReset().mockResolvedValue(1);
+    mockRedisExpire.mockReset().mockResolvedValue(1);
+  });
+
+  it('increments the correct daily key', async () => {
+    await incrementMessageCounter('tenant-xyz');
+    expect(mockRedisIncr).toHaveBeenCalledTimes(1);
+    const key = mockRedisIncr.mock.calls[0]![0] as string;
+    expect(key).toMatch(/^msg_count:tenant-xyz:\d{8}$/);
+  });
+
+  it('sets a 48h TTL on the counter key', async () => {
+    await incrementMessageCounter('tenant-xyz');
+    expect(mockRedisExpire).toHaveBeenCalledWith(expect.stringContaining('msg_count:tenant-xyz:'), 172800);
+  });
+
+  it('does not throw if Redis fails', async () => {
+    mockRedisIncr.mockRejectedValue(new Error('Redis unavailable'));
+    await expect(incrementMessageCounter('tenant-xyz')).resolves.toBeUndefined();
   });
 });

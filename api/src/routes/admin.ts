@@ -246,6 +246,42 @@ router.get("/metrics", requireAdmin, async (_req: Request, res: Response) => {
 });
 
 // ---------------------------------------------------------------------------
+// GET /admin/conversations — conversation counter heartbeat
+// Returns total messages in last 24h and per-tenant breakdown.
+// Data source: Redis msg_count:{tenantId}:{YYYYMMDD} keys written by saveChatHistory.
+// ---------------------------------------------------------------------------
+
+router.get("/conversations", requireAdmin, async (_req: Request, res: Response) => {
+  try {
+    const tenants = await listTenants();
+    const { getConversationStats } = await import("../services/ai.js");
+    const stats = await getConversationStats(tenants.map((t) => t.id));
+
+    const byTenant = tenants.map((t) => {
+      const s = stats.find((x) => x.tenantId === t.id)!;
+      return {
+        tenantId: t.id,
+        slug: t.slug,
+        name: t.name,
+        status: t.status,
+        messagesToday: s.messagesToday,
+        messagesLast24h: s.messagesLast24h,
+        lastMessageAt: t.lastActivityAt?.toISOString() ?? null,
+      };
+    });
+
+    return res.json({
+      totalLast24h: byTenant.reduce((s, c) => s + c.messagesLast24h, 0),
+      totalToday: byTenant.reduce((s, c) => s + c.messagesToday, 0),
+      byTenant,
+    });
+  } catch (err) {
+    console.error("[admin] GET /conversations error:", err);
+    return res.status(500).json({ error: "Failed to fetch conversation stats" });
+  }
+});
+
+// ---------------------------------------------------------------------------
 // GET /admin/flavors — GAP 3: flavor distribution across tenants
 // ---------------------------------------------------------------------------
 

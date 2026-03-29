@@ -160,6 +160,47 @@ export async function saveChatHistory(tenantId: string, chatId: number, history:
         'EX',
         86400 * 7,
     );
+    await incrementMessageCounter(tenantId);
+}
+
+// ─── Conversation counter ─────────────────────────────────────────────────────
+// Tracks per-tenant daily message exchange counts in Redis.
+// Key: msg_count:{tenantId}:{YYYYMMDD} — TTL 48h so yesterday + today are always readable.
+// One increment = one user→AI exchange (not individual messages).
+
+export async function incrementMessageCounter(tenantId: string): Promise<void> {
+    try {
+        const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+        const key = `msg_count:${tenantId}:${today}`;
+        await redis.incr(key);
+        await redis.expire(key, 172800); // 48h
+    } catch {
+        // Counter failure must never affect message delivery
+    }
+}
+
+export async function getConversationStats(tenantIds: string[]): Promise<{
+    tenantId: string;
+    messagesLast24h: number;
+    messagesToday: number;
+}[]> {
+    const now = new Date();
+    const today = now.toISOString().slice(0, 10).replace(/-/g, '');
+    const yesterday = new Date(now.getTime() - 86400000).toISOString().slice(0, 10).replace(/-/g, '');
+
+    return Promise.all(tenantIds.map(async (tenantId) => {
+        try {
+            const [todayVal, yesterdayVal] = await Promise.all([
+                redis.get(`msg_count:${tenantId}:${today}`),
+                redis.get(`msg_count:${tenantId}:${yesterday}`),
+            ]);
+            const messagesToday = parseInt(todayVal ?? '0', 10);
+            const messagesYesterday = parseInt(yesterdayVal ?? '0', 10);
+            return { tenantId, messagesToday, messagesLast24h: messagesToday + messagesYesterday };
+        } catch {
+            return { tenantId, messagesToday: 0, messagesLast24h: 0 };
+        }
+    }));
 }
 
 export async function clearTenantChatHistory(tenantId: string): Promise<number> {
@@ -168,6 +209,16 @@ export async function clearTenantChatHistory(tenantId: string): Promise<number> 
     await redis.del(...keys);
     console.log(`[AI] Cleared ${keys.length} chat history keys for tenant ${tenantId}.`);
     return keys.length;
+}
+
+// Returns LINE userId strings from chat_history keys.
+// Telegram chatIds are integers; LINE userIds are strings (e.g. "U123abc...").
+// getTenantChatIds filters out non-integers, so LINE users need a separate lookup.
+export async function getTenantLineUserIds(tenantId: string): Promise<string[]> {
+    const keys = await redis.keys(`chat_history:${tenantId}:*`);
+    return keys
+        .map((k) => k.split(':')[2])
+        .filter((suffix): suffix is string => !!suffix && isNaN(parseInt(suffix, 10)));
 }
 
 // ─── Key resolution ──────────────────────────────────────────────────────────
@@ -922,14 +973,41 @@ export async function processSystemRoutine(tenantId: string, routineType: string
         } else if (routineType === 'weekly_checkin' || routineType === 'feedback_reminder' || routineType === 'feedback_pause') {
             const message = await getRoutineText();
             if (message) {
-                const botToken = await getTenantBotToken(tenantId);
-                if (botToken) {
-                    const chatIds = await getTenantChatIds(tenantId);
-                    const bot = new TelegramBot(botToken);
-                    for (const cid of chatIds) {
-                        await bot.sendMessage(cid, message).catch(err =>
-                            console.error(`[AI Routine] Failed to send ${routineType} to ${cid}:`, err.message)
+                const channel = tenant.preferredChannel;
+                if (channel === 'line' && tenant.lineChannelAccessToken) {
+                    // LINE path: send to all known LINE userIds for this tenant
+                    const lineUserIds = await getTenantLineUserIds(tenantId);
+                    if (lineUserIds.length === 0) {
+                        console.warn(`[AI Routine] ${routineType}: no LINE userIds found for tenant ${tenantId} — feedback message not delivered.`);
+                    }
+                    const lineToken = decryptToken(tenant.lineChannelAccessToken);
+                    for (const userId of lineUserIds) {
+                        await fetch('https://api.line.me/v2/bot/message/push', {
+                            method: 'POST',
+                            headers: { 'Authorization': `Bearer ${lineToken}`, 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ to: userId, messages: [{ type: 'text', text: message.slice(0, 5000) }] }),
+                        }).then(async (r) => {
+                            if (!r.ok) console.error(`[AI Routine] LINE push failed for ${userId}:`, await r.text());
+                        }).catch(err =>
+                            console.error(`[AI Routine] Failed to send ${routineType} via LINE to ${userId}:`, err.message)
                         );
+                    }
+                } else {
+                    // Telegram path
+                    const botToken = await getTenantBotToken(tenantId);
+                    if (botToken) {
+                        const chatIds = await getTenantChatIds(tenantId);
+                        if (chatIds.length === 0) {
+                            console.warn(`[AI Routine] ${routineType}: no Telegram chatIds found for tenant ${tenantId} — feedback message not delivered.`);
+                        }
+                        const bot = new TelegramBot(botToken);
+                        for (const cid of chatIds) {
+                            await bot.sendMessage(cid, message).catch(err =>
+                                console.error(`[AI Routine] Failed to send ${routineType} to ${cid}:`, err.message)
+                            );
+                        }
+                    } else {
+                        console.warn(`[AI Routine] ${routineType}: no bot token for tenant ${tenantId} — feedback message not delivered.`);
                     }
                 }
                 if (routineType === 'feedback_pause') {
@@ -1008,6 +1086,7 @@ async function getOpenAIChatHistory(tenantId: string, chatId: number): Promise<O
 async function saveOpenAIChatHistory(tenantId: string, chatId: number, history: OpenAI.ChatCompletionMessageParam[]): Promise<void> {
     const trimmed = history.slice(-40); // keep last 40 messages (~20 turns)
     await redis.set(`oai_history:${tenantId}:${chatId}`, JSON.stringify(trimmed), 'EX', 60 * 60 * 24 * 30);
+    await incrementMessageCounter(tenantId);
 }
 
 // ─── Feedback loop detection ──────────────────────────────────────────────────
