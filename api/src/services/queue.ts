@@ -656,9 +656,10 @@ export const onboardingWorker = SHOULD_RUN_WORKERS ? new Worker(
         'market-intelligence-batch',
         async (job: Job) => {
         const fact = job.data;
-        const { saveMarketFact } = await import('./market_intel.js');
-        // Async and decoupled from the main chat loop — processes one fact per job.
-        await saveMarketFact(fact);
+        const { saveMarketFactBulk } = await import('./market_intel.js');
+        // We process individually for now as BullMQ 5.x bulk is complex, 
+        // but it's now async and decoupled from the main chat loop.
+        await saveMarketFactBulk([fact]);
         return { success: true };
         },
         { 
