@@ -47,6 +47,7 @@ import {
   getPoolStatus,
   getBotPoolEntryByUsername,
 } from "../services/pool.js";
+import { connection as redisConnection } from "../services/queue.js";
 
 const router = Router();
 
@@ -1098,6 +1099,20 @@ router.get("/magic-link", async (req: Request, res: Response) => {
   const url = `${frontendUrl}?email=${encodeURIComponent(email)}&token=${token}&expires=${expires}`;
 
   return res.json({ url, expires: new Date(expires).toISOString() });
+});
+
+// ── POST /admin/flush-redis ───────────────────────────────────────────────────
+// ONE-TIME USE: Wipe all Redis keys for a clean fire test.
+// Clears BullMQ queues, chat history, focus states, sessions, rate limits.
+// PRESERVE: market_intelligence and hive data live in PostgreSQL, not Redis.
+router.post("/flush-redis", async (_req: Request, res: Response) => {
+  try {
+    await redisConnection.flushall();
+    console.log("[admin] Redis FLUSHALL executed — all keys cleared.");
+    return res.json({ ok: true, message: "Redis flushed. All queues and session data cleared." });
+  } catch (err) {
+    return res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
 });
 
 export default router;
