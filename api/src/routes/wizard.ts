@@ -176,6 +176,35 @@ router.post("/hatch", async (req: Request, res: Response) => {
     return res.status(500).json({ error: "Failed to initiate hatch sequence." });
   }
 });
+// ── GET /wizard/bot-status ───────────────────────────────────────────────────
+// Polled by PostPaymentSuccess in the Stan Store flow (no Stripe session_id).
+// Uses botId (tenant UUID from verify-purchase) to check provisioning status.
+router.get("/bot-status", async (req: Request, res: Response) => {
+  const botId = req.query["botId"] as string | undefined;
+  if (!botId) {
+    return res.status(400).json({ error: "botId is required" });
+  }
+
+  const tenant = await getTenant(botId).catch(() => null);
+  if (!tenant) {
+    return res.status(404).json({ error: "Tenant not found" });
+  }
+
+  const isLive = tenant.status === "active" || tenant.status === "onboarding";
+  if (!isLive) {
+    return res.json({ status: "pending", botUsername: null, telegramLink: null });
+  }
+
+  const botUsername = await getTenantBotUsername(botId).catch(() => null);
+  return res.json({
+    status: "live",
+    botUsername: botUsername ?? null,
+    telegramLink: botUsername ? `https://t.me/${botUsername}` : null,
+    tenantSlug: tenant.slug,
+    tenantId: tenant.id,
+  });
+});
+
 // Polled by PostPaymentSuccess after Stripe redirect.
 // Returns provisioning status so the UI can show "live" when the bot is ready.
 
