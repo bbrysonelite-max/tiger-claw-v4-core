@@ -1,3 +1,13 @@
+## Current Session State (2026-03-29)
+
+- Phase 4 COMPLETE (PRs #93-#98 all merged)
+- Phase 5 (fire test) is NEXT — audit Stan Store purchase flow first
+- Database is clean (wiped all test data)
+- Container healthy on Cloud Run
+- See START_HERE.md for full context and STATE_OF_THE_TIGER_PATH_FORWARD.md for recovery plan status
+
+---
+
 # Tiger Claw — Agent Directives
 
 **Every AI reading this file must treat these as non-negotiable constraints,
