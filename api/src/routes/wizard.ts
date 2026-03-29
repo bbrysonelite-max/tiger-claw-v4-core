@@ -154,15 +154,17 @@ router.post("/hatch", async (req: Request, res: Response) => {
       return res.status(404).json({ error: "Bot not found" });
     }
 
-    // 3. A pending subscription must exist for this bot
+    // 3. A pending subscription must exist for this bot — also captures user_id
+    //    (the subscription owner from the users table) for the provisioning job.
     const subResult = await getPool().query(
-      `SELECT 1 FROM subscriptions WHERE tenant_id = $1 AND status = 'pending_setup' LIMIT 1`,
+      `SELECT user_id FROM subscriptions WHERE tenant_id = $1 AND status = 'pending_setup' LIMIT 1`,
       [botId]
     );
     if (subResult.rowCount === 0) {
       console.error(`[hatch] Pre-flight failed: no pending subscription for botId=${botId}`);
       return res.status(404).json({ error: "No pending subscription found for this bot" });
     }
+    const userId = subResult.rows[0].user_id as string;
 
     // 4. BYOK key must be configured
     const keyResult = await getPool().query(
@@ -188,7 +190,7 @@ router.post("/hatch", async (req: Request, res: Response) => {
 
     // Enqueue the heavy lifting
     await provisionQueue.add('tenant-provisioning', {
-      userId: tenant.id,
+      userId,
       botId: botId,
       slug,
       name: name || tenant.name,
