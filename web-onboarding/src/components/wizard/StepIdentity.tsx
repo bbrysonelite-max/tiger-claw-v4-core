@@ -9,8 +9,6 @@ interface IdentityProps {
     state: WizardState;
     updateState: (updates: Partial<WizardState>) => void;
     onNext: () => void;
-    magicToken?: string;
-    magicExpires?: string;
 }
 
 const NICHES = [
@@ -26,74 +24,27 @@ const NICHES = [
     { id: "sales-tiger", name: "Sales Professional", icon: "📈" },
 ];
 
-export default function StepIdentity({ state, updateState, onNext, magicToken, magicExpires }: IdentityProps) {
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState("");
+export default function StepIdentity({ state, updateState, onNext }: IdentityProps) {
     const [localState, setLocalState] = useState(state);
 
-    const handleContinue = async () => {
+    const handleContinue = () => {
         if (!localState.nicheId || !localState.yourName || !localState.email || !localState.botName) return;
-        
-        setLoading(true);
-        setError("");
-
-        try {
-            const base = "https://api.tigerclaw.io";
-
-            // First: check if they're a returning paid customer
-            const authUrl = new URL(`${base}/wizard/auth`);
-            authUrl.searchParams.set("email", localState.email);
-            if (magicToken) authUrl.searchParams.set("token", magicToken);
-            if (magicExpires) authUrl.searchParams.set("expires", magicExpires);
-            const authResponse = await fetch(authUrl.toString());
-            const authData = await authResponse.json();
-
-            let botId: string | undefined;
-
-            if (authResponse.ok && authData.ok) {
-                // Existing paid tenant — proceed normally
-                botId = authData.botId;
-            } else if (authResponse.status === 404) {
-                // No account found — they need to purchase first
-                throw new Error("No account found for this email. Purchase your agent at tigerclaw.io/#pricing to get started.");
-            } else if (authResponse.status === 401) {
-                throw new Error("Your setup link has expired. Check your email for a fresh link, or reply to your welcome email to get a new one.");
-            } else {
-                throw new Error(authData.error || "Authentication failed. Please try again.");
-            }
-
-            const nicheName = NICHES.find(n => n.id === localState.nicheId)?.name || "Agent";
-            updateState({ ...localState, nicheName, botId });
-            onNext();
-        } catch (err: any) {
-            setError(err.message);
-        } finally {
-            setLoading(false);
-        }
+        const nicheName = NICHES.find(n => n.id === localState.nicheId)?.name || "Agent";
+        updateState({ ...localState, nicheName });
+        onNext();
     };
+
+    const canProceed = !!(localState.nicheId && localState.yourName && localState.email && localState.botName);
 
     return (
         <div className="flex flex-col h-full animate-fade-in">
             <div className="mb-6 text-center">
                 <h3 className="text-2xl font-bold mb-2 text-white">Identity & Niche</h3>
-                <p className="text-white/50 text-base">Who are you, and what is your Tiger's mission?</p>
+                <p className="text-white/50 text-base">Who are you, and what is your Tiger&apos;s mission?</p>
             </div>
 
-            {error && (
-                <div className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 text-sm font-medium">
-                    {error.includes("tigerclaw.io") ? (
-                        <>
-                            No account found for this email.{" "}
-                            <a href="https://tigerclaw.io/#pricing" target="_blank" rel="noopener noreferrer" className="underline font-bold text-primary">
-                                Purchase your agent here →
-                            </a>
-                        </>
-                    ) : error}
-                </div>
-            )}
-
             <div className="space-y-6 flex-1">
-                {/* Niche Selection (Horizontal) */}
+                {/* Niche Selection */}
                 <div className="space-y-3">
                     <label className="text-xs font-black text-white/40 uppercase tracking-widest flex items-center gap-2">
                         <Target className="w-3 h-3" /> Select Industry
@@ -105,8 +56,8 @@ export default function StepIdentity({ state, updateState, onNext, magicToken, m
                                 onClick={() => setLocalState({ ...localState, nicheId: n.id })}
                                 className={cn(
                                     "p-3 rounded-xl border text-sm font-bold transition-all flex flex-col items-center gap-1",
-                                    localState.nicheId === n.id 
-                                        ? "bg-primary text-black border-primary" 
+                                    localState.nicheId === n.id
+                                        ? "bg-primary text-black border-primary"
                                         : "bg-white/5 border-white/10 text-white/60 hover:border-white/20"
                                 )}
                             >
@@ -166,19 +117,19 @@ export default function StepIdentity({ state, updateState, onNext, magicToken, m
                             placeholder="e.g. Prospect Scout"
                         />
                     </div>
-                    <p className="text-[10px] text-white/20 italic italic">This is how your agent will introduce itself to prospects.</p>
+                    <p className="text-[10px] text-white/20 italic">This is how your agent will introduce itself to prospects.</p>
                 </div>
             </div>
 
             <div className="mt-8 flex justify-end">
                 <button
                     onClick={handleContinue}
-                    disabled={!localState.nicheId || !localState.yourName || !localState.email || !localState.botName || loading}
+                    disabled={!canProceed}
                     className="group relative inline-flex h-12 items-center justify-center overflow-hidden rounded-full font-bold px-8 bg-primary text-black transition-all disabled:opacity-50 hover:scale-105 active:scale-95"
                 >
                     <span className="relative z-10 flex items-center gap-2">
-                        {loading ? "Authenticating..." : "Next: Configure AI"} 
-                        {!loading && <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />}
+                        Next: Configure AI
+                        <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                     </span>
                 </button>
             </div>

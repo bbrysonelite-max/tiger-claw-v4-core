@@ -190,22 +190,21 @@ router.post("/stripe", async (req: Request, res: Response) => {
       const preBotId = meta["botId"] && meta["botId"] !== "pending" ? meta["botId"] : null;
       const botId = preBotId ?? await createBYOKBot(userId, meta["botName"] ?? name, flavor, "pending");
 
-      // 3. Create Subscription record
+      // 3. Create Subscription record — pending_setup until wizard is completed
       if (session.subscription || session.payment_status === "paid") {
         await createBYOKSubscription({
           userId,
           botId,
           stripeSubscriptionId: (session.subscription as string) || `stan_store_sale_${session.id}`,
-          planTier: "byok_basic"
+          planTier: "byok_basic",
+          status: "pending_setup",
         });
       }
 
-      // Stan Store pre-sale: user + pending bot created, waiting for Wizard to complete setup
-      console.log(`[stripe-webhook] 🛍️ STAN STORE PRE-SALE for ${email}. User created, waiting for Wizard completion.`);
+      // Stan Store receipt email drives customer to wizard.tigerclaw.io directly.
+      // No magic link needed — purchase-based auth (POST /auth/verify-purchase) gates the wizard.
+      console.log(`[stripe-webhook] 🛍️ STAN STORE PRE-SALE for ${email}. User + pending_setup subscription created.`);
       await logAdminEvent("stan_store_purchase", botId, { email, slug, sessionId: session.id });
-      
-      // Dispatch the V4 magic link email to the customer
-      await sendStanStoreWelcome(email, name);
 
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err);
@@ -501,18 +500,17 @@ router.post("/stan-store", async (req: Request, res: Response) => {
       // Create pending bot — customer completes setup in the Wizard
       const botId = await createBYOKBot(userId, name, flavor, "pending");
 
-      // Create subscription record keyed to Stan Store
+      // Create subscription as pending_setup — activated when customer completes wizard
       await createBYOKSubscription({
         userId,
         botId,
         stripeSubscriptionId: `stan_store_zapier_${Date.now()}`,
         planTier: "byok_basic",
+        status: "pending_setup",
       });
 
       await logAdminEvent("stan_store_zapier_purchase", botId, { email, productName });
-
-      // Send magic link email to customer
-      await sendStanStoreWelcome(email, name, productName);
+      // Stan Store receipt drives customer to wizard.tigerclaw.io — no magic link needed
 
       console.log(`[stan-store-webhook] ✅ Provisioned Stan Store customer: ${email} (botId: ${botId})`);
       await sendAdminAlert(`✅ Stan Store purchase provisioned\nCustomer: ${name} (${email})\nProduct: ${productName}`);
