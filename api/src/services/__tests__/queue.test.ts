@@ -147,12 +147,14 @@ describe('queue.ts workers', () => {
             ];
             mockQuery.mockResolvedValue({ rows: tenants });
 
-            // getBotState throws for tenant-bad only
+            // getBotState throws for tenant-bad key_state only; onboard_state returns null (complete) for the ok tenants
             const { getBotState } = await import('../db.js');
             (getBotState as ReturnType<typeof vi.fn>)
-                .mockResolvedValueOnce({})           // tenant-ok-1
-                .mockRejectedValueOnce(new Error('DB timeout')) // tenant-bad → throws
-                .mockResolvedValueOnce({});          // tenant-ok-2
+                .mockResolvedValueOnce({})           // tenant-ok-1 key_state
+                .mockResolvedValueOnce(null)          // tenant-ok-1 onboard_state → complete
+                .mockRejectedValueOnce(new Error('DB timeout')) // tenant-bad key_state → throws
+                .mockResolvedValueOnce({})            // tenant-ok-2 key_state
+                .mockResolvedValueOnce(null);         // tenant-ok-2 onboard_state → complete
 
             vi.useFakeTimers();
             vi.setSystemTime(new Date('2024-01-01T10:00:00Z'));
@@ -224,7 +226,10 @@ describe('queue.ts workers', () => {
                 .mockResolvedValueOnce({ rows: [{ 1: 1 }] }); // gap query returns a row
 
             const { getBotState } = await import('../db.js');
-            (getBotState as ReturnType<typeof vi.fn>).mockResolvedValue({ layer2Key: 'key', trialRemindersSent: {} });
+            (getBotState as ReturnType<typeof vi.fn>).mockImplementation(async (_: string, stateKey: string) => {
+                if (stateKey === 'onboard_state.json') return null; // onboarding complete
+                return { layer2Key: 'key', trialRemindersSent: {} };
+            });
 
             vi.useFakeTimers();
             vi.setSystemTime(new Date('2024-01-01T09:00:00Z'));
@@ -248,7 +253,10 @@ describe('queue.ts workers', () => {
                 .mockResolvedValueOnce({ rows: [] }); // no gap
 
             const { getBotState } = await import('../db.js');
-            (getBotState as ReturnType<typeof vi.fn>).mockResolvedValue({ layer2Key: 'key', trialRemindersSent: {} });
+            (getBotState as ReturnType<typeof vi.fn>).mockImplementation(async (_: string, stateKey: string) => {
+                if (stateKey === 'onboard_state.json') return null;
+                return { layer2Key: 'key', trialRemindersSent: {} };
+            });
 
             vi.useFakeTimers();
             vi.setSystemTime(new Date('2024-01-01T09:00:00Z'));
@@ -267,7 +275,10 @@ describe('queue.ts workers', () => {
                 .mockResolvedValueOnce({ rows: [{ id: 'tenant-gap', created_at: new Date().toISOString() }] });
 
             const { getBotState } = await import('../db.js');
-            (getBotState as ReturnType<typeof vi.fn>).mockResolvedValue({ layer2Key: 'key', trialRemindersSent: {} });
+            (getBotState as ReturnType<typeof vi.fn>).mockImplementation(async (_: string, stateKey: string) => {
+                if (stateKey === 'onboard_state.json') return null;
+                return { layer2Key: 'key', trialRemindersSent: {} };
+            });
 
             vi.useFakeTimers();
             vi.setSystemTime(new Date('2024-01-01T10:00:00Z')); // 10 AM, not 9
@@ -288,7 +299,10 @@ describe('queue.ts workers', () => {
                 .mockRejectedValueOnce(new Error('DB timeout'));
 
             const { getBotState } = await import('../db.js');
-            (getBotState as ReturnType<typeof vi.fn>).mockResolvedValue({ layer2Key: 'key', trialRemindersSent: {} });
+            (getBotState as ReturnType<typeof vi.fn>).mockImplementation(async (_: string, stateKey: string) => {
+                if (stateKey === 'onboard_state.json') return null;
+                return { layer2Key: 'key', trialRemindersSent: {} };
+            });
 
             vi.useFakeTimers();
             vi.setSystemTime(new Date('2024-01-01T09:00:00Z'));
