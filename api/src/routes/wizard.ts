@@ -24,6 +24,7 @@ import {
   createBYOKUser,
   createBYOKBot,
   activateSubscription,
+  getPool,
 } from "../services/db.js";
 import { encryptToken } from "../services/pool.js";
 import { provisionQueue } from "../services/queue.js";
@@ -136,11 +137,44 @@ router.post("/hatch", async (req: Request, res: Response) => {
   }
   const { botId, name, email, flavor, language, timezone, preferredChannel, region, hiveOptIn, botToken } = parsed.data;
 
+  // ── Pre-flight checks ───────────────────────────────────────────────────────
+  // Validate all preconditions before any database writes or queue operations.
+
+  // 1. botId presence (belt-and-suspenders over the schema check)
+  if (!botId) {
+    console.error(`[hatch] Pre-flight failed: botId is required`);
+    return res.status(400).json({ error: "botId is required" });
+  }
+
   try {
-    // Look up by botId (UUID from verify-purchase) — Stan Store tenants have email=NULL
-    // so getTenantByEmail fails. botId is the tenant's UUID, always reliable.
+    // 2. Bot (tenant) must exist
     const tenant = await getTenant(botId);
-    if (!tenant) return res.status(404).json({ error: "Tenant not found" });
+    if (!tenant) {
+      console.error(`[hatch] Pre-flight failed: bot not found for botId=${botId}`);
+      return res.status(404).json({ error: "Bot not found" });
+    }
+
+    // 3. A pending subscription must exist for this bot
+    const subResult = await getPool().query(
+      `SELECT 1 FROM subscriptions WHERE tenant_id = $1 AND status = 'pending_setup' LIMIT 1`,
+      [botId]
+    );
+    if (subResult.rowCount === 0) {
+      console.error(`[hatch] Pre-flight failed: no pending subscription for botId=${botId}`);
+      return res.status(404).json({ error: "No pending subscription found for this bot" });
+    }
+
+    // 4. BYOK key must be configured
+    const keyResult = await getPool().query(
+      `SELECT 1 FROM bot_ai_config WHERE tenant_id = $1 LIMIT 1`,
+      [botId]
+    );
+    if (keyResult.rowCount === 0) {
+      console.error(`[hatch] Pre-flight failed: no AI key configured for botId=${botId}`);
+      return res.status(400).json({ error: "No AI key configured. Please complete key setup first." });
+    }
+
+    // ── All pre-flight checks passed ─────────────────────────────────────────
 
     const slug = tenant.slug || name.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 30);
     const finalRegion = region || (language === "th" ? "th-th" : "us-en");
