@@ -27,6 +27,7 @@ export interface RefinementReport {
   domain: string;
   goal: string;
   facts: RefinedFact[];
+  rejectedCount: number;
   summary: string;
 }
 
@@ -122,9 +123,63 @@ Return an empty array [] if no meaningful facts are present. Do not invent facts
     return { ok: false, error: `Gemini extraction failed: ${String(geminiErr)}` };
   }
 
+  // Phase 6 Task: Relevance Gate
+  let finalFacts: RefinedFact[] = [];
+  let rejectedCount = 0;
+
+  if (facts.length > 0) {
+    try {
+      const genAI = new GoogleGenerativeAI(apiKey);
+      const gateModel = genAI.getGenerativeModel({
+        model: "gemini-2.0-flash",
+        generationConfig: { responseMimeType: "application/json" },
+      });
+
+      const gatePrompt = `You are a RUTHLESS commercial relevance gate for a market intelligence engine.
+Domain: "${domain}"
+
+Your job is to filter out any facts that are not directly relevant to a REAL-WORLD professional working in the "${domain}" industry. 
+
+CRITICAL RULE: If the fact is about a VIDEO GAME, BOARD GAME, MOVIE, BOOK, or FICTIONAL UNIVERSE, you MUST return FALSE. Even if terms like "health", "stats", "plumbing", or "design" are used, if they refer to game mechanics or lore, they are 100% IRRELEVANT.
+
+REJECT (false):
+- Fictional lore, sci-fi, fantasy, or gaming content (e.g., Warhammer, Animal Crossing, RPG mechanics, game balance, video game updates, "builds", "variators").
+- Personal relationship stories or general social chitchat.
+- Any content that does not provide actionable business insight for a real "${domain}".
+
+ACCEPT (true):
+- Real-world purchase intent or research behavior from real people.
+- Business-related pain points or unmet needs.
+- Competitor mentions or pricing sensitivity.
+- Industry-specific professional challenges.
+
+Facts to classify:
+${facts.map((f, i) => `${i}. ${f.purifiedFact}`).join("\n")}
+
+Return a JSON object mapping each index to a boolean representing its relevance. 
+Strictness: 10/10. If in doubt, return false.
+Example: {"0": true, "1": false}`;
+
+      const gateResult = await callGemini(() => gateModel.generateContent(gatePrompt));
+      const gateResponse = gateResult.response.text();
+      const classification = JSON.parse(gateResponse);
+      logger.info(`[tiger_refine] Gate classification results for "${domain}":`, classification);
+
+      finalFacts = facts.filter((_, i) => classification[String(i)] === true);
+      rejectedCount = facts.length - finalFacts.length;
+
+      if (rejectedCount > 0) {
+        logger.info(`[tiger_refine] Relevance gate rejected ${rejectedCount}/${facts.length} facts for domain "${domain}".`);
+      }
+    } catch (gateErr) {
+      logger.error("[tiger_refine] Relevance gate failed, falling back to all facts", { err: String(gateErr) });
+      finalFacts = facts;
+    }
+  }
+
   // Save facts to the Data Moat
   let saved = 0;
-  for (const fact of facts) {
+  for (const fact of finalFacts) {
     try {
       await saveMarketFact({
         domain,
@@ -146,13 +201,14 @@ Return an empty array [] if no meaningful facts are present. Do not invent facts
     }
   }
 
-  logger.info(`[tiger_refine] Purification complete: ${saved}/${facts.length} facts saved.`);
+  logger.info(`[tiger_refine] Purification complete: ${saved}/${facts.length} facts saved. (${rejectedCount} rejected by gate)`);
 
   const report: RefinementReport = {
     domain,
     goal: extractionGoal,
-    facts,
-    summary: `Extracted ${facts.length} facts from ${sourceUrl} via ${capturedBy}. ${saved} saved to moat.`,
+    facts: finalFacts,
+    rejectedCount,
+    summary: `Extracted ${facts.length} facts. ${rejectedCount} rejected by relevance gate. ${saved} saved to moat.`,
   };
 
   return {
