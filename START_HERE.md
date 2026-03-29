@@ -308,3 +308,4 @@ Full report: `specs/RELIABILITY_AUDIT.md`
 ---
 
 *Last updated: 2026-03-29 23:45 UTC (Phase 1-3 complete; Phase 5 Task #13/#14 complete — PR #70). Proceed.*
+<!-- CI refresh -->
