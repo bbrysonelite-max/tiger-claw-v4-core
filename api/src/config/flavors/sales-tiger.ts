@@ -11,11 +11,11 @@ export const SALES_TIGER_FLAVOR: FlavorConfig = {
   professionLabel: "Sales Professional",
   defaultKeywords: ["sales job opportunity", "sales commission", "b2b sales", "remote sales job", "high ticket sales", "sales career growth"],
   scoutQueries: [
-    "high paying sales jobs no degree reddit",
-    "best industries for sales professionals to break into",
-    "is commission only sales worth it",
-    "how to find b2b sales opportunities reddit",
-    "sales career advice for top performers",
+    "subreddit:sales high paying sales career path advice no degree income",
+    "subreddit:sales best industries for sales professionals break into commission",
+    "subreddit:sales commission only sales worth it pros cons base salary",
+    "subreddit:b2bsales OR subreddit:sales how to find b2b sales opportunities leads pipeline",
+    "subreddit:sales top sales performer career advice income growth quota",
   ],
 
   conversion: {
