@@ -9,6 +9,10 @@
 
 ALTER TABLE subscriptions DROP CONSTRAINT IF EXISTS subscriptions_bot_id_fkey;
 
-ALTER TABLE subscriptions
-  ADD CONSTRAINT subscriptions_tenant_id_fkey
-  FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE subscriptions
+    ADD CONSTRAINT subscriptions_tenant_id_fkey
+    FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE;
+EXCEPTION WHEN duplicate_object THEN
+  NULL; -- constraint already exists, safe to skip
+END $$;
