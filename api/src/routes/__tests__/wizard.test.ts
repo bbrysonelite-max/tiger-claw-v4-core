@@ -128,6 +128,56 @@ describe('POST /wizard/validate-key', () => {
     expect(res.status).toBe(400)
   })
 
+  it('accepts a valid Grok key (200 from x.ai)', async () => {
+    const app = await buildApp()
+    mockFetch.mockResolvedValueOnce({ ok: true, status: 200 })
+    mockDb.addAIKey.mockResolvedValue(undefined)
+
+    const res = await request(app)
+      .post('/wizard/validate-key')
+      .send({ botId: 'b1', keys: [{ provider: 'grok', key: 'xai-validkey', model: 'grok-2-1212' }] })
+
+    expect(res.status).toBe(200)
+    expect(res.body.valid).toBe(true)
+  })
+
+  it('rejects an invalid Grok key (401 from x.ai)', async () => {
+    const app = await buildApp()
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 401 })
+
+    const res = await request(app)
+      .post('/wizard/validate-key')
+      .send({ botId: 'b1', keys: [{ provider: 'grok', key: 'xai-badkey', model: 'grok-2-1212' }] })
+
+    expect(res.status).toBe(200)
+    expect(res.body.valid).toBe(false)
+  })
+
+  it('accepts a valid OpenRouter key (200 from openrouter.ai)', async () => {
+    const app = await buildApp()
+    mockFetch.mockResolvedValueOnce({ ok: true, status: 200 })
+    mockDb.addAIKey.mockResolvedValue(undefined)
+
+    const res = await request(app)
+      .post('/wizard/validate-key')
+      .send({ botId: 'b1', keys: [{ provider: 'openrouter', key: 'sk-or-validkey', model: 'openai/gpt-4o-mini' }] })
+
+    expect(res.status).toBe(200)
+    expect(res.body.valid).toBe(true)
+  })
+
+  it('rejects an invalid OpenRouter key (401 from openrouter.ai)', async () => {
+    const app = await buildApp()
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 401 })
+
+    const res = await request(app)
+      .post('/wizard/validate-key')
+      .send({ botId: 'b1', keys: [{ provider: 'openrouter', key: 'sk-or-badkey', model: 'openai/gpt-4o-mini' }] })
+
+    expect(res.status).toBe(200)
+    expect(res.body.valid).toBe(false)
+  })
+
   it('stores an encrypted key (not plaintext) in the database', async () => {
     const app = await buildApp()
     mockFetch.mockResolvedValueOnce({ ok: true, status: 200 })

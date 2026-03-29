@@ -276,8 +276,18 @@ router.post("/validate-key", async (req: Request, res: Response) => {
           headers: { "Authorization": `Bearer ${k.key}` }
         });
         isValid = response.ok;
+      } else if (k.provider === "grok") {
+        const response = await fetch("https://api.x.ai/v1/models", {
+          headers: { "Authorization": `Bearer ${k.key}` }
+        });
+        isValid = response.ok;
+      } else if (k.provider === "openrouter") {
+        const response = await fetch("https://openrouter.ai/api/v1/models", {
+          headers: { "Authorization": `Bearer ${k.key}` }
+        });
+        isValid = response.ok;
       } else {
-        // Fallback for other providers: assume valid if format is correct
+        // Unknown provider — length check only
         isValid = k.key.length > 10;
       }
 

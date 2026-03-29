@@ -122,13 +122,21 @@ Max runs his own distribution network and wants a white-labeled Tiger Claw insta
 
 ---
 
-### PHASE 4.5: CALIBRATION SIMPLIFICATION — 🔴 NEXT PRIORITY
+### PHASE 4.5: CRITICAL BUG FIXES — 🔴 MUST SHIP BEFORE ANY ACTIVATION
+
+Two CRITICAL bugs discovered during fire test that break ALL BYOK customers:
+
+| # | Task | Agent | Status | Notes |
+|---|------|-------|--------|-------|
+| 4.5-BUG-1 | **Fix BYOK key resolution** — wizard stores keys in `bot_ai_keys` via `/wizard/validate-key`; bot runtime reads `key_state.json` from `bot_states`. Never intersect. Every BYOK customer gets "key expired/invalid" immediately after hatch. Fix: on successful `/wizard/validate-key`, also write `key_state.json` into `bot_states` with correct provider format. | CLAUDE | 🔴 OPEN — #1 priority | Affects every single BYOK customer |
+| 4.5-BUG-2 | **Fix FRONTEND_URL** Cloud Run env var — currently `https://app.tigerclaw.io` (dead), must be `https://wizard.tigerclaw.io` | BRENT | 🔴 OPEN | Update via GCP Console → Cloud Run → tiger-claw-api → Edit & Deploy → Env vars |
+| 4.5-BUG-3 | **Stan Store webhook broken** — real purchases not triggering Zapier. Was working before, something changed at Stan Store level. Manual webhook trigger still works. | BRENT | 🔴 OPEN | Investigate Stan Store webhook settings |
 
 Must ship BEFORE activating any more paying customers. The current `tiger_onboard` tool asks 11+ questions across 5 phases, most of which are redundant with the wizard.
 
 | # | Task | Agent | Status | Notes |
 |---|------|-------|--------|-------|
-| 4.5a | Simplify `tiger_onboard` — reduce to 2-3 focused ICP questions | CLAUDE | ⬜ Next | Identity (name, product) already in wizard. Keys already in DB. Only ICP is new. |
+| 4.5a | Simplify `tiger_onboard` — reduce to 2-3 focused ICP questions | CLAUDE | ⬜ After BUG-1 | Identity (name, product) already in wizard. Keys already in DB. Only ICP is new. |
 | 4.5b | Post-hatch wizard screen — show `@botusername` as a tappable Telegram link | CLAUDE | ⬜ Next | User had to hunt for their bot after hatch |
 | 4.5c | Update Zapier email template to use `?email={{email}}` on setup link | BRENT | ⬜ Next | One-line change in Zapier; auto-populates email in wizard |
 
@@ -205,4 +213,4 @@ Do not trust base-model memory. Trust the repo.
 
 ---
 
-*Last updated: 2026-03-29 16:00 UTC. Phases 1–3 complete. FIRE TEST PASSED. Phase 4.5 (calibration simplification) is the next code task. Phase 4 activation blocked on 4.5a (tiger_onboard simplification). PRs #79–#87 merged. 395 tests passing. Proceed.*
+*Last updated: 2026-03-29 (end of fire test session). Phases 1–3 complete. FIRE TEST PASSED. PRs #79–#89 merged. 395 tests passing. TWO CRITICAL BUGS blocking all BYOK customers: (1) key resolution split between bot_ai_keys and key_state.json — fix in /wizard/validate-key route; (2) FRONTEND_URL Cloud Run env var = dead URL. Fix BUG-1 first — it breaks every paying customer's bot the moment they hatch.*

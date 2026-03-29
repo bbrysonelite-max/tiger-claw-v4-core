@@ -281,14 +281,18 @@ See `STATE_OF_THE_TIGER_PATH_FORWARD.md` for full task list.
 |---|---|---|
 | ✅ RESOLVED | Full fire test (Stan Store → wizard → live bot) | PASSED 2026-03-29 |
 | ✅ RESOLVED | Subscriptions FK constraint broken since migration 002 | Fixed migration 020, PR #83 |
-| 🔴 HIGH | Bot calibration (tiger_onboard) is too complex — user feedback | OPEN — needs simplification |
-| 🔴 HIGH | Post-hatch UX doesn't clearly direct user to their Telegram bot | OPEN — wizard completion screen needs a direct link |
-| 🟡 MED | Zapier sends `test@tigerclaw.io` test data — real purchase emails may not flow | Check Zapier field mapping: should send real customer email |
-| 🟡 MED | Stan Store receipt email link doesn't use `?email=` yet | Zapier/Stan Store email template needs `?email={{email}}` on the setup link |
+| ✅ RESOLVED | nurture_check firing every minute during calibration, trampling tiger_onboard state | Fixed PR #86/#87 — gate on onboard_state.json phase check |
+| ✅ RESOLVED | Kimi console is Chinese-only — removed from wizard provider tiles | Fixed PR #89 |
+| 🔴 CRITICAL | **BYOK key resolution bug** — wizard stores keys in `bot_ai_keys` table via `/wizard/validate-key`; bot runtime (`ai.ts`) resolves keys from `key_state.json` in `bot_states` table. These never intersect. Every BYOK customer gets "⚠️ Your AI key appears to be expired or invalid" after hatch. Fix: either write `key_state.json` from `/wizard/validate-key`, OR make `ai.ts` key resolution also check `bot_ai_keys`. | 🔴 OPEN — blocking ALL paying customers |
+| 🔴 CRITICAL | **FRONTEND_URL Cloud Run env var** = `https://app.tigerclaw.io` (dead URL). Bot sends customers to nonexistent domain when key is missing. Must be `https://wizard.tigerclaw.io`. Update in Cloud Run service config or Secret Manager. | 🔴 OPEN |
+| 🔴 HIGH | **Stan Store webhook not firing on real purchases** — was working before; something broke at Stan Store level (not Zapier config). Manual webhook trigger still works as workaround. | 🔴 OPEN — investigate Stan Store webhook settings |
+| 🔴 HIGH | Bot calibration (tiger_onboard) is too complex — user feedback | OPEN — needs simplification (task 4.5a) |
+| 🔴 HIGH | Post-hatch UX doesn't clearly direct user to their Telegram bot | OPEN — wizard completion screen needs tappable `@botusername` link (task 4.5b) |
+| 🟡 MED | Stan Store receipt email link doesn't use `?email=` yet | Zapier/Stan Store email template needs `?email={{email}}` on the setup link (task 4.5c — Brent's lane) |
 | 🟡 MED | Welcome email says "bot in 60 seconds" — false for BYOB wizard flow | NOT FIXED |
 | 🟡 MED | `DATABASE_READ_URL` pinned to secret version 8 (should be latest) | NOT FIXED |
+| 🟡 MED | Duplicate tenant/subscription records for bbryson@me.com from multiple failed provisions | Clean up when convenient |
 | 🟡 LOW | Reddit scout returns 0 results (403 without OAuth) | NOT FIXED — needs TigerClaw-branded Reddit app |
-| 🟡 LOW | Duplicate tenant/subscription records for bbryson@me.com from multiple failed provisions | Clean up when convenient |
 
 ---
 
@@ -312,4 +316,4 @@ Full report: `specs/RELIABILITY_AUDIT.md`
 
 ---
 
-*Last updated: 2026-03-29 (PRs #79–#87 merged. FIRE TEST PASSED. First bot live in Telegram. nurture_check blocks onboarding fix live. Bot calibration simplification is next priority.)*
+*Last updated: 2026-03-29 (PRs #79–#89 merged. FIRE TEST PASSED. Two CRITICAL bugs discovered post-fire-test: (1) BYOK key resolution — wizard writes bot_ai_keys, bot reads key_state.json, never intersect; (2) FRONTEND_URL Cloud Run env var = dead URL. Both blocking paying customers. Fix BYOK key resolution FIRST.)*
