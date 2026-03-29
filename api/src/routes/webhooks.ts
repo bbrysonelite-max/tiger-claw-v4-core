@@ -24,6 +24,7 @@ import {
   createBYOKBot,
   createBYOKSubscription,
   getTenant,
+  getTenantByEmail,
   logAdminEvent,
 } from "../services/db.js";
 import { decryptToken } from "../services/pool.js";
@@ -246,7 +247,7 @@ router.post("/telegram/:tenantId", webhookLimiter, async (req: Request, res: Res
 
   // Ensure tenant exists and is active/live/onboarding
   const tenant = await getTenant(tenantId);
-  if (!tenant || (tenant.status !== "active" && tenant.status !== "live" && tenant.status !== "onboarding")) {
+  if (!tenant || !["active", "live", "onboarding"].includes(tenant.status)) {
     console.warn(`[webhooks] Telegram update ignored for inactive tenant: ${tenantId}`);
     return res.status(200).send("OK"); // Acknowledge to stop Telegram from retrying
   }
@@ -268,7 +269,8 @@ router.post("/telegram/:tenantId", webhookLimiter, async (req: Request, res: Res
     // Respond quickly to Telegram
     res.status(200).send("OK");
   } catch (err) {
-    console.error(`[webhooks] Failed to enqueue Telegram message for ${tenantId}:`, err);
+    console.error(`[webhooks] [ALERT] Failed to enqueue Telegram message for ${tenantId}:`, err);
+    sendAdminAlert(`⚠️ Telegram enqueue failure — message lost for tenant ${tenantId}\nError: ${err instanceof Error ? err.message : String(err)}`).catch(() => {});
     res.status(500).send("Internal Server Error");
   }
 });
@@ -391,6 +393,14 @@ router.post("/email", emailLimiter, async (req: Request, res: Response) => {
 
   // Acknowledge immediately — AI reply is async
   res.status(200).json({ received: true });
+
+  // Only run AI processing for known tenants — prevents arbitrary senders from
+  // consuming AI quota. Non-tenant support emails are logged for human review.
+  const senderTenant = await getTenantByEmail(fromEmail).catch(() => null);
+  if (!senderTenant) {
+    console.warn(`[webhooks] Inbound email from unknown sender ${fromEmail} — skipping AI queue. Subject: "${subject}"`);
+    return;
+  }
 
   await emailQueue.add("email-support", {
     fromEmail,
