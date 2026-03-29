@@ -824,11 +824,17 @@ export async function lookupPurchaseByEmail(email: string): Promise<{ userId: st
 }
 
 // Mark a subscription active after wizard completion.
-export async function activateSubscription(botId: string): Promise<void> {
-  await getPool().query(
+export async function activateSubscription(botId: string): Promise<boolean> {
+  const result = await getPool().query(
     `UPDATE subscriptions SET status = 'active' WHERE tenant_id = $1 AND status = 'pending_setup'`,
     [botId]
   );
+  if ((result.rowCount ?? 0) > 0) {
+    console.log(`[activateSubscription] Activated subscription for botId=${botId}`);
+    return true;
+  }
+  console.error(`[activateSubscription] No pending subscription found for botId=${botId}`);
+  return false;
 }
 
 export async function getBotState<T>(tenantId: string, stateKey: string): Promise<T | null> {

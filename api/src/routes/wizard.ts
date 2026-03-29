@@ -145,6 +145,13 @@ router.post("/hatch", async (req: Request, res: Response) => {
     const slug = tenant.slug || name.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 30);
     const finalRegion = region || (language === "th" ? "th-th" : "us-en");
 
+    // Activate the subscription before provisioning — if no pending subscription
+    // exists, there is nothing to hatch and we must not queue provisioning.
+    const activated = await activateSubscription(botId);
+    if (!activated) {
+      return res.status(500).json({ error: "Failed to activate subscription. Please try again." });
+    }
+
     // Enqueue the heavy lifting
     await provisionQueue.add('tenant-provisioning', {
       userId: tenant.id,
@@ -163,11 +170,6 @@ router.post("/hatch", async (req: Request, res: Response) => {
       attempts: 5,
       backoff: { type: 'exponential', delay: 10000 },
     });
-
-    // Activate the subscription now that setup is complete
-    await activateSubscription(botId).catch((e) =>
-      console.warn(`[wizard] activateSubscription failed for ${botId}:`, e)
-    );
 
     console.log(`[wizard] 🚀 Agent Hatch triggered for ${email} (Bot: ${botId})`);
     return res.json({ ok: true, message: "Hatch sequence initiated." });
