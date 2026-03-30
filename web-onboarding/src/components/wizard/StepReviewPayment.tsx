@@ -74,18 +74,18 @@ export default function StepReviewPayment({ state, isDeploying, setIsDeploying, 
                     </div>
 
                     <div className="p-6 space-y-4">
-                        <h4 className="text-xs font-black text-white/40 uppercase tracking-widest flex items-center justify-between mb-2">
+                        <h4 className="text-base font-bold text-white/80 uppercase tracking-widest flex items-center justify-between mb-2">
                             Order Summary
-                            <CreditCard className="w-4 h-4" />
+                            <CreditCard className="w-5 h-5" />
                         </h4>
 
-                        <div className="flex justify-between items-center text-sm border-b border-white/5 pb-3">
-                            <span className="text-white/70">Subscription Plan</span>
+                        <div className="flex justify-between items-center text-base border-b border-white/10 pb-3">
+                            <span className="text-white/80">Subscription Plan</span>
                             <span className="font-bold text-white">{state.planName}</span>
                         </div>
 
-                        <div className="flex justify-between items-center text-sm border-b border-white/5 pb-3">
-                            <span className="text-white/70">AI Computations</span>
+                        <div className="flex justify-between items-center text-base border-b border-white/10 pb-3">
+                            <span className="text-white/80">AI Computations</span>
                             <span className="font-bold text-white flex items-center gap-2">
                                 {state.aiKeys.length > 0 ? `Bring Your Own Key (${state.aiKeys.length})` : "No Keys Configured"}
                             </span>
@@ -93,16 +93,16 @@ export default function StepReviewPayment({ state, isDeploying, setIsDeploying, 
 
                         <div className="flex flex-col gap-1 pt-2">
                             <div className="flex justify-between items-end border-b-2 border-primary/20 pb-4">
-                                <span className="text-white/50 text-xs font-bold uppercase tracking-widest">Total Due Today</span>
+                                <span className="text-white/80 text-base font-bold uppercase tracking-widest">Total Due Today</span>
                                 <span className="text-3xl font-black text-white tracking-tighter">{state.price}</span>
                             </div>
                         </div>
 
-                        <div className="p-3 bg-white/5 rounded-xl border border-white/10 flex gap-3 text-left">
+                        <div className="p-4 bg-white/5 rounded-xl border border-white/10 flex gap-3 text-left">
                             <div className="mt-0.5">
-                                <Lock className="w-4 h-4 text-white/40" />
+                                <Lock className="w-4 h-4 text-white/60" />
                             </div>
-                            <p className="text-[10px] text-white/60 font-medium leading-relaxed">
+                            <p className="text-sm text-white/70 font-medium leading-relaxed">
                                 ✅ 7-Day Money-Back Guarantee. Payments processed by <span className="text-white font-bold">Stan Store</span>.
                             </p>
                         </div>
@@ -112,7 +112,7 @@ export default function StepReviewPayment({ state, isDeploying, setIsDeploying, 
                 <div className="space-y-4">
 
 
-                    {error && <p className="text-sm text-red-500 text-center font-bold">{error}</p>}
+                    {error && <p className="text-base text-red-400 text-center font-bold">{error}</p>}
 
                     <button
                         onClick={handleHatch}
@@ -130,7 +130,7 @@ export default function StepReviewPayment({ state, isDeploying, setIsDeploying, 
                 </div>
             </div>
 
-            <p className="mt-4 text-[10px] text-white/20 uppercase tracking-widest text-center">
+            <p className="mt-4 text-sm text-white/50 uppercase tracking-widest text-center">
                 Clicking activate will hatch your bot instantly. Watch the magic happen.
             </p>
         </div>

@@ -147,7 +147,7 @@ export default function OnboardingModal({ onClose, initialEmail, initialBotId, i
                         )}
                         <div>
                             <h2 className="font-bold text-xl">Agent Setup</h2>
-                            <div className="text-white/50 text-sm mt-1">
+                            <div className="text-white/80 text-base mt-1">
                                 Step {step} of {totalSteps}
                             </div>
                         </div>
