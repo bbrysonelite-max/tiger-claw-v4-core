@@ -64,6 +64,8 @@ const HatchSchema = z.object({
   preferredChannel: z.string().optional(),
   region: z.string().optional(),
   botToken: z.string().optional(), // BYOB: Telegram tenants provide their own BotFather token
+  lineToken: z.string().optional(), // LINE channel access token
+  lineChannelSecret: z.string().optional(), // LINE channel secret (for webhook signature verification)
   hiveOptIn: z.boolean().optional(),
   customerProfile: CustomerProfileSchema,
 });
@@ -149,7 +151,7 @@ router.post("/hatch", async (req: Request, res: Response) => {
   if (!parsed.success) {
     return res.status(400).json({ error: "Invalid payload.", details: parsed.error.format() });
   }
-  const { botId, name, email, flavor, language, timezone, preferredChannel, region, hiveOptIn, botToken, customerProfile } = parsed.data;
+  const { botId, name, email, flavor, language, timezone, preferredChannel, region, hiveOptIn, botToken, lineToken, lineChannelSecret, customerProfile } = parsed.data;
 
   // ── Pre-flight checks ───────────────────────────────────────────────────────
   // Validate all preconditions before any database writes or queue operations.
@@ -200,6 +202,28 @@ router.post("/hatch", async (req: Request, res: Response) => {
     const activated = await activateSubscription(botId);
     if (!activated) {
       return res.status(500).json({ error: "Failed to activate subscription. Please try again." });
+    }
+
+    // Save LINE credentials encrypted to the tenant record (if provided).
+    // The provisioner reads these from the refreshed tenant to register the LINE webhook.
+    if (lineToken || lineChannelSecret) {
+      const updates: string[] = [];
+      const values: (string | null)[] = [];
+      let paramIdx = 1;
+      if (lineToken) {
+        updates.push(`line_channel_access_token = $${paramIdx++}`);
+        values.push(encryptToken(lineToken));
+      }
+      if (lineChannelSecret) {
+        updates.push(`line_channel_secret = $${paramIdx++}`);
+        values.push(encryptToken(lineChannelSecret));
+      }
+      values.push(botId);
+      await getPool().query(
+        `UPDATE tenants SET ${updates.join(", ")} WHERE id = $${paramIdx}`,
+        values
+      );
+      console.log(`[hatch] LINE credentials saved for botId=${botId}`);
     }
 
     // Write ICP data to onboard_state.json so the bot starts with the customer
