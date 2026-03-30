@@ -903,6 +903,22 @@ export async function processTelegramMessage(
         const onboardState = await getBotState<any>(tenantId, 'onboard_state.json').catch(() => null);
         const onboardingComplete = onboardState?.phase === 'complete';
         const isFirstMessage = (await getChatHistory(tenantId, chatId)).length === 0;
+
+        // ── Wizard ICP fast-path: skip onboarding interview entirely ──────────
+        // When the operator already completed the ICP wizard, the bot knows its
+        // identity. Send a confident intro instead of asking setup questions.
+        const hasWizardIcp = !!(onboardState?.customerProfile?.idealCustomer?.trim());
+        if (isFirstMessage && hasWizardIcp) {
+            const botName = (onboardState?.botName ?? tenant.name ?? 'Tiger') as string;
+            const intro = `I'm ${botName}, your AI sales agent powered by Tiger Claw — a self-improving intelligence network that gets smarter with every conversation across the entire platform. I'm loaded with your industry profile and ready to hunt. Let's get to work... because I'm getting my nails done later.`;
+            await bot.sendMessage(chatId, intro);
+            await saveChatHistory(tenantId, chatId, [
+                { role: 'user' as const, parts: [{ text }] },
+                { role: 'model' as const, parts: [{ text: intro }] },
+            ]);
+            return;
+        }
+
         const effectiveText = buildFirstMessageText(text, onboardingComplete, isFirstMessage);
 
         // ── Check feedback loop: is this message a feedback response? ──────────
