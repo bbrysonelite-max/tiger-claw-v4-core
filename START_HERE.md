@@ -1,6 +1,6 @@
 # START HERE — Tiger Claw Session Brief
 
-**Last Updated:** 2026-03-30 (Monday — we pulled an all-nighter)
+**Last Updated:** 2026-03-30 (Monday — all-nighter complete, Pebo is in bed)
 **Author:** Pebo + Claude Code
 
 ---
@@ -14,94 +14,82 @@ AI sales agent SaaS. Customers buy on Stan Store, walk through a 5-step wizard t
 - **Repo:** `github.com/bbrysonelite-max/tiger-claw-v4-core`
 - **Architecture:** BYOB (customer's Telegram token) + BYOK (customer's AI key)
 - **DB password:** `TigerClaw2026Secure` (from Secret Manager: `tiger-claw-database-url`)
-- **Cloud SQL proxy port:** 5433 (proxy user: `botcraft`)
+- **Cloud SQL proxy port:** 5433 (proxy user: `botcraft`, DB: `tiger_claw_shared`)
 
 ---
 
-## Where We Are Right Now
+## Current State: READY TO FIRE TEST
 
-### Phases 1–5a COMPLETE. Fire test is the next gate.
+Everything is merged and deployed. The wizard is live at `wizard.tigerclaw.io`.
 
-| PR  | What It Fixed | Status |
-|-----|---------------|--------|
-| #93 | secrets.ts EISDIR crash (container crash-loop) | MERGED |
-| #94 | BYOK key observability — logs where keys resolve from | MERGED |
-| #95 | activateSubscription() fails loudly | MERGED |
+### All Merged PRs (complete history)
+
+| PR  | What It Did | Status |
+|-----|-------------|--------|
+| #93 | secrets.ts EISDIR crash fix | MERGED |
+| #94 | BYOK key observability | MERGED |
+| #95 | activateSubscription() loud failure | MERGED |
 | #96 | Pre-flight validation on /hatch | MERGED |
-| #97 | userId in provisioning queue (was tenant UUID, now user UUID) | MERGED |
-| #98 | Clear stale wizard frontend state after hatch | MERGED |
-| #99 | verify-purchase creates records on-demand (no webhook required) | MERGED |
-| #100 | StepCustomerProfile wizard step (ICP collection, 4 fields) | MERGED |
-| #101 | Network-marketer prospect section in StepCustomerProfile | MERGED |
-| #102 | Bot skips onboarding interview when wizard ICP is present | **OPEN — needs merge** |
-| #103 | LINE webhook registration in provisioner + UI collects both LINE creds | **OPEN — needs merge** |
+| #97 | userId fix in provisioning queue | MERGED |
+| #98 | Clear stale wizard state after hatch | MERGED |
+| #99 | verify-purchase creates records on-demand | MERGED |
+| #100 | StepCustomerProfile ICP step (4 fields) | MERGED |
+| #101 | Network-marketer prospect section | MERGED |
+| #102 | Bot skips onboarding when wizard ICP present | MERGED |
+| #103 | LINE webhook registration in provisioner | MERGED |
+| #104 | LINE-only validation (superseded by #105) | MERGED |
+| #105 | LINE-only bots + full wizard readability overhaul | MERGED |
 
----
-
-## Database State (as of 2026-03-30)
-
-Only 2 tenants exist:
-
-| Tenant ID | Name | Status | Telegram | LINE | AI Key |
-|-----------|------|--------|----------|------|--------|
-| `71018251...` | heylookbrentisgolfing | onboarding | ✅ | ❌ | ✅ openai/gpt-4o-mini |
-| `8803b9f4...` | bbryson | pending | ❌ | ❌ | ❌ |
-
-Tenant `2ca971d3-c6c6-4ab9-aa55-d1b2d327ee5a` **does not exist** in the database (confirmed 2026-03-30).
+### Open PRs
+None. Everything is on main.
 
 ---
 
 ## Wizard Flow (Current — 5 Steps)
 
 1. **StepIdentity** — niche, bot name, your name, email
-2. **StepChannelSetup** — Telegram bot token (required) + LINE credentials (optional: access token + channel secret)
-3. **StepAIConnection** — BYOK key entry + validation
-4. **StepCustomerProfile** — ICP fields (who/problem/not-working/where); network-marketer also gets prospect section
+2. **StepChannelSetup** — Telegram (optional) + LINE (optional, needs access token + secret). At least one required.
+3. **StepAIConnection** — BYOK key install + validation (Gemini free tier available)
+4. **StepCustomerProfile** — ICP: who/problem/not-working/where. Network marketers also get prospect section.
 5. **StepReviewPayment** — order summary + "Hatch" button
 
 ---
 
 ## What Happens at Hatch
 
-1. `POST /wizard/hatch` — validates botId, subscription, AI key
+1. `POST /wizard/hatch` validates botId, subscription, AI key
 2. Activates subscription (`pending_setup` → `active`)
 3. Saves LINE credentials encrypted to tenant record (if provided)
 4. Writes ICP to `onboard_state.json` in Redis
-5. Enqueues provisioning job to BullMQ
-6. Worker calls `provisionTenant()`:
-   - Updates tenant record
-   - Registers Telegram webhook (if bot token present)
-   - Registers LINE webhook via LINE API (if `lineChannelAccessToken` present, non-fatal)
-   - Sets status → onboarding
+5. Enqueues BullMQ provisioning job
+6. Worker: updates tenant, registers Telegram webhook (if token), registers LINE webhook (if creds, non-fatal), sets status → onboarding
 
 ## First Message Behavior
 
-- **Wizard-hatched bots (ICP present):** Skips `tiger_onboard()` entirely. Sends confident intro: *"I'm [botName], your AI sales agent powered by Tiger Claw..."*
-- **Bots without ICP:** Runs `tiger_onboard()` calibration interview as before.
+- **Wizard-hatched bots (ICP in onboard_state.json):** Sends confident intro, skips `tiger_onboard()` entirely
+- **No ICP:** Runs calibration interview as before
 
 ---
 
-## Stan Store Purchase Flow
+## Database State (as of 2026-03-30)
 
-`Stan Store purchase → receipt email with ?email= link → wizard.tigerclaw.io?email=X → POST /auth/verify-purchase → wizard`
-
-- If Stan Store webhook fired: finds existing record, issues session token
-- If no webhook (common): **creates records on-demand** (PR #99), issues session token
-- Zapier is still active but no longer required
+| Tenant | Name | Status | Telegram | AI Key |
+|--------|------|--------|----------|--------|
+| `71018251...` | heylookbrentisgolfing | onboarding | ✅ | ✅ openai/gpt-4o-mini |
+| `8803b9f4...` | bbryson | pending | ❌ | ❌ |
 
 ---
 
 ## Fire Test Checklist
 
 ```
-[ ] Merge PR #102 (ICP first-message bypass)
-[ ] Merge PR #103 (LINE webhook registration)
-[ ] Deploy to Cloud Run (auto on main merge)
-[ ] Complete wizard with a fresh Telegram token + Gemini key + ICP filled in
-[ ] Hit Hatch — watch Cloud Run logs
-[ ] Send first message to the bot on Telegram
-[ ] Gate: bot sends confident intro, NOT onboarding questions
-[ ] Optional: add LINE credentials and verify LINE webhook registers
+[ ] Go to wizard.tigerclaw.io
+[ ] Walk through all 5 steps with a fresh Telegram token + Gemini key + ICP filled in
+[ ] Hit Hatch — watch Cloud Run logs for provisioning success
+[ ] Send first message on Telegram
+[ ] Gate: bot sends confident intro (NOT onboarding questions)
+[ ] Celebrate
+[ ] Pick first real customer from the waiting list
 ```
 
 ---
@@ -113,17 +101,18 @@ Tenant `2ca971d3-c6c6-4ab9-aa55-d1b2d327ee5a` **does not exist** in the database
 | `api/src/routes/wizard.ts` | POST /wizard/hatch, POST /wizard/validate-key |
 | `api/src/routes/auth.ts` | POST /auth/verify-purchase (on-demand record creation) |
 | `api/src/services/provisioner.ts` | Telegram + LINE webhook registration |
-| `api/src/services/ai.ts` | processTelegramMessage(), processLINEMessage(), ICP first-message bypass |
-| `api/src/services/db.ts` | activateSubscription(), createBYOK*, lookupPurchaseByEmail() |
+| `api/src/services/ai.ts` | ICP first-message bypass, processTelegramMessage, processLINEMessage |
+| `api/src/services/db.ts` | activateSubscription(), createBYOK* |
 | `api/src/services/queue.ts` | provisionWorker, telegramWorker, lineWorker |
-| `web-onboarding/src/components/OnboardingModal.tsx` | WizardState, 5-step flow |
-| `web-onboarding/src/components/wizard/StepCustomerProfile.tsx` | ICP collection step |
+| `web-onboarding/src/components/OnboardingModal.tsx` | WizardState, 5-step orchestration |
+| `web-onboarding/src/components/wizard/StepChannelSetup.tsx` | Channel validation (Telegram OR LINE) |
+| `web-onboarding/src/components/wizard/StepCustomerProfile.tsx` | ICP collection |
 
 ---
 
 ## Rules of Engagement
 
-1. **One PR per fix.** No chaining. Verify after every merge.
+1. **One PR per fix.** No chaining.
 2. **Never push directly to main.** Always `feat/` branches + `gh pr create`.
-3. **Stop if something breaks.** Don't stack fixes on top of a broken deploy.
-4. **The mission:** ONE clean bot hatches end-to-end. Then first real customer.
+3. **Stop if something breaks.** Don't stack fixes on a broken deploy.
+4. **The mission:** Paying customers get a live bot that works. That's it.
