@@ -47,9 +47,12 @@ export default function StepChannelSetup({ state, updateState, onNext }: Channel
         return () => clearTimeout(timer);
     }, [state.telegramBotToken]);
 
+    const hasLine = !!(state.lineToken?.trim() && state.lineChannelSecret?.trim());
+    const canProceed = !!botUsername || hasLine;
+
     const handleNext = () => {
-        if (!botUsername) {
-            setProceedError("A Telegram bot token is required. Follow the steps above to get one.");
+        if (!canProceed) {
+            setProceedError("Configure at least one channel — Telegram or LINE.");
             return;
         }
         setProceedError("");
@@ -59,8 +62,8 @@ export default function StepChannelSetup({ state, updateState, onNext }: Channel
     return (
         <div className="flex flex-col h-full animate-fade-in">
             <div className="mb-6 text-center">
-                <h3 className="text-2xl font-bold mb-2 text-white">Connect Your Telegram Bot</h3>
-                <p className="text-white/50 text-base">Create a free bot with @BotFather in 60 seconds. Paste the token — Tiger Claw does the rest.</p>
+                <h3 className="text-2xl font-bold mb-2 text-white">Connect Your Channel</h3>
+                <p className="text-white/50 text-base">Configure Telegram, LINE, or both. At least one channel is required.</p>
             </div>
 
             <div className="flex flex-col gap-5 flex-1">
@@ -87,7 +90,7 @@ export default function StepChannelSetup({ state, updateState, onNext }: Channel
 
                     <div className="flex items-center gap-2 mb-2">
                         <h4 className="text-lg font-bold text-white">Telegram Bot</h4>
-                        <span className="text-[10px] text-primary font-bold uppercase tracking-widest border border-primary/30 rounded px-1.5 py-0.5">Required</span>
+                        <span className="text-[10px] text-white/30 font-bold uppercase tracking-widest border border-white/10 rounded px-1.5 py-0.5">Optional</span>
                     </div>
 
                     <p className="text-xs text-white/40 mb-4 leading-relaxed">
@@ -154,7 +157,7 @@ export default function StepChannelSetup({ state, updateState, onNext }: Channel
                                 GET TOKEN <ExternalLink className="w-2.5 h-2.5" />
                             </a>
                         </div>
-                        <h4 className="text-sm font-bold text-white mb-1">LINE <span className="text-[10px] text-white/30 font-normal">Optional</span></h4>
+                        <h4 className="text-sm font-bold text-white mb-1">LINE <span className="text-[10px] text-white/30 font-bold uppercase tracking-widest border border-white/10 rounded px-1.5 py-0.5">Optional</span></h4>
                         <input
                             type="password"
                             value={state.lineToken || ""}
