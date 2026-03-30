@@ -54,11 +54,15 @@ export default function StepReviewPayment({ state, isDeploying, setIsDeploying, 
         }
     };
 
+    // Determine AI provider display
+    const aiProvider = state.aiKeys.length > 0 ? (state.aiKeys[0].provider === 'openai' ? 'OpenAI' : 'Google Gemini') : 'None';
+    const aiStatus = state.aiKeys.length > 0 ? 'Connected' : 'Not Connected';
+
     return (
         <div className="flex flex-col h-full animate-fade-in">
             <div className="mb-6 text-center">
                 <h3 className="text-3xl font-black mb-2 text-white italic">HATCH YOUR TIGER</h3>
-                <p className="text-white/50 text-base">Your agent is configured and ready to hunt.</p>
+                <p className="text-white/80 text-base">Your agent is configured and ready to hunt.</p>
             </div>
 
             <div className="space-y-6 flex-1">
@@ -74,35 +78,38 @@ export default function StepReviewPayment({ state, isDeploying, setIsDeploying, 
                     </div>
 
                     <div className="p-6 space-y-4">
-                        <h4 className="text-base font-bold text-white/80 uppercase tracking-widest flex items-center justify-between mb-2">
+                        <h4 className="text-base font-bold text-white uppercase tracking-widest flex items-center justify-between mb-2">
                             Order Summary
                             <CreditCard className="w-5 h-5" />
                         </h4>
 
                         <div className="flex justify-between items-center text-base border-b border-white/10 pb-3">
-                            <span className="text-white/80">Subscription Plan</span>
+                            <span className="text-white">Subscription Plan</span>
                             <span className="font-bold text-white">{state.planName}</span>
                         </div>
 
                         <div className="flex justify-between items-center text-base border-b border-white/10 pb-3">
-                            <span className="text-white/80">AI Computations</span>
+                            <span className="text-white">AI Provider</span>
                             <span className="font-bold text-white flex items-center gap-2">
-                                {state.aiKeys.length > 0 ? `Bring Your Own Key (${state.aiKeys.length})` : "No Keys Configured"}
+                                {aiProvider} — {aiStatus}
                             </span>
                         </div>
 
                         <div className="flex flex-col gap-1 pt-2">
                             <div className="flex justify-between items-end border-b-2 border-primary/20 pb-4">
-                                <span className="text-white/80 text-base font-bold uppercase tracking-widest">Total Due Today</span>
-                                <span className="text-3xl font-black text-white tracking-tighter">{state.price}</span>
+                                <span className="text-white text-base font-bold uppercase tracking-widest">Your Plan</span>
+                                <div className="text-right">
+                                    <div className="text-sm text-green-400 font-bold">✓ Paid via Stan Store</div>
+                                    <div className="text-2xl font-black text-white tracking-tighter">{state.planName} — {state.price}</div>
+                                </div>
                             </div>
                         </div>
 
                         <div className="p-4 bg-white/5 rounded-xl border border-white/10 flex gap-3 text-left">
                             <div className="mt-0.5">
-                                <Lock className="w-4 h-4 text-white/60" />
+                                <Lock className="w-4 h-4 text-white/90" />
                             </div>
-                            <p className="text-sm text-white/70 font-medium leading-relaxed">
+                            <p className="text-sm text-white/90 font-medium leading-relaxed">
                                 ✅ 7-Day Money-Back Guarantee. Payments processed by <span className="text-white font-bold">Stan Store</span>.
                             </p>
                         </div>
@@ -130,7 +137,7 @@ export default function StepReviewPayment({ state, isDeploying, setIsDeploying, 
                 </div>
             </div>
 
-            <p className="mt-4 text-sm text-white/50 uppercase tracking-widest text-center">
+            <p className="mt-4 text-sm text-white/90 uppercase tracking-widest text-center">
                 Clicking activate will hatch your bot instantly. Watch the magic happen.
             </p>
         </div>

@@ -803,16 +803,16 @@ export async function createBYOKSubscription(data: {
 // Look up the most recent subscription for an email — used by POST /auth/verify-purchase.
 // Accepts pending_setup OR active/onboarding (in case the provisioning worker auto-activated
 // before the customer finished the wizard). 72-hour window prevents stale re-entry.
-export async function lookupPurchaseByEmail(email: string): Promise<{ userId: string; botId: string; name: string } | null> {
+export async function lookupPurchaseByEmail(email: string): Promise<{ userId: string; botId: string; name: string; subscriptionStatus: string } | null> {
   const result = await getReadPool().query(
-    `SELECT u.id AS user_id, s.tenant_id AS bot_id, u.name
-     FROM subscriptions s
-     JOIN users u ON u.id = s.user_id
-     WHERE u.email = $1
-       AND s.status IN ('pending_setup', 'active', 'onboarding')
-       AND s.created_at > NOW() - INTERVAL '72 hours'
-     ORDER BY s.created_at DESC
-     LIMIT 1`,
+    `SELECT u.id AS user_id, s.tenant_id AS bot_id, u.name, s.status AS subscription_status
+      FROM subscriptions s
+      JOIN users u ON u.id = s.user_id
+      WHERE u.email = $1
+        AND s.status IN ('pending_setup', 'active', 'onboarding')
+        AND s.created_at > NOW() - INTERVAL '72 hours'
+      ORDER BY s.created_at DESC
+      LIMIT 1`,
     [email]
   );
   if (!result.rows[0]) return null;
@@ -820,9 +820,9 @@ export async function lookupPurchaseByEmail(email: string): Promise<{ userId: st
     userId: result.rows[0]["user_id"] as string,
     botId: result.rows[0]["bot_id"] as string,
     name: result.rows[0]["name"] as string,
+    subscriptionStatus: result.rows[0]["subscription_status"] as string,
   };
 }
-
 // Mark a subscription active after wizard completion.
 export async function activateSubscription(botId: string): Promise<boolean> {
   const result = await getPool().query(

@@ -99,7 +99,7 @@ export default function PostPaymentSuccess({ state, onClose }: PostPaymentSucces
                  "Session Error"}
             </h2>
 
-            <p className="text-white/60 text-lg mb-8 max-w-md mx-auto relative z-10 !leading-relaxed">
+            <p className="text-white/90 text-lg mb-8 max-w-md mx-auto relative z-10 !leading-relaxed">
                 {status === "deploying"
                     ? `Setting up ${state.botName || "your agent"} on our infrastructure. This usually takes 10-30 seconds.`
                     : status === "live"
@@ -128,7 +128,7 @@ export default function PostPaymentSuccess({ state, onClose }: PostPaymentSucces
                                 </span>
                                 Agent Activated
                             </h4>
-                            <p className="text-white/60 text-base">
+                            <p className="text-white/90 text-base">
                                 Your Tiger is awake and waiting at <span className="text-[#22c55e] font-mono font-bold">@{botUsername}</span>
                             </p>
                         </div>
@@ -146,14 +146,14 @@ export default function PostPaymentSuccess({ state, onClose }: PostPaymentSucces
                             {dashboardUrl && (
                                 <a
                                     href={dashboardUrl}
-                                    className="inline-flex items-center justify-center gap-2 font-bold py-3 px-6 rounded-xl bg-white/5 hover:bg-white/10 transition-colors text-white/60 text-sm border border-white/10"
+                                    className="inline-flex items-center justify-center gap-2 font-bold py-3 px-6 rounded-xl bg-white/5 hover:bg-white/10 transition-colors text-white/90 text-sm border border-white/10"
                                 >
                                     Access Admin Dashboard
                                 </a>
                             )}
                         </div>
                         
-                        <p className="text-[10px] text-white/40 uppercase tracking-[0.2em] font-bold text-center mt-2">
+                        <p className="text-[10px] text-white/70 uppercase tracking-[0.2em] font-bold text-center mt-2">
                             Send /start to your bot
                         </p>
 
@@ -161,7 +161,7 @@ export default function PostPaymentSuccess({ state, onClose }: PostPaymentSucces
                         <div className="w-full mt-6 pt-6 border-t border-white/10 text-left">
                             <h5 className="text-[11px] font-black uppercase tracking-widest text-primary mb-4 flex items-center justify-between">
                                 Optional Enhancements
-                                <span className="text-white/30 text-[9px] bg-white/5 px-2 py-1 rounded">Do this later</span>
+                                <span className="text-white/70 text-[9px] bg-white/5 px-2 py-1 rounded">Do this later</span>
                             </h5>
                             
                             <div className="space-y-4">
@@ -170,9 +170,9 @@ export default function PostPaymentSuccess({ state, onClose }: PostPaymentSucces
                                         <span className="font-bold text-sm text-white flex items-center gap-2">
                                             <div className="w-2 h-2 rounded-full bg-[#25D366]"></div> WhatsApp Outreach
                                         </span>
-                                        <ArrowRight className="w-3 h-3 text-white/20 group-hover:text-white group-hover:translate-x-1 transition-all" />
+                                        <ArrowRight className="w-3 h-3 text-white/70 group-hover:text-white group-hover:translate-x-1 transition-all" />
                                     </div>
-                                    <p className="text-xs text-white/50">Deploy a mirrored brain directly into any WhatsApp number.</p>
+                                    <p className="text-xs text-white/80">Deploy a mirrored brain directly into any WhatsApp number.</p>
                                 </div>
                                 
                                 <div className="p-4 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-colors group cursor-pointer">
@@ -180,9 +180,9 @@ export default function PostPaymentSuccess({ state, onClose }: PostPaymentSucces
                                         <span className="font-bold text-sm text-white flex items-center gap-2">
                                             <div className="w-2 h-2 rounded-full bg-[#00B900]"></div> LINE Official Account
                                         </span>
-                                        <ArrowRight className="w-3 h-3 text-white/20 group-hover:text-white group-hover:translate-x-1 transition-all" />
+                                        <ArrowRight className="w-3 h-3 text-white/70 group-hover:text-white group-hover:translate-x-1 transition-all" />
                                     </div>
-                                    <p className="text-xs text-white/50">Capture the Asian market with LINE OA integration.</p>
+                                    <p className="text-xs text-white/80">Capture the Asian market with LINE OA integration.</p>
                                 </div>
                             </div>
                         </div>
@@ -193,7 +193,7 @@ export default function PostPaymentSuccess({ state, onClose }: PostPaymentSucces
             {status === "live" && (
                 <button
                     onClick={() => { if (dashboardUrl) { window.location.href = dashboardUrl; } else { onClose(); } }}
-                    className="text-white/40 hover:text-white transition-colors text-sm font-semibold uppercase tracking-widest relative z-10 hover:underline"
+                    className="text-white/70 hover:text-white transition-colors text-sm font-semibold uppercase tracking-widest relative z-10 hover:underline"
                 >
                     Or close this window and go to Dashboard
                 </button>
@@ -204,7 +204,7 @@ export default function PostPaymentSuccess({ state, onClose }: PostPaymentSucces
 
 function BotIcon() {
     return (
-        <svg className="h-10 w-10 text-white/50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg className="h-10 w-10 text-white/80" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
         </svg>
     );
