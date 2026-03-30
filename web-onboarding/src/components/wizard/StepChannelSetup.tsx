@@ -159,7 +159,14 @@ export default function StepChannelSetup({ state, updateState, onNext }: Channel
                             type="password"
                             value={state.lineToken || ""}
                             onChange={(e) => updateState({ lineToken: e.target.value })}
-                            placeholder="Paste LINE Channel Token..."
+                            placeholder="Channel Access Token"
+                            className="bg-black/40 border border-white/10 rounded-lg p-2 text-xs text-white focus:border-primary outline-none mb-2"
+                        />
+                        <input
+                            type="password"
+                            value={state.lineChannelSecret || ""}
+                            onChange={(e) => updateState({ lineChannelSecret: e.target.value })}
+                            placeholder="Channel Secret"
                             className="bg-black/40 border border-white/10 rounded-lg p-2 text-xs text-white focus:border-primary outline-none mb-2"
                         />
                         <div className="mt-auto pt-3 border-t border-white/5 flex items-center gap-2 text-[10px] text-white/20 uppercase tracking-widest font-bold">

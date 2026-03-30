@@ -145,67 +145,84 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
     return { success: false, error: `DB error: ${err instanceof Error ? err.message : String(err)}`, steps };
   }
 
-  // 3. Multi-Tenant Activation! No Docker containers to spin up. 
-  // We simply register an active Webhook with Telegram for the newly assigned token bridging directly to this API cluster.
+  // 3. Register webhooks for all configured channels.
 
   try {
     const baseUrl = (process.env["TIGER_CLAW_API_URL"] || "").replace(/\/$/, "");
     if (!baseUrl) throw new Error("[FATAL] TIGER_CLAW_API_URL environment variable is required");
-    const webhookUrl = `${baseUrl}/webhooks/telegram/${tenant.id}`;
 
-    // Call Telegram API to set the webhook (Use POST with JSON to avoid URL encoding issues)
-    const webhookSecret = process.env["TELEGRAM_WEBHOOK_SECRET"];
-    const tgResponse = await tgFetch(`https://api.telegram.org/bot${resolvedBotToken}/setWebhook`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url: webhookUrl, ...(webhookSecret ? { secret_token: webhookSecret } : {}) })
-    });
-    const tgData = await tgResponse.json();
+    // ── Telegram webhook (BYOB — only when a bot token is provided) ──────────
+    if (resolvedBotToken) {
+      const webhookUrl = `${baseUrl}/webhooks/telegram/${tenant.id}`;
 
-    if (!tgData.ok) {
-      await logLearning({
-        type: "ERROR",
-        code: `ERR-PROV-TG-${Date.now()}`,
-        description: `Telegram Webhook failed: ${tgData.description}`,
-        context: { slug: tenant.slug, botToken: "********", description: tgData.description }
+      // Call Telegram API to set the webhook (Use POST with JSON to avoid URL encoding issues)
+      const webhookSecret = process.env["TELEGRAM_WEBHOOK_SECRET"];
+      const tgResponse = await tgFetch(`https://api.telegram.org/bot${resolvedBotToken}/setWebhook`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: webhookUrl, ...(webhookSecret ? { secret_token: webhookSecret } : {}) })
       });
-      throw new Error(`Telegram Webhook failed: ${tgData.description}`);
-    }
+      const tgData = await tgResponse.json();
 
-    // GAP 12: Telegram Rebranding
-    // We update the bot's profile on Telegram to match the new tenant's identity.
-    try {
-      console.log(`[provisioner] Rebranding Telegram profile...`);
-      
-      // Update Display Name
-      await tgFetch(`https://api.telegram.org/bot${resolvedBotToken}/setMyName?name=${encodeURIComponent(tenant.name)}`);
+      if (!tgData.ok) {
+        await logLearning({
+          type: "ERROR",
+          code: `ERR-PROV-TG-${Date.now()}`,
+          description: `Telegram Webhook failed: ${tgData.description}`,
+          context: { slug: tenant.slug, botToken: "********", description: tgData.description }
+        });
+        throw new Error(`Telegram Webhook failed: ${tgData.description}`);
+      }
 
-      // Update Description/Bio
-      const description = `AI-powered ${input.flavor} agent for ${tenant.name}. Managed by Tiger Claw.`;
-      await tgFetch(`https://api.telegram.org/bot${resolvedBotToken}/setMyDescription?description=${encodeURIComponent(description)}`);
-      
-      steps.push(`Telegram profile rebranded to: ${tenant.name}`);
-    } catch (rebrandErr) {
-      console.warn(`[provisioner] Telegram rebrand failed (non-fatal):`, rebrandErr);
-    }
+      // GAP 12: Telegram Rebranding
+      try {
+        console.log(`[provisioner] Rebranding Telegram profile...`);
+        await tgFetch(`https://api.telegram.org/bot${resolvedBotToken}/setMyName?name=${encodeURIComponent(tenant.name)}`);
+        const description = `AI-powered ${input.flavor} agent for ${tenant.name}. Managed by Tiger Claw.`;
+        await tgFetch(`https://api.telegram.org/bot${resolvedBotToken}/setMyDescription?description=${encodeURIComponent(description)}`);
+        steps.push(`Telegram profile rebranded to: ${tenant.name}`);
+      } catch (rebrandErr) {
+        console.warn(`[provisioner] Telegram rebrand failed (non-fatal):`, rebrandErr);
+      }
 
-    steps.push(`Telegram webhook attached to Master API router successfully.`);
+      steps.push(`Telegram webhook attached to Master API router successfully.`);
+      steps.push(`Leader Core active: Browser [ON], Memory [ON], Evolution [ON]`);
+      console.log(`[provisioner] Agent ${tenant.slug} is now AWAKE and ready to hunt.`);
 
-    // Unified 'Leader' Class Hatching
-    steps.push(`Leader Core active: Browser [ON], Memory [ON], Evolution [ON]`);
-    
-    console.log(`[provisioner] Agent ${tenant.slug} is now AWAKE and ready to hunt.`);
-    
-    // GAP 10: Proactive Initiation
-    // We fire the 'Wake Up' signal. This triggers Gemini to introduce itself and start the interview.
-    // Note: We need a chatId to send a message. Since hatching is async, we'll trigger this 
-    // the moment the bot receives its first /start OR we use the pre-registered admin chat if available.
-    if (input.email === "brentbryson@me.com" && resolvedBotToken) {
+      if (input.email === "brentbryson@me.com") {
         const ADMIN_CHAT_ID = parseInt(process.env["ADMIN_TELEGRAM_CHAT_ID"] || "0");
         if (ADMIN_CHAT_ID) {
-            console.log(`[provisioner] Sending proactive intake to Admin Chat for ${tenant.slug}`);
-            // await triggerProactiveInitiation(tenant.id, resolvedBotToken, ADMIN_CHAT_ID);
+          console.log(`[provisioner] Sending proactive intake to Admin Chat for ${tenant.slug}`);
+          // await triggerProactiveInitiation(tenant.id, resolvedBotToken, ADMIN_CHAT_ID);
         }
+      }
+    }
+
+    // ── LINE webhook registration (non-fatal — LINE-only bots are valid) ──────
+    if (tenant.lineChannelAccessToken) {
+      try {
+        const channelAccessToken = decryptToken(tenant.lineChannelAccessToken);
+        const lineWebhookUrl = `${baseUrl}/webhooks/line/${tenant.id}`;
+        const lineRes = await fetch(`https://api.line.me/v2/bot/channel/webhook/endpoint`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${channelAccessToken}`,
+          },
+          body: JSON.stringify({ endpoint: lineWebhookUrl }),
+        });
+        if (lineRes.ok) {
+          console.log(`[provisioner] LINE webhook registered for tenant ${tenant.id}`);
+          steps.push("LINE webhook registered successfully.");
+        } else {
+          const errBody = await lineRes.json().catch(() => ({})) as Record<string, unknown>;
+          console.warn(`[provisioner] LINE webhook registration failed for ${tenant.id} (non-fatal): HTTP ${lineRes.status}`, errBody);
+          steps.push(`LINE webhook registration failed (non-fatal): HTTP ${lineRes.status}`);
+        }
+      } catch (lineErr: any) {
+        console.warn(`[provisioner] LINE webhook registration error for ${tenant.id} (non-fatal):`, lineErr.message);
+        steps.push(`LINE webhook registration error (non-fatal): ${lineErr.message}`);
+      }
     }
 
   } catch (err) {

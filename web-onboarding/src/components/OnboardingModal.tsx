@@ -45,6 +45,7 @@ export interface WizardState {
     whatsappEnabled: boolean;
     telegramBotToken?: string;
     lineToken?: string;
+    lineChannelSecret?: string;
     contactsRaw: string;
     botId?: string;
     tenantSlug?: string;
