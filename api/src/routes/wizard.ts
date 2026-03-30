@@ -196,7 +196,7 @@ router.post("/hatch", async (req: Request, res: Response) => {
 
     const slug = tenant.slug || name.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 30);
     const finalRegion = region || (language === "th" ? "th-th" : "us-en");
-    const channel = preferredChannel || tenant.preferredChannel || "telegram";
+    const channel = preferredChannel || (lineToken && !botToken ? "line" : null) || tenant.preferredChannel || "telegram";
 
     // Activate the subscription before provisioning — if no pending subscription
     // exists, there is nothing to hatch and we must not queue provisioning.
