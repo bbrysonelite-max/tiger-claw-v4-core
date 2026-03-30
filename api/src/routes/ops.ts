@@ -29,8 +29,6 @@ router.post("/", async (req: Request, res: Response) => {
     // Acknowledge immediately to prevent Telegram retries
     res.status(200).send("OK");
     
-    console.log(`[ops-webhook] Received update: ${JSON.stringify(req.body)}`);
-
     if (!ADMIN_BOT_TOKEN || !ADMIN_CHAT_ID) {
         console.warn("[ops-webhook] Admin Telegram credentials not configured. Ignored.");
         return;
@@ -51,15 +49,12 @@ router.post("/", async (req: Request, res: Response) => {
             return;
         }
 
-        console.log(`[ops-webhook] Authorized message from ${chatId}: "${text}"`);
-
         if (text === "/status") {
             const pool = getPool();
             
             // 1. Database Metrics
             const { rows: activeTenants } = await pool.query("SELECT COUNT(*) as count FROM tenants WHERE status = 'active'");
             const { rows: waitlistedTenants } = await pool.query("SELECT COUNT(*) as count FROM tenants WHERE status = 'pending'");
-            const { rows: activeBots } = await pool.query("SELECT COUNT(*) as count FROM bot_pool WHERE status = 'available'");
             
             // 2. Queue Metrics (BullMQ)
             const telegramQueueCount = await telegramQueue.getJobCounts('wait', 'active', 'failed', 'delayed');
@@ -73,7 +68,7 @@ router.post("/", async (req: Request, res: Response) => {
 <b>📊 Active Database state:</b>
 • Active Tenants: <b>${activeTenants[0].count}</b>
 • Pending Tenants: <b>${waitlistedTenants[0].count}</b>
-• Available Bot Tokens: <b>${activeBots[0].count}</b>
+• Architecture: <b>BYOB (Bring Your Own Bot)</b>
 
 <b>⚙️ Background Workers (BullMQ):</b>
 • Telegram Inference: ${telegramQueueCount.wait} wait | ${telegramQueueCount.active} act | ${telegramQueueCount.failed} fail
