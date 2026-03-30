@@ -1,6 +1,6 @@
 # State of the Tiger — Path Forward
 
-**Last Updated:** 2026-03-30 (Monday — end of all-nighter session)
+**Last Updated:** 2026-03-30 (Monday morning — post all-nighter session 2)
 **PRs merged this session:** #99–#105 (7 PRs)
 
 ---
@@ -57,11 +57,21 @@ After that: pick first real customer from the waiting list.
 
 | Issue | Severity | Notes |
 |-------|----------|-------|
+| **Admin bot token expired** | **HIGH** | `sendAdminAlert()` returns 401 — all provisioning alerts silently failing. Token `8451751033:AAEN...` is dead. Fix: BotFather → new token → update Cloud Run env var. |
 | `bot_ai_keys` dead write | LOW | Wizard writes here, runtime never reads. Cleanup after fire test. |
 | LINE-only bot untested end-to-end | MEDIUM | Provisioner supports it, wizard supports it. Never fire-tested. |
 | `lineChannelSecret` not in WizardState on older sessionStorage | LOW | Fresh session will always have it; edge case for anyone mid-wizard during deploy |
 | ~25 dead BotFather bots | LOW | Need manual /deletebot cleanup |
 | Founding member 5-instance cap | INFO | Observation window ends ~2026-04-03 |
+
+## DB State (as of 2026-03-30 morning)
+
+Only 2 test tenants exist. No real customers yet. Fire test not completed.
+
+| Tenant | Name | Status | Notes |
+|--------|------|--------|-------|
+| `71018251...` | heylookbrentisgolfing | onboarding | Telegram + OpenAI key |
+| `8803b9f4...` | bbryson | pending | LINE creds saved, provisioner never ran |
 
 ---
 

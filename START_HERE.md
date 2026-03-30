@@ -1,6 +1,6 @@
 # START HERE — Tiger Claw Session Brief
 
-**Last Updated:** 2026-03-30 (Monday — all-nighter complete, Pebo is in bed)
+**Last Updated:** 2026-03-30 (Monday morning — post all-nighter session 2)
 **Author:** Pebo + Claude Code
 
 ---
@@ -71,12 +71,24 @@ None. Everything is on main.
 
 ---
 
-## Database State (as of 2026-03-30)
+## Database State (as of 2026-03-30 morning)
 
-| Tenant | Name | Status | Telegram | AI Key |
-|--------|------|--------|----------|--------|
-| `71018251...` | heylookbrentisgolfing | onboarding | ✅ | ✅ openai/gpt-4o-mini |
-| `8803b9f4...` | bbryson | pending | ❌ | ❌ |
+| Tenant | Name | Status | Telegram | LINE | AI Key |
+|--------|------|--------|----------|------|--------|
+| `71018251...` | heylookbrentisgolfing | onboarding | ✅ | ❌ | ✅ openai/gpt-4o-mini |
+| `8803b9f4...` | bbryson | pending | ❌ | ✅ token+secret saved | ❌ |
+
+**No customer tenants exist yet.** Fire test has not been completed with a real customer.
+
+## Known Issues (Post-Session)
+
+| Issue | Severity | Notes |
+|-------|----------|-------|
+| Admin bot token expired | HIGH | `sendAdminAlert()` returns 401 — all provisioning alerts silently failing. Token: `8451751033:AAEN...`. Fix: get new token from BotFather, update env var in Cloud Run. |
+| `bbryson` tenant stuck at `pending` | LOW | LINE creds saved but provisioner never ran. Test record — ignore or re-hatch. |
+| `bot_ai_keys` dead write | LOW | Wizard writes here, runtime never reads. Cleanup after fire test. |
+| LINE-only bot untested end-to-end | MEDIUM | Provisioner supports it, wizard supports it. Never fire-tested. |
+| ~25 dead BotFather bots | LOW | Need manual /deletebot cleanup |
 
 ---
 
@@ -86,9 +98,12 @@ None. Everything is on main.
 [ ] Go to wizard.tigerclaw.io
 [ ] Walk through all 5 steps with a fresh Telegram token + Gemini key + ICP filled in
 [ ] Hit Hatch — watch Cloud Run logs for provisioning success
+      NOTE: sendAdminAlert() is broken (401) — you will NOT get a Telegram ping.
+      Instead: query DB — if status = 'onboarding', provisioner succeeded.
 [ ] Send first message on Telegram
 [ ] Gate: bot sends confident intro (NOT onboarding questions)
 [ ] Celebrate
+[ ] Fix admin bot token (BotFather → new token → Cloud Run env var)
 [ ] Pick first real customer from the waiting list
 ```
 
