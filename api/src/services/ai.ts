@@ -85,7 +85,7 @@ async function isGeminiCircuitTripped(tenantId: string): Promise<boolean> {
 // Phase 5 Task #15: Gemini rate limit hardening — semaphore + backoff
 // Implementation lives in geminiGateway.ts (no tool imports = no circular deps).
 // Re-exported here so existing callers that import from ai.ts keep working.
-import { callGemini } from './geminiGateway.js';
+import { callGemini, sanitizeGeminiJSON } from './geminiGateway.js';
 export { callGemini };
 
 // Phase 5 Task #14: Model Gemini unit economics
@@ -477,7 +477,7 @@ async function runToolLoopOpenAI(
                 result = JSON.stringify({ error: `Unknown tool: ${toolName}` });
             } else {
                 try {
-                    const params = JSON.parse(fn.arguments);
+                    const params = JSON.parse(sanitizeGeminiJSON(fn.arguments));
                     const toolResult = await tool.execute(params, toolContext);
                     result = JSON.stringify(toolResult);
                     if (toolResult?.success === false || toolResult?.ok === false) {

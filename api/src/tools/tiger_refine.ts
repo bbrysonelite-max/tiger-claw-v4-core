@@ -1,7 +1,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { ToolContext, ToolResult } from "./ToolContext.js";
 import { saveMarketFact } from "../services/market_intel.js";
-import { callGemini } from "../services/geminiGateway.js";
+import { callGemini, sanitizeGeminiJSON } from "../services/geminiGateway.js";
 
 // ---------------------------------------------------------------------------
 // Types for High-Value Data
@@ -105,7 +105,7 @@ Return an empty array [] if no meaningful facts are present. Do not invent facts
     const responseText = result.response.text();
 
     try {
-      const parsed = JSON.parse(responseText);
+      const parsed = JSON.parse(sanitizeGeminiJSON(responseText));
       if (Array.isArray(parsed)) {
         facts = parsed.filter(
           (f: any) =>

@@ -62,6 +62,85 @@ const geminiSemaphore = new Semaphore(GEMINI_MAX_CONCURRENT);
 //
 // Retry delays: ~1s, ~2s, ~4s (+ up to 500ms jitter). Non-rate errors throw immediately.
 
+// ─── sanitizeGeminiJSON ──────────────────────────────────────────────────────
+// Gemini sometimes emits invalid escape sequences (\x27, \', \a, \v) or
+// unescaped control characters even when responseMimeType is "application/json".
+// Node's JSON.parse() is strict and rejects all of these.
+
+export function sanitizeGeminiJSON(raw: string): string {
+    // Strip markdown code fences if present
+    let s = raw.trim();
+    if (s.startsWith("```json")) s = s.slice(7);
+    else if (s.startsWith("```")) s = s.slice(3);
+    if (s.endsWith("```")) s = s.slice(0, -3);
+    s = s.trim();
+
+    // Fix invalid escape sequences inside JSON strings.
+    // Walk character-by-character to only fix escapes inside quoted strings.
+    let result = "";
+    let inString = false;
+    let i = 0;
+    while (i < s.length) {
+        const ch = s[i];
+
+        if (ch === '"' && (i === 0 || s[i - 1] !== "\\")) {
+            inString = !inString;
+            result += ch;
+            i++;
+            continue;
+        }
+
+        if (inString && ch === "\\") {
+            const next = s[i + 1];
+            if (next === undefined) {
+                // Trailing backslash — drop it
+                i++;
+                continue;
+            }
+            // Valid JSON escapes: " \ / b f n r t u
+            if ('"\\/bfnrtu'.includes(next)) {
+                result += ch + next;
+                i += 2;
+                continue;
+            }
+            // \xNN hex escape (not valid JSON) — convert to \u00NN
+            if (next === "x" && i + 3 < s.length) {
+                const hex = s.slice(i + 2, i + 4);
+                if (/^[0-9a-fA-F]{2}$/.test(hex)) {
+                    result += "\\u00" + hex;
+                    i += 4;
+                    continue;
+                }
+            }
+            // \' — common from LLMs, just emit the apostrophe
+            if (next === "'") {
+                result += "'";
+                i += 2;
+                continue;
+            }
+            // Any other invalid escape (\a, \v, \w, etc.) — drop the backslash
+            result += next;
+            i += 2;
+            continue;
+        }
+
+        // Unescaped control characters inside strings
+        if (inString && ch.charCodeAt(0) < 32) {
+            if (ch === "\n") result += "\\n";
+            else if (ch === "\r") result += "\\r";
+            else if (ch === "\t") result += "\\t";
+            else result += "\\u" + ch.charCodeAt(0).toString(16).padStart(4, "0");
+            i++;
+            continue;
+        }
+
+        result += ch;
+        i++;
+    }
+
+    return result;
+}
+
 export async function callGemini<T>(fn: () => Promise<T>): Promise<T> {
     await geminiSemaphore.acquire();
     try {
