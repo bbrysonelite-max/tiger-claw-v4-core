@@ -24,6 +24,11 @@ export interface CustomerProfile {
     problem: string;
     notWorking: string;
     whereToFind: string;
+    // Network marketing only — ideal prospect for the business opportunity
+    prospectIdeal?: string;
+    prospectProblem?: string;
+    prospectNotWorking?: string;
+    prospectWhereToBeThem?: string;
 }
 
 export interface WizardState {
