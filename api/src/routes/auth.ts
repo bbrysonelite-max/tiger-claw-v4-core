@@ -55,9 +55,7 @@ router.post("/verify-purchase", async (req: Request, res: Response) => {
     const purchase = await lookupPurchaseByEmail(email);
 
     if (!purchase) {
-      // No webhook record found — Stan Store uses a managed Stripe account that does not
-      // forward webhooks to our API. The customer's receipt email is proof of purchase.
-      // Create the records on-demand so the wizard can proceed immediately.
+      // No purchase record found — create on-demand
       console.log(`[auth] No purchase record for ${email} — creating on-demand (Stan Store self-serve)`);
 
       const name = email.split("@")[0] ?? email;
@@ -83,9 +81,51 @@ router.post("/verify-purchase", async (req: Request, res: Response) => {
       });
     }
 
+    // Existing purchase found — check if we can resume or if we need a new one
+    // TIGERCLAW-V4 Multi-Agent Rule:
+    // If the latest bot for this email is ALREADY live/active, then a re-entry
+    // into /verify-purchase means they bought a SECOND agent.
+    if (purchase.subscriptionStatus && purchase.subscriptionStatus !== "pending_setup") {
+        console.log(`[auth] Active purchase found for ${email} — creating NEW bot for second agent purchase.`);
+        
+        const userId = purchase.userId;
+        const name = purchase.name || email.split("@")[0] || email;
+        const botId = await createBYOKBot(userId, name, "network-marketer", "pending", email);
+        
+        await createBYOKSubscription({
+            userId,
+            botId,
+            stripeSubscriptionId: `stan_store_multi_agent_${Date.now()}`,
+            planTier: "pro",
+            status: "pending_setup",
+        });
+
+        const { sessionToken, expires } = generateSessionToken(email, botId, userId);
+        return res.json({
+            ok: true,
+            sessionToken,
+            expires,
+            botId,
+            name,
+        });
+    }
+
+    // If subscription doesn't exist at all for some reason, create it
+    if (!purchase.subscriptionStatus) {
+        console.log(`[auth] Purchase found but no subscription for ${email} — creating pending_setup.`);
+        await createBYOKSubscription({
+            userId: purchase.userId,
+            botId: purchase.botId,
+            stripeSubscriptionId: `fix_missing_sub_${Date.now()}`,
+            planTier: "pro",
+            status: "pending_setup",
+        });
+    }
+
+    // Normal resume path: status is pending_setup
     const { sessionToken, expires } = generateSessionToken(email, purchase.botId, purchase.userId);
 
-    console.log(`[auth] Purchase verified for ${email} — botId: ${purchase.botId}`);
+    console.log(`[auth] Purchase verified (resume) for ${email} — botId: ${purchase.botId}`);
 
     return res.json({
       ok: true,

@@ -80,7 +80,7 @@ export default function StepCustomerProfile({ state, updateState, onNext }: Cust
         <div className="flex flex-col h-full animate-fade-in">
             <div className="mb-6 text-center">
                 <h3 className="text-2xl font-bold mb-2 text-white">Your Ideal Customer</h3>
-                <p className="text-white/80 text-lg">
+                <p className="text-white/90 text-lg">
                     Your Tiger needs to know who to hunt. These answers are loaded into your bot before it goes live — it will never ask your customers these questions.
                 </p>
             </div>
@@ -99,7 +99,7 @@ export default function StepCustomerProfile({ state, updateState, onNext }: Cust
                                 value={(profile[key] as string) ?? ""}
                                 onChange={(e) => update(key, e.target.value)}
                                 placeholder={placeholder}
-                                className="w-full bg-black/40 border border-white/20 rounded-xl px-4 py-3 text-base text-white placeholder:text-white/40 focus:border-primary focus:outline-none transition-colors"
+                                className="w-full bg-black/40 border border-white/20 rounded-xl px-4 py-3 text-base text-white placeholder:text-white/70 focus:border-primary focus:outline-none transition-colors"
                             />
                         </div>
                     ))}
@@ -112,7 +112,7 @@ export default function StepCustomerProfile({ state, updateState, onNext }: Cust
                             <TrendingUp className="w-5 h-5 text-primary shrink-0" />
                             <h4 className="text-lg font-bold text-white">Your Ideal Prospect (Business Opportunity)</h4>
                         </div>
-                        <p className="text-white/80 text-base -mt-3">
+                        <p className="text-white/90 text-base -mt-3">
                             Who are you recruiting into your team? Your Tiger will qualify prospects for the business — not just the product.
                         </p>
                         {PROSPECT_FIELDS.map(({ key, label, placeholder }) => (
@@ -126,7 +126,7 @@ export default function StepCustomerProfile({ state, updateState, onNext }: Cust
                                     value={(profile[key] as string) ?? ""}
                                     onChange={(e) => update(key, e.target.value)}
                                     placeholder={placeholder}
-                                    className="w-full bg-black/40 border border-white/20 rounded-xl px-4 py-3 text-base text-white placeholder:text-white/40 focus:border-primary focus:outline-none transition-colors"
+                                    className="w-full bg-black/40 border border-white/20 rounded-xl px-4 py-3 text-base text-white placeholder:text-white/70 focus:border-primary focus:outline-none transition-colors"
                                 />
                             </div>
                         ))}

@@ -140,14 +140,14 @@ export default function OnboardingModal({ onClose, initialEmail, initialBotId, i
                         {step > 1 && !isDeploying && (
                             <button
                                 onClick={handleBack}
-                                className="p-2 hover:bg-white/10 rounded-full transition-colors text-white/70 hover:text-white"
+                                className="p-2 hover:bg-white/10 rounded-full transition-colors text-white/90 hover:text-white"
                             >
                                 <ArrowLeft className="w-5 h-5" />
                             </button>
                         )}
                         <div>
                             <h2 className="font-bold text-xl">Agent Setup</h2>
-                            <div className="text-white/80 text-base mt-1">
+                            <div className="text-white text-base mt-1">
                                 Step {step} of {totalSteps}
                             </div>
                         </div>
@@ -155,7 +155,7 @@ export default function OnboardingModal({ onClose, initialEmail, initialBotId, i
                     <button
                         onClick={onClose}
                         disabled={isDeploying}
-                        className="p-2 hover:bg-white/10 rounded-full transition-colors text-white/50 hover:text-white disabled:opacity-50"
+                        className="p-2 hover:bg-white/10 rounded-full transition-colors text-white/80 hover:text-white disabled:opacity-50"
                     >
                         <X className="w-5 h-5" />
                     </button>

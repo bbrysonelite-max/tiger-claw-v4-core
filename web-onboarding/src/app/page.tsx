@@ -132,7 +132,7 @@ function HomeContent() {
           transition={{ duration: 0.5, delay: 0.2 }}
           className="text-lg md:text-xl text-white/90 !leading-relaxed mb-12 max-w-2xl mx-auto font-medium"
         >
-          Bring Your Own Key (BYOK) architecture. Secure, compliant, and highly available agents on edge computing. Stop wiring tools, start selling.
+          Your AI key. Your bot. Your control. Deploy a live sales agent in 60 seconds. Stop wiring tools, start selling.
         </motion.p>
 
         {/* Purchase verification form */}

@@ -63,7 +63,7 @@ export default function StepChannelSetup({ state, updateState, onNext }: Channel
         <div className="flex flex-col h-full animate-fade-in">
             <div className="mb-6 text-center">
                 <h3 className="text-2xl font-bold mb-2 text-white">Connect Your Channel</h3>
-                <p className="text-white/80 text-lg">Configure Telegram, LINE, or both. At least one channel is required.</p>
+                <p className="text-white/90 text-lg">Configure Telegram, LINE, or both. At least one channel is required.</p>
             </div>
 
             <div className="flex flex-col gap-5 flex-1">
@@ -90,10 +90,10 @@ export default function StepChannelSetup({ state, updateState, onNext }: Channel
 
                     <div className="flex items-center gap-2 mb-2">
                         <h4 className="text-xl font-bold text-white">Telegram Bot</h4>
-                        <span className="text-xs text-white/50 font-bold uppercase tracking-widest border border-white/20 rounded px-1.5 py-0.5">Optional</span>
+                        <span className="text-xs text-white/80 font-bold uppercase tracking-widest border border-white/20 rounded px-1.5 py-0.5">Optional</span>
                     </div>
 
-                    <p className="text-base text-white/70 mb-4 leading-relaxed">
+                    <p className="text-base text-white/90 mb-4 leading-relaxed">
                         1. Open{" "}
                         <a href="https://t.me/botfather" target="_blank" rel="noopener noreferrer" className="text-[#0088cc] hover:underline font-bold">
                             @BotFather
@@ -113,10 +113,10 @@ export default function StepChannelSetup({ state, updateState, onNext }: Channel
                                 setProceedError("");
                             }}
                             placeholder="Paste bot token (e.g. 7654321:AAFxyz...)"
-                            className="w-full bg-black/40 border border-white/30 rounded-lg px-4 py-3 text-base text-white placeholder:text-white/40 focus:border-[#0088cc]/70 outline-none pr-12 min-h-[48px]"
+                            className="w-full bg-black/40 border border-white/30 rounded-lg px-4 py-3 text-base text-white placeholder:text-white/70 focus:border-[#0088cc]/70 outline-none pr-12 min-h-[48px]"
                         />
                         <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                            {validating && <Loader2 className="w-5 h-5 text-white/50 animate-spin" />}
+                            {validating && <Loader2 className="w-5 h-5 text-white/80 animate-spin" />}
                             {!validating && botUsername && <CheckCircle2 className="w-5 h-5 text-green-400" />}
                             {!validating && validationError && <AlertCircle className="w-5 h-5 text-red-400" />}
                         </div>
@@ -132,7 +132,7 @@ export default function StepChannelSetup({ state, updateState, onNext }: Channel
                         <p className="text-base text-red-400 mt-2 font-medium">{validationError}</p>
                     )}
 
-                    <div className="mt-4 pt-4 border-t border-white/10 flex items-center gap-2 text-xs text-white/40 uppercase tracking-widest font-bold">
+                    <div className="mt-4 pt-4 border-t border-white/10 flex items-center gap-2 text-xs text-white/70 uppercase tracking-widest font-bold">
                         <ShieldCheck className="w-3 h-3 text-[#0088cc]" /> AES-256-GCM Encrypted at Rest
                     </div>
                 </div>
@@ -157,28 +157,28 @@ export default function StepChannelSetup({ state, updateState, onNext }: Channel
                     </div>
                     <div className="flex items-center gap-2 mb-3">
                         <h4 className="text-xl font-bold text-white">LINE</h4>
-                        <span className="text-xs text-white/50 font-bold uppercase tracking-widest border border-white/20 rounded px-1.5 py-0.5">Optional</span>
+                        <span className="text-xs text-white/80 font-bold uppercase tracking-widest border border-white/20 rounded px-1.5 py-0.5">Optional</span>
                     </div>
                     <input
                         type="password"
                         value={state.lineToken || ""}
                         onChange={(e) => { updateState({ lineToken: e.target.value }); setProceedError(""); }}
                         placeholder="Channel Access Token"
-                        className="w-full bg-black/40 border border-white/30 rounded-lg px-4 py-3 text-base text-white placeholder:text-white/40 focus:border-[#00B900]/70 outline-none mb-3 min-h-[48px]"
+                        className="w-full bg-black/40 border border-white/30 rounded-lg px-4 py-3 text-base text-white placeholder:text-white/70 focus:border-[#00B900]/70 outline-none mb-3 min-h-[48px]"
                     />
                     <input
                         type="password"
                         value={state.lineChannelSecret || ""}
                         onChange={(e) => { updateState({ lineChannelSecret: e.target.value }); setProceedError(""); }}
                         placeholder="Channel Secret"
-                        className="w-full bg-black/40 border border-white/30 rounded-lg px-4 py-3 text-base text-white placeholder:text-white/40 focus:border-[#00B900]/70 outline-none mb-3 min-h-[48px]"
+                        className="w-full bg-black/40 border border-white/30 rounded-lg px-4 py-3 text-base text-white placeholder:text-white/70 focus:border-[#00B900]/70 outline-none mb-3 min-h-[48px]"
                     />
                     {hasLine && (
                         <p className="text-base text-green-400 font-bold flex items-center gap-2">
                             <CheckCircle2 className="w-4 h-4 shrink-0" /> LINE configured — APAC market ready.
                         </p>
                     )}
-                    <div className="mt-3 pt-3 border-t border-white/10 flex items-center gap-2 text-xs text-white/40 uppercase tracking-widest font-bold">
+                    <div className="mt-3 pt-3 border-t border-white/10 flex items-center gap-2 text-xs text-white/70 uppercase tracking-widest font-bold">
                         <ShieldCheck className="w-3 h-3 text-[#00B900]" /> AES-256-GCM Encrypted at Rest
                     </div>
                 </div>
