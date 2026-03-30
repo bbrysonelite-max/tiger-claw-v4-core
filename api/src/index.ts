@@ -150,6 +150,7 @@ const ALERT_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour
 const lastKeyLayerAlert: Record<string, { layer: number; alertedAt: number }> = {};
 const lastActivityAlert: Record<string, { level: string; alertedAt: number }> = {};
 const lastDiskAlert: { level: string; alertedAt: number } = { level: "ok", alertedAt: 0 };
+let lastAdminBotHealth: { ok: boolean; alertedAt: number } = { ok: true, alertedAt: 0 };
 
 // Pool level alert state — Block 5.3 Decision 9
 // Alert thresholds: ≥25=no action, 10-24=once/day, <10=every hour, 0=immediate
@@ -163,6 +164,27 @@ const POOL_ALERT = {
 let lastPoolAlert = { level: "ok" as "ok" | "low" | "critical" | "empty", alertedAt: 0 };
 
 async function runHealthMonitor(): Promise<void> {
+  // Admin Bot Heartbeat — Block 6.2 extension
+  try {
+    const now = Date.now();
+    const token = process.env["ADMIN_TELEGRAM_BOT_TOKEN"];
+    if (token) {
+      const response = await fetch(`https://api.telegram.org/bot${token}/getMe`);
+      const data = await response.json() as { ok: boolean };
+      if (!data.ok) {
+        if (lastAdminBotHealth.ok || (now - lastAdminBotHealth.alertedAt) > ALERT_COOLDOWN_MS) {
+          console.error("[monitor] 🚨 Admin Bot Token is EXPIRED or INVALID (401/403)");
+          lastAdminBotHealth = { ok: false, alertedAt: now };
+          await logAdminEvent("nervous_system_failure", "system", { error: "Admin token 401/403" }).catch(() => {});
+        }
+      } else {
+        lastAdminBotHealth = { ok: true, alertedAt: now };
+      }
+    }
+  } catch (err) {
+    // Non-fatal — network glitch
+  }
+
   // Disk usage check — Block 6.2 threshold
   try {
     const { execSync } = await import("child_process");
