@@ -9,7 +9,7 @@
 import { Router, type Request, type Response } from "express";
 import { createHmac, timingSafeEqual } from "crypto";
 import { z } from "zod";
-import { lookupPurchaseByEmail } from "../services/db.js";
+import { lookupPurchaseByEmail, createBYOKUser, createBYOKBot, createBYOKSubscription } from "../services/db.js";
 
 const router = Router();
 
@@ -55,8 +55,31 @@ router.post("/verify-purchase", async (req: Request, res: Response) => {
     const purchase = await lookupPurchaseByEmail(email);
 
     if (!purchase) {
-      return res.status(404).json({
-        error: "We couldn't find your purchase. Please check the email you used to buy, or contact help@tigerclaw.ai"
+      // No webhook record found — Stan Store uses a managed Stripe account that does not
+      // forward webhooks to our API. The customer's receipt email is proof of purchase.
+      // Create the records on-demand so the wizard can proceed immediately.
+      console.log(`[auth] No purchase record for ${email} — creating on-demand (Stan Store self-serve)`);
+
+      const name = email.split("@")[0] ?? email;
+      const userId = await createBYOKUser(email, name);
+      const botId = await createBYOKBot(userId, name, "network-marketer", "pending", email);
+      await createBYOKSubscription({
+        userId,
+        botId,
+        stripeSubscriptionId: `stan_store_self_serve_${Date.now()}`,
+        planTier: "pro",
+        status: "pending_setup",
+      });
+
+      console.log(`[auth] On-demand records created for ${email} — botId: ${botId}`);
+
+      const { sessionToken, expires } = generateSessionToken(email, botId, userId);
+      return res.json({
+        ok: true,
+        sessionToken,
+        expires,
+        botId,
+        name,
       });
     }
 
