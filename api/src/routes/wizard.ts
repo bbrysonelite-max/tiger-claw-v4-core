@@ -47,6 +47,11 @@ const CustomerProfileSchema = z.object({
   problem: z.string(),
   notWorking: z.string(),
   whereToFind: z.string(),
+  // Network marketing only — prospect / business opportunity section
+  prospectIdeal: z.string().optional(),
+  prospectProblem: z.string().optional(),
+  prospectNotWorking: z.string().optional(),
+  prospectWhereToBeThem: z.string().optional(),
 }).optional();
 
 const HatchSchema = z.object({
