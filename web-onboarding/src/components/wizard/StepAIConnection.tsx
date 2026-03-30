@@ -22,7 +22,6 @@ const PROVIDERS = [
 
 type ProviderId = typeof PROVIDERS[number]["id"];
 
-// Detect provider from key prefix so we can auto-select the tile on paste
 function detectProvider(key: string): ProviderId | null {
     if (key.startsWith("AIza"))    return "google";
     if (key.startsWith("xai-"))   return "grok";
@@ -66,9 +65,6 @@ export default function StepAIConnection({ state, updateState, onNext }: AIConne
         setInstallError("");
 
         try {
-            // Read session token stored by verify-purchase; send as Authorization header
-            // so the API can self-heal botId if the wizard state was loaded from an older
-            // Vercel-cached chunk that didn't carry initialBotId.
             let sessionToken: string | undefined;
             try { sessionToken = sessionStorage.getItem("tc_session") ?? undefined; } catch { /* ignore */ }
 
@@ -128,7 +124,7 @@ export default function StepAIConnection({ state, updateState, onNext }: AIConne
         <div className="flex flex-col h-full animate-fade-in">
             <div className="mb-6">
                 <h3 className="text-2xl font-bold mb-2 text-white">AI Power Core</h3>
-                <p className="text-white/50 text-base leading-relaxed">
+                <p className="text-white/80 text-lg leading-relaxed">
                     Use any AI provider you already have. Add a Backup key and your agent automatically switches if your Primary ever hits a rate limit.
                 </p>
             </div>
@@ -136,7 +132,7 @@ export default function StepAIConnection({ state, updateState, onNext }: AIConne
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 flex-1">
                 {/* Left: Provider Selection & Key Input */}
                 <div className="space-y-4">
-                    {/* Provider tiles — click to select + open key page */}
+                    {/* Provider tiles */}
                     <div className="grid grid-cols-2 gap-2">
                         {PROVIDERS.map((p) => (
                             <button
@@ -150,30 +146,30 @@ export default function StepAIConnection({ state, updateState, onNext }: AIConne
                                     "flex flex-col items-center justify-center p-3 rounded-xl border transition-all text-center group",
                                     selectedProvider === p.id
                                         ? "bg-primary/10 border-primary text-white"
-                                        : "bg-black/20 border-white/5 text-white/40 hover:border-white/20 hover:text-white"
+                                        : "bg-black/20 border-white/20 text-white/60 hover:border-white/40 hover:text-white"
                                 )}
                             >
                                 <span className="text-2xl mb-1">{p.icon}</span>
-                                <span className="text-[10px] font-bold uppercase tracking-tighter">{p.name}</span>
+                                <span className="text-sm font-bold uppercase tracking-tight">{p.name}</span>
                                 {p.free
-                                    ? <span className="text-[8px] bg-green-500/20 text-green-400 px-1 rounded mt-1">FREE</span>
-                                    : <span className="text-[8px] text-white/20 mt-1">get key →</span>
+                                    ? <span className="text-xs bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded mt-1 font-bold">FREE</span>
+                                    : <span className="text-xs text-white/40 mt-1">get key →</span>
                                 }
                             </button>
                         ))}
                     </div>
 
                     {/* Config panel */}
-                    <div className="space-y-3 bg-white/5 p-5 rounded-2xl border border-white/10">
+                    <div className="space-y-3 bg-white/5 p-5 rounded-2xl border border-white/20">
                         <div>
-                            <h4 className="text-sm font-bold text-white flex items-center gap-2 mb-0.5">
+                            <h4 className="text-base font-bold text-white flex items-center gap-2 mb-1">
                                 <Key className="w-4 h-4 text-primary" />
                                 Installing: <span className="text-primary">{slotLabel}</span> — {currentProvider.name}
                             </h4>
-                            <p className="text-[11px] text-white/40">{currentProvider.help}</p>
+                            <p className="text-base text-white/70">{currentProvider.help}</p>
                         </div>
 
-                        <p className="text-[11px] text-white/30 text-center">
+                        <p className="text-sm text-white/60 text-center">
                             Tap a provider above to select it and open its key page.
                         </p>
 
@@ -189,39 +185,37 @@ export default function StepAIConnection({ state, updateState, onNext }: AIConne
                                     tabIndex={0}
                                     disabled={installState === "validating" || installState === "success"}
                                     className={cn(
-                                        "w-full bg-black/40 border rounded-lg p-3 text-sm font-mono outline-none select-text cursor-text transition-colors",
-                                        installState === "error"   ? "border-red-500/50 focus:border-red-400" :
-                                        installState === "success" ? "border-green-500/50" :
-                                                                     "border-white/10 focus:border-primary"
+                                        "w-full bg-black/40 border rounded-lg px-4 py-3 text-base font-mono text-white outline-none select-text cursor-text transition-colors min-h-[48px] placeholder:text-white/40",
+                                        installState === "error"   ? "border-red-500/60 focus:border-red-400" :
+                                        installState === "success" ? "border-green-500/60" :
+                                                                     "border-white/30 focus:border-primary"
                                     )}
                                 />
                             </div>
                             <button
                                 onClick={handleInstall}
                                 disabled={!tempKey || state.aiKeys.length >= maxKeys || installState === "validating" || installState === "success"}
-                                className="bg-primary text-black px-4 rounded-lg hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 transition-all font-bold text-xs min-w-[72px] flex items-center justify-center gap-1"
+                                className="bg-primary text-black px-4 rounded-lg hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 transition-all font-bold text-sm min-w-[80px] flex items-center justify-center gap-1 min-h-[48px]"
                             >
-                                {installState === "validating" ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Checking</> :
-                                 installState === "success"    ? <><Check className="w-3.5 h-3.5" /> Done!</> :
+                                {installState === "validating" ? <><Loader2 className="w-4 h-4 animate-spin" /> Checking</> :
+                                 installState === "success"    ? <><Check className="w-4 h-4" /> Done!</> :
                                                                  "INSTALL"}
                             </button>
                         </div>
 
-                        {/* Detected provider hint */}
                         {detectedHint && installState === "idle" && (
-                            <p className="text-[11px] text-green-400 flex items-center gap-1.5">
-                                <Check className="w-3 h-3" /> {detectedHint}
+                            <p className="text-base text-green-400 flex items-center gap-2 font-medium">
+                                <Check className="w-4 h-4" /> {detectedHint}
                             </p>
                         )}
 
-                        {/* Validation error */}
                         {installState === "error" && installError && (
-                            <p className="text-[11px] text-red-400 flex items-center gap-1.5">
-                                <AlertCircle className="w-3 h-3 shrink-0" /> {installError}
+                            <p className="text-base text-red-400 flex items-center gap-2 font-medium">
+                                <AlertCircle className="w-4 h-4 shrink-0" /> {installError}
                             </p>
                         )}
 
-                        <p className="text-[10px] text-white/20 italic">
+                        <p className="text-sm text-white/50 italic">
                             AES-256-GCM encrypted. Your key never leaves the hardened server environment.
                         </p>
                     </div>
@@ -229,7 +223,7 @@ export default function StepAIConnection({ state, updateState, onNext }: AIConne
 
                 {/* Right: Installed keys */}
                 <div className="space-y-4">
-                    <h4 className="text-xs font-black text-white/40 uppercase tracking-widest">
+                    <h4 className="text-sm font-bold text-white/70 uppercase tracking-widest">
                         {state.aiKeys.length === 0
                             ? "Waiting for Primary Key"
                             : state.aiKeys.length === 1
@@ -239,11 +233,11 @@ export default function StepAIConnection({ state, updateState, onNext }: AIConne
 
                     <div className="space-y-3 min-h-[180px]">
                         {state.aiKeys.length === 0 ? (
-                            <div className="h-full border-2 border-dashed border-white/5 rounded-2xl flex flex-col items-center justify-center p-8 text-center gap-3">
-                                <Shield className="w-8 h-8 text-white/10" />
+                            <div className="h-full border-2 border-dashed border-white/10 rounded-2xl flex flex-col items-center justify-center p-8 text-center gap-3">
+                                <Shield className="w-8 h-8 text-white/20" />
                                 <div>
-                                    <p className="text-sm text-white/30 font-bold">No key installed yet</p>
-                                    <p className="text-[11px] text-white/20 mt-1">Pick a provider on the left and paste your key.<br/>Gemini has a free tier if you need one.</p>
+                                    <p className="text-base text-white/60 font-bold">No key installed yet</p>
+                                    <p className="text-sm text-white/50 mt-1">Pick a provider on the left and paste your key.<br/>Gemini has a free tier if you need one.</p>
                                 </div>
                             </div>
                         ) : (
@@ -261,16 +255,16 @@ export default function StepAIConnection({ state, updateState, onNext }: AIConne
                                                 {PROVIDERS.find(p => p.id === k.provider)?.icon}
                                             </div>
                                             <div>
-                                                <div className="text-sm font-bold text-white flex items-center gap-2">
+                                                <div className="text-base font-bold text-white flex items-center gap-2">
                                                     {k.label}
-                                                    <span className="text-[9px] bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded-full font-black uppercase tracking-wider">Verified</span>
+                                                    <span className="text-xs bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded-full font-black uppercase tracking-wider">Verified</span>
                                                 </div>
-                                                <div className="text-[10px] text-white/30 font-mono mt-0.5">****{k.key.slice(-4)}</div>
+                                                <div className="text-sm text-white/50 font-mono mt-0.5">****{k.key.slice(-4)}</div>
                                             </div>
                                         </div>
                                         <button
                                             onClick={() => removeKey(i)}
-                                            className="text-white/20 hover:text-red-400 transition-colors p-1"
+                                            className="text-white/40 hover:text-red-400 transition-colors p-1"
                                         >
                                             <Trash2 className="w-4 h-4" />
                                         </button>
@@ -281,9 +275,9 @@ export default function StepAIConnection({ state, updateState, onNext }: AIConne
                     </div>
 
                     {state.aiKeys.length > 0 && (
-                        <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl flex gap-3 items-start">
-                            <Info className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
-                            <p className="text-[11px] text-blue-300/80 leading-relaxed">
+                        <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-xl flex gap-3 items-start">
+                            <Info className="w-5 h-5 text-blue-400 shrink-0 mt-0.5" />
+                            <p className="text-base text-blue-300 leading-relaxed">
                                 {state.aiKeys.length === 2
                                     ? <><strong>Failover Active:</strong> If your Primary hits a rate limit, Backup takes over instantly. Zero downtime for your prospects.</>
                                     : <><strong>Optional:</strong> Add a Backup key from any provider. If your Primary ever rate-limits, your Tiger never misses a beat.</>
@@ -295,7 +289,7 @@ export default function StepAIConnection({ state, updateState, onNext }: AIConne
             </div>
 
             <div className="mt-8 flex justify-between items-center">
-                <p className="text-[10px] text-white/20">
+                <p className="text-sm text-white/60">
                     {state.aiKeys.length === 0
                         ? "You need at least one key to continue."
                         : state.aiKeys.length === 1
@@ -307,8 +301,8 @@ export default function StepAIConnection({ state, updateState, onNext }: AIConne
                     disabled={state.aiKeys.length === 0}
                     className="group relative inline-flex h-12 items-center justify-center overflow-hidden rounded-full font-bold px-8 bg-primary text-black transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105 active:scale-95"
                 >
-                    <span className="relative z-10 flex items-center gap-2">
-                        Continue to Launch <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                    <span className="relative z-10 flex items-center gap-2 text-base">
+                        Continue <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                     </span>
                 </button>
             </div>
