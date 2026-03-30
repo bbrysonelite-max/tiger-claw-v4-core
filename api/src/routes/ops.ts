@@ -29,6 +29,8 @@ router.post("/", async (req: Request, res: Response) => {
     // Acknowledge immediately to prevent Telegram retries
     res.status(200).send("OK");
     
+    console.log(`[ops-webhook] Received update: ${JSON.stringify(req.body)}`);
+
     if (!ADMIN_BOT_TOKEN || !ADMIN_CHAT_ID) {
         console.warn("[ops-webhook] Admin Telegram credentials not configured. Ignored.");
         return;
@@ -48,6 +50,8 @@ router.post("/", async (req: Request, res: Response) => {
             console.warn(`[ops-webhook] Unauthorized access attempt from chat ID: ${chatId}`);
             return;
         }
+
+        console.log(`[ops-webhook] Authorized message from ${chatId}: "${text}"`);
 
         if (text === "/status") {
             const pool = getPool();
