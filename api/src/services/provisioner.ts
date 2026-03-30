@@ -89,6 +89,7 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
 
   // BYOB: Telegram tenants must supply their own bot token from @BotFather.
   // The wizard collects and validates the token before calling /wizard/hatch.
+  // LINE and other channels do not use the Telegram bot pool/token.
   if (!resolvedBotToken && input.preferredChannel === "telegram") {
     return {
       success: false,
