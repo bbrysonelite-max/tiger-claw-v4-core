@@ -25,6 +25,7 @@ import {
   createBYOKBot,
   activateSubscription,
   getPool,
+  setBotState,
 } from "../services/db.js";
 import { encryptToken } from "../services/pool.js";
 import { provisionQueue } from "../services/queue.js";
@@ -41,6 +42,13 @@ const ImportContactsSchema = z.object({
   })).min(1)
 });
 
+const CustomerProfileSchema = z.object({
+  idealCustomer: z.string(),
+  problem: z.string(),
+  notWorking: z.string(),
+  whereToFind: z.string(),
+}).optional();
+
 const HatchSchema = z.object({
   botId: z.string(),
   name: z.string().min(1),
@@ -51,7 +59,8 @@ const HatchSchema = z.object({
   preferredChannel: z.string().optional(),
   region: z.string().optional(),
   botToken: z.string().optional(), // BYOB: Telegram tenants provide their own BotFather token
-  hiveOptIn: z.boolean().optional()
+  hiveOptIn: z.boolean().optional(),
+  customerProfile: CustomerProfileSchema,
 });
 
 const ValidateKeySchema = z.object({
@@ -135,7 +144,7 @@ router.post("/hatch", async (req: Request, res: Response) => {
   if (!parsed.success) {
     return res.status(400).json({ error: "Invalid payload.", details: parsed.error.format() });
   }
-  const { botId, name, email, flavor, language, timezone, preferredChannel, region, hiveOptIn, botToken } = parsed.data;
+  const { botId, name, email, flavor, language, timezone, preferredChannel, region, hiveOptIn, botToken, customerProfile } = parsed.data;
 
   // ── Pre-flight checks ───────────────────────────────────────────────────────
   // Validate all preconditions before any database writes or queue operations.
@@ -186,6 +195,14 @@ router.post("/hatch", async (req: Request, res: Response) => {
     const activated = await activateSubscription(botId);
     if (!activated) {
       return res.status(500).json({ error: "Failed to activate subscription. Please try again." });
+    }
+
+    // Write ICP data to onboard_state.json so the bot starts with the customer
+    // profile already loaded — it will never need to ask these questions in conversation.
+    if (customerProfile) {
+      await setBotState(botId, "onboard_state.json", { customerProfile }).catch((err) => {
+        console.warn(`[hatch] Failed to write customerProfile to onboard_state.json for botId=${botId}:`, err.message);
+      });
     }
 
     // Enqueue the heavy lifting
