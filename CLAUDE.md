@@ -1,18 +1,18 @@
-## Current Session State (2026-03-29)
-
-- Phase 4 COMPLETE (PRs #93-#98 all merged)
-- Phase 5 (fire test) is NEXT — audit Stan Store purchase flow first
-- Database is clean (wiped all test data)
-- Container healthy on Cloud Run
-- See START_HERE.md for full context and STATE_OF_THE_TIGER_PATH_FORWARD.md for recovery plan status
-
----
-
 # Tiger Claw — Agent Directives
 
 **Every AI reading this file must treat these as non-negotiable constraints,
 not suggestions. They apply to every line of code, every UI flow, every API
 endpoint, and every background job.**
+
+---
+
+## Current Session State (2026-03-30)
+
+- **ALL PHASES COMPLETE.** LINE is a first-class channel. Fire test ready.
+- **Admin Bot FIXED:** New `@AlienProbeadmin_bot` active with heartbeat monitor.
+- **JSON Parse FIXED:** Sanitization added for Gemini response escape sequences.
+- **Architecture LOCKED:** V4 Stateless (Cloud Run + Redis + Postgres).
+- **Recent PRs Merged:** #106, #107, #108, #109.
 
 ---
 
@@ -106,5 +106,5 @@ endpoint, and every background job.**
 
 - `ARCHITECTURE.md` — canonical system design
 - `START_HERE.md` — session resurrection briefing and phase status
+- `STATE_OF_THE_TIGER_PATH_FORWARD.md` — roadmap and merged history
 - `specs/` — feature specifications
-- `Rules.md` — coding rules

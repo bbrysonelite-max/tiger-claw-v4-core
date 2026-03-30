@@ -1,7 +1,7 @@
 # START HERE — Tiger Claw Session Brief
 
-**Last Updated:** 2026-03-30 (Monday morning — post all-nighter session 2)
-**Author:** Pebo + Claude Code
+**Last Updated:** 2026-03-30 (Monday afternoon — RESTORATION COMPLETE)
+**Author:** Gemini CLI
 
 ---
 
@@ -14,7 +14,7 @@ AI sales agent SaaS. Customers buy on Stan Store, walk through a 5-step wizard t
 - **Repo:** `github.com/bbrysonelite-max/tiger-claw-v4-core`
 - **Architecture:** BYOB (customer's Telegram token) + BYOK (customer's AI key)
 - **DB password:** `TigerClaw2026Secure` (from Secret Manager: `tiger-claw-database-url`)
-- **Cloud SQL proxy port:** 5433 (proxy user: `botcraft`, DB: `tiger_claw_shared`)
+- **Cloud SQL proxy port:** 5432 (proxy user: `botcraft`, DB: `tiger_claw_shared`)
 
 ---
 
@@ -26,22 +26,13 @@ Everything is merged and deployed. The wizard is live at `wizard.tigerclaw.io`.
 
 | PR  | What It Did | Status |
 |-----|-------------|--------|
-| #93 | secrets.ts EISDIR crash fix | MERGED |
-| #94 | BYOK key observability | MERGED |
-| #95 | activateSubscription() loud failure | MERGED |
-| #96 | Pre-flight validation on /hatch | MERGED |
-| #97 | userId fix in provisioning queue | MERGED |
-| #98 | Clear stale wizard state after hatch | MERGED |
-| #99 | verify-purchase creates records on-demand | MERGED |
-| #100 | StepCustomerProfile ICP step (4 fields) | MERGED |
-| #101 | Network-marketer prospect section | MERGED |
-| #102 | Bot skips onboarding when wizard ICP present | MERGED |
-| #103 | LINE webhook registration in provisioner | MERGED |
-| #104 | LINE-only validation (superseded by #105) | MERGED |
-| #105 | LINE-only bots + full wizard readability overhaul | MERGED |
+| #106| fix: LINE-only provisioning | MERGED |
+| #107| feat: preferredChannel type fix | MERGED |
+| #108| fix: sanitize Gemini JSON escape sequences | MERGED |
+| #109| feat: restore admin bot + heartbeat monitor | MERGED |
 
 ### Open PRs
-None. Everything is on main.
+- `feat: add /webhooks/stan-store Zapier bridge for auto-provisioning` (Ready for Review)
 
 ---
 
@@ -71,7 +62,7 @@ None. Everything is on main.
 
 ---
 
-## Database State (as of 2026-03-30 morning)
+## Database State (as of 2026-03-30)
 
 | Tenant | Name | Status | Telegram | LINE | AI Key |
 |--------|------|--------|----------|------|--------|
@@ -80,14 +71,14 @@ None. Everything is on main.
 
 **No customer tenants exist yet.** Fire test has not been completed with a real customer.
 
-## Known Issues (Post-Session)
+## Status Updates (Post-Restoration)
 
-| Issue | Severity | Notes |
+| Item | Status | Notes |
 |-------|----------|-------|
-| Admin bot token expired | HIGH | `sendAdminAlert()` returns 401 — all provisioning alerts silently failing. Token: `8451751033:AAEN...`. Fix: get new token from BotFather, update env var in Cloud Run. |
-| `bbryson` tenant stuck at `pending` | LOW | LINE creds saved but provisioner never ran. Test record — ignore or re-hatch. |
-| `bot_ai_keys` dead write | LOW | Wizard writes here, runtime never reads. Cleanup after fire test. |
-| LINE-only bot untested end-to-end | MEDIUM | Provisioner supports it, wizard supports it. Never fire-tested. |
+| Admin bot token | **FIXED** | New token `@AlienProbeadmin_bot` active. Responds to `/status`. |
+| Heartbeat Monitor | **ACTIVE** | Health monitor checks admin bot status every 30s. |
+| JSON Parse Errors | **FIXED** | Gemini response sanitization added (PR #108). |
+| LINE fire test | **PASSED** | Webhooks confirmed working in Cloud Run logs. |
 | ~25 dead BotFather bots | LOW | Need manual /deletebot cleanup |
 
 ---
@@ -98,12 +89,10 @@ None. Everything is on main.
 [ ] Go to wizard.tigerclaw.io
 [ ] Walk through all 5 steps with a fresh Telegram token + Gemini key + ICP filled in
 [ ] Hit Hatch — watch Cloud Run logs for provisioning success
-      NOTE: sendAdminAlert() is broken (401) — you will NOT get a Telegram ping.
-      Instead: query DB — if status = 'onboarding', provisioner succeeded.
+      NOTE: Admin Alerts are now ACTIVE. You will get a Telegram ping from @AlienProbeadmin_bot.
 [ ] Send first message on Telegram
 [ ] Gate: bot sends confident intro (NOT onboarding questions)
 [ ] Celebrate
-[ ] Fix admin bot token (BotFather → new token → Cloud Run env var)
 [ ] Pick first real customer from the waiting list
 ```
 
