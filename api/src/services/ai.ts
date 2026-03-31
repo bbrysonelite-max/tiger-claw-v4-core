@@ -699,10 +699,21 @@ export async function buildSystemPrompt(tenant: any): Promise<string> {
         `For all other questions (strategy, training, advice), answer fully and intelligently based on your expertise.`,
     ].join('\n');
 
-    // ICP block — injected when ICP data exists
+    // ICP block — injected when ICP data exists.
+    // Fallback: wizard-hatched bots store ICP in customerProfile, not icpSingle.
+    // Any bot hatched before the icpSingle translation fix may have customerProfile
+    // but empty icpSingle — use customerProfile as the source in that case.
+    const cp = onboardState?.customerProfile;
+    const icpSingleResolved = (icpSingle?.idealPerson) ? icpSingle : (cp?.idealCustomer ? {
+        idealPerson: cp.idealCustomer,
+        problemFaced: cp.problem ?? '',
+        currentApproachFailing: cp.notWorking ?? '',
+        onlinePlatforms: cp.whereToFind ?? '',
+    } : icpSingle);
+
     const icpLines: string[] = [];
     if (hasOnboarding) {
-        const primaryIcp = onboardState?.flavor === 'network-marketer' ? icpBuilder : icpSingle;
+        const primaryIcp = onboardState?.flavor === 'network-marketer' ? icpBuilder : icpSingleResolved;
         if (primaryIcp?.idealPerson) {
             const label = onboardState?.flavor === 'real-estate' ? 'Ideal Client' : 'Ideal Customer / Recruit';
             icpLines.push(``, `━━━━ IDEAL CUSTOMER PROFILE ━━━━`);
