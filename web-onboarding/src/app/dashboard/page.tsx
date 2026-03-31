@@ -188,8 +188,8 @@ export default function DashboardPage() {
                     <StatCard
                         icon={<Zap className="h-5 w-5 text-amber-400" />}
                         title="Subscription"
-                        value="$47/mo"
-                        subtitle={`${data.subscription.status === "active" ? "Active" : data.subscription.status} · BYOK Basic`}
+                        value="Stan Store · Paid"
+                        subtitle="Lifetime Access · BYOK"
                     />
                 </div>
 

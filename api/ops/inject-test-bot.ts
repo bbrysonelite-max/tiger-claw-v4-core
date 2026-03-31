@@ -3,7 +3,7 @@ import * as dotenv from "dotenv";
 
 dotenv.config();
 
-const TOKEN = "8664992580:AAGeeRFSJrwHu09OOOx0uHSx183VZHcKEks";
+const TOKEN = "REMOVED_ORPHANED_TOKEN";
 const USERNAME = "tc_yfb199md_bot";
 
 async function main() {

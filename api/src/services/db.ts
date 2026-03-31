@@ -933,16 +933,11 @@ export async function importContacts(tenantId: string, contacts: { name: string;
 
 export async function getBYOKStatus(tenantId: string) {
   try {
-    // BUG FIX: Previous query joined bot_pool.id with bot_ai_config.bot_id which references bots.id —
-    // different tables, different UUIDs. The join always produced zero rows.
-    // Correct path: tenants.email → users.email → users.id → bots.user_id → bots.id → bot_ai_config.bot_id
     const result = await getPool().query(
-      `SELECT c.provider, c.model, c.key_preview, c.connection_type, c.updated_at
-       FROM bot_ai_config c
-       JOIN bots b ON b.id = c.tenant_id
-       JOIN users u ON u.id = b.user_id
-       WHERE u.email = (SELECT email FROM tenants WHERE id = $1)
-       ORDER BY c.updated_at DESC
+      `SELECT provider, model, key_preview, connection_type, updated_at
+       FROM bot_ai_config
+       WHERE tenant_id = $1
+       ORDER BY updated_at DESC
        LIMIT 1`,
       [tenantId],
     );
