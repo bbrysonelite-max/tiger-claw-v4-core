@@ -329,7 +329,7 @@ export type AIProvider = {
 // OpenAI-compatible providers — routed through OpenAI SDK with a custom base URL
 const OPENAI_COMPAT: Record<string, { baseURL: string; defaultModel: string }> = {
     kimi:       { baseURL: 'https://api.moonshot.cn/v1',   defaultModel: 'moonshot-v1-8k' },
-    grok:       { baseURL: 'https://api.x.ai/v1',          defaultModel: 'grok-2-1212' },
+    grok:       { baseURL: 'https://api.x.ai/v1',          defaultModel: 'grok-4-1-fast-non-reasoning' },
     openrouter: { baseURL: 'https://openrouter.ai/api/v1', defaultModel: 'openai/gpt-4o-mini' },
 };
 
