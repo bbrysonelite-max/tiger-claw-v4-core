@@ -177,6 +177,14 @@ export const HEALTH_WELLNESS_FLAVOR: FlavorConfig = {
     activeSources: ["facebook_groups", "reddit", "telegram"],
   },
 
+  fallbackIntelligence: [
+    "Bio-individual personalization is the primary wellness trend for 2026; 74% of consumers now prefer results-based service models over traditional subscription-only options.",
+    "Stress-related health expenditures have increased by 18% in the last 12 months, driving a surge in demand for preventive holistic coaching.",
+    "Data indicates that 'micro-wellness' (short, consistent 5-10 minute daily interventions) results in 40% higher long-term adherence than intensive weekend-only retreats.",
+    "The transition from 'aesthetic-first' to 'longevity-first' wellness is accelerating; 58% of target demographics are now prioritizing metabolic health markers.",
+    "Social-based wellness communities show a 3x higher retention rate for personal coaching services compared to isolated one-on-one training models."
+  ],
+
   // -------------------------------------------------------------------------
   // Nurture Templates (Block 3.6 — Spec decision #32)
   // -------------------------------------------------------------------------

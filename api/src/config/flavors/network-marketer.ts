@@ -301,6 +301,14 @@ export const NETWORK_MARKETER_FLAVOR: FlavorConfig = {
     activeSources: ["reddit", "facebook_groups", "telegram"],
   },
 
+  fallbackIntelligence: [
+    "Traditional B2B lead decay has accelerated; 22.5% of contact data goes stale annually, making social discovery 3x more effective than email lists.",
+    "The 'Side Hustle Economy' reached $2.58 trillion in 2025; 41% of full-time employees are currently seeking secondary income streams due to inflation.",
+    "AI-driven workforce displacement is the #1 driver for professional-to-entrepreneur transitions this year.",
+    "Trust in corporate structures is at a 15-year low; peer-to-peer recommendation models currently outperform traditional advertising by 400% in conversion.",
+    "A 2% monthly drop-off in social engagement is typical during market pivots; high-agency consultants are using this 'quiet' period to recalibrate ICPs for higher intent."
+  ],
+
   // -------------------------------------------------------------------------
   // Nurture Templates (Block 3.6 — Spec decision #32)
   // -------------------------------------------------------------------------

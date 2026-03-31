@@ -663,11 +663,17 @@ function loadFitfao(): string {
 }
 
 // ─── Market intelligence formatter ───────────────────────────────────────────
-function formatMarketIntelligence(facts: MarketFact[]): string {
-    if (facts.length === 0) return '';
+function formatMarketIntelligence(facts: MarketFact[], fallbackFacts: string[] = []): string {
+    const hasLive = facts.length > 0;
+    const displayFacts = hasLive ? facts.map(f => f.fact_summary) : fallbackFacts;
+    
+    if (displayFacts.length === 0) return '';
+
+    const label = hasLive ? `LIVE MARKET INTELLIGENCE (verified within 7 days):` : `MARKET INTELLIGENCE & BENCHMARKS:`;
+
     const lines = [
-        `LIVE MARKET INTELLIGENCE (verified within 7 days):`,
-        ...facts.map(f => `- ${f.fact_summary}`),
+        label,
+        ...displayFacts.map(f => `- ${f}`),
         ``,
         `INSTRUCTION: Reference these facts naturally in conversation when relevant. Do NOT list them unprompted. Do NOT say "according to my data" or "my sources say." Speak as if you personally keep up with the market — because you do. When a fact is directly relevant to what the prospect just said, weave it in. When no facts are relevant to the current topic, don't force them.`,
     ];
@@ -834,8 +840,8 @@ export async function buildSystemPrompt(tenant: any): Promise<string> {
             : []
         ),
         // Market intelligence — live mined facts for this vertical (Birdie/Monica data moat)
-        ...(marketFacts.length > 0
-            ? [``, `━━━━ LIVE MARKET INTELLIGENCE ━━━━`, formatMarketIntelligence(marketFacts)]
+        ...(marketFacts.length > 0 || (flavor.fallbackIntelligence && flavor.fallbackIntelligence.length > 0)
+            ? [``, `━━━━ MARKET INTELLIGENCE ━━━━`, formatMarketIntelligence(marketFacts, flavor.fallbackIntelligence)]
             : []
         ),
         // FITFO operating protocol (agent self-improvement and persistence rules)

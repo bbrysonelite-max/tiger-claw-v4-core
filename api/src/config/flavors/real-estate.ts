@@ -190,6 +190,14 @@ export const REAL_ESTATE_FLAVOR: FlavorConfig = {
     activeSources: ["facebook_groups", "reddit", "telegram"],
   },
 
+  fallbackIntelligence: [
+    "Mortgage rate volatility has created a 'lock-in effect' where 62% of homeowners are holding rates below 4%; this is shifting the market toward new construction and relocation-driven listings.",
+    "Micro-migration patterns show a 14% increase in 'secondary city' interest as remote-first professionals seek lower cost of living with high-tier amenities.",
+    "Inventory remains the primary market constraint; average days-on-market for well-priced single-family homes is currently 21% lower than the 5-year average.",
+    "Institutional buyers have reduced activity by 30% in Q1, opening a significant window for first-time individual buyers to compete without cash-offer wars.",
+    "Social media-driven property discovery now accounts for 38% of first-touch showings, outpacing traditional portal searches for the under-40 demographic."
+  ],
+
   // -------------------------------------------------------------------------
   // Nurture Templates (Block 3.6 — Spec decision #32)
   // -------------------------------------------------------------------------
