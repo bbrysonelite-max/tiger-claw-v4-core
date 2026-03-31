@@ -944,8 +944,20 @@ async function checkWizardIcpFastPath(
 
         const intro = `I'm ${botName}, your AI prospecting agent powered by Tiger Claw. I know your ideal customer is ${ideal} dealing with ${problem}. I'm ready — let me hunt.`;
         
-        // Mark onboarding as complete so buildSystemPrompt picks it up
-        const updatedState = { ...onboardState, phase: 'complete' };
+        // Mark onboarding as complete and translate wizard customerProfile into the
+        // icpSingle format that buildSystemPrompt reads. Without this, buildSystemPrompt
+        // finds an empty icpSingle, injects no ICP block, and the LLM re-runs onboarding.
+        const updatedState = {
+            ...onboardState,
+            phase: 'complete',
+            botName,
+            icpSingle: {
+                idealPerson: customerProfile.idealCustomer,
+                problemFaced: customerProfile.problem,
+                currentApproachFailing: customerProfile.notWorking ?? '',
+                onlinePlatforms: customerProfile.whereToFind ?? '',
+            },
+        };
         await setBotState(tenantId, 'onboard_state.json', updatedState);
 
         await sendMessage(intro);
