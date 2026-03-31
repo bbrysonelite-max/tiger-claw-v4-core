@@ -134,3 +134,51 @@ export async function queryMarketIntel(params: {
     verified_at: row.verified_at
   }));
 }
+
+// Minimum purity floor for bot injection — facts below this are noise.
+const BOT_CONFIDENCE_THRESHOLD = 70;
+
+/**
+ * Fetch fresh, high-confidence market facts for a given domain (tenant flavor).
+ * Used by buildSystemPrompt() to inject live market intelligence into the bot brain.
+ *
+ * Filters:
+ * - domain match (exact — aligns with tenant.flavor)
+ * - confidence_score >= 70 (high-purity facts only)
+ * - created_at within the last 7 days (stale facts are worse than no facts)
+ * - valid_until not yet expired (if set)
+ * - ordered newest first, then by confidence desc
+ */
+export async function getMarketIntelligence(
+  domain: string,
+  limit: number = 5
+): Promise<MarketFact[]> {
+  if (!domain) return [];
+
+  const result = await getPool().query(
+    `SELECT id, domain, category, entity_label, fact_summary, confidence_score,
+            source_url, captured_by, metadata, verified_at, valid_until
+     FROM market_intelligence
+     WHERE domain = $1
+       AND confidence_score >= $2
+       AND created_at >= NOW() - INTERVAL '7 days'
+       AND (valid_until IS NULL OR valid_until > NOW())
+     ORDER BY created_at DESC, confidence_score DESC
+     LIMIT $3`,
+    [domain, BOT_CONFIDENCE_THRESHOLD, limit]
+  );
+
+  return result.rows.map(row => ({
+    id: row.id,
+    domain: row.domain,
+    category: row.category,
+    entity_label: row.entity_label,
+    fact_summary: row.fact_summary,
+    confidence_score: row.confidence_score,
+    source_url: row.source_url,
+    captured_by: row.captured_by ?? "unknown",
+    metadata: row.metadata,
+    verified_at: row.verified_at,
+    valid_until: row.valid_until,
+  }));
+}
