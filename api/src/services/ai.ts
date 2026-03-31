@@ -910,7 +910,7 @@ async function checkWizardIcpFastPath(
         const ideal = customerProfile.idealCustomer;
         const problem = customerProfile.problem;
 
-        const intro = `I'm ${botName}, your AI prospecting agent powered by Tiger Claw. I'm loaded up and ready to hunt. I know your ideal customer is ${ideal} dealing with ${problem}. Send me a name or let me start prospecting.`;
+        const intro = `I'm ${botName}, your AI prospecting agent powered by Tiger Claw. I know your ideal customer is ${ideal} dealing with ${problem}. I'm ready — let me hunt.`;
         
         // Mark onboarding as complete so buildSystemPrompt picks it up
         const updatedState = { ...onboardState, phase: 'complete' };
