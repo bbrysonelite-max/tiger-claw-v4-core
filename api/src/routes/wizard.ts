@@ -230,8 +230,21 @@ router.post("/hatch", async (req: Request, res: Response) => {
 
     // Write ICP data to onboard_state.json so the bot starts with the customer
     // profile already loaded — it will never need to ask these questions in conversation.
+    // Also translate customerProfile into icpSingle so buildSystemPrompt injects the ICP
+    // block correctly. Without icpSingle, the system prompt has no ICP data and the LLM
+    // calls tiger_onboard on every message after the first.
     if (customerProfile) {
-      await setBotState(botId, "onboard_state.json", { customerProfile }).catch((err) => {
+      const botDisplayName = name || tenant.name || 'Tiger';
+      await setBotState(botId, "onboard_state.json", {
+        customerProfile,
+        botName: botDisplayName,
+        icpSingle: {
+          idealPerson: customerProfile.idealCustomer,
+          problemFaced: customerProfile.problem,
+          currentApproachFailing: customerProfile.notWorking ?? '',
+          onlinePlatforms: customerProfile.whereToFind ?? '',
+        },
+      }).catch((err) => {
         console.warn(`[hatch] Failed to write customerProfile to onboard_state.json for botId=${botId}:`, err.message);
       });
     }
