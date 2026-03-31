@@ -6,14 +6,14 @@ endpoint, and every background job.**
 
 ---
 
-## Current Session State (2026-03-31)
+## Current Session State (2026-03-31 Session 2)
 
-- **ALL PHASES COMPLETE.** LINE is a first-class channel. Intent bridge live.
-- **Intent Bridge LIVE:** `market_intelligence` → `buildSystemPrompt()`. Bots now receive live mined market facts (10,833 facts in prod, up to 5 per request, confidence ≥ 70, within 7 days). PR #112.
-- **LINE Provisioning FIXED:** `preferredChannel` inference bug fixed. PR #107.
-- **Zapier Bridge LIVE:** Stan Store → `/webhooks/stan-store` auto-provisioning. PR #109.
-- **Architecture LOCKED:** V4 Stateless (Cloud Run + Redis + Postgres).
-- **Recent PRs Merged:** #107, #109, #110, #111, #112.
+- **FIRST BOT CONFIRMED LIVE.** Captain Tiger Two (`bbryson-mne8ffim`) responded on Telegram at 1:35 AM.
+- **ICP Fast-Path FIXED:** Wizard bots no longer re-run onboarding. `icpSingle` is now written at hatch time and on first message. `buildSystemPrompt` falls back to `customerProfile` for pre-fix bots.
+- **Grok Model UPDATED:** `grok-2-1212` → `grok-4-1-fast-non-reasoning` (xAI dropped the old model).
+- **Dashboard FIXED:** AI engine label no longer mashes provider names. Telegram card no longer shows ACTIVE + "Pending" simultaneously.
+- **Architecture LOCKED:** V4 Stateless (Cloud Run + PostgreSQL + BullMQ).
+- **Recent PRs Merged:** direct commit (greeting CTA), #113, #114, #115, #116.
 
 ---
 
@@ -54,37 +54,22 @@ endpoint, and every background job.**
 - Any tenant who is paying and has **not generated a lead in 3 consecutive
   days** must be flagged in the system.
 - The flag triggers a "Value Check-in" message to the operator — not a
-  retention campaign, but a genuine diagnostic: *"Your bot hasn't surfaced a
-  lead in 3 days. Here's what might be wrong, and here's how to fix it."*
+  retention campaign, but a genuine diagnostic.
 - This logic lives in the cron heartbeat. It is not optional.
 
 ### Proactive Error Correction
-- If the system detects a backend processing error — even one the user has not
-  yet seen — the code must: (1) log it, (2) attempt self-correction, (3) notify
-  the affected user with a plain-language apology and status update.
-- **Never** swallow errors silently when the error affects a paying user's
-  output. `console.warn` is acceptable for non-critical internal noise; it is
-  not acceptable as a substitute for user notification when their bot failed to
-  deliver.
+- If the system detects a backend processing error affecting a paying user,
+  the code must: (1) log it, (2) attempt self-correction, (3) notify the
+  affected user with a plain-language apology and status update.
+- **Never** swallow errors silently when the error affects a paying user's output.
 
 ---
 
 ## 3. Complexity Is a Moral Tax — Protect the User's Time
 
-### Friction Audit Standard
-- Before adding any new user-facing step, ask: *"Does the user need to do this,
-  or can the system handle it?"*
-- Dead clicks, redundant confirmation screens, and "just in case" form fields
-  are defects, not features. Remove them.
-
 ### Zero-Config Target
-- Background infrastructure (Redis compression, fact extraction, hive signal
-  aggregation, Mac cluster Reflexion Loop) must be **completely invisible** to
-  the operator.
+- Background infrastructure must be **completely invisible** to the operator.
 - The user sees one thing: their bot working. The agent handles everything else.
-- If a new feature requires the user to configure something, first exhaust every
-  option to make the system self-configure. Only surface configuration when
-  self-configuration is genuinely impossible.
 
 ---
 
@@ -98,16 +83,24 @@ endpoint, and every background job.**
 - The Mac cluster at 192.168.0.2 is an **offline** Reflexion Loop tool. It is
   NOT a Cloud Run dependency. Never make Cloud Run call it.
 - `buildSystemPrompt()` is async. Always `await` it.
-- All DB/Redis calls in hot paths must be wrapped in `try/catch` with graceful
+- All DB calls in hot paths must be wrapped in `try/catch` with graceful
   degradation. A DB outage must never crash message delivery.
 - Market intelligence domain key is **flavor displayName** (e.g. `"Real Estate Agent"`),
   NOT the flavor key (e.g. `"real-estate"`). See `getMarketIntelligence()` in `market_intel.ts`.
+- Bot state lives in **PostgreSQL** per-tenant schemas (`t_{tenantId}.bot_states`), not Redis.
+- Cloud SQL instance is `tiger-claw-postgres-ha`. Local proxy runs on **port 5433**.
+- Grok keys: stored as `provider=grok` in `bot_ai_config`. `resolveAIProvider` translates
+  to `provider=openai` + `baseURL=https://api.x.ai/v1` for the OpenAI SDK. Never confuse
+  these two layers. Current model: `grok-4-1-fast-non-reasoning`.
+- ICP data: wizard writes `customerProfile`. `buildSystemPrompt` reads `icpSingle`.
+  Both are now written at hatch time. `buildSystemPrompt` falls back to `customerProfile`
+  if `icpSingle` is absent. Do not break this fallback chain.
 
 ---
 
 ## Reference Files
 
 - `ARCHITECTURE.md` — canonical system design
-- `START_HERE.md` — session resurrection briefing and phase status
-- `STATE_OF_THE_TIGER_PATH_FORWARD.md` — roadmap and merged history
+- `START_HERE.md` — session resurrection briefing, infrastructure notes, bug history
+- `STATE_OF_THE_TIGER_PATH_FORWARD.md` — roadmap, merged PR history, known issues
 - `specs/` — feature specifications
