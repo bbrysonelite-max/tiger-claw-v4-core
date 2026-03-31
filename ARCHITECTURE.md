@@ -1,6 +1,6 @@
 # Tiger Claw V4 — Core Architecture
 
-**Last updated:** 2026-03-29
+**Last updated:** 2026-03-31
 **Status:** LIVE. Locked. Do not rewrite.
 
 ---
@@ -50,9 +50,7 @@ The entire platform operates as a shared-nothing Node.js Google Cloud Run API (`
 
 ---
 
-## 4. Memory Architecture (V4.1)
-
-All four phases are shipped and live.
+## 4. Memory Architecture (V4.2)
 
 ### Redis Keys
 | Key | Purpose | TTL |
@@ -68,12 +66,14 @@ All four phases are shipped and live.
 | `fact_anchors` | Extracted business facts from live conversations |
 
 ### Dynamic System Prompt (`buildSystemPrompt`)
-Async. Injects three live signals via `buildMemoryContext()`:
-1. **ICP summary** — from `onboard_state.json` + `fact_anchors`
-2. **Hive patterns** — top 3 `hive_signals` rows for tenant's vertical/region
-3. **Lead stats** — live counts from `tenant_leads`
+Async. Injects **four live signals** loaded in `Promise.all()`. DB failure on any signal = graceful degradation, no crash.
 
-All three loaded in `Promise.all()`. DB failure = graceful degradation, no crash.
+1. **ICP summary** — from `onboard_state.json` + `fact_anchors`
+2. **Hive patterns** — top signals from `hive_signals` for tenant's flavor/region
+3. **Lead stats** — live counts from `tenant_leads`
+4. **Market intelligence** — up to 5 fresh facts from `market_intelligence` (confidence ≥ 70, within 7 days). Mined by Birdie/Monica. Injected as `LIVE MARKET INTELLIGENCE` block. See `getMarketIntelligence()` in `market_intel.ts`.
+
+**IMPORTANT:** `market_intelligence.domain` stores the flavor **displayName** (e.g. `"Real Estate Agent"`), not the flavor key (`"real-estate"`). Always pass `flavor.displayName` — never `tenant.flavor`.
 
 ### Sawtooth Compression (Two Triggers)
 - **History threshold:** `history.length > MAX_HISTORY_TURNS * 2` → `compressChatHistory()`
@@ -114,7 +114,24 @@ Handled in `tiger_keys.ts` and `ai.ts`.
 
 ---
 
-## 7. Security & Isolation
+## 7. Data Moat (`market_intelligence` table)
+
+Global cross-tenant fact store. Populated by Birdie and Monica data miners running daily Reddit scrape + Gemini extraction passes.
+
+| Column | Type | Notes |
+|---|---|---|
+| `domain` | TEXT | Flavor displayName (e.g. `"Real Estate Agent"`) — NOT the flavor key |
+| `category` | TEXT | Fact category |
+| `fact_summary` | TEXT | Plain-language mined fact |
+| `confidence_score` | INTEGER | 0–100. Bot injection threshold: 70 |
+| `created_at` | TIMESTAMPTZ | Freshness gate: 7 days for bot injection |
+| `valid_until` | TIMESTAMPTZ | Explicit expiry (nullable) |
+
+As of 2026-03-31: **10,833 facts** across 15 verticals.
+
+---
+
+## 8. Security & Isolation
 
 - SQL queries never built from LLM output
 - Tenant data siloed to tenant-specific schemas (`t_{uuid}`)
@@ -125,13 +142,12 @@ Handled in `tiger_keys.ts` and `ai.ts`.
 
 ---
 
-## 8. Deployment
+## 9. Deployment
 
 ### API (Cloud Run)
-Triggered automatically by GitHub Actions on merge to `main`. Do not deploy manually.
+Triggered automatically by GitHub Actions on merge to `main`.
 
 ```bash
-# The only deploy path:
 git push origin feat/your-branch
 gh pr create && gh pr merge --auto --squash
 # GitHub Actions handles the rest
@@ -145,4 +161,4 @@ Separate repo `tiger-bot-website`. Push to `main` → auto-deploy to `tigerclaw.
 
 ---
 
-> **Note to all AI agents:** This architecture is locked. If you see a type error, fix the TypeScript interface. Do NOT rewrite the architecture to fix it. Do NOT restore OpenClaw. Do NOT add per-tenant containers. Do NOT switch AI providers.
+> **Note to all AI agents:** This architecture is locked. If you see a type error, fix the TypeScript interface. Do NOT rewrite the architecture to fix it. Do NOT restore OpenClaw. Do NOT add per-tenant containers. Do NOT switch AI providers. Always test data-layer changes against the real prod DB — the CI Postgres integration test is broken at the infra level (not your code).
