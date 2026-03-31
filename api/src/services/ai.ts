@@ -891,11 +891,11 @@ async function checkWizardIcpFastPath(
 
         const intro = `I'm ${botName}, your AI prospecting agent powered by Tiger Claw. I'm loaded up and ready to hunt. I know your ideal customer is ${ideal} dealing with ${problem}. Send me a name or let me start prospecting.`;
         
-        await sendMessage(intro);
-
         // Mark onboarding as complete so buildSystemPrompt picks it up
         const updatedState = { ...onboardState, phase: 'complete' };
         await setBotState(tenantId, 'onboard_state.json', updatedState);
+
+        await sendMessage(intro);
 
         await saveChatHistory(tenantId, chatId, [
             { role: 'user' as const, parts: [{ text }] },
