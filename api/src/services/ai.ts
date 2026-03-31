@@ -1,6 +1,7 @@
 import { GoogleGenerativeAI, Content, Part, GenerateContentResult } from '@google/generative-ai';
 import OpenAI from 'openai';
 import { getTenant, getPool, getBotState, setBotState, getTenantBotToken, getHiveSignalWithFallback, queryHivePatterns } from './db.js';
+import { getMarketIntelligence, MarketFact } from './market_intel.js';
 import TelegramBot from 'node-telegram-bot-api';
 import IORedis from 'ioredis';
 import * as fs from 'fs';
@@ -594,6 +595,18 @@ function loadFitfao(): string {
     }
 }
 
+// ─── Market intelligence formatter ───────────────────────────────────────────
+function formatMarketIntelligence(facts: MarketFact[]): string {
+    if (facts.length === 0) return '';
+    const lines = [
+        `LIVE MARKET INTELLIGENCE (verified within 7 days):`,
+        ...facts.map(f => `- ${f.fact_summary}`),
+        ``,
+        `INSTRUCTION: Reference these facts naturally in conversation when relevant. Do NOT list them unprompted. Do NOT say "according to my data" or "my sources say." Speak as if you personally keep up with the market — because you do. When a fact is directly relevant to what the prospect just said, weave it in. When no facts are relevant to the current topic, don't force them.`,
+    ];
+    return lines.join('\n');
+}
+
 // ─── System prompt ────────────────────────────────────────────────────────────
 // Async version — reads onboard_state.json so the bot has full operator context.
 export async function buildSystemPrompt(tenant: any): Promise<string> {
@@ -619,11 +632,14 @@ export async function buildSystemPrompt(tenant: any): Promise<string> {
     // Load dynamic approved skills for this tenant
     const approvedSkills = await loadApprovedSkills(tenant.id, tenant.flavor).catch(() => []);
 
-    // Load hive benchmarks — cross-tenant intelligence for this flavor/region
-    const hiveBenchmarks = await loadHiveBenchmarks(
-        tenant.flavor ?? 'universal',
-        tenant.region ?? 'universal',
-    ).catch(() => []);
+    // Load hive benchmarks and market intelligence in parallel
+    const [hiveBenchmarks, marketFacts] = await Promise.all([
+        loadHiveBenchmarks(
+            tenant.flavor ?? 'universal',
+            tenant.region ?? 'universal',
+        ).catch(() => []),
+        getMarketIntelligence(flavor.displayName ?? '').catch(() => []),
+    ]);
 
     // Load FITFO operating protocol
     const fitfao = loadFitfao();
@@ -737,6 +753,11 @@ export async function buildSystemPrompt(tenant: any): Promise<string> {
                 `The following benchmarks are derived from anonymized, aggregated data across all Tiger Claw agents in your vertical and region. Use them to calibrate your strategies — but always prioritize your operator's specific context over general benchmarks.`,
                 ...hiveBenchmarks,
             ]
+            : []
+        ),
+        // Market intelligence — live mined facts for this vertical (Birdie/Monica data moat)
+        ...(marketFacts.length > 0
+            ? [``, `━━━━ LIVE MARKET INTELLIGENCE ━━━━`, formatMarketIntelligence(marketFacts)]
             : []
         ),
         // FITFO operating protocol (agent self-improvement and persistence rules)
