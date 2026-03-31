@@ -6,13 +6,14 @@ endpoint, and every background job.**
 
 ---
 
-## Current Session State (2026-03-30)
+## Current Session State (2026-03-31)
 
-- **ALL PHASES COMPLETE.** LINE is a first-class channel. Fire test ready.
-- **Admin Bot FIXED:** New `@AlienProbeadmin_bot` active with heartbeat monitor.
-- **JSON Parse FIXED:** Sanitization added for Gemini response escape sequences.
+- **ALL PHASES COMPLETE.** LINE is a first-class channel. Intent bridge live.
+- **Intent Bridge LIVE:** `market_intelligence` → `buildSystemPrompt()`. Bots now receive live mined market facts (10,833 facts in prod, up to 5 per request, confidence ≥ 70, within 7 days). PR #112.
+- **LINE Provisioning FIXED:** `preferredChannel` inference bug fixed. PR #107.
+- **Zapier Bridge LIVE:** Stan Store → `/webhooks/stan-store` auto-provisioning. PR #109.
 - **Architecture LOCKED:** V4 Stateless (Cloud Run + Redis + Postgres).
-- **Recent PRs Merged:** #106, #107, #108, #109.
+- **Recent PRs Merged:** #107, #109, #110, #111, #112.
 
 ---
 
@@ -99,6 +100,8 @@ endpoint, and every background job.**
 - `buildSystemPrompt()` is async. Always `await` it.
 - All DB/Redis calls in hot paths must be wrapped in `try/catch` with graceful
   degradation. A DB outage must never crash message delivery.
+- Market intelligence domain key is **flavor displayName** (e.g. `"Real Estate Agent"`),
+  NOT the flavor key (e.g. `"real-estate"`). See `getMarketIntelligence()` in `market_intel.ts`.
 
 ---
 
