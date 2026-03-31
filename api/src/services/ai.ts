@@ -871,6 +871,41 @@ export function buildFirstMessageText(
     return operatorText;
 }
 
+// ─── Wizard ICP fast-path: skip onboarding interview entirely ──────────
+async function checkWizardIcpFastPath(
+    tenantId: string,
+    onboardState: any,
+    tenant: any,
+    isFirstMessage: boolean,
+    text: string,
+    chatId: number,
+    sendMessage: (text: string) => Promise<void>
+): Promise<boolean> {
+    const customerProfile = onboardState?.customerProfile;
+    const hasWizardIcp = !!(customerProfile?.idealCustomer?.trim() && customerProfile?.problem?.trim());
+
+    if (isFirstMessage && hasWizardIcp) {
+        const botName = (onboardState?.botName ?? tenant.name ?? 'Tiger') as string;
+        const ideal = customerProfile.idealCustomer;
+        const problem = customerProfile.problem;
+
+        const intro = `I'm ${botName}, your AI prospecting agent powered by Tiger Claw. I'm loaded up and ready to hunt. I know your ideal customer is ${ideal} dealing with ${problem}. Send me a name or let me start prospecting.`;
+        
+        await sendMessage(intro);
+
+        // Mark onboarding as complete so buildSystemPrompt picks it up
+        const updatedState = { ...onboardState, phase: 'complete' };
+        await setBotState(tenantId, 'onboard_state.json', updatedState);
+
+        await saveChatHistory(tenantId, chatId, [
+            { role: 'user' as const, parts: [{ text }] },
+            { role: 'model' as const, parts: [{ text: intro }] },
+        ]);
+        return true;
+    }
+    return false;
+}
+
 // ─── Public: process a Telegram user message ─────────────────────────────────
 export async function processTelegramMessage(
     tenantId: string,
@@ -905,19 +940,16 @@ export async function processTelegramMessage(
         const isFirstMessage = (await getChatHistory(tenantId, chatId)).length === 0;
 
         // ── Wizard ICP fast-path: skip onboarding interview entirely ──────────
-        // When the operator already completed the ICP wizard, the bot knows its
-        // identity. Send a confident intro instead of asking setup questions.
-        const hasWizardIcp = !!(onboardState?.customerProfile?.idealCustomer?.trim());
-        if (isFirstMessage && hasWizardIcp) {
-            const botName = (onboardState?.botName ?? tenant.name ?? 'Tiger') as string;
-            const intro = `I'm ${botName}, your AI sales agent powered by Tiger Claw — a self-improving intelligence network that gets smarter with every conversation across the entire platform. I'm loaded with your industry profile and ready to hunt. Let's get to work... because I'm getting my nails done later.`;
-            await bot.sendMessage(chatId, intro);
-            await saveChatHistory(tenantId, chatId, [
-                { role: 'user' as const, parts: [{ text }] },
-                { role: 'model' as const, parts: [{ text: intro }] },
-            ]);
-            return;
-        }
+        const fastPathHandled = await checkWizardIcpFastPath(
+            tenantId,
+            onboardState,
+            tenant,
+            isFirstMessage,
+            text,
+            chatId,
+            async (introText) => { await bot.sendMessage(chatId, introText); }
+        );
+        if (fastPathHandled) return;
 
         const effectiveText = buildFirstMessageText(text, onboardingComplete, isFirstMessage);
 
@@ -1357,6 +1389,21 @@ export async function processLINEMessage(
     const chatId = userId as unknown as number;
 
     try {
+        const onboardState = await getBotState<any>(tenantId, 'onboard_state.json').catch(() => null);
+        const isFirstMessage = (await getChatHistory(tenantId, chatId)).length === 0;
+
+        // ── Wizard ICP fast-path: skip onboarding interview entirely ──────────
+        const fastPathHandled = await checkWizardIcpFastPath(
+            tenantId,
+            onboardState,
+            tenant,
+            isFirstMessage,
+            text,
+            chatId,
+            async (introText) => { await sendLineMessage(introText); }
+        );
+        if (fastPathHandled) return;
+
         const history = await getChatHistory(tenantId, chatId);
         const genAI = new GoogleGenerativeAI(aiProvider.provider === 'google' ? aiProvider.key : '');
         const model = aiProvider.provider === 'google' ? genAI.getGenerativeModel({

@@ -109,11 +109,13 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
       // Just update it with the final configs
       await getPool().query(
         `UPDATE tenants SET 
-            flavor = $1, region = $2, language = $3, preferred_channel = $4, 
-            bot_token = COALESCE($5, bot_token),
-            bot_username = COALESCE($6, bot_username)
-           WHERE id = $7`,
+            name = $1,
+            flavor = $2, region = $3, language = $4, preferred_channel = $5, 
+            bot_token = COALESCE($6, bot_token),
+            bot_username = COALESCE($7, bot_username)
+           WHERE id = $8`,
         [
+          input.name,
           input.flavor, 
           input.region, 
           input.language, 
