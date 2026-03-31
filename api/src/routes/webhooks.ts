@@ -29,7 +29,6 @@ import {
 } from "../services/db.js";
 import { decryptToken } from "../services/pool.js";
 import { sendAdminAlert } from "./admin.js";
-import { sendStanStoreWelcome } from "../services/email.js";
 
 // ---------------------------------------------------------------------------
 // Rate limiters
@@ -510,7 +509,8 @@ router.post("/stan-store", async (req: Request, res: Response) => {
       });
 
       await logAdminEvent("stan_store_zapier_purchase", botId, { email, productName });
-      // Stan Store receipt drives customer to wizard.tigerclaw.io — no magic link needed
+      // Stan Store receipt email drives customer to wizard.tigerclaw.io directly.
+      // No magic link needed — purchase-based auth (POST /auth/verify-purchase) gates the wizard.
 
       console.log(`[stan-store-webhook] ✅ Provisioned Stan Store customer: ${email} (botId: ${botId})`);
       await sendAdminAlert(`✅ Stan Store purchase provisioned\nCustomer: ${name} (${email})\nProduct: ${productName}`);
