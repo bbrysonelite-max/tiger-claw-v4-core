@@ -638,7 +638,7 @@ export async function buildSystemPrompt(tenant: any): Promise<string> {
             tenant.flavor ?? 'universal',
             tenant.region ?? 'universal',
         ).catch(() => []),
-        getMarketIntelligence(tenant.flavor ?? '').catch(() => []),
+        getMarketIntelligence(flavor.displayName ?? '').catch(() => []),
     ]);
 
     // Load FITFO operating protocol

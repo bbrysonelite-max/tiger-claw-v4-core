@@ -139,11 +139,15 @@ export async function queryMarketIntel(params: {
 const BOT_CONFIDENCE_THRESHOLD = 70;
 
 /**
- * Fetch fresh, high-confidence market facts for a given domain (tenant flavor).
+ * Fetch fresh, high-confidence market facts for a given domain.
  * Used by buildSystemPrompt() to inject live market intelligence into the bot brain.
  *
+ * IMPORTANT: domain must be the flavor displayName (e.g. "Real Estate Agent"),
+ * NOT the flavor key (e.g. "real-estate"). The miner stores displayName as domain.
+ * Pass flavor.displayName from ai.ts, which already has the flavor config loaded.
+ *
  * Filters:
- * - domain match (exact — aligns with tenant.flavor)
+ * - domain match (exact — flavor displayName as stored by the miner)
  * - confidence_score >= 70 (high-purity facts only)
  * - created_at within the last 7 days (stale facts are worse than no facts)
  * - valid_until not yet expired (if set)

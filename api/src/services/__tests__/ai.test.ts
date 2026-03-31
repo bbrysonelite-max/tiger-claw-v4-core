@@ -60,6 +60,11 @@ vi.mock('../self-improvement.js', () => ({
   draftSkillFromFailure: vi.fn().mockResolvedValue(null),
 }));
 
+const mockGetMarketIntelligence = vi.hoisted(() => vi.fn().mockResolvedValue([]));
+vi.mock('../market_intel.js', () => ({
+  getMarketIntelligence: mockGetMarketIntelligence,
+}));
+
 // Mock all 19 tools so the module loads without error
 vi.mock('../../tools/tiger_onboard.js', () => ({ tiger_onboard: { name: 'tiger_onboard', description: '', parameters: {}, execute: vi.fn() } }));
 vi.mock('../../tools/tiger_scout.js', () => ({ tiger_scout: { name: 'tiger_scout', description: '', parameters: {}, execute: vi.fn() } }));
@@ -308,6 +313,33 @@ describe('buildSystemPrompt', () => {
     // Anti-churn: warm market banned
     expect(prompt).toContain('warm market');   // appears in banned list
     expect(prompt).not.toContain('work their warm market'); // never as instruction
+  });
+
+  it('injects market intelligence block when facts are returned', async () => {
+    mockGetMarketIntelligence.mockResolvedValueOnce([
+      { fact_summary: 'Network marketers see 3x retention when they follow up within 24 hours.' },
+      { fact_summary: 'Top recruiters average 12 outreach messages per converted lead.' },
+    ]);
+    const prompt = await buildSystemPrompt(mockTenant);
+    expect(prompt).toContain('LIVE MARKET INTELLIGENCE');
+    expect(prompt).toContain('3x retention when they follow up within 24 hours');
+    expect(prompt).toContain('12 outreach messages per converted lead');
+    expect(prompt).toContain('weave it in');
+  });
+
+  it('omits market intelligence block when no facts returned', async () => {
+    mockGetMarketIntelligence.mockResolvedValueOnce([]);
+    const prompt = await buildSystemPrompt(mockTenant);
+    expect(prompt).not.toContain('LIVE MARKET INTELLIGENCE');
+  });
+
+  it('calls getMarketIntelligence with the flavor displayName, not the flavor key', async () => {
+    mockGetMarketIntelligence.mockResolvedValueOnce([]);
+    await buildSystemPrompt(mockTenant);
+    // loadFlavorConfig mock returns displayName: 'Network Marketer'
+    // tenant.flavor is 'network-marketer' — must NOT be passed
+    expect(mockGetMarketIntelligence).toHaveBeenCalledWith('Network Marketer');
+    expect(mockGetMarketIntelligence).not.toHaveBeenCalledWith('network-marketer');
   });
 });
 
