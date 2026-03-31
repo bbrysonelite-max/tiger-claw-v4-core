@@ -30,6 +30,7 @@ interface DashboardData {
     };
     apiKey: {
         configured: boolean;
+        health: string;
         provider: string | null;
         model: string | null;
         keyPreview: string | null;
@@ -203,42 +204,54 @@ export default function DashboardPage() {
                         <Key className="h-5 w-5 text-white/50" />
                         API Key
                     </h3>
-                    <div className={`rounded-2xl p-6 border ${data.apiKey.configured
-                        ? "bg-[#22c55e]/5 border-[#22c55e]/20"
-                        : "bg-amber-500/5 border-amber-500/20"
+                    <div className={`rounded-2xl p-6 border ${data.apiKey.health === 'dead'
+                        ? "bg-red-500/5 border-red-500/20"
+                        : data.apiKey.configured
+                            ? "bg-[#22c55e]/5 border-[#22c55e]/20"
+                            : "bg-amber-500/5 border-amber-500/20"
                         }`}>
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-4">
-                                <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${data.apiKey.configured
-                                    ? "bg-[#22c55e]/10 border border-[#22c55e]/20"
-                                    : "bg-amber-500/10 border border-amber-500/20"
+                                <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${data.apiKey.health === 'dead'
+                                    ? "bg-red-500/10 border border-red-500/20"
+                                    : data.apiKey.configured
+                                        ? "bg-[#22c55e]/10 border border-[#22c55e]/20"
+                                        : "bg-amber-500/10 border border-amber-500/20"
                                     }`}>
-                                    {data.apiKey.configured
-                                        ? <CheckCircle2 className="h-5 w-5 text-[#22c55e]" />
-                                        : <AlertCircle className="h-5 w-5 text-amber-400" />
+                                    {data.apiKey.health === 'dead'
+                                        ? <XCircle className="h-5 w-5 text-red-500" />
+                                        : data.apiKey.configured
+                                            ? <CheckCircle2 className="h-5 w-5 text-[#22c55e]" />
+                                            : <AlertCircle className="h-5 w-5 text-amber-400" />
                                     }
                                 </div>
                                 <div>
                                     <p className="font-semibold text-white">
-                                        {data.apiKey.configured ? "Key Active & Encrypted" : "No API Key Configured"}
+                                        {data.apiKey.health === 'dead'
+                                            ? "Key Dead - Action Required"
+                                            : data.apiKey.configured ? "Key Active & Encrypted" : "No API Key Configured"
+                                        }
                                     </p>
                                     <p className="text-white/40 text-sm">
-                                        {data.apiKey.configured
-                                            ? `${data.apiKey.keyPreview ?? "***"} · AES-256-GCM encrypted · ${data.apiKey.lastUpdated ? `Updated ${timeAgo(data.apiKey.lastUpdated)}` : ""
-                                            }`
-                                            : "Your agent is using the platform onboarding key (limited). Add your own key for unlimited usage."
+                                        {data.apiKey.health === 'dead'
+                                            ? "Your AI key stopped working. Click 'Update Key' to fix it."
+                                            : data.apiKey.configured
+                                                ? `${data.apiKey.keyPreview ?? "***"} · AES-256-GCM encrypted · ${data.apiKey.lastUpdated ? `Updated ${timeAgo(data.apiKey.lastUpdated)}` : ""
+                                                }`
+                                                : "Your agent is using the platform onboarding key (limited). Add your own key for unlimited usage."
                                         }
                                     </p>
                                 </div>
                             </div>
-                            {!data.apiKey.configured && (
+                            {(data.apiKey.health === 'dead' || !data.apiKey.configured) && (
                                 <a
-                                    href="https://aistudio.google.com/apikey"
-                                    target="_blank"
+                                    href={data.apiKey.health === 'dead' ? `/wizard/${data.tenant.slug}?step=3` : "https://aistudio.google.com/apikey"}
+                                    target={data.apiKey.health === 'dead' ? undefined : "_blank"}
                                     rel="noopener noreferrer"
-                                    className="inline-flex items-center gap-1 text-amber-400 text-sm font-semibold hover:underline whitespace-nowrap"
+                                    className={`inline-flex items-center gap-1 text-sm font-semibold hover:underline whitespace-nowrap ${data.apiKey.health === 'dead' ? 'text-red-500' : 'text-amber-400'}`}
                                 >
-                                    Get API Key <ExternalLink className="h-3 w-3" />
+                                    {data.apiKey.health === 'dead' ? "Fix Key" : "Get API Key"}
+                                    <ExternalLink className="h-3 w-3" />
                                 </a>
                             )}
                         </div>

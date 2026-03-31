@@ -53,6 +53,7 @@ router.get("/:slug", async (req: Request, res: Response) => {
         },
         apiKey: {
             configured: keyStatus?.configured ?? false,
+            health: tenant.keyHealth ?? 'healthy',
             provider: keyStatus?.provider ?? null,
             model: keyStatus?.model ?? null,
             keyPreview: keyStatus?.keyPreview ?? null,

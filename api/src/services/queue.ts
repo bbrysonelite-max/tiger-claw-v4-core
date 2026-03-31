@@ -1,9 +1,10 @@
 import { Queue, Worker, Job } from 'bullmq';
 import IORedis from 'ioredis';
 import { provisionTenant } from './provisioner.js'; // Multi-tenant provisioner
-import { getPool, getTenantBotUsername } from './db.js';
+import { getPool, getTenantBotUsername, updateTenantKeyHealth } from './db.js';
 import { sendAdminAlert } from '../routes/admin.js';
 import { sendProvisioningReceipt } from './email.js';
+import { resolveAIProvider, validateAIKey } from './ai.js';
 import TelegramBot from 'node-telegram-bot-api';
 
 // Provide a stable connection to our newly provisioned Memorystore Redis
@@ -398,8 +399,9 @@ export const cronWorker = SHOULD_RUN_WORKERS ? new Worker(
             const pool = getPool();
             // Fetch all active tenants and check hours since creation for Trial Engine
             const { rows: tenants } = await pool.query(`
-                SELECT id, created_at, feedback_loop_enabled, feedback_paused,
-                       last_feedback_at, feedback_reminder_sent_at, feedback_pause_sent_at
+                SELECT id, name, created_at, feedback_loop_enabled, feedback_paused,
+                       last_feedback_at, feedback_reminder_sent_at, feedback_pause_sent_at,
+                       key_health, bot_token
                 FROM tenants WHERE status IN ('active', 'live', 'onboarding')
             `);
 
@@ -466,6 +468,33 @@ export const cronWorker = SHOULD_RUN_WORKERS ? new Worker(
                             tenantId: tenant.id,
                             routineType: 'daily_scout',
                         }, { jobId: `scout_${tenant.id}_${today}`, removeOnComplete: true, removeOnFail: true });
+                    }
+
+                    // ── Key Health Monitor — runs every hour ─────────────────────────
+                    // Job 2: Lightweight validation ping against the tenant's AI key.
+                    // Only checks tenants with a configured BYOK key.
+                    const aiProvider = await resolveAIProvider(tenant.id);
+                    if (aiProvider && aiProvider.key && !aiProvider.key.startsWith('AIzaSyD')) { // Only BYOK, skip platform key
+                        const { valid, error: keyErr } = await validateAIKey(aiProvider.provider, aiProvider.key);
+                        const currentHealth = valid ? 'healthy' : 'dead';
+                        
+                        if (tenant.key_health !== currentHealth) {
+                            console.log(`[Cron] Key health change for ${tenant.id}: ${tenant.key_health} -> ${currentHealth} (${keyErr ?? 'OK'})`);
+                            await updateTenantKeyHealth(tenant.id, currentHealth);
+
+                            if (currentHealth === 'dead' && tenant.bot_token) {
+                                try {
+                                    const bot = new TelegramBot(tenant.bot_token);
+                                    await bot.sendMessage(
+                                        tenant.id, // Assuming tenant.id is used as chatId for the operator's control channel
+                                        `🚨 *Tiger Claw Alert:* your AI key (${aiProvider.provider}) has stopped working. Your agent is now paused.\n\nError: ${keyErr ?? 'Unauthorized'}\n\nPlease update your key at your dashboard: ${process.env['FRONTEND_URL'] ?? 'https://wizard.tigerclaw.io'}/dashboard?slug=${tenant.slug}`,
+                                        { parse_mode: 'Markdown' }
+                                    ).catch(e => console.warn(`[Cron] Failed to notify dead key to tenant ${tenant.id}:`, e.message));
+                                } catch (notifyErr) {
+                                    console.warn(`[Cron] Failed to init bot for health notification:`, notifyErr);
+                                }
+                            }
+                        }
                     }
 
                     // ── Value-gap detection — runs once per day at 9 AM UTC ────────────

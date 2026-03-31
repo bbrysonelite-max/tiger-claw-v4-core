@@ -28,6 +28,7 @@ import {
   setBotState,
 } from "../services/db.js";
 import { encryptToken } from "../services/pool.js";
+import { validateAIKey } from "../services/ai.js";
 import { provisionQueue } from "../services/queue.js";
 import { z } from "zod";
 
@@ -378,32 +379,7 @@ router.post("/validate-key", async (req: Request, res: Response) => {
     console.log(`[wizard] Validating ${k.provider} key for bot ${botId}...`);
 
     try {
-      let isValid = false;
-
-      // Provider-specific validation logic
-      if (k.provider === "google") {
-        const testUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(k.key)}`;
-        const response = await fetch(testUrl);
-        isValid = response.ok;
-      } else if (k.provider === "openai") {
-        const response = await fetch("https://api.openai.com/v1/models", {
-          headers: { "Authorization": `Bearer ${k.key}` }
-        });
-        isValid = response.ok;
-      } else if (k.provider === "grok") {
-        const response = await fetch("https://api.x.ai/v1/models", {
-          headers: { "Authorization": `Bearer ${k.key}` }
-        });
-        isValid = response.ok;
-      } else if (k.provider === "openrouter") {
-        const response = await fetch("https://openrouter.ai/api/v1/models", {
-          headers: { "Authorization": `Bearer ${k.key}` }
-        });
-        isValid = response.ok;
-      } else {
-        // Unknown provider — length check only
-        isValid = k.key.length > 10;
-      }
+      const { valid: isValid, error: validationError } = await validateAIKey(k.provider, k.key);
 
       if (isValid) {
         const encrypted = encryptToken(k.key);

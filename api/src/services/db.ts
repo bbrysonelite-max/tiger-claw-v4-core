@@ -141,6 +141,8 @@ export interface Tenant {
   lastActivityAt?: Date;
   suspendedAt?: Date;
   suspendedReason?: string;
+  keyHealth: string;
+  keyHealthUpdatedAt: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -170,6 +172,8 @@ function rowToTenant(row: Record<string, unknown>): Tenant {
     lastActivityAt: row["last_activity_at"] ? new Date(row["last_activity_at"] as string) : undefined,
     suspendedAt: row["suspended_at"] ? new Date(row["suspended_at"] as string) : undefined,
     suspendedReason: row["suspended_reason"] as string | undefined,
+    keyHealth: (row["key_health"] as string) ?? 'healthy',
+    keyHealthUpdatedAt: row["key_health_updated_at"] ? new Date(row["key_health_updated_at"] as string) : new Date(),
     createdAt: new Date(row["created_at"] as string),
     updatedAt: new Date(row["updated_at"] as string),
   };
@@ -300,6 +304,13 @@ export async function updateTenantActivity(id: string): Promise<void> {
   await getPool().query(
     "UPDATE tenants SET last_activity_at=NOW(), updated_at=NOW() WHERE id=$1",
     [id]
+  );
+}
+
+export async function updateTenantKeyHealth(id: string, health: string): Promise<void> {
+  await getPool().query(
+    "UPDATE tenants SET key_health=$1, key_health_updated_at=NOW(), updated_at=NOW() WHERE id=$2",
+    [health, id]
   );
 }
 

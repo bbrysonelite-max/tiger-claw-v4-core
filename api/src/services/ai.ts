@@ -4,6 +4,7 @@ import { getTenant, getPool, getBotState, setBotState, getTenantBotToken, getHiv
 import { getMarketIntelligence, MarketFact } from './market_intel.js';
 import TelegramBot from 'node-telegram-bot-api';
 import IORedis from 'ioredis';
+import fetch from 'node-fetch';
 import * as fs from 'fs';
 import * as path from 'path';
 import { loadFlavorConfig } from '../tools/flavorConfig.js';
@@ -81,6 +82,37 @@ async function trackGeminiSuccess(tenantId: string) {
 async function isGeminiCircuitTripped(tenantId: string): Promise<boolean> {
     const tripped = await redis.get(`circuit_breaker:gemini:tripped:${tenantId}`);
     return !!tripped;
+}
+
+/**
+ * Lightweight validation ping for an AI key.
+ * Used by wizard and heartbeat health monitor.
+ */
+export async function validateAIKey(provider: string, key: string): Promise<{ valid: boolean; error?: string }> {
+    try {
+        if (provider === "google") {
+            const testUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(key)}`;
+            const response = await fetch(testUrl);
+            return { valid: response.ok, error: response.ok ? undefined : `HTTP ${response.status}` };
+        } 
+        
+        if (provider === "openai" || provider === "grok" || provider === "openrouter" || provider === "kimi") {
+            let baseUrl = "https://api.openai.com/v1/models";
+            if (provider === "grok") baseUrl = "https://api.x.ai/v1/models";
+            if (provider === "openrouter") baseUrl = "https://openrouter.ai/api/v1/models";
+            if (provider === "kimi") baseUrl = "https://api.moonshot.cn/v1/models";
+
+            const response = await fetch(baseUrl, {
+                headers: { "Authorization": `Bearer ${key}` }
+            });
+            return { valid: response.ok, error: response.ok ? undefined : `HTTP ${response.status}` };
+        }
+
+        // Unknown provider — basic length check
+        return { valid: key.length > 10 };
+    } catch (err: any) {
+        return { valid: false, error: err.message };
+    }
 }
 
 // Phase 5 Task #15: Gemini rate limit hardening — semaphore + backoff
