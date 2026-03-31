@@ -27,12 +27,15 @@ const mockStripe = vi.hoisted(() => ({
   },
 }))
 
+const mockValidateAIKey = vi.hoisted(() => vi.fn().mockResolvedValue({ valid: true }));
+
 vi.mock('../../services/db.js', () => mockDb)
+vi.mock('../../services/ai.js', () => ({
+  validateAIKey: mockValidateAIKey,
+}))
 vi.mock('stripe', () => ({ default: class StripeMock { constructor() { return mockStripe } } }))
 
-// Stub fetch globally for the /validate-key Gemini probe
-const mockFetch = vi.fn()
-vi.stubGlobal('fetch', mockFetch)
+// Removed global fetch stub since we're mocking validateAIKey directly
 
 async function buildApp() {
   const { default: wizardRouter } = await import('../../routes/wizard.js')
@@ -44,7 +47,6 @@ async function buildApp() {
 
 beforeEach(() => {
   vi.resetAllMocks()
-  vi.stubGlobal('fetch', mockFetch)
   process.env['STRIPE_SECRET_KEY'] = 'sk_test_abc'
   process.env['ENCRYPTION_KEY'] = 'a'.repeat(32)
 })
@@ -94,8 +96,7 @@ describe('GET /wizard/status', () => {
 describe('POST /wizard/validate-key', () => {
   it('accepts a valid Google API key and stores encrypted config', async () => {
     const app = await buildApp()
-    // Gemini listModels probe returns 200
-    mockFetch.mockResolvedValueOnce({ ok: true, status: 200 })
+    mockValidateAIKey.mockResolvedValueOnce({ valid: true })
     mockDb.addAIKey.mockResolvedValue(undefined)
 
     const res = await request(app)
@@ -109,7 +110,7 @@ describe('POST /wizard/validate-key', () => {
 
   it('rejects an invalid Google API key (403 from Gemini)', async () => {
     const app = await buildApp()
-    mockFetch.mockResolvedValueOnce({ ok: false, status: 403 })
+    mockValidateAIKey.mockResolvedValueOnce({ valid: false, error: 'HTTP 403' })
 
     const res = await request(app)
       .post('/wizard/validate-key')
@@ -131,7 +132,7 @@ describe('POST /wizard/validate-key', () => {
 
   it('accepts a valid Grok key (200 from x.ai)', async () => {
     const app = await buildApp()
-    mockFetch.mockResolvedValueOnce({ ok: true, status: 200 })
+    mockValidateAIKey.mockResolvedValueOnce({ valid: true })
     mockDb.addAIKey.mockResolvedValue(undefined)
 
     const res = await request(app)
@@ -144,7 +145,7 @@ describe('POST /wizard/validate-key', () => {
 
   it('rejects an invalid Grok key (401 from x.ai)', async () => {
     const app = await buildApp()
-    mockFetch.mockResolvedValueOnce({ ok: false, status: 401 })
+    mockValidateAIKey.mockResolvedValueOnce({ valid: false, error: 'HTTP 401' })
 
     const res = await request(app)
       .post('/wizard/validate-key')
@@ -156,7 +157,7 @@ describe('POST /wizard/validate-key', () => {
 
   it('accepts a valid OpenRouter key (200 from openrouter.ai)', async () => {
     const app = await buildApp()
-    mockFetch.mockResolvedValueOnce({ ok: true, status: 200 })
+    mockValidateAIKey.mockResolvedValueOnce({ valid: true })
     mockDb.addAIKey.mockResolvedValue(undefined)
 
     const res = await request(app)
@@ -169,7 +170,7 @@ describe('POST /wizard/validate-key', () => {
 
   it('rejects an invalid OpenRouter key (401 from openrouter.ai)', async () => {
     const app = await buildApp()
-    mockFetch.mockResolvedValueOnce({ ok: false, status: 401 })
+    mockValidateAIKey.mockResolvedValueOnce({ valid: false, error: 'HTTP 401' })
 
     const res = await request(app)
       .post('/wizard/validate-key')
@@ -181,7 +182,7 @@ describe('POST /wizard/validate-key', () => {
 
   it('stores an encrypted key (not plaintext) in the database', async () => {
     const app = await buildApp()
-    mockFetch.mockResolvedValueOnce({ ok: true, status: 200 })
+    mockValidateAIKey.mockResolvedValueOnce({ valid: true })
 
     let savedConfig: Record<string, unknown> | null = null
     mockDb.addAIKey.mockImplementation((config: Record<string, unknown>) => {

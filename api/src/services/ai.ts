@@ -98,9 +98,10 @@ export async function validateAIKey(provider: string, key: string): Promise<{ va
         
         if (provider === "openai" || provider === "grok" || provider === "openrouter" || provider === "kimi") {
             let baseUrl = "https://api.openai.com/v1/models";
-            if (provider === "grok") baseUrl = "https://api.x.ai/v1/models";
-            if (provider === "openrouter") baseUrl = "https://openrouter.ai/api/v1/models";
-            if (provider === "kimi") baseUrl = "https://api.moonshot.cn/v1/models";
+            // Auto-detect specific provider if generic "openai" is passed but key has specific prefix
+            if (provider === "grok" || key.startsWith("xai-")) baseUrl = "https://api.x.ai/v1/models";
+            else if (provider === "openrouter" || key.startsWith("sk-or-")) baseUrl = "https://openrouter.ai/api/v1/models";
+            else if (provider === "kimi") baseUrl = "https://api.moonshot.cn/v1/models";
 
             const response = await fetch(baseUrl, {
                 headers: { "Authorization": `Bearer ${key}` }
@@ -340,6 +341,27 @@ function detectProvider(key: string): 'google' | 'openai' | null {
     return null;
 }
 
+function resolveCompatInfo(key: string, model?: string): { provider: 'google' | 'openai'; baseURL?: string } {
+    if (key.startsWith('AIza')) return { provider: 'google' };
+    
+    // Explicit Grok prefix
+    if (key.startsWith('xai-')) return { provider: 'openai', baseURL: 'https://api.x.ai/v1' };
+    
+    // OpenRouter prefix
+    if (key.startsWith('sk-or-')) return { provider: 'openai', baseURL: 'https://openrouter.ai/api/v1' };
+    
+    // Model-based detection (if prefix is generic sk- or missing)
+    if (model) {
+        if (model.toLowerCase().includes('grok')) return { provider: 'openai', baseURL: 'https://api.x.ai/v1' };
+        if (model.toLowerCase().includes('moonshot') || model.toLowerCase().includes('kimi')) return { provider: 'openai', baseURL: 'https://api.moonshot.cn/v1' };
+        // OpenRouter models often have a slash: "openai/gpt-4o-mini"
+        if (model.includes('/') && !model.toLowerCase().includes('openai')) return { provider: 'openai', baseURL: 'https://openrouter.ai/api/v1' };
+    }
+    
+    // Default to OpenAI if it looks like an sk- key, otherwise fallback to google
+    return { provider: key.startsWith('sk-') ? 'openai' : 'google' };
+}
+
 function defaultModel(provider: 'google' | 'openai'): string {
     return provider === 'openai' ? 'gpt-4o-mini' : 'gemini-2.0-flash';
 }
@@ -373,10 +395,15 @@ export async function resolveAIProvider(tenantId: string): Promise<AIProvider | 
                     console.warn(`[AI] Tenant ${tenantId} has unknown activeLayer=${activeLayer} — falling through to DB lookup.`);
             }
             if (rawKey) {
-                const provider = detectProvider(rawKey) ?? 'google';
+                const { provider, baseURL } = resolveCompatInfo(rawKey, state.layer2Model);
                 if (!circuitTripped || provider !== 'google') {
-                    console.log(`[AI] resolveAIProvider: tenant=${tenantId} source=key_state.json provider=${provider}`);
-                    return { key: rawKey, provider, model: state.layer2Model ?? defaultModel(provider) };
+                    console.log(`[AI] resolveAIProvider: tenant=${tenantId} source=key_state.json provider=${provider}${baseURL ? ' compat=' + baseURL : ''}`);
+                    return { 
+                        key: rawKey, 
+                        provider, 
+                        model: state.layer2Model ?? defaultModel(provider),
+                        baseURL
+                    };
                 }
                 console.log(`[AI] Gemini circuit tripped for ${tenantId}. Skipping Gemini in key_state.`);
             }
@@ -399,20 +426,28 @@ export async function resolveAIProvider(tenantId: string): Promise<AIProvider | 
                 const { provider, model, encrypted_key } = row;
                 if (encrypted_key) {
                     const key = decryptToken(encrypted_key);
-                    const resolvedProvider = (provider as 'google' | 'openai') ?? detectProvider(key) ?? 'google';
-
-                    if (circuitTripped && resolvedProvider === 'google') {
-                        continue; // Skip Gemini if tripped
-                    }
-
+                    
                     // OpenAI-compatible providers (kimi, grok, openrouter) — route through OpenAI SDK
                     const compat = OPENAI_COMPAT[provider as string];
                     if (compat) {
                         console.log(`[AI] resolveAIProvider: tenant=${tenantId} source=bot_ai_config provider=${provider} (openai-compat)`);
                         return { key, provider: 'openai', model: model ?? compat.defaultModel, baseURL: compat.baseURL };
                     }
-                    console.log(`[AI] resolveAIProvider: tenant=${tenantId} source=bot_ai_config provider=${resolvedProvider}`);
-                    return { key, provider: resolvedProvider, model: model ?? defaultModel(resolvedProvider) };
+
+                    // Smarter resolution using key prefix + model name (covers generic "openai" entries that are actually Grok/OpenRouter)
+                    const { provider: resolvedProvider, baseURL } = resolveCompatInfo(key, model);
+
+                    if (circuitTripped && resolvedProvider === 'google') {
+                        continue; // Skip Gemini if tripped
+                    }
+
+                    console.log(`[AI] resolveAIProvider: tenant=${tenantId} source=bot_ai_config provider=${resolvedProvider}${baseURL ? ' compat=' + baseURL : ''}`);
+                    return { 
+                        key, 
+                        provider: resolvedProvider, 
+                        model: model ?? defaultModel(resolvedProvider),
+                        baseURL
+                    };
                 }
             }
         }
