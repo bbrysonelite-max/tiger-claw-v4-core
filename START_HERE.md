@@ -1,7 +1,7 @@
 # START HERE — Tiger Claw Session Brief
 
-**Last Updated:** 2026-03-30 (Monday afternoon — RESTORATION COMPLETE)
-**Author:** Gemini CLI
+**Last Updated:** 2026-03-31
+**Author:** Claude Sonnet 4.6
 
 ---
 
@@ -18,21 +18,29 @@ AI sales agent SaaS. Customers buy on Stan Store, walk through a 5-step wizard t
 
 ---
 
-## Current State: READY TO FIRE TEST
+## Current State: READY FOR FIRST REAL CUSTOMER
 
-Everything is merged and deployed. The wizard is live at `wizard.tigerclaw.io`.
+Everything is merged and deployed. Intent bridge is live. The bot is smarter than it was yesterday.
 
-### All Merged PRs (complete history)
+### All Merged PRs (this session — 2026-03-31)
 
 | PR  | What It Did | Status |
 |-----|-------------|--------|
-| #106| fix: LINE-only provisioning | MERGED |
-| #107| feat: preferredChannel type fix | MERGED |
-| #108| fix: sanitize Gemini JSON escape sequences | MERGED |
-| #109| feat: restore admin bot + heartbeat monitor | MERGED |
+| #107| fix: LINE-only provisioning — preferredChannel inference bug | MERGED |
+| #109| fix: Zapier bridge cleanup — remove unused import | MERGED |
+| #110| fix: wizard UX friction pass — contrast, copy, multi-agent support | MERGED |
+| #111| fix: 3 critical fire test bugs (name update, ICP fast-path, email placeholder) | MERGED |
+| #112| feat: intent bridge — market intelligence → bot system prompt | MERGED |
 
 ### Open PRs
-- `feat: add /webhooks/stan-store Zapier bridge for auto-provisioning` (Ready for Review)
+| PR  | Title | Notes |
+|-----|-------|-------|
+| #90 | Real API validation for Grok/OpenRouter keys | Needs triage |
+| #78 | Mine Quality Hardening & Reliability Audit | Needs triage |
+| #77 | Mine Quality Audit (Task #18) | Needs triage |
+| #75 | Stan Store Integration Audit | Needs triage |
+| #74 | Ruthless Relevance Gate for Data Refinery | Needs triage |
+| #46 | Email support agent + session wrap docs | Needs triage — may be stale |
 
 ---
 
@@ -62,24 +70,26 @@ Everything is merged and deployed. The wizard is live at `wizard.tigerclaw.io`.
 
 ---
 
-## Database State (as of 2026-03-30)
+## Intent Bridge (NEW — PR #112)
+
+`market_intelligence` table → `buildSystemPrompt()`. Every bot message now includes up to 5 fresh mined facts for that tenant's vertical.
+
+- **10,833 facts** in prod as of 2026-03-31
+- **Confidence threshold:** 70/100 minimum
+- **Freshness window:** 7 days
+- **Domain key:** flavor `displayName` (e.g. `"Real Estate Agent"`), NOT the flavor key (`"real-estate"`)
+- **Files:** `api/src/services/market_intel.ts` → `getMarketIntelligence()`, `api/src/services/ai.ts` → `formatMarketIntelligence()`
+
+---
+
+## Database State (as of 2026-03-31)
 
 | Tenant | Name | Status | Telegram | LINE | AI Key |
 |--------|------|--------|----------|------|--------|
 | `71018251...` | heylookbrentisgolfing | onboarding | ✅ | ❌ | ✅ openai/gpt-4o-mini |
 | `8803b9f4...` | bbryson | pending | ❌ | ✅ token+secret saved | ❌ |
 
-**No customer tenants exist yet.** Fire test has not been completed with a real customer.
-
-## Status Updates (Post-Restoration)
-
-| Item | Status | Notes |
-|-------|----------|-------|
-| Admin bot token | **FIXED** | New token `@AlienProbeadmin_bot` active. Responds to `/status`. |
-| Heartbeat Monitor | **ACTIVE** | Health monitor checks admin bot status every 30s. |
-| JSON Parse Errors | **FIXED** | Gemini response sanitization added (PR #108). |
-| LINE fire test | **PASSED** | Webhooks confirmed working in Cloud Run logs. |
-| ~25 dead BotFather bots | LOW | Need manual /deletebot cleanup |
+**No customer tenants exist yet.**
 
 ---
 
@@ -89,9 +99,10 @@ Everything is merged and deployed. The wizard is live at `wizard.tigerclaw.io`.
 [ ] Go to wizard.tigerclaw.io
 [ ] Walk through all 5 steps with a fresh Telegram token + Gemini key + ICP filled in
 [ ] Hit Hatch — watch Cloud Run logs for provisioning success
-      NOTE: Admin Alerts are now ACTIVE. You will get a Telegram ping from @AlienProbeadmin_bot.
+      NOTE: Admin Alerts are ACTIVE. You will get a Telegram ping from @AlienProbeadmin_bot.
 [ ] Send first message on Telegram
 [ ] Gate: bot sends confident intro (NOT onboarding questions)
+[ ] Gate: bot weaves in a market fact naturally when relevant
 [ ] Celebrate
 [ ] Pick first real customer from the waiting list
 ```
@@ -104,13 +115,13 @@ Everything is merged and deployed. The wizard is live at `wizard.tigerclaw.io`.
 |------|-------------|
 | `api/src/routes/wizard.ts` | POST /wizard/hatch, POST /wizard/validate-key |
 | `api/src/routes/auth.ts` | POST /auth/verify-purchase (on-demand record creation) |
+| `api/src/routes/webhooks.ts` | POST /webhooks/stan-store (Zapier bridge) |
 | `api/src/services/provisioner.ts` | Telegram + LINE webhook registration |
-| `api/src/services/ai.ts` | ICP first-message bypass, processTelegramMessage, processLINEMessage |
+| `api/src/services/ai.ts` | ICP first-message bypass, processTelegramMessage, processLINEMessage, buildSystemPrompt |
+| `api/src/services/market_intel.ts` | getMarketIntelligence() — intent bridge query layer |
 | `api/src/services/db.ts` | activateSubscription(), createBYOK* |
 | `api/src/services/queue.ts` | provisionWorker, telegramWorker, lineWorker |
 | `web-onboarding/src/components/OnboardingModal.tsx` | WizardState, 5-step orchestration |
-| `web-onboarding/src/components/wizard/StepChannelSetup.tsx` | Channel validation (Telegram OR LINE) |
-| `web-onboarding/src/components/wizard/StepCustomerProfile.tsx` | ICP collection |
 
 ---
 
@@ -119,4 +130,5 @@ Everything is merged and deployed. The wizard is live at `wizard.tigerclaw.io`.
 1. **One PR per fix.** No chaining.
 2. **Never push directly to main.** Always `feat/` branches + `gh pr create`.
 3. **Stop if something breaks.** Don't stack fixes on a broken deploy.
-4. **The mission:** Paying customers get a live bot that works. That's it.
+4. **Always test against prod DB** before merging data-layer changes. The CI Postgres infra bug (`role "root"`) is pre-existing and not your code — but verify SQL against the real schema.
+5. **The mission:** Paying customers get a live bot that works. That's it.
