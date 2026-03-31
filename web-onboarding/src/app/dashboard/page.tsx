@@ -180,10 +180,7 @@ export default function DashboardPage() {
                     <StatCard
                         icon={<Shield className="h-5 w-5 text-[#22c55e]" />}
                         title="AI Engine"
-                        value={data.apiKey.provider
-                            ? `${data.apiKey.provider.charAt(0).toUpperCase() + data.apiKey.provider.slice(1)} Gemini`
-                            : "Google Gemini"
-                        }
+                        value={engineLabel(data.apiKey.provider, data.apiKey.model)}
                         subtitle={data.apiKey.model ?? "gemini-2.5-flash"}
                     />
                     <StatCard
@@ -275,7 +272,9 @@ export default function DashboardPage() {
                             enabled={data.channels.telegram.enabled}
                             detail={data.channels.telegram.botUsername
                                 ? `@${data.channels.telegram.botUsername}`
-                                : "Pending"
+                                : data.channels.telegram.enabled
+                                    ? "Active — Awaiting first message"
+                                    : "Pending"
                             }
                         />
                         <ChannelCard
@@ -674,6 +673,17 @@ function ActionCard({ title, description, href, icon, external }: {
             <ArrowRight className="h-5 w-5 text-white/20 group-hover:text-primary group-hover:translate-x-1 transition-all" />
         </a>
     );
+}
+
+function engineLabel(provider: string | null, model: string | null): string {
+    switch (provider) {
+        case "google":     return "Google Gemini";
+        case "grok":       return "Grok 2";
+        case "openai":     return "OpenAI GPT";
+        case "openrouter": return "OpenRouter";
+        case "kimi":       return "Kimi (Moonshot)";
+        default:           return "Google Gemini";
+    }
 }
 
 function timeAgo(iso: string): string {
