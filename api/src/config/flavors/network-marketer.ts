@@ -302,11 +302,11 @@ export const NETWORK_MARKETER_FLAVOR: FlavorConfig = {
   },
 
   fallbackIntelligence: [
-    "Traditional B2B lead decay has accelerated; 22.5% of contact data goes stale annually, making social discovery 3x more effective than email lists.",
-    "The 'Side Hustle Economy' reached $2.58 trillion in 2025; 41% of full-time employees are currently seeking secondary income streams due to inflation.",
-    "AI-driven workforce displacement is the #1 driver for professional-to-entrepreneur transitions this year.",
-    "Trust in corporate structures is at a 15-year low; peer-to-peer recommendation models currently outperform traditional advertising by 400% in conversion.",
-    "A 2% monthly drop-off in social engagement is typical during market pivots; high-agency consultants are using this 'quiet' period to recalibrate ICPs for higher intent."
+    "41% of full-time employees are actively seeking a second income right now. One of them is about to find you.",
+    "The gig economy hit $2.58 trillion in 2025. The people who need what you have have never been easier to find.",
+    "Every person scared of losing their job to AI is a prospect. You have the answer they're looking for.",
+    "Trust in corporate structures is at a 15-year low; people are looking for peer-to-peer recommendation models more than ever.",
+    "Traditional B2B lead decay is accelerating, but social discovery is wide open. The market is quiet for some, but it's a goldmine for those who know where to look."
   ],
 
   // -------------------------------------------------------------------------

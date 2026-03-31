@@ -68,9 +68,9 @@ async function trackGeminiError(tenantId: string, err: any) {
         console.error(`[AI] [CIRCUIT BREAKER] Tripping Gemini circuit for tenant ${tenantId} after ${count} consecutive errors.`);
         await redis.set(tripKey, '1', 'EX', GEMINI_CIRCUIT_TTL);
         await redis.del(errorCountKey);
-        
+
         // Notify admin
-        const { sendAdminAlert } = await import('../routes/admin.js');
+        const { sendAdminAlert } = await import('./admin_shared.js');
         await sendAdminAlert(`🚨 Gemini Circuit Tripped for tenant ${tenantId}\nFailover to OpenRouter activated for 1 hour.`);
     }
 }
@@ -650,6 +650,16 @@ async function loadHiveBenchmarks(flavor: string, region: string): Promise<strin
     return lines;
 }
 
+// ─── SOUL loader ─────────────────────────────────────────────────────────────
+function loadSoul(): string {
+    try {
+        const soulPath = path.resolve(__dirname, '..', '..', '..', 'SOUL.md');
+        return fs.readFileSync(soulPath, 'utf-8');
+    } catch {
+        return ''; 
+    }
+}
+
 // ─── FITFO loader ────────────────────────────────────────────────────────────
 function loadFitfao(): string {
     try {
@@ -705,6 +715,10 @@ export async function buildSystemPrompt(tenant: any): Promise<string> {
     // Load dynamic approved skills for this tenant
     const approvedSkills = await loadApprovedSkills(tenant.id, tenant.flavor).catch(() => []);
 
+    // Load brand soul and FITFO operating protocol
+    const soul = loadSoul();
+    const fitfao = loadFitfao();
+
     // Load hive benchmarks and market intelligence in parallel
     const [hiveBenchmarks, marketFacts] = await Promise.all([
         loadHiveBenchmarks(
@@ -713,9 +727,6 @@ export async function buildSystemPrompt(tenant: any): Promise<string> {
         ).catch(() => []),
         getMarketIntelligence(flavor.displayName ?? '').catch(() => []),
     ]);
-
-    // Load FITFO operating protocol
-    const fitfao = loadFitfao();
 
     // Build operator context block — only injected when onboarding is complete
     const operatorBlock = hasOnboarding ? [
@@ -777,6 +788,8 @@ export async function buildSystemPrompt(tenant: any): Promise<string> {
             ? [`━━━━ MASTER STRATEGIC DIRECTIVES ━━━━`, ...approvedSkills, ``]
             : []
         ),
+        // BRAND SOUL (The "Brighter Future" Covenant)
+        ...(soul ? [``, `━━━━ BRAND SOUL & VOICE ━━━━`, soul, ``] : []),
         `You are ${botName}, an elite, highly intelligent, and autonomous AI sales and recruiting consulting partner.`,
         `You are currently deployed to serve: ${operatorName}.`,
         `Industry flavor: ${flavor.displayName} (${flavor.professionLabel}).`,

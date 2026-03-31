@@ -48,26 +48,15 @@ import {
   getBotPoolEntryByUsername,
 } from "../services/pool.js";
 import { connection as redisConnection } from "../services/queue.js";
+import { requireAdmin, sendAdminAlert } from "../services/admin_shared.js";
 
 const router = Router();
+
+export { sendAdminAlert };
 
 // ---------------------------------------------------------------------------
 // Admin auth middleware
 // ---------------------------------------------------------------------------
-
-const ADMIN_TOKEN = process.env["ADMIN_TOKEN"] ?? "";
-
-function requireAdmin(req: Request, res: Response, next: NextFunction): void {
-  const auth = req.headers["authorization"] ?? "";
-  const token = auth.startsWith("Bearer ") ? auth.slice(7) : auth;
-  
-  if (token === ADMIN_TOKEN) {
-    next();
-    return;
-  }
-  
-  res.status(401).json({ error: "Unauthorized" });
-}
 
 router.use(requireAdmin);
 
@@ -602,25 +591,6 @@ router.get("/events/recent", requireAdmin, async (_req: Request, res: Response) 
 });
 
 // ---------------------------------------------------------------------------
-// Admin Telegram alert utility (exported for use in webhooks.ts)
-// ---------------------------------------------------------------------------
-
-let adminBot: TelegramBot | null = null;
-const ADMIN_CHAT_ID = process.env["ADMIN_TELEGRAM_CHAT_ID"] ?? "";
-const ADMIN_BOT_TOKEN = process.env["ADMIN_TELEGRAM_BOT_TOKEN"] ?? "";
-
-export async function sendAdminAlert(message: string): Promise<void> {
-  if (!ADMIN_BOT_TOKEN || !ADMIN_CHAT_ID) return;
-
-  try {
-    if (!adminBot) adminBot = new TelegramBot(ADMIN_BOT_TOKEN);
-    await adminBot.sendMessage(ADMIN_CHAT_ID, message);
-  } catch (err) {
-    console.error("[admin] Failed to send Telegram alert:", err);
-  }
-}
-
-// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -1090,7 +1060,7 @@ router.delete("/skills/:id", async (req: Request, res: Response) => {
 // ── GET /admin/pipeline/health ───────────────────────────────────────────────
 // NEW for Admin Dashboard: returns market intelligence pipeline health metrics
 // Answers: "Is the mine healthy?"
-router.get("/pipeline/health", requireAdmin, async (_req: Request, res: Response) => {
+router.get("/pipeline/health", async (_req: Request, res: Response) => {
   try {
     const pool = getPool();
 

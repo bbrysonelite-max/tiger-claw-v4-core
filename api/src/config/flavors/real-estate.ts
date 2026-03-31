@@ -191,11 +191,11 @@ export const REAL_ESTATE_FLAVOR: FlavorConfig = {
   },
 
   fallbackIntelligence: [
-    "Mortgage rate volatility has created a 'lock-in effect' where 62% of homeowners are holding rates below 4%; this is shifting the market toward new construction and relocation-driven listings.",
-    "Micro-migration patterns show a 14% increase in 'secondary city' interest as remote-first professionals seek lower cost of living with high-tier amenities.",
-    "Inventory remains the primary market constraint; average days-on-market for well-priced single-family homes is currently 21% lower than the 5-year average.",
-    "Institutional buyers have reduced activity by 30% in Q1, opening a significant window for first-time individual buyers to compete without cash-offer wars.",
-    "Social media-driven property discovery now accounts for 38% of first-touch showings, outpacing traditional portal searches for the under-40 demographic."
+    "Mortgage rate volatility has created a unique window for relocation-driven listings. The people who need to move are looking for an expert to lead them.",
+    "Micro-migration patterns are shifting interest to secondary cities. The next great neighborhood is being discovered right now.",
+    "Inventory is tight, which means correctly priced homes are still moving at record speeds. The market isn't slow; it's just selective.",
+    "Institutional buyers are stepping back, opening a massive door for first-time individual buyers. This is their moment to get in.",
+    "Social media discovery is now the primary way properties are found by the under-40 demographic. You're already where the buyers are."
   ],
 
   // -------------------------------------------------------------------------
