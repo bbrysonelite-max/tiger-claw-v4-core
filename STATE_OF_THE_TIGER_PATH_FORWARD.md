@@ -1,6 +1,6 @@
 # State of the Tiger — Path Forward
 
-**Last Updated:** 2026-04-01 (Session 3 — broken windows sweep, complete)
+**Last Updated:** 2026-04-01 (Session 4 — Stan Store audit, trial system removal, Stop hook killed)
 **Author:** Claude Sonnet 4.6
 
 ---
@@ -123,6 +123,7 @@
 | #119 | fix: migration 022 wrong column names — was crashing every Cloud Run startup | 4/1 |
 | #120 | feat: SOUL.md voice enforcement — SOUL_VOICE_BLOCK first in every prompt | 4/1 |
 | #75 | feat: Stan Store audit — circuit breaker, email copy, deploy secrets, STAN_STORE_AUDIT.md | 4/1 |
+| #121 | fix: remove 72-hour trial reminder system — pivoted to 7-day money-back guarantee | 4/1 |
 | #46 | closed: email support agent — stale | 4/1 |
 
 ---

@@ -1,6 +1,6 @@
 # Tiger Claw V4 — Core Architecture
 
-**Last updated:** 2026-04-01
+**Last updated:** 2026-04-01 (Session 4)
 **Status:** LIVE. Locked. Do not rewrite.
 
 ---
@@ -30,7 +30,7 @@ Tiger Claw V4 is **stateless**. There are no long-running Docker containers per 
 
 ## 3. Core Intelligence (The "Brain")
 
-- **19 active tools** in `api/src/tools/` — Gemini function-calling, not OpenClaw skills
+- **26 active tools** in `api/src/tools/` — Gemini function-calling, not OpenClaw skills
 - Every tool strictly adheres to `ToolContext` typing (`api/src/tools/ToolContext.ts`)
 - `ai.ts` builds `ToolContext` statelessly on every incoming message
 - Tools missing from `toolsMap` in `ai.ts` cause infinite loops — always register new tools
@@ -119,7 +119,7 @@ Handled in `tiger_keys.ts` and `ai.ts`.
 | `telegram-webhooks` | `telegramWorker` | Telegram message processing |
 | `line-webhooks` | `lineWorker` | LINE message processing |
 | `fact-extraction` | `factExtractionWorker` | Async fact anchor extraction |
-| `ai-routines` | `routineWorker` | Scout, nurture, trial reminders |
+| `ai-routines` | `routineWorker` | Scout, nurture, value-gap check-ins, weekly check-ins, Strike/Postiz routines |
 | `global-cron` | `cronWorker` | Heartbeat scheduler (every minute) |
 
 ---

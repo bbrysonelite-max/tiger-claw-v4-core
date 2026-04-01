@@ -7,13 +7,15 @@
 ## Current Session State (2026-04-01 — Session 4 IN PROGRESS)
 
 - **PR #75 MERGED** — Stan Store integration audit: Gemini circuit breaker, email copy fix ("Start Setup Wizard →"), `MAGIC_LINK_SECRET` + `DATABASE_READ_URL` secrets added to deploy script, `specs/STAN_STORE_AUDIT.md` committed.
+- **PR #121 MERGED** — Ripped out 72-hour trial reminder system entirely (email.ts, ai.ts, queue.ts, tests). Pivoted to 7-day money-back guarantee — no more free trial.
 - **PR #46 CLOSED** — Email support agent, stale.
+- **Stop hook removed** — `send_messages_to_letta.ts` Stop hook deleted from `~/.claude/settings.json`. No more LETTA_API_KEY errors on every action.
 - **PRs #117–#120 MERGED (Session 3)** — Admin dashboard, Grok health fix, docs, migration 022 crash fix, SOUL voice enforcement.
 
-### Open for Session 4
-- **PRs #74, #78, #77** — data quality (now unblocked, do next)
-- **LETTA_API_KEY hook** — Fixed in `~/.zprofile`; takes effect on shell restart.
+### Open for Session 5
+- **PRs #74, #78, #77** — data quality (unblocked, do next session)
 - **First paying customer** — Pick from waiting list, activate.
+- **bot_ai_keys dead write** — Wizard writes here, runtime reads `bot_ai_config`. Small cleanup PR.
 
 ### Active Business Context
 - **Max Steingart:** White label deal, 30% affiliate via Stan Store.

@@ -1,6 +1,6 @@
 # START HERE — Tiger Claw Session Brief
 
-**Last Updated:** 2026-04-01 (Session 3 — broken windows sweep, complete)
+**Last Updated:** 2026-04-01 (Session 4 — Stan Store audit, trial system removal, Stop hook killed)
 **Author:** Claude Sonnet 4.6
 
 ---
@@ -21,6 +21,14 @@ AI sales agent SaaS. Customers buy on Stan Store, walk through a 5-step wizard t
 ## Current State: ALL PHASES COMPLETE — FIRST BOT LIVE ✅
 
 Captain Tiger Two (`bbryson-mne8ffim`) confirmed live on Telegram at 1:35 AM 2026-03-31.
+
+### Merged PRs — Session 4 (2026-04-01)
+
+| PR | What It Did | Status |
+|----|-------------|--------|
+| #75 | feat: Stan Store audit — Gemini circuit breaker, email copy fix, deploy secrets, STAN_STORE_AUDIT.md | MERGED |
+| #121 | fix: remove 72-hour trial reminder system — pivoted to 7-day money-back guarantee | MERGED |
+| #46 | closed: email support agent stale | CLOSED |
 
 ### Merged PRs — Session 3 (2026-04-01)
 
@@ -52,15 +60,13 @@ Captain Tiger Two (`bbryson-mne8ffim`) confirmed live on Telegram at 1:35 AM 202
 | #109 | feat: admin bot + heartbeat monitor | MERGED |
 | #107 | fix: LINE-only provisioning (`preferredChannel` defaulted to `"telegram"`) | MERGED |
 
-### Open PRs (triage in progress this session)
+### Open PRs (Session 5)
 
 | PR | Title | Priority |
 |----|-------|----------|
-| #75 | Stan Store Integration Audit | Pre-customer critical — next |
-| #74 | Ruthless Relevance Gate for Data Refinery | Data quality |
+| #74 | Ruthless Relevance Gate for Data Refinery | Data quality — next |
 | #78 | Mine Quality Hardening | Data quality |
 | #77 | Mine Quality Audit | Report |
-| #46 | Email support agent | Likely stale — close |
 
 ---
 
@@ -151,7 +157,7 @@ Captain Tiger Two (`bbryson-mne8ffim`) responded on Telegram with correct ICP-aw
 |------|---------|--------|-------|
 | White Label | Max Steingart | Negotiating | 30% affiliate commission via Stan Store. Max must sell 10 before Pebo builds. |
 | LINE Distribution | John (Bryson International Group) | Active | 21,000 LINE distributors in Thailand. John is Pebo's own downline. |
-| Demo | Jeff Mack | Tonight 8 PM | Extremely non-technical. Uses Telegram. Paying Stan Store customer. |
+| Demo | Jeff Mack | Bot LIVE and hunting | Demo passed. Paying Stan Store customer. Telegram. |
 
 ---
 
