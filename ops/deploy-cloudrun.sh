@@ -90,7 +90,8 @@ for i in "${!DEPLOY_REGIONS[@]}"; do
     --vpc-egress private-ranges-only \
     --startup-probe="httpGet.path=/health,httpGet.port=4000,timeoutSeconds=5,periodSeconds=10,failureThreshold=3" \
     --liveness-probe="httpGet.path=/health,httpGet.port=4000,timeoutSeconds=5,periodSeconds=30,failureThreshold=3" \
-    --update-secrets "$SECRETS"
+    --update-secrets "$SECRETS" \
+    --set-env-vars "INTERNAL_API_URL=https://api.tigerclaw.io"
 
   LIVE_URL=$(gcloud run services describe "$SERVICE_NAME" \
     --region "$REGION" \
