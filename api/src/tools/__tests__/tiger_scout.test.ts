@@ -77,7 +77,7 @@ describe('tiger_scout', () => {
     const result = await tiger_scout.execute({ action: 'hunt', mode: 'burst' }, ctx)
 
     expect(result.ok).toBe(true)
-    expect(result.output).toContain('Maximum 3 burst scans')
+    expect(result.output).toContain('locked out for a few hours')
   })
 
   it('rejects unknown actions', async () => {
