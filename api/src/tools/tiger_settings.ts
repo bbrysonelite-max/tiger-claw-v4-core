@@ -399,7 +399,7 @@ async function handleReset(
 // ---------------------------------------------------------------------------
 
 type ChannelSubAction = "list" | "add" | "remove";
-type ChannelName = "whatsapp" | "line";
+type ChannelName = "whatsapp" | "line" | "postiz";
 
 interface ChannelsParams {
   action: "channels";
@@ -407,6 +407,7 @@ interface ChannelsParams {
   channel?: ChannelName;
   lineChannelSecret?: string;
   lineChannelAccessToken?: string;
+  postizApiKey?: string;
 }
 
 async function handleChannels(
@@ -431,12 +432,14 @@ async function handleChannels(
       // Channel credentials are stored encrypted in PostgreSQL — query the API for real status.
       let waEnabled = false;
       let lineConfigured = false;
+      let postizConfigured = false;
       try {
         const resp = await fetch(`${apiBase}/tenants/${slug}/channels`);
         if (resp.ok) {
-          const data = await resp.json() as { telegram?: boolean; whatsapp?: boolean; line?: boolean };
+          const data = await resp.json() as { telegram?: boolean; whatsapp?: boolean; line?: boolean; postiz?: boolean };
           waEnabled = !!data.whatsapp;
           lineConfigured = !!data.line;
+          postizConfigured = !!data.postiz;
         }
       } catch {
         // If API is unreachable, fall through with defaults (false)
@@ -447,15 +450,16 @@ async function handleChannels(
         "  Telegram   ACTIVE         (primary — always on)",
         `  WhatsApp   ${waEnabled ? "ENABLED" : "DISABLED"}`,
         `  LINE       ${lineConfigured ? "CONFIGURED" : "NOT CONFIGURED"}`,
+        `  Postiz     ${postizConfigured ? "CONFIGURED" : "NOT CONFIGURED"}`,
         "",
-        "To add/remove: channels add whatsapp, channels add line [secret] [token], channels remove line, etc.",
+        "To add/remove: channels add whatsapp, channels add line [secret] [token], channels add postiz [apiKey], channels remove line, etc.",
       ];
       return { ok: true, output: lines.join("\n") };
     }
 
     case "add": {
       if (!params.channel) {
-        return { ok: false, error: "channel is required for add. Valid: whatsapp | line" };
+        return { ok: false, error: "channel is required for add. Valid: whatsapp | line | postiz" };
       }
 
       if (params.channel === "whatsapp") {
@@ -484,12 +488,24 @@ async function handleChannels(
         return { ok: true, output: "LINE channel configured." };
       }
 
-      return { ok: false, error: `Unknown channel: "${params.channel}". Valid: whatsapp | line` };
+      if (params.channel === "postiz") {
+        if (!params.postizApiKey) {
+          return { ok: false, error: "postizApiKey is required. Usage: channels add postiz [apiKey]" };
+        }
+        const resp = await apiPost(`${apiBase}/tenants/${slug}/channels/postiz`, {
+          apiKey: params.postizApiKey,
+        });
+        if (!resp.ok) return { ok: false, error: resp.error ?? "Failed to configure Postiz." };
+        logger.info("tiger_settings: channels add postiz");
+        return { ok: true, output: "Postiz channel configured. Your agent can now broadcast high-value insights to your social profiles." };
+      }
+
+      return { ok: false, error: `Unknown channel: "${params.channel}". Valid: whatsapp | line | postiz` };
     }
 
     case "remove": {
       if (!params.channel) {
-        return { ok: false, error: "channel is required for remove. Valid: whatsapp | line" };
+        return { ok: false, error: "channel is required for remove. Valid: whatsapp | line | postiz" };
       }
 
       if (params.channel === "whatsapp") {
@@ -509,7 +525,16 @@ async function handleChannels(
         return { ok: true, output: "LINE channel removed." };
       }
 
-      return { ok: false, error: `Unknown channel: "${params.channel}". Valid: whatsapp | line` };
+      if (params.channel === "postiz") {
+        const resp = await apiPost(`${apiBase}/tenants/${slug}/channels/postiz`, {
+          apiKey: null,
+        });
+        if (!resp.ok) return { ok: false, error: resp.error ?? "Failed to remove Postiz." };
+        logger.info("tiger_settings: channels remove postiz");
+        return { ok: true, output: "Postiz channel removed." };
+      }
+
+      return { ok: false, error: `Unknown channel: "${params.channel}". Valid: whatsapp | line | postiz` };
     }
 
     default:
@@ -606,7 +631,7 @@ export const tiger_settings = {
       },
       channel: {
         type: "string",
-        enum: ["whatsapp", "line"],
+        enum: ["whatsapp", "line", "postiz"],
         description: "Channel to add or remove. Required for channels add/remove.",
       },
       lineChannelSecret: {
@@ -616,6 +641,10 @@ export const tiger_settings = {
       lineChannelAccessToken: {
         type: "string",
         description: "LINE channel access token. Required for channels add line.",
+      },
+      postizApiKey: {
+        type: "string",
+        description: "Postiz API key. Required for channels add postiz.",
       },
     },
     required: ["action"],

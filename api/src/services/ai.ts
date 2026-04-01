@@ -4,7 +4,6 @@ import { getTenant, getPool, getBotState, setBotState, getTenantBotToken, getHiv
 import { getMarketIntelligence, MarketFact } from './market_intel.js';
 import TelegramBot from 'node-telegram-bot-api';
 import IORedis from 'ioredis';
-import fetch from 'node-fetch';
 import * as fs from 'fs';
 import * as path from 'path';
 import { loadFlavorConfig } from '../tools/flavorConfig.js';
@@ -39,6 +38,7 @@ import { tiger_gmail_send, tiger_drive_list } from '../tools/tiger_google_worksp
 import { tiger_strike_harvest } from "../tools/tiger_strike_harvest.js";
 import { tiger_strike_draft } from "../tools/tiger_strike_draft.js";
 import { tiger_strike_engage } from "../tools/tiger_strike_engage.js";
+import { tiger_postiz } from "../tools/tiger_postiz.js";
 
 // ─── Safety constants ────────────────────────────────────────────────────────
 // BUG 1 FIX: circuit breaker — prevents infinite tool loop if Gemini misbehaves
@@ -68,9 +68,9 @@ async function trackGeminiError(tenantId: string, err: any) {
         console.error(`[AI] [CIRCUIT BREAKER] Tripping Gemini circuit for tenant ${tenantId} after ${count} consecutive errors.`);
         await redis.set(tripKey, '1', 'EX', GEMINI_CIRCUIT_TTL);
         await redis.del(errorCountKey);
-        
+
         // Notify admin
-        const { sendAdminAlert } = await import('../routes/admin.js');
+        const { sendAdminAlert } = await import('./admin_shared.js');
         await sendAdminAlert(`🚨 Gemini Circuit Tripped for tenant ${tenantId}\nFailover to OpenRouter activated for 1 hour.`);
     }
 }
@@ -98,9 +98,10 @@ export async function validateAIKey(provider: string, key: string): Promise<{ va
         
         if (provider === "openai" || provider === "grok" || provider === "openrouter" || provider === "kimi") {
             let baseUrl = "https://api.openai.com/v1/models";
-            if (provider === "grok") baseUrl = "https://api.x.ai/v1/models";
-            if (provider === "openrouter") baseUrl = "https://openrouter.ai/api/v1/models";
-            if (provider === "kimi") baseUrl = "https://api.moonshot.cn/v1/models";
+            // Auto-detect specific provider if generic "openai" is passed but key has specific prefix
+            if (provider === "grok" || key.startsWith("xai-")) baseUrl = "https://api.x.ai/v1/models";
+            else if (provider === "openrouter" || key.startsWith("sk-or-")) baseUrl = "https://openrouter.ai/api/v1/models";
+            else if (provider === "kimi") baseUrl = "https://api.moonshot.cn/v1/models";
 
             const response = await fetch(baseUrl, {
                 headers: { "Authorization": `Bearer ${key}` }
@@ -167,6 +168,7 @@ const toolsMap = {
     tiger_strike_harvest,
     tiger_strike_draft,
     tiger_strike_engage,
+    tiger_postiz,
 };
 // Fix: Use STRICT @google/generative-ai Type enums to prevent silent JSON stripping
 // standard OpenClaw JSON schema uses lowercase 'object', 'string'. We recursively map it here.
@@ -340,6 +342,27 @@ function detectProvider(key: string): 'google' | 'openai' | null {
     return null;
 }
 
+function resolveCompatInfo(key: string, model?: string): { provider: 'google' | 'openai'; baseURL?: string } {
+    if (key.startsWith('AIza')) return { provider: 'google' };
+    
+    // Explicit Grok prefix
+    if (key.startsWith('xai-')) return { provider: 'openai', baseURL: 'https://api.x.ai/v1' };
+    
+    // OpenRouter prefix
+    if (key.startsWith('sk-or-')) return { provider: 'openai', baseURL: 'https://openrouter.ai/api/v1' };
+    
+    // Model-based detection (if prefix is generic sk- or missing)
+    if (model) {
+        if (model.toLowerCase().includes('grok')) return { provider: 'openai', baseURL: 'https://api.x.ai/v1' };
+        if (model.toLowerCase().includes('moonshot') || model.toLowerCase().includes('kimi')) return { provider: 'openai', baseURL: 'https://api.moonshot.cn/v1' };
+        // OpenRouter models often have a slash: "openai/gpt-4o-mini"
+        if (model.includes('/') && !model.toLowerCase().includes('openai')) return { provider: 'openai', baseURL: 'https://openrouter.ai/api/v1' };
+    }
+    
+    // Default to OpenAI if it looks like an sk- key, otherwise fallback to google
+    return { provider: key.startsWith('sk-') ? 'openai' : 'google' };
+}
+
 function defaultModel(provider: 'google' | 'openai'): string {
     return provider === 'openai' ? 'gpt-4o-mini' : 'gemini-2.0-flash';
 }
@@ -373,10 +396,15 @@ export async function resolveAIProvider(tenantId: string): Promise<AIProvider | 
                     console.warn(`[AI] Tenant ${tenantId} has unknown activeLayer=${activeLayer} — falling through to DB lookup.`);
             }
             if (rawKey) {
-                const provider = detectProvider(rawKey) ?? 'google';
+                const { provider, baseURL } = resolveCompatInfo(rawKey, state.layer2Model);
                 if (!circuitTripped || provider !== 'google') {
-                    console.log(`[AI] resolveAIProvider: tenant=${tenantId} source=key_state.json provider=${provider}`);
-                    return { key: rawKey, provider, model: state.layer2Model ?? defaultModel(provider) };
+                    console.log(`[AI] resolveAIProvider: tenant=${tenantId} source=key_state.json provider=${provider}${baseURL ? ' compat=' + baseURL : ''}`);
+                    return { 
+                        key: rawKey, 
+                        provider, 
+                        model: state.layer2Model ?? defaultModel(provider),
+                        baseURL
+                    };
                 }
                 console.log(`[AI] Gemini circuit tripped for ${tenantId}. Skipping Gemini in key_state.`);
             }
@@ -399,20 +427,28 @@ export async function resolveAIProvider(tenantId: string): Promise<AIProvider | 
                 const { provider, model, encrypted_key } = row;
                 if (encrypted_key) {
                     const key = decryptToken(encrypted_key);
-                    const resolvedProvider = (provider as 'google' | 'openai') ?? detectProvider(key) ?? 'google';
-
-                    if (circuitTripped && resolvedProvider === 'google') {
-                        continue; // Skip Gemini if tripped
-                    }
-
+                    
                     // OpenAI-compatible providers (kimi, grok, openrouter) — route through OpenAI SDK
                     const compat = OPENAI_COMPAT[provider as string];
                     if (compat) {
                         console.log(`[AI] resolveAIProvider: tenant=${tenantId} source=bot_ai_config provider=${provider} (openai-compat)`);
                         return { key, provider: 'openai', model: model ?? compat.defaultModel, baseURL: compat.baseURL };
                     }
-                    console.log(`[AI] resolveAIProvider: tenant=${tenantId} source=bot_ai_config provider=${resolvedProvider}`);
-                    return { key, provider: resolvedProvider, model: model ?? defaultModel(resolvedProvider) };
+
+                    // Smarter resolution using key prefix + model name (covers generic "openai" entries that are actually Grok/OpenRouter)
+                    const { provider: resolvedProvider, baseURL } = resolveCompatInfo(key, model);
+
+                    if (circuitTripped && resolvedProvider === 'google') {
+                        continue; // Skip Gemini if tripped
+                    }
+
+                    console.log(`[AI] resolveAIProvider: tenant=${tenantId} source=bot_ai_config provider=${resolvedProvider}${baseURL ? ' compat=' + baseURL : ''}`);
+                    return { 
+                        key, 
+                        provider: resolvedProvider, 
+                        model: model ?? defaultModel(resolvedProvider),
+                        baseURL
+                    };
                 }
             }
         }
@@ -615,6 +651,16 @@ async function loadHiveBenchmarks(flavor: string, region: string): Promise<strin
     return lines;
 }
 
+// ─── SOUL loader ─────────────────────────────────────────────────────────────
+function loadSoul(): string {
+    try {
+        const soulPath = path.resolve(__dirname, '..', '..', '..', 'SOUL.md');
+        return fs.readFileSync(soulPath, 'utf-8');
+    } catch {
+        return ''; 
+    }
+}
+
 // ─── FITFO loader ────────────────────────────────────────────────────────────
 function loadFitfao(): string {
     try {
@@ -628,11 +674,17 @@ function loadFitfao(): string {
 }
 
 // ─── Market intelligence formatter ───────────────────────────────────────────
-function formatMarketIntelligence(facts: MarketFact[]): string {
-    if (facts.length === 0) return '';
+function formatMarketIntelligence(facts: MarketFact[], fallbackFacts: string[] = []): string {
+    const hasLive = facts.length > 0;
+    const displayFacts = hasLive ? facts.map(f => f.fact_summary) : fallbackFacts;
+    
+    if (displayFacts.length === 0) return '';
+
+    const label = hasLive ? `LIVE MARKET INTELLIGENCE (verified within 7 days):` : `MARKET INTELLIGENCE & BENCHMARKS:`;
+
     const lines = [
-        `LIVE MARKET INTELLIGENCE (verified within 7 days):`,
-        ...facts.map(f => `- ${f.fact_summary}`),
+        label,
+        ...displayFacts.map(f => `- ${f}`),
         ``,
         `INSTRUCTION: Reference these facts naturally in conversation when relevant. Do NOT list them unprompted. Do NOT say "according to my data" or "my sources say." Speak as if you personally keep up with the market — because you do. When a fact is directly relevant to what the prospect just said, weave it in. When no facts are relevant to the current topic, don't force them.`,
     ];
@@ -664,6 +716,10 @@ export async function buildSystemPrompt(tenant: any): Promise<string> {
     // Load dynamic approved skills for this tenant
     const approvedSkills = await loadApprovedSkills(tenant.id, tenant.flavor).catch(() => []);
 
+    // Load brand soul and FITFO operating protocol
+    const soul = loadSoul();
+    const fitfao = loadFitfao();
+
     // Load hive benchmarks and market intelligence in parallel
     const [hiveBenchmarks, marketFacts] = await Promise.all([
         loadHiveBenchmarks(
@@ -672,9 +728,6 @@ export async function buildSystemPrompt(tenant: any): Promise<string> {
         ).catch(() => []),
         getMarketIntelligence(flavor.displayName ?? '').catch(() => []),
     ]);
-
-    // Load FITFO operating protocol
-    const fitfao = loadFitfao();
 
     // Build operator context block — only injected when onboarding is complete
     const operatorBlock = hasOnboarding ? [
@@ -736,6 +789,8 @@ export async function buildSystemPrompt(tenant: any): Promise<string> {
             ? [`━━━━ MASTER STRATEGIC DIRECTIVES ━━━━`, ...approvedSkills, ``]
             : []
         ),
+        // BRAND SOUL (The "Brighter Future" Covenant)
+        ...(soul ? [``, `━━━━ BRAND SOUL & VOICE ━━━━`, soul, ``] : []),
         `You are ${botName}, an elite, highly intelligent, and autonomous AI sales and recruiting consulting partner.`,
         `You are currently deployed to serve: ${operatorName}.`,
         `Industry flavor: ${flavor.displayName} (${flavor.professionLabel}).`,
@@ -799,8 +854,8 @@ export async function buildSystemPrompt(tenant: any): Promise<string> {
             : []
         ),
         // Market intelligence — live mined facts for this vertical (Birdie/Monica data moat)
-        ...(marketFacts.length > 0
-            ? [``, `━━━━ LIVE MARKET INTELLIGENCE ━━━━`, formatMarketIntelligence(marketFacts)]
+        ...(marketFacts.length > 0 || (flavor.fallbackIntelligence && flavor.fallbackIntelligence.length > 0)
+            ? [``, `━━━━ MARKET INTELLIGENCE ━━━━`, formatMarketIntelligence(marketFacts, flavor.fallbackIntelligence)]
             : []
         ),
         // FITFO operating protocol (agent self-improvement and persistence rules)
@@ -814,6 +869,14 @@ export async function buildSystemPrompt(tenant: any): Promise<string> {
         `2. tiger_strike_draft — Drafts contextual replies in the operator's voice. Always present drafts for review before sending. Never auto-approve.`,
         ``,
         `3. tiger_strike_engage — Generates zero-cost Web Intent URLs for approved drafts. The operator clicks the link to post. After posting, ask them to confirm so the learning loop can track results.`,
+        ``,
+        `━━━━ TIGER POSTIZ — SOCIAL MEDIA BROADCASTING ━━━━`,
+        `Use tiger_postiz to manage the operator's public social media presence (LinkedIn, X, IG, etc.):`,
+        `- list_channels: See which social accounts the operator has connected.`,
+        `- schedule_post: Draft and schedule high-value insights or authority-building content.`,
+        `- get_analytics: Track how the operator's audience is growing and engaging.`,
+        ``,
+        `STRATEGY: Use tiger_postiz to broadcast refined market intelligence from the Data Moat. This establishes the operator as a market leader and drives inbound leads.`,
         ``,
         `Pipeline order: harvest → draft → review → engage → confirm.`,
         `Never skip the review step. The operator must see and approve every reply before it goes out.`,

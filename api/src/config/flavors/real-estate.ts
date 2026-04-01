@@ -190,6 +190,14 @@ export const REAL_ESTATE_FLAVOR: FlavorConfig = {
     activeSources: ["facebook_groups", "reddit", "telegram"],
   },
 
+  fallbackIntelligence: [
+    "Mortgage rate volatility has created a unique window for relocation-driven listings. The people who need to move are looking for an expert to lead them.",
+    "Micro-migration patterns are shifting interest to secondary cities. The next great neighborhood is being discovered right now.",
+    "Inventory is tight, which means correctly priced homes are still moving at record speeds. The market isn't slow; it's just selective.",
+    "Institutional buyers are stepping back, opening a massive door for first-time individual buyers. This is their moment to get in.",
+    "Social media discovery is now the primary way properties are found by the under-40 demographic. You're already where the buyers are."
+  ],
+
   // -------------------------------------------------------------------------
   // Nurture Templates (Block 3.6 — Spec decision #32)
   // -------------------------------------------------------------------------

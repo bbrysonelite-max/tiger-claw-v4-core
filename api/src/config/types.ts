@@ -197,6 +197,7 @@ export interface FlavorConfig {
   soul: SoulConfig;
   discovery: Partial<DiscoveryConfig>;
   nurtureTemplates: NurtureTemplates;
+  fallbackIntelligence?: string[];    // High-value, vertical-specific facts when live mining is empty
 }
 
 // ---------------------------------------------------------------------------

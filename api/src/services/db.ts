@@ -138,6 +138,7 @@ export interface Tenant {
   lineToken?: string;
   lineChannelSecret?: string;
   lineChannelAccessToken?: string;
+  postizApiKey?: string;
   lastActivityAt?: Date;
   suspendedAt?: Date;
   suspendedReason?: string;
@@ -169,6 +170,7 @@ function rowToTenant(row: Record<string, unknown>): Tenant {
     lineToken: row["line_token"] as string | undefined,
     lineChannelSecret: row["line_channel_secret"] as string | undefined,
     lineChannelAccessToken: row["line_channel_access_token"] as string | undefined,
+    postizApiKey: row["postiz_api_key"] as string | undefined,
     lastActivityAt: row["last_activity_at"] ? new Date(row["last_activity_at"] as string) : undefined,
     suspendedAt: row["suspended_at"] ? new Date(row["suspended_at"] as string) : undefined,
     suspendedReason: row["suspended_reason"] as string | undefined,
@@ -658,6 +660,7 @@ export async function updateTenantChannelConfig(
     lineToken?: string | null;
     lineChannelSecret?: string | null;
     lineChannelAccessToken?: string | null;
+    postizApiKey?: string | null;
   },
 ): Promise<void> {
   const sets: string[] = ["updated_at = NOW()"];
@@ -679,6 +682,10 @@ export async function updateTenantChannelConfig(
   if (config.lineChannelAccessToken !== undefined) {
     sets.push(`line_channel_access_token = $${idx++}`);
     values.push(config.lineChannelAccessToken);
+  }
+  if (config.postizApiKey !== undefined) {
+    sets.push(`postiz_api_key = $${idx++}`);
+    values.push(config.postizApiKey);
   }
 
   values.push(id);

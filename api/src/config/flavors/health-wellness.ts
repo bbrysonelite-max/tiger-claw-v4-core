@@ -177,6 +177,14 @@ export const HEALTH_WELLNESS_FLAVOR: FlavorConfig = {
     activeSources: ["facebook_groups", "reddit", "telegram"],
   },
 
+  fallbackIntelligence: [
+    "Bio-individual personalization is the future of wellness. People aren't looking for a plan; they're looking for someone to lead them to their brighter future.",
+    "Stress-related demand for preventive coaching is at an all-time high. The world needs what you offer more than ever.",
+    "Data shows that small, daily consistency is the key to transformation. You're here to help them make those micro-shifts that matter.",
+    "The move toward longevity-first wellness is a massive tailwind. The demographic you serve is ready for a results-based model.",
+    "Social wellness communities are seeing record engagement. Connection is the best medicine, and you're the one facilitating it."
+  ],
+
   // -------------------------------------------------------------------------
   // Nurture Templates (Block 3.6 — Spec decision #32)
   // -------------------------------------------------------------------------

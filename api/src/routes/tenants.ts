@@ -180,9 +180,54 @@ router.get("/:slug/channels", async (req: Request, res: Response) => {
       telegram: true,
       whatsapp: tenant.whatsappEnabled,
       line: !!(tenant.lineChannelSecret && tenant.lineChannelAccessToken),
+      postiz: !!tenant.postizApiKey,
     });
   } catch (err) {
     console.error("[tenants] GET channels error:", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// POST /tenants/:slug/channels/postiz
+// Body: { apiKey: string | null }
+// Called by tiger_settings channels action to configure/remove Postiz.
+// Saves config to DB.
+// ---------------------------------------------------------------------------
+
+router.post("/:slug/channels/postiz", async (req: Request, res: Response) => {
+  try {
+    const tenant = await getTenantBySlug(req.params["slug"]!);
+    if (!tenant) {
+      return res.status(404).json({ error: "Tenant not found" });
+    }
+
+    const { apiKey } = req.body as { apiKey?: string | null };
+
+    if (apiKey !== null && apiKey !== undefined) {
+      if (typeof apiKey !== "string" || apiKey.length > 500) {
+        return res.status(400).json({ error: "Postiz API key must be 500 characters or fewer." });
+      }
+    }
+
+    // Encrypt Postiz API key before storage
+    const encryptedKey = apiKey == null ? apiKey : encryptToken(apiKey);
+
+    await updateTenantChannelConfig(tenant.id, {
+      postizApiKey: encryptedKey,
+    } as any); // Cast to any until db.ts is updated
+
+    const adding = !!apiKey;
+
+    await logAdminEvent({
+      tenantId: tenant.id,
+      action: adding ? "channel_postiz_add" : "channel_postiz_remove",
+      details: { source: "channels_api" },
+    });
+
+    return res.json({ ok: true, postizConfigured: adding });
+  } catch (err) {
+    console.error("[tenants] POST channels/postiz error:", err);
     return res.status(500).json({ error: "Internal server error" });
   }
 });

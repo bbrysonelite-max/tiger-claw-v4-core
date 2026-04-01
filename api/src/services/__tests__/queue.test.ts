@@ -35,11 +35,14 @@ vi.mock('bullmq', () => {
 const mockProcessTelegramMessage = vi.hoisted(() => vi.fn().mockResolvedValue(true));
 const mockProcessLINEMessage = vi.hoisted(() => vi.fn().mockResolvedValue(true));
 const mockProcessSystemRoutine = vi.hoisted(() => vi.fn().mockResolvedValue(true));
+const mockResolveAIProvider = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 
 vi.mock('../ai.js', () => ({
     processTelegramMessage: mockProcessTelegramMessage,
     processLINEMessage: mockProcessLINEMessage,
     processSystemRoutine: mockProcessSystemRoutine,
+    resolveAIProvider: mockResolveAIProvider,
+    validateAIKey: vi.fn().mockResolvedValue({ valid: true }),
 }));
 
 const mockQuery = vi.hoisted(() => vi.fn().mockResolvedValue({ rows: [] }));
@@ -113,7 +116,7 @@ describe('queue.ts workers', () => {
 
             // Should have queried active tenants — must include 'onboarding' so paying customers
             // in the onboarding window receive scouts, value-gap check-ins, and feedback routines.
-            expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining("SELECT id, created_at"));
+            expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining("SELECT id, name, created_at"));
             expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining("'onboarding'"));
             
             expect(routineQueue.add).toHaveBeenCalledTimes(2);

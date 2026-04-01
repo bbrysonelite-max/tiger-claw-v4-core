@@ -48,26 +48,15 @@ import {
   getBotPoolEntryByUsername,
 } from "../services/pool.js";
 import { connection as redisConnection } from "../services/queue.js";
+import { requireAdmin, sendAdminAlert } from "../services/admin_shared.js";
 
 const router = Router();
+
+export { sendAdminAlert };
 
 // ---------------------------------------------------------------------------
 // Admin auth middleware
 // ---------------------------------------------------------------------------
-
-const ADMIN_TOKEN = process.env["ADMIN_TOKEN"] ?? "";
-
-function requireAdmin(req: Request, res: Response, next: NextFunction): void {
-  const auth = req.headers["authorization"] ?? "";
-  const token = auth.startsWith("Bearer ") ? auth.slice(7) : auth;
-  
-  if (token === ADMIN_TOKEN) {
-    next();
-    return;
-  }
-  
-  res.status(401).json({ error: "Unauthorized" });
-}
 
 router.use(requireAdmin);
 
@@ -602,25 +591,6 @@ router.get("/events/recent", requireAdmin, async (_req: Request, res: Response) 
 });
 
 // ---------------------------------------------------------------------------
-// Admin Telegram alert utility (exported for use in webhooks.ts)
-// ---------------------------------------------------------------------------
-
-let adminBot: TelegramBot | null = null;
-const ADMIN_CHAT_ID = process.env["ADMIN_TELEGRAM_CHAT_ID"] ?? "";
-const ADMIN_BOT_TOKEN = process.env["ADMIN_TELEGRAM_BOT_TOKEN"] ?? "";
-
-export async function sendAdminAlert(message: string): Promise<void> {
-  if (!ADMIN_BOT_TOKEN || !ADMIN_CHAT_ID) return;
-
-  try {
-    if (!adminBot) adminBot = new TelegramBot(ADMIN_BOT_TOKEN);
-    await adminBot.sendMessage(ADMIN_CHAT_ID, message);
-  } catch (err) {
-    console.error("[admin] Failed to send Telegram alert:", err);
-  }
-}
-
-// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -1084,6 +1054,75 @@ router.delete("/skills/:id", async (req: Request, res: Response) => {
     return res.json({ ok: true });
   } catch (err) {
     return res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+// ── GET /admin/pipeline/health ───────────────────────────────────────────────
+// NEW for Admin Dashboard: returns market intelligence pipeline health metrics
+// Answers: "Is the mine healthy?"
+router.get("/pipeline/health", async (_req: Request, res: Response) => {
+  try {
+    const pool = getPool();
+
+    const stats = await pool.query(`
+      SELECT 
+        COUNT(*) as total_facts,
+        COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '24 hours') as facts_last_24h,
+        COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '7 days') as facts_last_7d,
+        MIN(created_at) as oldest_fact,
+        MAX(created_at) as newest_fact
+      FROM market_intelligence
+    `);
+
+    const byVertical = await pool.query(`
+      SELECT domain as vertical, COUNT(*) as count, MAX(created_at) as newest
+      FROM market_intelligence
+      GROUP BY domain
+      ORDER BY count DESC
+    `);
+
+    const byRegion = await pool.query(`
+      SELECT entity_label as region, COUNT(*) as count, MAX(created_at) as newest
+      FROM market_intelligence
+      WHERE entity_label IS NOT NULL
+      GROUP BY entity_label
+      ORDER BY count DESC
+    `);
+
+    const rows = stats.rows[0];
+    const totalFacts = parseInt(rows.total_facts, 10);
+    const factsLast24h = parseInt(rows.facts_last_24h, 10);
+    const factsLast7d = parseInt(rows.facts_last_7d, 10);
+    const newestFactDate = rows.newest_fact ? new Date(rows.newest_fact) : null;
+    
+    const staleVerticals = byVertical.rows
+      .filter(v => v.newest && (Date.now() - new Date(v.newest).getTime()) > 7 * 24 * 60 * 60 * 1000)
+      .map(v => v.vertical);
+
+    const healthy = factsLast24h > 0 && newestFactDate && (Date.now() - newestFactDate.getTime()) <= 48 * 60 * 60 * 1000;
+
+    return res.json({
+      totalFacts,
+      factsLast24h,
+      factsLast7d,
+      oldestFact: rows.oldest_fact,
+      newestFact: rows.newest_fact,
+      byVertical: byVertical.rows.map(v => ({
+        vertical: v.vertical,
+        count: parseInt(v.count, 10),
+        newest: v.newest
+      })),
+      byRegion: byRegion.rows.map(r => ({
+        region: r.region,
+        count: parseInt(r.count, 10),
+        newest: r.newest
+      })),
+      staleVerticals,
+      healthy: !!healthy
+    });
+  } catch (err) {
+    console.error("[admin] GET /pipeline/health error:", err);
+    return res.status(500).json({ healthy: false, error: err instanceof Error ? err.message : String(err) });
   }
 });
 

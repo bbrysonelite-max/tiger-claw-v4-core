@@ -1,76 +1,135 @@
 # State of the Tiger — Path Forward
 
-**Last Updated:** 2026-03-31 (Session 2)
-**Author:** Claude Sonnet 4.6
+**Last Updated:** 2026-03-30 5:45 PM MST (Monday evening — FIRE TEST IN PROGRESS)
+**Author:** Claude (Cowork) + Gemini CLI
 
 ---
 
 ## Phase Status
 
-### ✅ ALL PHASES COMPLETE — FIRST BOT CONFIRMED LIVE
+### Phase 6 — FIRE TEST (IN PROGRESS)
+
+Phases 1–5 are complete. Phase 6 is the live fire test with real credentials.
 
 **Phase 1 — Container Health** ✅
+- secrets.ts EISDIR fix (PR #93)
+- FRONTEND_URL → wizard.tigerclaw.io
+- Container stable on Cloud Run
+
 **Phase 2 — Database Cleanup** ✅
+- All test data wiped, clean slate
+
 **Phase 3 — BYOK Key Path** ✅
+- Key observability + loud failures (PR #94)
+- Runtime reads from `bot_ai_config` (confirmed)
+
 **Phase 4 — Wizard Hatch Fixes** ✅
+- activateSubscription loud failure (PR #95)
+- Pre-flight validation on /hatch (PR #96)
+- userId fix in provisioning queue (PR #97)
+- Clear stale frontend state (PR #98)
+
 **Phase 5 — Wizard Completion & Hardening** ✅
-**Phase 6 — Intent Bridge (Data Moat → Bot Brain)** ✅
-**Phase 7 — ICP Fast-Path & Display Hardening** ✅ ← NEW THIS SESSION
+- Stan Store on-demand record creation (PR #99)
+- StepCustomerProfile ICP wizard step (PR #100)
+- Network-marketer prospect section (PR #101)
+- ICP first-message bypass in ai.ts (PR #102)
+- LINE end-to-end: UI + hatch + provisioner (PR #103)
+- LINE-only bot validation (PR #104)
+- Full wizard readability overhaul (PR #105)
+- JSON escape sequence sanitization (PR #108)
+- Admin bot restoration + heartbeat monitor (PR #109)
+
+**Phase 6 — Fire Test** 🔥 IN PROGRESS
+- Wizard UX friction pass — contrast, copy, multi-agent (PR #110) ✅
+- Bot_pool spam alert removal ✅
+- Multi-agent auth (one email → many bots) ✅
+- Provisioner name UPDATE fix (deploying)
+- ICP fast-path in ai.ts (deploying)
+- Jeff Mack demo at 8 PM tonight
 
 ---
 
-## Confirmed Working (2026-03-31)
+## Fire Test Findings (2026-03-30)
 
-Captain Tiger Two (`bbryson-mne8ffim`) is live on Telegram with a Grok xAI key. Bot responded correctly at 1:35 AM. No onboarding questions. Story told. Personality intact.
+### Bugs Found & Fixed During Walkthrough
+
+| # | Bug | Root Cause | Fix | Status |
+|---|-----|-----------|-----|--------|
+| 1 | Bot shows "bbryson" not wizard name | `provisioner.ts` UPDATE missing `name` in SET | Added `name = $1` to UPDATE | Deploying |
+| 2 | Bot asks ICP questions manually | `ai.ts` didn't check `onboard_state.json` for pre-loaded `customerProfile` | Added `checkWizardIcpFastPath` to both message handlers | Deploying |
+| 3 | Email prefix used as name | `auth.ts` uses `email.split("@")[0]` — correct as placeholder | Fixed by Bug 1 (provisioner overwrites at hatch) | Deploying |
+| 4 | "No pending subscription" on ACTIVATE | `lookupPurchaseByEmail` returned stale bot | Multi-agent branch in auth.ts (PR #110) | ✅ Deployed |
+| 5 | Bot_pool spam alerts every 30s | `EMPTY_COOLDOWN_MS: 0` + always-empty V4 table | Removed pool check + POOL_ALERT from index.ts | ✅ Deployed |
+| 6 | Wizard text unreadable (low contrast) | `text-white/40` through `/80` classes | All opacity bumped to /70–/100 | ✅ Deployed |
+| 7 | "Total Due Today $147" scare copy | Looked like new charge | "Your Plan" + green "Paid via Stan Store" | ✅ Deployed |
+| 8 | "AI Computations" jargon | Confusing label | Changed to "AI Provider" | ✅ Deployed |
+
+### UX Issues Still Open
+
+| Issue | Priority |
+|-------|----------|
+| Clicking dashboard/admin link loses wizard state | MEDIUM |
+| "Connected" text should be green | LOW |
 
 ---
 
-## Next: First Real Customer
+## Next Steps (After Fire Test)
 
-Immediate priorities:
-1. **Pick a customer** from the waiting list and activate.
-2. **Triage open PRs** (#90, #78, #77, #75, #74, #46) — determine stale vs. ready.
-3. **Key health monitor false positive** — cron passes provider `openai` to `validateAIKey` for Grok bots, hits wrong endpoint, marks key dead. Fix: pass original provider through alongside the resolved SDK alias.
-
----
-
-## Merged PRs — Session 2 (2026-03-31)
-
-| PR | What It Did |
-|----|-------------|
-| direct commit | fix: bot greeting CTA — removed "Send me a name", now "I'm ready — let me hunt" |
-| **#113** | fix: dashboard display — AI engine label (`Grok Gemini` → `Grok 2`), Telegram card contradiction (ACTIVE + "Pending") |
-| **#114** | fix: wizard ICP fast-path — hatch now writes `icpSingle` + `botName`; fast-path also writes on first message |
-| **#115** | fix: `buildSystemPrompt` fallback to `customerProfile` when `icpSingle` missing — repairs all existing broken bots without migration |
-| **#116** | fix: Grok model `grok-2-1212` → `grok-4-1-fast-non-reasoning` (xAI dropped the old model, returned 400 Model not found) |
-
-## Merged PRs — Session 1 (2026-03-31)
-
-| PR | What It Did |
-|----|-------------|
-| **#107** | fix: LINE-only provisioning — `preferredChannel` defaulted to `"telegram"` |
-| **#109** | fix: Zapier bridge cleanup |
-| **#110** | fix: wizard UX friction pass |
-| **#111** | fix: 3 critical fire test bugs |
-| **#112** | feat: intent bridge — market intelligence → `buildSystemPrompt()` |
-
-## Merged PRs — Previous Session (2026-03-30)
-
-- **PR #106:** fix: LINE-only provisioning (provisioner side)
-- **PR #108:** fix: sanitize Gemini JSON escape sequences
-- **PR #99–#105:** Wizard completion — Stan Store on-demand, ICP steps, LINE e2e, readability
+1. **Complete Jeff Mack demo** — 8 PM tonight. He's extremely non-technical, uses Telegram.
+2. **Hatch 5+ real agents** — Pebo wants to deploy agents for the Nu Skin rebuild team.
+3. **Test dialogue quality** — Do the bots sound smart? Do they reference ICP data? Are they ready to hunt?
+4. **Max Steingart white label** — 30% affiliate commission via Stan Store. Max sells 10, then we build.
+5. **John / Bryson International Group** — 21,000 LINE distributors in Thailand. Scale test.
+6. **Stan Store Zapier webhook** — Automate "Receipt → Wizard" flow.
 
 ---
 
 ## Known Issues / Tech Debt
 
-| Item | Priority | Notes |
-|------|----------|-------|
-| Key health monitor false positive for Grok | MEDIUM | Cron passes SDK alias `openai` to `validateAIKey` → hits `api.openai.com` with xAI key → 401 → `key_health=dead`. Does not block delivery. Fix: pass original provider through `resolveAIProvider`. |
-| `bot_ai_keys` dead write | LOW | Wizard writes here, runtime never reads. Cleanup when convenient. |
-| ~25 dead BotFather bots | LOW | Need manual /deletebot cleanup |
-| CI `API Tests` failure | INFRA BUG | Postgres `role "root"` in GitHub Actions — pre-existing, not our code. `build_and_test` (TypeScript compile) is the reliable gate. |
-| Open PRs #46, #74, #75, #77, #78, #90 | TRIAGE | From prior Gemini sessions — review for staleness |
+| Item | Status | Notes |
+|-------|----------|-------|
+| **Admin Bot** | **FIXED** | `@AlienProbeadmin_bot` active with heartbeat. |
+| **JSON Parse** | **FIXED** | Sanitizer in `geminiGateway.ts`. |
+| **Bot_pool alerts** | **FIXED** | Removed from index.ts. |
+| `bot_ai_keys` dead write | LOW | Wizard writes here, runtime reads `bot_ai_config`. |
+| ~25 dead BotFather bots | LOW | Need manual /deletebot cleanup. |
+| Navigation recovery in wizard | MEDIUM | Dashboard link kills wizard state. |
+
+---
+
+## DB State (as of 2026-03-30 5:45 PM MST)
+
+| Tenant | Slug | Status | Channel | Notes |
+|--------|------|--------|---------|-------|
+| `71018251...` | heylookbrentisgolfing | onboarding | Telegram | OpenAI key |
+| `8803b9f4...` | bbryson-mndsgv0q | onboarding | Telegram | Job 3, Google key |
+| (newest) | bbryson-mndudbum | onboarding | Telegram | Job 4, Google key |
+
+---
+
+## Merged PRs (Full Session History)
+
+| PR | Description | Date |
+|----|-------------|------|
+| #93 | fix: secrets.ts EISDIR | 3/23 |
+| #94 | feat: BYOK key observability | 3/23 |
+| #95 | fix: activateSubscription loud failure | 3/24 |
+| #96 | feat: hatch pre-flight validation | 3/24 |
+| #97 | fix: userId in provisioning queue | 3/24 |
+| #98 | fix: clear stale frontend state | 3/24 |
+| #99 | feat: Stan Store on-demand records | 3/25 |
+| #100 | feat: StepCustomerProfile ICP | 3/25 |
+| #101 | feat: network-marketer prospect section | 3/25 |
+| #102 | feat: ICP first-message bypass | 3/26 |
+| #103 | feat: LINE end-to-end | 3/26 |
+| #104 | fix: LINE-only bot validation | 3/27 |
+| #105 | feat: wizard readability overhaul | 3/27 |
+| #106 | fix: LINE-only provisioning | 3/28 |
+| #107 | feat: preferredChannel type fix | 3/28 |
+| #108 | fix: Gemini JSON escape sanitization | 3/30 |
+| #109 | feat: admin bot + heartbeat monitor | 3/30 |
+| #110 | fix: wizard UX friction pass + multi-agent | 3/30 |
 
 ---
 
@@ -79,22 +138,18 @@ Immediate priorities:
 | Resource | Value |
 |----------|-------|
 | GCP Project | `hybrid-matrix-472500-k5` |
-| Cloud Run | `tiger-claw-api` (us-central1), latest `tiger-claw-api-00186-jq7` |
-| Cloud SQL instance | `tiger-claw-postgres-ha` (NOT `tiger-claw-db`) |
-| Cloud SQL proxy | port **5433** locally |
-| DB | user `botcraft`, DB `tiger_claw_shared` |
-| Bot state | PostgreSQL per-tenant schema `t_{tenantId}.bot_states` (NOT Redis) |
-| Wizard | Next.js on Vercel, `wizard.tigerclaw.io` |
-| Deploys | Auto via GHA on merge to main |
-| Market Intelligence | 10,833+ facts in `market_intelligence` table |
+| Cloud Run | `tiger-claw-api` (us-central1), current revision: 00172+ |
+| Cloud SQL proxy | port 5432, user `botcraft`, DB `tiger_claw_shared` |
+| DB password | `TigerClaw2026Secure` |
+| Wizard | Next.js on Vercel at `wizard.tigerclaw.io` |
+| GitHub | `bbrysonelite-max/tiger-claw-v4-core` |
+| Deploys | GitHub Actions on merge to main |
 
 ---
 
 ## Agent Rules
 
 - One PR per fix. No chaining.
-- `feat/` branches only. Never push direct to main unless explicitly told to.
+- feat/ branches only. Never push direct to main.
 - Architecture is **LOCKED**. No RAG, no containers, no OpenClaw.
-- Always test SQL against prod DB via Cloud SQL proxy — CI Postgres is broken.
-- `buildSystemPrompt()` is async. Always `await` it.
-- Grok keys: provider stored as `grok` in DB, resolved to `openai` + `baseURL: https://api.x.ai/v1` by `resolveAIProvider`. Never confuse the two layers.
+- **No new features.** Friction reduction and sales only.

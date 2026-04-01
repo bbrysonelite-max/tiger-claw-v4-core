@@ -301,6 +301,14 @@ export const NETWORK_MARKETER_FLAVOR: FlavorConfig = {
     activeSources: ["reddit", "facebook_groups", "telegram"],
   },
 
+  fallbackIntelligence: [
+    "41% of full-time employees are actively seeking a second income right now. One of them is about to find you.",
+    "The gig economy hit $2.58 trillion in 2025. The people who need what you have have never been easier to find.",
+    "Every person scared of losing their job to AI is a prospect. You have the answer they're looking for.",
+    "Trust in corporate structures is at a 15-year low; people are looking for peer-to-peer recommendation models more than ever.",
+    "Traditional B2B lead decay is accelerating, but social discovery is wide open. The market is quiet for some, but it's a goldmine for those who know where to look."
+  ],
+
   // -------------------------------------------------------------------------
   // Nurture Templates (Block 3.6 — Spec decision #32)
   // -------------------------------------------------------------------------
