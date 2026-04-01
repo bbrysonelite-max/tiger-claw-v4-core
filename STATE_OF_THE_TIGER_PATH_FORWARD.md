@@ -52,14 +52,14 @@
 
 ---
 
-## Next Steps (Session 4)
+## Next Steps (Session 4 — In Progress)
 
-1. **PR #75** — Stan Store integration audit (pre-customer critical, next up).
-2. **First paying customer** — pick from waiting list, activate.
-3. **PRs #74, #78, #77** — data mine quality (do not touch until #75 done).
-4. **PR #46** — close as stale.
+1. ~~**PR #75**~~ **MERGED** — Stan Store integration audit.
+2. ~~**PR #46**~~ **CLOSED** as stale.
+3. **First paying customer** — pick from waiting list, activate.
+4. **PRs #74, #78, #77** — data mine quality (now unblocked).
 5. **Fix `bot_ai_keys` dead write** — small cleanup PR.
-6. **LETTA_API_KEY hook error** — Stop hook in `~/.claude/settings.json` fires `send_messages_to_letta.ts` which exits with error when `LETTA_API_KEY` env var is unset. Fix: set placeholder in shell profile or patch script to exit gracefully.
+6. ~~**LETTA_API_KEY hook error**~~ **FIXED** — `LETTA_API_KEY` added to `~/.zprofile`. Takes effect on next shell restart.
 
 ---
 
@@ -74,7 +74,7 @@
 | `bot_ai_keys` dead write | LOW | Open | Wizard writes here, runtime reads `bot_ai_config`. Cleanup when convenient. |
 | ~25 dead BotFather bots | LOW | Open | Need manual /deletebot cleanup. |
 | Navigation recovery in wizard | MEDIUM | Open | Dashboard link kills wizard state. |
-| LETTA_API_KEY hook error | LOW | Open | `~/.claude/settings.json` Stop hook fires `send_messages_to_letta.ts` → exits with error when key unset. |
+| LETTA_API_KEY hook error | — | **FIXED** | Added `LETTA_API_KEY` to `~/.zprofile` so hooks inherit it in non-interactive shells. |
 | CI Postgres `role "root"` | INFRA | Open | Pre-existing GitHub Actions infra bug — not our code. TypeScript compile gate works fine. |
 
 ---
@@ -122,6 +122,8 @@
 | #118 | docs: update all 4 core docs to session 3 state | 4/1 |
 | #119 | fix: migration 022 wrong column names — was crashing every Cloud Run startup | 4/1 |
 | #120 | feat: SOUL.md voice enforcement — SOUL_VOICE_BLOCK first in every prompt | 4/1 |
+| #75 | feat: Stan Store audit — circuit breaker, email copy, deploy secrets, STAN_STORE_AUDIT.md | 4/1 |
+| #46 | closed: email support agent — stale | 4/1 |
 
 ---
 

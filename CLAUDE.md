@@ -4,18 +4,16 @@
 
 ---
 
-## Current Session State (2026-04-01 — Session 3 COMPLETE)
+## Current Session State (2026-04-01 — Session 4 IN PROGRESS)
 
-- **PRs #117, #118, #119, #120 MERGED** — Admin dashboard, Grok health fix, docs, migration 022 crash fix, SOUL voice enforcement.
-- **Migration 022 crash FIXED (#119)** — Wrong column names in `admin_events` INSERT crashed every Cloud Run startup since #117. Now resolved.
-- **SOUL voice enforcement LIVE (#120)** — `SOUL_VOICE_BLOCK` is now the first injection in every system prompt. Tiger's identity, voice rules, Language of Hope table, edification directive, and Voice Test are all enforced before ICP, market intel, or anything else. "Recruiting" removed from identity line for non-NM flavors.
-- **All 7 phases complete.** First bot live. Broken windows swept.
+- **PR #75 MERGED** — Stan Store integration audit: Gemini circuit breaker, email copy fix ("Start Setup Wizard →"), `MAGIC_LINK_SECRET` + `DATABASE_READ_URL` secrets added to deploy script, `specs/STAN_STORE_AUDIT.md` committed.
+- **PR #46 CLOSED** — Email support agent, stale.
+- **PRs #117–#120 MERGED (Session 3)** — Admin dashboard, Grok health fix, docs, migration 022 crash fix, SOUL voice enforcement.
 
 ### Open for Session 4
-- **PR #75** — Stan Store integration audit (pre-customer critical, do first)
-- **PRs #74, #78, #77** — data quality (after #75)
-- **PR #46** — close as stale
-- **LETTA_API_KEY hook** — `~/.claude/settings.json` Stop hook errors on every action; fix by patching script or setting placeholder env var
+- **PRs #74, #78, #77** — data quality (now unblocked, do next)
+- **LETTA_API_KEY hook** — Fixed in `~/.zprofile`; takes effect on shell restart.
+- **First paying customer** — Pick from waiting list, activate.
 
 ### Active Business Context
 - **Max Steingart:** White label deal, 30% affiliate via Stan Store.
