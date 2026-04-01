@@ -469,7 +469,7 @@ export const cronWorker = SHOULD_RUN_WORKERS ? new Worker(
                             const { rows: gapRows } = await pool.query(`
                                 SELECT 1
                                 FROM tenants t
-                                LEFT JOIN tenant_leads l ON l.tenant_id = t.id
+                                LEFT JOIN tenant_leads l ON l.tenant_id = t.id::text
                                 WHERE t.id = $1
                                   AND t.status IN ('active', 'live', 'onboarding')
                                 GROUP BY t.id
