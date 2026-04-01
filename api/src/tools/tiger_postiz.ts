@@ -13,7 +13,6 @@ import { ToolContext, ToolResult } from "./ToolContext.js";
 //
 // Stateless: All state lives in the Postiz API. API keys stored encrypted in PostgreSQL.
 
-import fetch from "node-fetch";
 import { getTenant } from "../services/db.js";
 import { decryptToken } from "../services/pool.js";
 
