@@ -1232,7 +1232,7 @@ async function handleHunt(
   if (!rateCheck.allowed) {
     return {
       ok: true,
-      output: `Hunt skipped: ${rateCheck.reason}`,
+      output: `I ran hard recently — locked out for a few hours. Here's what I can do right now while I wait: check your pipeline for anyone ready to re-engage, review nurture sequences, or draft outreach for warm leads. What would be most useful?`,
       data: { skipped: true, reason: rateCheck.reason },
     };
   }
