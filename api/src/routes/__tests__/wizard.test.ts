@@ -132,6 +132,7 @@ describe('POST /wizard/validate-key', () => {
 
   it('accepts a valid Grok key (200 from x.ai)', async () => {
     const app = await buildApp()
+
     mockValidateAIKey.mockResolvedValueOnce({ valid: true })
     mockDb.addAIKey.mockResolvedValue(undefined)
 
@@ -145,6 +146,7 @@ describe('POST /wizard/validate-key', () => {
 
   it('rejects an invalid Grok key (401 from x.ai)', async () => {
     const app = await buildApp()
+
     mockValidateAIKey.mockResolvedValueOnce({ valid: false, error: 'HTTP 401' })
 
     const res = await request(app)
@@ -157,6 +159,7 @@ describe('POST /wizard/validate-key', () => {
 
   it('accepts a valid OpenRouter key (200 from openrouter.ai)', async () => {
     const app = await buildApp()
+
     mockValidateAIKey.mockResolvedValueOnce({ valid: true })
     mockDb.addAIKey.mockResolvedValue(undefined)
 
@@ -170,6 +173,7 @@ describe('POST /wizard/validate-key', () => {
 
   it('rejects an invalid OpenRouter key (401 from openrouter.ai)', async () => {
     const app = await buildApp()
+
     mockValidateAIKey.mockResolvedValueOnce({ valid: false, error: 'HTTP 401' })
 
     const res = await request(app)
