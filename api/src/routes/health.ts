@@ -6,7 +6,6 @@ import { Router, type Request, type Response } from "express";
 import { execSync } from "child_process";
 import { createClient } from "redis";
 import { getPool } from "../services/db.js";
-import { getPoolStatus } from "../services/pool.js";
 import * as os from "os";
 
 const router = Router();
@@ -34,20 +33,6 @@ router.get("/", async (_req: Request, res: Response) => {
     checks["redis"] = "ok";
   } catch (err) {
     checks["redis"] = `error: ${err instanceof Error ? err.message : String(err)}`;
-  }
-
-  // Bot pool status (GAP-6 requirement: warn if below 50)
-  let poolAvailable = 0;
-  try {
-    const poolStatus = await getPoolStatus();
-    poolAvailable = poolStatus.available ?? 0;
-    checks["pool"] = poolAvailable < 10
-      ? `critical: ${poolAvailable} tokens`
-      : poolAvailable < 50
-        ? `low: ${poolAvailable} tokens`
-        : `ok: ${poolAvailable} tokens`;
-  } catch (err) {
-    checks["pool"] = `error: ${err instanceof Error ? err.message : String(err)}`;
   }
 
   // Disk usage
@@ -82,11 +67,6 @@ router.get("/", async (_req: Request, res: Response) => {
     uptimeSec: Math.round(process.uptime()),
     responseMs: Date.now() - startMs,
     checks,
-    pool: {
-      available: poolAvailable,
-      warning: poolAvailable < 50,
-      critical: poolAvailable < 10,
-    },
     system: {
       totalMemMb,
       freeMemMb,
