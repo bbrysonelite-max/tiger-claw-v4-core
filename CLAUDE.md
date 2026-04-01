@@ -4,23 +4,18 @@
 
 ---
 
-## Current Session State (2026-03-30 5:45 PM MST)
+## Current Session State (2026-04-01 — Session 3)
 
-- **FIRE TEST IN PROGRESS.** Phase 6. Jeff Mack demo at 8 PM tonight.
-- **Revision 00172** deployed with: multi-agent auth, wizard UX fixes, bot_pool removal.
-- **3 additional bugs found during fire test** — all fixed by Gemini, deploying now:
-  1. Provisioner name UPDATE missing (bot showed email prefix)
-  2. ICP fast-path missing in ai.ts (bot asked ICP questions instead of using wizard data)
-  3. Email prefix as name (resolved by fix #1)
-- **PRs Merged:** #106, #107, #108, #109, #110.
-- **Architecture LOCKED:** V4 Stateless (Cloud Run + Redis + Postgres).
-- **Admin Bot ACTIVE:** `@AlienProbeadmin_bot` with heartbeat monitor.
+- **PR #117 MERGED** — Admin dashboard at `/admin`, Grok key health false-positive fixed, SOUL.md integrated, Postiz social broadcasting tool added.
+- **TypeScript CI FIXED** — Removed phantom `node-fetch` imports from `ai.ts`, `webhook_dispatcher.ts`, `tiger_postiz.ts`. `node-fetch` is not in `package.json` and never was. CI Test now green.
+- **Open PR triage in progress:** #90, #75, #74, #78, #77, #46 — working through these this session.
+- **All 7 phases complete.** First bot live. Next: first paying customer.
 
 ### Active Business Context
-- **Max Steingart:** White label deal, 30% affiliate via Stan Store. Must sell 10 before we build.
-- **John / Bryson International Group:** 21,000 LINE distributors in Thailand. Pebo's own downline.
-- **Jeff Mack:** Demo tonight at 8 PM. Non-technical. Telegram. Paying customer.
-- **Directive from Pebo:** No new features. Reduce friction, provision agents, sell.
+- **Max Steingart:** White label deal, 30% affiliate via Stan Store.
+- **John / Bryson International Group:** 21,000 LINE distributors in Thailand.
+- **Jeff Mack:** Demo PASSED. Bot AWAKE and hunting.
+- **Data Refinery:** Mining operations active. FallbackIntelligence active for dry pipelines.
 
 ---
 
@@ -89,15 +84,23 @@
 - `main` is branch-protected. Always use `feat/` branches and `gh pr create`.
 - Never push directly to `main` or use `--no-verify` / `--force` without explicit user instruction.
 - OpenClaw, Mini-RAG, and per-tenant Docker containers are permanently eradicated. Do not reference or recreate them.
-- The Mac cluster at 192.168.0.2 is an **offline** Reflexion Loop tool. It is NOT a Cloud Run dependency.
+- The Mac cluster at 192.168.0.2 is an **offline** Reflexion Loop tool. It is NOT a Cloud Run dependency. Never make Cloud Run call it.
 - `buildSystemPrompt()` is async. Always `await` it.
-- All DB/Redis calls in hot paths must be wrapped in `try/catch` with graceful degradation.
+- All DB calls in hot paths must be wrapped in `try/catch` with graceful degradation. A DB outage must never crash message delivery.
+- Cloud SQL instance is `tiger-claw-postgres-ha`. Local proxy runs on **port 5433** (NOT 5432).
+- Bot state lives in **PostgreSQL** per-tenant schemas (`t_{tenantId}.bot_states`), not Redis.
+- Market intelligence domain key is **flavor displayName** (e.g. `"Real Estate Agent"`), NOT the flavor key (e.g. `"real-estate"`). See `getMarketIntelligence()` in `market_intel.ts`.
+- Grok keys: stored as `provider=grok` in `bot_ai_config`. `resolveAIProvider` translates to `provider=openai` + `baseURL=https://api.x.ai/v1`. Current model: `grok-4-1-fast-non-reasoning`.
+- ICP data: wizard writes `customerProfile`. `buildSystemPrompt` reads `icpSingle`. Both written at hatch. Falls back to `customerProfile` if `icpSingle` absent. Do not break this chain.
+- `node-fetch` is NOT in `package.json`. Node.js 18+ provides `fetch` globally. Never add `node-fetch` imports.
+- New tools in `api/src/tools/` MUST be registered in `toolsMap` in `ai.ts`. Missing = infinite tool loop.
 
 ---
 
 ## Reference Files
 
 - `ARCHITECTURE.md` — canonical system design
-- `START_HERE.md` — session resurrection briefing and phase status
-- `STATE_OF_THE_TIGER_PATH_FORWARD.md` — roadmap and merged history
+- `START_HERE.md` — session resurrection briefing, infrastructure notes, bug history
+- `STATE_OF_THE_TIGER_PATH_FORWARD.md` — roadmap, merged PR history, known issues
+- `SOUL.md` — brand voice, mission, and personality directives
 - `specs/` — feature specifications

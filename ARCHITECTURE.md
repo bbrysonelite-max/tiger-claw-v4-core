@@ -1,6 +1,6 @@
 # Tiger Claw V4 — Core Architecture
 
-**Last updated:** 2026-03-30 5:45 PM MST
+**Last updated:** 2026-04-01
 **Status:** LIVE. Locked. Do not rewrite.
 
 ---
@@ -67,12 +67,12 @@ All four phases are shipped and live.
 | `fact_anchors` | Extracted business facts from live conversations |
 
 ### Dynamic System Prompt (`buildSystemPrompt`)
-Async. Injects three live signals via `buildMemoryContext()`:
-1. **ICP summary** — from `onboard_state.json` (wizard-provided `customerProfile`) + `fact_anchors`
-2. **Hive patterns** — top 3 `hive_signals` rows for tenant's vertical/region
-3. **Lead stats** — live counts from `tenant_leads`
+Async. Injects **four live signals** loaded in `Promise.all()`. DB failure on any signal = graceful degradation, no crash.
 
-All three loaded in `Promise.all()`. DB failure = graceful degradation, no crash.
+1. **ICP summary** — from `onboard_state.json` (`icpSingle`, falling back to `customerProfile`) + `fact_anchors`
+2. **Hive patterns** — top signals from `hive_signals` for tenant's flavor/region
+3. **Lead stats** — live counts from `tenant_leads`
+4. **Market intelligence** — up to 5 fresh facts from `market_intelligence` (confidence ≥ 70, within 7 days). Domain key is flavor **displayName** (e.g. `"Real Estate Agent"`), NOT the flavor key (`"real-estate"`). See `getMarketIntelligence()` in `market_intel.ts`.
 
 ### Sawtooth Compression (Two Triggers)
 - **History threshold:** `history.length > MAX_HISTORY_TURNS * 2` → `compressChatHistory()`
