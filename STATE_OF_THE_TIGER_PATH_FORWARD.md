@@ -1,6 +1,6 @@
 # State of the Tiger — Path Forward
 
-**Last Updated:** 2026-04-01 (Session 3 — broken windows sweep)
+**Last Updated:** 2026-04-01 (Session 3 — broken windows sweep, complete)
 **Author:** Claude Sonnet 4.6
 
 ---
@@ -52,12 +52,14 @@
 
 ---
 
-## Next Steps (Session 3 — 2026-04-01)
+## Next Steps (Session 4)
 
-1. **First paying customer** — pick from waiting list, activate.
-2. **Triage open PRs** — #90, #75 are pre-customer critical; #74, #78, #77 are data quality; #46 likely stale.
-3. **Fix `bot_ai_keys` dead write** — small cleanup PR.
-4. **CI Postgres infra bug** — investigate the `role "root"` issue in GitHub Actions (pre-existing, but worth fixing).
+1. **PR #75** — Stan Store integration audit (pre-customer critical, next up).
+2. **First paying customer** — pick from waiting list, activate.
+3. **PRs #74, #78, #77** — data mine quality (do not touch until #75 done).
+4. **PR #46** — close as stale.
+5. **Fix `bot_ai_keys` dead write** — small cleanup PR.
+6. **LETTA_API_KEY hook error** — Stop hook in `~/.claude/settings.json` fires `send_messages_to_letta.ts` which exits with error when `LETTA_API_KEY` env var is unset. Fix: set placeholder in shell profile or patch script to exit gracefully.
 
 ---
 
@@ -67,9 +69,12 @@
 |------|----------|--------|-------|
 | **Grok key health false positive** | — | **FIXED (#117)** | Cron now passes original provider to `validateAIKey`, not SDK alias. |
 | **TypeScript CI errors** | — | **FIXED (Session 3)** | `node-fetch` phantom imports removed. CI Test green. |
+| **Migration 022 crash** | — | **FIXED (#119)** | Wrong column names in admin_events INSERT crashed every Cloud Run startup since #117. |
+| **Tiger voice bleeding** | — | **FIXED (#120)** | SOUL_VOICE_BLOCK now first in every system prompt. "Recruiting" removed from identity. Language of Hope enforced. |
 | `bot_ai_keys` dead write | LOW | Open | Wizard writes here, runtime reads `bot_ai_config`. Cleanup when convenient. |
 | ~25 dead BotFather bots | LOW | Open | Need manual /deletebot cleanup. |
 | Navigation recovery in wizard | MEDIUM | Open | Dashboard link kills wizard state. |
+| LETTA_API_KEY hook error | LOW | Open | `~/.claude/settings.json` Stop hook fires `send_messages_to_letta.ts` → exits with error when key unset. |
 | CI Postgres `role "root"` | INFRA | Open | Pre-existing GitHub Actions infra bug — not our code. TypeScript compile gate works fine. |
 
 ---
@@ -114,6 +119,9 @@
 | #116 | fix: Grok model grok-2-1212 → grok-4-1-fast-non-reasoning | 3/31 |
 | #117 | feat: admin dashboard + grok key health fix + SOUL + Postiz | 4/1 |
 | fix (in #117) | fix: remove node-fetch phantom imports — CI Test green | 4/1 |
+| #118 | docs: update all 4 core docs to session 3 state | 4/1 |
+| #119 | fix: migration 022 wrong column names — was crashing every Cloud Run startup | 4/1 |
+| #120 | feat: SOUL.md voice enforcement — SOUL_VOICE_BLOCK first in every prompt | 4/1 |
 
 ---
 

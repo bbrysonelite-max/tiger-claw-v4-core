@@ -1,6 +1,6 @@
 # START HERE — Tiger Claw Session Brief
 
-**Last Updated:** 2026-04-01 (Session 3 — broken windows sweep)
+**Last Updated:** 2026-04-01 (Session 3 — broken windows sweep, complete)
 **Author:** Claude Sonnet 4.6
 
 ---
@@ -26,8 +26,11 @@ Captain Tiger Two (`bbryson-mne8ffim`) confirmed live on Telegram at 1:35 AM 202
 
 | PR | What It Did | Status |
 |----|-------------|--------|
-| #117 + commits | feat: admin dashboard at `/admin`, Grok key health fix, SOUL.md integration, Postiz tool | MERGED |
-| fix (in #117) | fix: remove `node-fetch` phantom imports — CI Test green | MERGED |
+| #117 | feat: admin dashboard at `/admin`, Grok key health fix, SOUL.md integration, Postiz tool | MERGED |
+| fix (in #117) | fix: remove `node-fetch` phantom imports from ai.ts, webhook_dispatcher.ts, tiger_postiz.ts — CI green | MERGED |
+| #118 | docs: update all 4 core docs to session 3 state | MERGED |
+| #119 | fix: migration 022 wrong column names (`event_type`/`metadata` → `action`/`details`) — was crashing every Cloud Run startup since #117 | MERGED |
+| #120 | feat: SOUL.md voice enforcement — SOUL_VOICE_BLOCK first in every system prompt; Tiger's identity, voice rules, Language of Hope table, edification directive, The Voice Test; value_gap_checkin and tiger_scout skip message rewritten | MERGED |
 
 ### Merged PRs — Session 2 (2026-03-31)
 
@@ -53,12 +56,11 @@ Captain Tiger Two (`bbryson-mne8ffim`) confirmed live on Telegram at 1:35 AM 202
 
 | PR | Title | Priority |
 |----|-------|----------|
-| #90 | Real API validation for Grok/OpenRouter keys | Pre-customer critical |
-| #75 | Stan Store Integration Audit | Pre-customer critical |
+| #75 | Stan Store Integration Audit | Pre-customer critical — next |
 | #74 | Ruthless Relevance Gate for Data Refinery | Data quality |
 | #78 | Mine Quality Hardening | Data quality |
 | #77 | Mine Quality Audit | Report |
-| #46 | Email support agent | Likely stale |
+| #46 | Email support agent | Likely stale — close |
 
 ---
 

@@ -4,12 +4,18 @@
 
 ---
 
-## Current Session State (2026-04-01 — Session 3)
+## Current Session State (2026-04-01 — Session 3 COMPLETE)
 
-- **PR #117 MERGED** — Admin dashboard at `/admin`, Grok key health false-positive fixed, SOUL.md integrated, Postiz social broadcasting tool added.
-- **TypeScript CI FIXED** — Removed phantom `node-fetch` imports from `ai.ts`, `webhook_dispatcher.ts`, `tiger_postiz.ts`. `node-fetch` is not in `package.json` and never was. CI Test now green.
-- **Open PR triage in progress:** #90, #75, #74, #78, #77, #46 — working through these this session.
-- **All 7 phases complete.** First bot live. Next: first paying customer.
+- **PRs #117, #118, #119, #120 MERGED** — Admin dashboard, Grok health fix, docs, migration 022 crash fix, SOUL voice enforcement.
+- **Migration 022 crash FIXED (#119)** — Wrong column names in `admin_events` INSERT crashed every Cloud Run startup since #117. Now resolved.
+- **SOUL voice enforcement LIVE (#120)** — `SOUL_VOICE_BLOCK` is now the first injection in every system prompt. Tiger's identity, voice rules, Language of Hope table, edification directive, and Voice Test are all enforced before ICP, market intel, or anything else. "Recruiting" removed from identity line for non-NM flavors.
+- **All 7 phases complete.** First bot live. Broken windows swept.
+
+### Open for Session 4
+- **PR #75** — Stan Store integration audit (pre-customer critical, do first)
+- **PRs #74, #78, #77** — data quality (after #75)
+- **PR #46** — close as stale
+- **LETTA_API_KEY hook** — `~/.claude/settings.json` Stop hook errors on every action; fix by patching script or setting placeholder env var
 
 ### Active Business Context
 - **Max Steingart:** White label deal, 30% affiliate via Stan Store.
