@@ -19,12 +19,13 @@ const mockContext: any = {
  *
  * Called by the BullMQ miningWorker on a daily schedule.
  */
-export async function runMarketMining(): Promise<{ flavorsProcessed: number; postsFound: number; factsSaved: number }> {
+export async function runMarketMining(): Promise<{ flavorsProcessed: number; postsFound: number; factsSaved: number; factsRejected: number }> {
     console.log("[Miner] Starting daily market intelligence run.");
 
     let flavorsProcessed = 0;
     let postsFound = 0;
     let factsSaved = 0;
+    let factsRejected = 0;
 
     for (const [flavorId, flavor] of Object.entries(FLAVOR_REGISTRY)) {
         if (flavorId === "admin") continue;
@@ -78,8 +79,10 @@ export async function runMarketMining(): Promise<{ flavorsProcessed: number; pos
 
                     if (result.ok) {
                         const facts = (result.data as any)?.facts ?? [];
+                        const rejected = (result.data as any)?.rejectedCount ?? 0;
                         factsSaved += facts.length;
-                        console.log(`[Miner] ✅ ${facts.length} facts saved for ${flavorId}`);
+                        factsRejected += rejected;
+                        console.log(`[Miner] ✅ ${facts.length} facts saved for ${flavorId} (${rejected} rejected)`);
                     } else {
                         console.warn(`[Miner] ⚠️  Refinement failed for ${sourceUrl}: ${result.error}`);
                     }
@@ -93,6 +96,6 @@ export async function runMarketMining(): Promise<{ flavorsProcessed: number; pos
         }
     }
 
-    console.log(`[Miner] Run complete. Flavors: ${flavorsProcessed}, Posts: ${postsFound}, Facts saved: ${factsSaved}`);
-    return { flavorsProcessed, postsFound, factsSaved };
+    console.log(`[Miner] Run complete. Flavors: ${flavorsProcessed}, Posts: ${postsFound}, Facts saved: ${factsSaved}, Facts rejected: ${factsRejected}`);
+    return { flavorsProcessed, postsFound, factsSaved, factsRejected };
 }
