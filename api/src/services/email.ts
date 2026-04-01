@@ -105,41 +105,6 @@ export async function sendKeyAbuseWarning(email: string, strike: number, limit: 
   }
 }
 
-export async function sendTrialReminderEmail(
-  email: string,
-  hoursRemaining: number,
-): Promise<void> {
-  const isMock = process.env["RESEND_API_KEY"] === undefined;
-  const wizardUrl = process.env["FRONTEND_URL"] ?? "https://wizard.tigerclaw.io";
-
-  if (isMock) {
-    console.log(`[Email] MOCK sendTrialReminderEmail to ${email} (${hoursRemaining}h remaining)`);
-    return;
-  }
-
-  const isExpired = hoursRemaining <= 0;
-  const subject = isExpired
-    ? "⚠️ Your Tiger Claw trial has ended — add your key to resume"
-    : `⏰ ${hoursRemaining} hours left on your Tiger Claw trial`;
-
-  const bodyText = isExpired
-    ? `<p>Your 72-hour free trial is complete and your bot has been paused.</p>
-       <p>To resume, add your Google Gemini API key at <a href="${wizardUrl}">${wizardUrl}</a>.</p>`
-    : `<p>You have <strong>${hoursRemaining} hours</strong> remaining on your free trial.</p>
-       <p>Add your Google Gemini API key now so your bot keeps working: <a href="${wizardUrl}">${wizardUrl}</a>.</p>`;
-
-  try {
-    await resend.emails.send({
-      from: FROM_EMAIL,
-      to: email,
-      subject,
-      html: `<h2>Tiger Claw Trial Update</h2>${bodyText}<p>Need help? Reply to this email.</p>`,
-    });
-    console.log(`[Email] sendTrialReminderEmail (${hoursRemaining}h) sent to ${email}`);
-  } catch (error) {
-    console.error(`[Email] sendTrialReminderEmail failed:`, error);
-  }
-}
 
 export async function sendSupportReply(to: string, toName: string, subject: string, replyText: string): Promise<void> {
   const isMock = process.env["RESEND_API_KEY"] === undefined;
