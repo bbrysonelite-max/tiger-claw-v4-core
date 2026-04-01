@@ -1013,8 +1013,14 @@ async function runToolLoop(
                 }
             }
 
+            // If the tool provided a human-voiced output string, that's all Gemini sees.
+            // Never expose raw data fields (skipped, reason, error codes) — they produce woody responses.
+            const geminiPayload = toolResult?.output
+                ? { output: toolResult.output }
+                : toolResult;
+
             functionResponses.push({
-                functionResponse: { name: fc.name, response: toolResult },
+                functionResponse: { name: fc.name, response: geminiPayload },
             } as any);
         }
 
