@@ -1251,7 +1251,7 @@ export async function processSystemRoutine(tenantId: string, routineType: string
 
         const wizardUrl = process.env['FRONTEND_URL'] ?? 'https://wizard.tigerclaw.io';
         const systemPrompts: Record<string, string> = {
-            daily_scout:   'SYSTEM: Run your Daily Scout routine. Find new leads to contact.',
+            daily_scout:   `SYSTEM: Good morning. Run your Daily Scout routine now — call tiger_scout to hunt for new leads. When the scout completes, send your operator a morning report in your exact voice. The report must: (1) tell them how many people you found and who looks most promising, (2) give them one specific action they can take right now, (3) end with something that makes them feel like today is worth showing up for. If nothing was found, use the Language of Hope — never dead air. This message goes directly to their Telegram. Make it feel like you worked all night for them.`,
             nurture_check: 'SYSTEM: Run your Nurture Check. Review follow-ups and reach out where due.',
             weekly_checkin: `SYSTEM: You are checking in with your operator as a coach and strategic partner. Write a warm, brief Telegram message asking them to share one win and one challenge from this week. Keep it conversational, not formal. Sign off with your name. Do NOT execute any tools.`,
             feedback_reminder: `SYSTEM: Your operator hasn't responded to your weekly check-in yet. Send a short, friendly nudge — one sentence. Remind them you're waiting to hear how things are going. Use your personality. Do NOT execute any tools.`,
@@ -1280,12 +1280,12 @@ export async function processSystemRoutine(tenantId: string, routineType: string
             try {
                 const chat = model.startChat({ history: [] });
                 const initial = await callGemini(() => chat.sendMessage(prompt));
-                // For tool-loop routines, run the loop
+                // For tool-loop routines, run the loop and capture the final message
                 if (routineType === 'daily_scout' || routineType === 'nurture_check') {
-                    const { apiCalls } = await runToolLoop(chat, initial.response, toolContext, `AI Routine:${routineType}`);
+                    const { accumulatedText, apiCalls } = await runToolLoop(chat, initial.response, toolContext, `AI Routine:${routineType}`);
                     await trackAICalls(tenantId, 'google', apiCalls);
                     await trackGeminiSuccess(tenantId);
-                    return '';
+                    return accumulatedText;
                 }
                 const resultText = initial.response.text?.() ?? '';
                 await trackAICalls(tenantId, 'google', 1);
@@ -1369,8 +1369,34 @@ export async function processSystemRoutine(tenantId: string, routineType: string
                     );
                 }
             }
+        } else if (routineType === 'daily_scout') {
+            // Morning Hunt Report — Tiger ran while they slept, now tells them what it found
+            const message = await getRoutineText();
+            if (message) {
+                const channel = tenant.preferredChannel;
+                const botToken = await getTenantBotToken(tenantId);
+                if (channel === 'line' && tenant.lineChannelAccessToken) {
+                    const lineUserIds = await getTenantLineUserIds(tenantId);
+                    const lineToken = decryptToken(tenant.lineChannelAccessToken);
+                    for (const userId of lineUserIds) {
+                        await fetch('https://api.line.me/v2/bot/message/push', {
+                            method: 'POST',
+                            headers: { 'Authorization': `Bearer ${lineToken}`, 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ to: userId, messages: [{ type: 'text', text: message.slice(0, 5000) }] }),
+                        }).catch(err => console.error(`[AI Routine] Morning report LINE push failed for ${userId}:`, err.message));
+                    }
+                } else if (botToken) {
+                    const chatIds = await getTenantChatIds(tenantId);
+                    const bot = new TelegramBot(botToken);
+                    for (const cid of chatIds) {
+                        await bot.sendMessage(cid, message).catch(err =>
+                            console.error(`[AI Routine] Morning report failed to send to ${cid}:`, err.message)
+                        );
+                    }
+                }
+            }
         } else {
-            // Standard tool loop (daily_scout, nurture_check)
+            // nurture_check and other tool-loop routines — run silently
             await getRoutineText();
         }
 
