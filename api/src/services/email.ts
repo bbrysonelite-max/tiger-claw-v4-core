@@ -188,15 +188,15 @@ export async function sendStanStoreWelcome(email: string, name: string, productN
 <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:480px;margin:0 auto;padding:24px;background:#0a0a0f;color:#e8e8f0;border-radius:12px;">
   <h2 style="color:#f59e0b;margin-top:0;">🐯 Your ${productName} is ready!</h2>
   <p>Hi ${name},</p>
-  <p>You're one click away from your personal AI prospecting assistant. Tap the button below to set it up.</p>
+  <p>You're one click away from your personal AI prospecting assistant. Tap the button below to start the 4-step setup wizard.</p>
   <p style="text-align:center;margin:28px 0;">
     <a href="${claimUrl}" style="display:inline-block;background:#f59e0b;color:#0a0a0f;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:700;font-size:16px;">
-      Claim My Tiger Claw →
+      Start Setup Wizard →
     </a>
   </p>
   <p style="color:#6b7280;font-size:13px;line-height:1.6;">
     This link is securely tied to your email address.<br>
-    After claiming, your personal Tiger Claw bot will message you on Telegram within 60 seconds.
+    The wizard will guide you through connecting your own Telegram bot and AI keys.
   </p>
 </div>`;
 
