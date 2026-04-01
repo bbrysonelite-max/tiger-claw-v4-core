@@ -1,7 +1,7 @@
 # START HERE — Tiger Claw Session Brief
 
-**Last Updated:** 2026-03-31 (Tuesday afternoon — SOUL & SOCIAL MOAT LIVE)
-**Author:** Gemini CLI
+**Last Updated:** 2026-04-01 (Session 3 — broken windows sweep)
+**Author:** Claude Sonnet 4.6
 
 ---
 
@@ -14,42 +14,51 @@ AI sales agent SaaS. Customers buy on Stan Store, walk through a 5-step wizard t
 - **Repo:** `github.com/bbrysonelite-max/tiger-claw-v4-core`
 - **Architecture:** BYOB (customer's Telegram token) + BYOK (customer's AI key)
 - **DB password:** `TigerClaw2026Secure` (from Secret Manager: `tiger-claw-database-url`)
-- **Cloud SQL proxy port:** 5432 (proxy user: `botcraft`, DB: `tiger_claw_shared`)
+- **Cloud SQL instance:** `tiger-claw-postgres-ha` (proxy port **5433** locally — NOT 5432, DB: `tiger_claw_shared`, user: `botcraft`)
 
 ---
 
-## Current State: SOUL & SOCIAL MOAT LIVE (Phase 7)
+## Current State: ALL PHASES COMPLETE — FIRST BOT LIVE ✅
 
-### Timeline (2026-03-31)
+Captain Tiger Two (`bbryson-mne8ffim`) confirmed live on Telegram at 1:35 AM 2026-03-31.
 
-| Time (MST) | Event |
-|------------|-------|
-| 08:00 | Morning queue: Build admin dashboard + fix Grok key bug |
-| 10:30 | **Operator Command Center** built at `/admin` (PR #117) |
-| 11:15 | Grok/OpenRouter "Key Dead" false-positive bug fixed |
-| 14:00 | **SOUL.md** integrated: Brand mission & voice injected into every agent prompt |
-| 14:20 | **Hope-Infused Intelligence** fallbacks added for dry data mines |
-| 17:00 | **Postiz Integration** complete: Autonomous multi-platform broadcasting (tiger_postiz) |
-| 17:15 | Martha onboarded as Intelligence Monitor |
-
-### Staff Roster
-- **Brent:** Operator / Lead Strategy
-- **Gemini CLI:** Lead Engineer / Orchestrator
-- **Claude (Terminal):** Batch Ops / Data Auditor
-- **Martha:** Intelligence Monitor (Pipeline Health & Freshness)
-
-### Merged PRs (complete history)
+### Merged PRs — Session 3 (2026-04-01)
 
 | PR | What It Did | Status |
-|-----|-------------|--------|
-| #117| feat: admin dashboard + grok key health fix | MERGED |
-| (push)| feat: SOUL.md integration + fallback intelligence | MERGED |
-| (push)| feat: Postiz integration (tiger_postiz) | MERGED |
-| #110| fix: wizard UX friction pass — multi-agent support | MERGED |
-| #109| feat: restore admin bot + heartbeat monitor | MERGED |
+|----|-------------|--------|
+| #117 + commits | feat: admin dashboard at `/admin`, Grok key health fix, SOUL.md integration, Postiz tool | MERGED |
+| fix (in #117) | fix: remove `node-fetch` phantom imports — CI Test green | MERGED |
 
-### Open PRs
-- `feat: add /webhooks/stan-store Zapier bridge for auto-provisioning` (Ready for Review)
+### Merged PRs — Session 2 (2026-03-31)
+
+| PR | What It Did | Status |
+|----|-------------|--------|
+| direct commit | fix: bot greeting CTA — "I'm ready — let me hunt" | MERGED |
+| #116 | fix: Grok model `grok-2-1212` → `grok-4-1-fast-non-reasoning` | MERGED |
+| #115 | fix: `buildSystemPrompt` fallback to `customerProfile` when `icpSingle` missing | MERGED |
+| #114 | fix: wizard ICP fast-path — write `icpSingle` + `botName` at hatch and first message | MERGED |
+| #113 | fix: dashboard display — AI engine label + Telegram dual-state contradiction | MERGED |
+| #112 | feat: intent bridge — market intelligence → `buildSystemPrompt()` | MERGED |
+| #111 | fix: 3 critical fire test bugs | MERGED |
+
+### Merged PRs — Session 1 (2026-03-31 early)
+
+| PR | What It Did | Status |
+|----|-------------|--------|
+| #110 | fix: wizard UX friction pass + multi-agent auth | MERGED |
+| #109 | feat: admin bot + heartbeat monitor | MERGED |
+| #107 | fix: LINE-only provisioning (`preferredChannel` defaulted to `"telegram"`) | MERGED |
+
+### Open PRs (triage in progress this session)
+
+| PR | Title | Priority |
+|----|-------|----------|
+| #90 | Real API validation for Grok/OpenRouter keys | Pre-customer critical |
+| #75 | Stan Store Integration Audit | Pre-customer critical |
+| #74 | Ruthless Relevance Gate for Data Refinery | Data quality |
+| #78 | Mine Quality Hardening | Data quality |
+| #77 | Mine Quality Audit | Report |
+| #46 | Email support agent | Likely stale |
 
 ---
 
@@ -95,7 +104,7 @@ The ICP data pipeline (wizard → hatch → `onboard_state.json`) was correctly 
 1. `POST /wizard/hatch` validates botId, subscription, AI key
 2. Activates subscription (`pending_setup` → `active`)
 3. Saves LINE credentials encrypted to tenant record (if provided)
-4. Writes ICP to `onboard_state.json` in Redis
+4. Writes ICP to `onboard_state.json` in **PostgreSQL** `tenant_states` table, **including `icpSingle` and `botName`** (critical — see ICP fix history below)
 5. Enqueues BullMQ provisioning job
 6. Worker: updates tenant (including name), registers Telegram webhook (if token), registers LINE webhook (if creds), sets status → onboarding
 
@@ -114,28 +123,23 @@ The ICP data pipeline (wizard → hatch → `onboard_state.json`) was correctly 
 
 ---
 
-## Database State (as of 2026-03-30 5:45 PM MST)
+## Database State (as of 2026-04-01)
 
-| Tenant | Slug | Status | Channel | AI Key |
+| Tenant | Name | Status | Channel | AI Key |
 |--------|------|--------|---------|--------|
-| `71018251...` | heylookbrentisgolfing | onboarding | Telegram | ✅ openai/gpt-4o-mini |
-| `8803b9f4...` | bbryson-mndsgv0q | onboarding | Telegram | ✅ google |
-| (newest) | bbryson-mndudbum | onboarding | Telegram | ✅ google |
+| `484dbe39...` | bbryson-mne8ffim (Captain Tiger Two) | onboarding | Telegram ✅ | Grok xai-...VBOH ✅ **LIVE** |
+| `71018251...` | heylookbrentisgolfing | onboarding | Telegram ✅ | openai/gpt-4o-mini ✅ |
+| `8803b9f4...` | bbryson | pending | LINE ✅ | ❌ no key |
+
+**No paying customer tenants yet.**
 
 ---
 
-## Fire Test Checklist
+## Fire Test Result: ✅ PASSED (2026-03-31 1:35 AM)
 
-```
-[x] Go to wizard.tigerclaw.io
-[x] Walk through all 5 steps with a fresh Telegram token + Gemini key + ICP filled in
-[x] Hit Hatch — watch Cloud Run logs for provisioning success
-[x] Verify provisioning job succeeds (Job 4 — bbryson-mndudbum AWAKE)
-[ ] PENDING: Verify bot name shows wizard-entered name (not email prefix)
-[ ] PENDING: Send first message — bot sends confident ICP-aware intro (NOT onboarding questions)
-[ ] Jeff Mack demo at 8 PM
-[ ] Pick first real customer from the waiting list
-```
+Captain Tiger Two (`bbryson-mne8ffim`) responded on Telegram with correct ICP-aware greeting. No onboarding questions. Name correct. Grok key live.
+
+**Next milestone:** Activate first paying customer from waiting list.
 
 ---
 

@@ -1,7 +1,7 @@
 # State of the Tiger — Path Forward
 
-**Last Updated:** 2026-03-31 (Tuesday afternoon — SOUL & SOCIAL MOAT LIVE)
-**Author:** Claude (Cowork) + Gemini CLI
+**Last Updated:** 2026-04-01 (Session 3 — broken windows sweep)
+**Author:** Claude Sonnet 4.6
 
 ---
 
@@ -52,27 +52,25 @@
 
 ---
 
-## Next Steps (After Fire Test)
+## Next Steps (Session 3 — 2026-04-01)
 
-1. **Complete Jeff Mack demo** — 8 PM tonight. He's extremely non-technical, uses Telegram.
-2. **Hatch 5+ real agents** — Pebo wants to deploy agents for the Nu Skin rebuild team.
-3. **Test dialogue quality** — Do the bots sound smart? Do they reference ICP data? Are they ready to hunt?
-4. **Max Steingart white label** — 30% affiliate commission via Stan Store. Max sells 10, then we build.
-5. **John / Bryson International Group** — 21,000 LINE distributors in Thailand. Scale test.
-6. **Stan Store Zapier webhook** — Automate "Receipt → Wizard" flow.
+1. **First paying customer** — pick from waiting list, activate.
+2. **Triage open PRs** — #90, #75 are pre-customer critical; #74, #78, #77 are data quality; #46 likely stale.
+3. **Fix `bot_ai_keys` dead write** — small cleanup PR.
+4. **CI Postgres infra bug** — investigate the `role "root"` issue in GitHub Actions (pre-existing, but worth fixing).
 
 ---
 
 ## Known Issues / Tech Debt
 
-| Item | Status | Notes |
-|-------|----------|-------|
-| **Admin Bot** | **FIXED** | `@AlienProbeadmin_bot` active with heartbeat. |
-| **JSON Parse** | **FIXED** | Sanitizer in `geminiGateway.ts`. |
-| **Bot_pool alerts** | **FIXED** | Removed from index.ts. |
-| `bot_ai_keys` dead write | LOW | Wizard writes here, runtime reads `bot_ai_config`. |
-| ~25 dead BotFather bots | LOW | Need manual /deletebot cleanup. |
-| Navigation recovery in wizard | MEDIUM | Dashboard link kills wizard state. |
+| Item | Priority | Status | Notes |
+|------|----------|--------|-------|
+| **Grok key health false positive** | — | **FIXED (#117)** | Cron now passes original provider to `validateAIKey`, not SDK alias. |
+| **TypeScript CI errors** | — | **FIXED (Session 3)** | `node-fetch` phantom imports removed. CI Test green. |
+| `bot_ai_keys` dead write | LOW | Open | Wizard writes here, runtime reads `bot_ai_config`. Cleanup when convenient. |
+| ~25 dead BotFather bots | LOW | Open | Need manual /deletebot cleanup. |
+| Navigation recovery in wizard | MEDIUM | Open | Dashboard link kills wizard state. |
+| CI Postgres `role "root"` | INFRA | Open | Pre-existing GitHub Actions infra bug — not our code. TypeScript compile gate works fine. |
 
 ---
 
@@ -108,9 +106,14 @@
 | #108 | fix: Gemini JSON escape sanitization | 3/30 |
 | #109 | feat: admin bot + heartbeat monitor | 3/30 |
 | #110 | fix: wizard UX friction pass + multi-agent | 3/30 |
-| #117 | feat: admin dashboard + grok key health fix | 3/31 |
-| (push) | feat: SOUL.md integration + hope-infused fallback intel | 3/31 |
-| (push) | feat: Postiz integration (tiger_postiz) | 3/31 |
+| #111 | fix: 3 critical fire test bugs | 3/31 |
+| #112 | feat: intent bridge — market intelligence → buildSystemPrompt | 3/31 |
+| #113 | fix: dashboard display — AI engine label + Telegram dual-state | 3/31 |
+| #114 | fix: wizard ICP fast-path — write icpSingle + botName at hatch | 3/31 |
+| #115 | fix: buildSystemPrompt fallback to customerProfile when icpSingle missing | 3/31 |
+| #116 | fix: Grok model grok-2-1212 → grok-4-1-fast-non-reasoning | 3/31 |
+| #117 | feat: admin dashboard + grok key health fix + SOUL + Postiz | 4/1 |
+| fix (in #117) | fix: remove node-fetch phantom imports — CI Test green | 4/1 |
 
 ---
 
@@ -120,7 +123,7 @@
 |----------|-------|
 | GCP Project | `hybrid-matrix-472500-k5` |
 | Cloud Run | `tiger-claw-api` (us-central1), current revision: 00172+ |
-| Cloud SQL proxy | port 5432, user `botcraft`, DB `tiger_claw_shared` |
+| Cloud SQL proxy | port **5433** locally (NOT 5432), user `botcraft`, DB `tiger_claw_shared` |
 | DB password | `TigerClaw2026Secure` |
 | Wizard | Next.js on Vercel at `wizard.tigerclaw.io` |
 | GitHub | `bbrysonelite-max/tiger-claw-v4-core` |
