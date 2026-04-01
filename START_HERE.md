@@ -1,7 +1,7 @@
 # START HERE — Tiger Claw Session Brief
 
-**Last Updated:** 2026-03-30 5:45 PM MST (Monday evening — FIRE TEST IN PROGRESS)
-**Author:** Claude (Cowork) + Gemini CLI
+**Last Updated:** 2026-03-31 (Tuesday afternoon — SOUL & SOCIAL MOAT LIVE)
+**Author:** Gemini CLI
 
 ---
 
@@ -18,32 +18,35 @@ AI sales agent SaaS. Customers buy on Stan Store, walk through a 5-step wizard t
 
 ---
 
-## Current State: FIRE TEST IN PROGRESS (Phase 6)
+## Current State: SOUL & SOCIAL MOAT LIVE (Phase 7)
 
-### Timeline (2026-03-30)
+### Timeline (2026-03-31)
 
 | Time (MST) | Event |
 |------------|-------|
-| 13:40 | Gemini deployed revision 00168–00172 (wizard UX fixes, multi-agent auth, bot_pool removal) |
-| 16:47 | Fire test hatch Job 3 — slug `bbryson-mndsgv0q` — AWAKE |
-| 16:53 | Fire test hatch Job 4 — slug `bbryson-mndudbum` — AWAKE |
-| 16:55 | **BUG FOUND:** Bot asks ICP questions manually instead of using wizard data |
-| 16:55 | **BUG FOUND:** Bot name shows "bbryson" (email prefix) not wizard-entered name |
-| 17:15 | Claude traced all 3 bugs to exact source lines, wrote marching orders |
-| 17:35 | Gemini read marching orders, fixed all 3 bugs in ai.ts + provisioner.ts |
-| 17:41 | Gemini deploying new revision (pending) |
-| **20:00** | **Jeff Mack demo — HARD DEADLINE** |
+| 08:00 | Morning queue: Build admin dashboard + fix Grok key bug |
+| 10:30 | **Operator Command Center** built at `/admin` (PR #117) |
+| 11:15 | Grok/OpenRouter "Key Dead" false-positive bug fixed |
+| 14:00 | **SOUL.md** integrated: Brand mission & voice injected into every agent prompt |
+| 14:20 | **Hope-Infused Intelligence** fallbacks added for dry data mines |
+| 17:00 | **Postiz Integration** complete: Autonomous multi-platform broadcasting (tiger_postiz) |
+| 17:15 | Martha onboarded as Intelligence Monitor |
+
+### Staff Roster
+- **Brent:** Operator / Lead Strategy
+- **Gemini CLI:** Lead Engineer / Orchestrator
+- **Claude (Terminal):** Batch Ops / Data Auditor
+- **Martha:** Intelligence Monitor (Pipeline Health & Freshness)
 
 ### Merged PRs (complete history)
 
 | PR | What It Did | Status |
 |-----|-------------|--------|
-| #106| fix: LINE-only provisioning | MERGED |
-| #107| feat: preferredChannel type fix | MERGED |
-| #108| fix: sanitize Gemini JSON escape sequences | MERGED |
+| #117| feat: admin dashboard + grok key health fix | MERGED |
+| (push)| feat: SOUL.md integration + fallback intelligence | MERGED |
+| (push)| feat: Postiz integration (tiger_postiz) | MERGED |
+| #110| fix: wizard UX friction pass — multi-agent support | MERGED |
 | #109| feat: restore admin bot + heartbeat monitor | MERGED |
-| #110| fix: wizard UX friction pass — contrast, copy, multi-agent support | MERGED |
-| (pending) | fix: provisioner name UPDATE + ICP fast-path + bot greeting | DEPLOYING |
 
 ### Open PRs
 - `feat: add /webhooks/stan-store Zapier bridge for auto-provisioning` (Ready for Review)

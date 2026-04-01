@@ -1,52 +1,30 @@
 # State of the Tiger — Path Forward
 
-**Last Updated:** 2026-03-30 5:45 PM MST (Monday evening — FIRE TEST IN PROGRESS)
+**Last Updated:** 2026-03-31 (Tuesday afternoon — SOUL & SOCIAL MOAT LIVE)
 **Author:** Claude (Cowork) + Gemini CLI
 
 ---
 
 ## Phase Status
 
-### Phase 6 — FIRE TEST (IN PROGRESS)
-
-Phases 1–5 are complete. Phase 6 is the live fire test with real credentials.
+### Phase 7 — SOCIAL MOAT & BRAND SOUL (COMPLETE)
 
 **Phase 1 — Container Health** ✅
-- secrets.ts EISDIR fix (PR #93)
-- FRONTEND_URL → wizard.tigerclaw.io
-- Container stable on Cloud Run
-
 **Phase 2 — Database Cleanup** ✅
-- All test data wiped, clean slate
-
 **Phase 3 — BYOK Key Path** ✅
-- Key observability + loud failures (PR #94)
-- Runtime reads from `bot_ai_config` (confirmed)
-
 **Phase 4 — Wizard Hatch Fixes** ✅
-- activateSubscription loud failure (PR #95)
-- Pre-flight validation on /hatch (PR #96)
-- userId fix in provisioning queue (PR #97)
-- Clear stale frontend state (PR #98)
-
 **Phase 5 — Wizard Completion & Hardening** ✅
-- Stan Store on-demand record creation (PR #99)
-- StepCustomerProfile ICP wizard step (PR #100)
-- Network-marketer prospect section (PR #101)
-- ICP first-message bypass in ai.ts (PR #102)
-- LINE end-to-end: UI + hatch + provisioner (PR #103)
-- LINE-only bot validation (PR #104)
-- Full wizard readability overhaul (PR #105)
-- JSON escape sequence sanitization (PR #108)
-- Admin bot restoration + heartbeat monitor (PR #109)
+**Phase 6 — Fire Test** ✅
+- Jeff Mack demo PASSED 3/30
+- 5+ real agents hatched and hunting
 
-**Phase 6 — Fire Test** 🔥 IN PROGRESS
-- Wizard UX friction pass — contrast, copy, multi-agent (PR #110) ✅
-- Bot_pool spam alert removal ✅
-- Multi-agent auth (one email → many bots) ✅
-- Provisioner name UPDATE fix (deploying)
-- ICP fast-path in ai.ts (deploying)
-- Jeff Mack demo at 8 PM tonight
+**Phase 7 — Social Moat & Brand Soul (3/31)** ✅
+- Admin Dashboard (Operator Command Center) at /admin (PR #117)
+- Grok/OpenRouter key health detection fix (PR #117)
+- SOUL.md integration — Brand voice & mission injected into every agent
+- FallbackIntelligence — Vertical-specific hope-infused facts for dry mines
+- Postiz Integration — Autonomous social broadcasting tool (tiger_postiz)
+- Postiz Key Management — Secure storage and configuration via tiger_settings
 
 ---
 
@@ -130,6 +108,9 @@ Phases 1–5 are complete. Phase 6 is the live fire test with real credentials.
 | #108 | fix: Gemini JSON escape sanitization | 3/30 |
 | #109 | feat: admin bot + heartbeat monitor | 3/30 |
 | #110 | fix: wizard UX friction pass + multi-agent | 3/30 |
+| #117 | feat: admin dashboard + grok key health fix | 3/31 |
+| (push) | feat: SOUL.md integration + hope-infused fallback intel | 3/31 |
+| (push) | feat: Postiz integration (tiger_postiz) | 3/31 |
 
 ---
 

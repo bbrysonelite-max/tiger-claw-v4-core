@@ -1,6 +1,6 @@
 # Tiger Claw V4 — Core Architecture
 
-**Last updated:** 2026-03-30 5:45 PM MST
+**Last updated:** 2026-03-31
 **Status:** LIVE. Locked. Do not rewrite.
 
 ---

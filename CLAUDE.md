@@ -4,23 +4,21 @@
 
 ---
 
-## Current Session State (2026-03-30 5:45 PM MST)
+## Current Session State (2026-03-31)
 
-- **FIRE TEST IN PROGRESS.** Phase 6. Jeff Mack demo at 8 PM tonight.
-- **Revision 00172** deployed with: multi-agent auth, wizard UX fixes, bot_pool removal.
-- **3 additional bugs found during fire test** — all fixed by Gemini, deploying now:
-  1. Provisioner name UPDATE missing (bot showed email prefix)
-  2. ICP fast-path missing in ai.ts (bot asked ICP questions instead of using wizard data)
-  3. Email prefix as name (resolved by fix #1)
-- **PRs Merged:** #106, #107, #108, #109, #110.
-- **Architecture LOCKED:** V4 Stateless (Cloud Run + Redis + Postgres).
-- **Admin Bot ACTIVE:** `@AlienProbeadmin_bot` with heartbeat monitor.
+- **SOUL & SOCIAL MOAT LIVE.** Phase 7 complete.
+- **Operator Command Center** built at `/admin`. Real-time visibility into fleet, pulse, and mine.
+- **Grok/OpenRouter Fix:** False-positive "Key Dead" status resolved via improved auto-detection.
+- **SOUL.md Integrated:** Brand mission, voice, and "Language of Hope" injected into every agent.
+- **Postiz Integrated:** `tiger_postiz` tool enables autonomous social media broadcasting.
+- **PRs Merged:** #117 (Admin Dashboard + Grok fix), + SOUL and Postiz pushes.
+- **Martha Onboarded:** Intelligence Monitor role active.
 
 ### Active Business Context
-- **Max Steingart:** White label deal, 30% affiliate via Stan Store. Must sell 10 before we build.
-- **John / Bryson International Group:** 21,000 LINE distributors in Thailand. Pebo's own downline.
-- **Jeff Mack:** Demo tonight at 8 PM. Non-technical. Telegram. Paying customer.
-- **Directive from Pebo:** No new features. Reduce friction, provision agents, sell.
+- **Max Steingart:** White label deal, 30% affiliate via Stan Store.
+- **John / Bryson International Group:** 21,000 LINE distributors in Thailand.
+- **Jeff Mack:** Demo PASSED. Bot AWAKE and hunting.
+- **Data Refinery:** Mining operations active. FallbackIntelligence active for dry pipelines.
 
 ---
 
