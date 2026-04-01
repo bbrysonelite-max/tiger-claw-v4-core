@@ -150,13 +150,11 @@ describe('queue.ts workers', () => {
             ];
             mockQuery.mockResolvedValue({ rows: tenants });
 
-            // getBotState throws for tenant-bad key_state only; onboard_state returns null (complete) for the ok tenants
+            // getBotState throws for tenant-bad; onboard_state returns null (complete) for the ok tenants
             const { getBotState } = await import('../db.js');
             (getBotState as ReturnType<typeof vi.fn>)
-                .mockResolvedValueOnce({})           // tenant-ok-1 key_state
                 .mockResolvedValueOnce(null)          // tenant-ok-1 onboard_state → complete
-                .mockRejectedValueOnce(new Error('DB timeout')) // tenant-bad key_state → throws
-                .mockResolvedValueOnce({})            // tenant-ok-2 key_state
+                .mockRejectedValueOnce(new Error('DB timeout')) // tenant-bad onboard_state → throws
                 .mockResolvedValueOnce(null);         // tenant-ok-2 onboard_state → complete
 
             vi.useFakeTimers();
@@ -169,53 +167,6 @@ describe('queue.ts workers', () => {
             const nurtureCalls = (routineQueue.add as ReturnType<typeof vi.fn>).mock.calls
                 .filter((call: any[]) => call[0] === 'nurture_check');
             expect(nurtureCalls.length).toBe(2); // only 2 of 3 tenants (bad one failed before add)
-
-            vi.useRealTimers();
-        });
-
-        // Phase 2: trial reminder dedup via BullMQ jobId
-        it('fires trial_reminder_24h with correct jobId for dedup', async () => {
-            const createdAt = new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString(); // 25h ago
-            mockQuery.mockResolvedValue({ rows: [{ id: 'tenant-trial', created_at: createdAt }] });
-
-            // No layer2Key, no h24 reminder sent yet
-            const { getBotState } = await import('../db.js');
-            (getBotState as ReturnType<typeof vi.fn>).mockResolvedValue({ trialRemindersSent: {} });
-
-            vi.useFakeTimers();
-            vi.setSystemTime(new Date());
-
-            await processors.cron();
-
-            // Trial reminder was enqueued with the correct dedup jobId
-            expect(routineQueue.add).toHaveBeenCalledWith(
-                'trial_reminder_24h',
-                expect.objectContaining({ tenantId: 'tenant-trial', routineType: 'trial_reminder_24h' }),
-                expect.objectContaining({ jobId: 'trial_reminder_24h_tenant-trial' })
-            );
-
-            vi.useRealTimers();
-        });
-
-        it('does NOT re-fire trial_reminder_24h when already sent (dedup via state)', async () => {
-            const createdAt = new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString();
-            mockQuery.mockResolvedValue({ rows: [{ id: 'tenant-trial', created_at: createdAt }] });
-
-            // h24 already sent
-            const { getBotState } = await import('../db.js');
-            (getBotState as ReturnType<typeof vi.fn>).mockResolvedValue(
-                { trialRemindersSent: { h24: true } }
-            );
-
-            vi.useFakeTimers();
-            vi.setSystemTime(new Date());
-
-            await processors.cron();
-
-            // No trial reminder should have been added
-            const trialCalls = (routineQueue.add as ReturnType<typeof vi.fn>).mock.calls
-                .filter((call: any[]) => call[0] === 'trial_reminder_24h');
-            expect(trialCalls.length).toBe(0);
 
             vi.useRealTimers();
         });
