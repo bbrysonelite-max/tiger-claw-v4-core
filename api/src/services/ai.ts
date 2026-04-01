@@ -4,7 +4,6 @@ import { getTenant, getPool, getBotState, setBotState, getTenantBotToken, getHiv
 import { getMarketIntelligence, MarketFact } from './market_intel.js';
 import TelegramBot from 'node-telegram-bot-api';
 import IORedis from 'ioredis';
-import fetch from 'node-fetch';
 import * as fs from 'fs';
 import * as path from 'path';
 import { loadFlavorConfig } from '../tools/flavorConfig.js';

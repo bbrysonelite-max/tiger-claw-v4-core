@@ -54,7 +54,7 @@ async function postizRequest(
     body: body ? JSON.stringify(body) : undefined,
   });
 
-  const data = await res.json();
+  const data = await res.json() as any;
   if (!res.ok) {
     throw new Error(data.message || data.error || `Postiz API error: ${res.status}`);
   }
