@@ -408,47 +408,10 @@ export const cronWorker = SHOULD_RUN_WORKERS ? new Worker(
             const nowHour = new Date().getUTCHours();
             const today = new Date().toISOString().split('T')[0];
 
-            // Dedup strategy for trial reminders:
-            //   - BullMQ jobId = unique per tenant per reminder type — queue deduplicates
-            //   - State (trialRemindersSent) is written BEFORE add() so crash-recovery is safe
-            //   - cronWorker concurrency=1 + singleton heartbeat jobId ensures single-writer
-            //   - Per-tenant try-catch below isolates failures: one bad tenant never kills the cycle
-
-            const { getBotState, setBotState } = await import('./db.js');
+            const { getBotState } = await import('./db.js');
 
             for (const tenant of tenants) {
                 try {
-                    // Handle 72hr free trial engine natively using the bot memory states
-                    const hoursElapsed = (Date.now() - new Date(tenant.created_at).getTime()) / (1000 * 60 * 60);
-
-                    const botState: Record<string, any> = (await getBotState<Record<string, any>>(tenant.id, 'key_state.json')) ?? {};
-
-                    if (!botState.layer2Key) {
-                        botState.trialRemindersSent = botState.trialRemindersSent || {};
-                        const { h24, h48, h72 } = botState.trialRemindersSent;
-
-                        let fireReminder: string | null = null;
-                        if (hoursElapsed >= 72 && !h72 && !botState.tenantPaused) {
-                            fireReminder = 'trial_reminder_72h';
-                            botState.trialRemindersSent.h72 = true;
-                        } else if (hoursElapsed >= 48 && hoursElapsed < 72 && !h48) {
-                            fireReminder = 'trial_reminder_48h';
-                            botState.trialRemindersSent.h48 = true;
-                        } else if (hoursElapsed >= 24 && hoursElapsed < 48 && !h24) {
-                            fireReminder = 'trial_reminder_24h';
-                            botState.trialRemindersSent.h24 = true;
-                        }
-
-                        if (fireReminder) {
-                            // Write state first — if add() fails, next cycle re-adds (BullMQ jobId dedup prevents double-fire)
-                            await setBotState(tenant.id, 'key_state.json', botState);
-                            await routineQueue.add(fireReminder, {
-                                tenantId: tenant.id,
-                                routineType: fireReminder,
-                            }, { jobId: `${fireReminder}_${tenant.id}`, removeOnComplete: true });
-                        }
-                    }
-
                     // Skip AI routines for tenants still in bot calibration (onboarding).
                     // nurture_check / daily_scout calling tiger_onboard mid-calibration
                     // corrupts the onboarding state and burns the user's API quota.

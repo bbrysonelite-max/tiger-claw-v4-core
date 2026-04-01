@@ -21,7 +21,6 @@ import { tiger_briefing }    from '../tools/tiger_briefing.js';
 import { tiger_convert }     from '../tools/tiger_convert.js';
 import { tiger_export }      from '../tools/tiger_export.js';
 import { tiger_email }       from '../tools/tiger_email.js';
-import { sendTrialReminderEmail } from './email.js';
 import { tiger_hive }        from '../tools/tiger_hive.js';
 import { tiger_import }      from '../tools/tiger_import.js';
 import { tiger_keys }        from '../tools/tiger_keys.js';
@@ -1254,9 +1253,6 @@ export async function processSystemRoutine(tenantId: string, routineType: string
         const systemPrompts: Record<string, string> = {
             daily_scout:   'SYSTEM: Run your Daily Scout routine. Find new leads to contact.',
             nurture_check: 'SYSTEM: Run your Nurture Check. Review follow-ups and reach out where due.',
-            trial_reminder_24h: `SYSTEM: Write a 1-sentence, highly conversational Telegram message to your operator reminding them they have 48 hours left on their free trial. Tell them to securely plug in their API key at ${wizardUrl} so you don't have to stop working for them. Use your exact flavor and personality. NEVER use placeholders. Do NOT execute any tools.`,
-            trial_reminder_48h: `SYSTEM: Write a 1-sentence, highly conversational Telegram message to your operator reminding them they have 24 hours left on their free trial. Tell them to securely plug in their API key at ${wizardUrl} so you don't have to stop working for them. Use your exact flavor and personality. NEVER use placeholders. Do NOT execute any tools.`,
-            trial_reminder_72h: `SYSTEM: Write a 1-sentence, highly conversational Telegram message to your operator telling them their 72-hour free trial is officially complete, and you have paused your operations so their flywheel has stopped. Tell them to unlock their bot to resume scouting at ${wizardUrl}. Use your exact flavor and personality. NEVER use placeholders. Do NOT execute any tools.`,
             weekly_checkin: `SYSTEM: You are checking in with your operator as a coach and strategic partner. Write a warm, brief Telegram message asking them to share one win and one challenge from this week. Keep it conversational, not formal. Sign off with your name. Do NOT execute any tools.`,
             feedback_reminder: `SYSTEM: Your operator hasn't responded to your weekly check-in yet. Send a short, friendly nudge — one sentence. Remind them you're waiting to hear how things are going. Use your personality. Do NOT execute any tools.`,
             feedback_pause: `SYSTEM: Your operator has not responded to your weekly check-in or reminder. Write a very brief message telling them you're pausing your operations until they check in with you. Keep it warm, not punitive. Tell them to just reply to this message to resume. Do NOT execute any tools.`,
@@ -1371,41 +1367,6 @@ export async function processSystemRoutine(tenantId: string, routineType: string
                         `UPDATE tenants SET feedback_reminder_sent_at = now() WHERE id = $1`,
                         [tenantId],
                     );
-                }
-            }
-        // ── Trial reminders ────────────────────────────────────────────────────
-        } else if (routineType.startsWith('trial_reminder_')) {
-            const hoursRemainingMap: Record<string, number> = {
-                trial_reminder_24h: 48,
-                trial_reminder_48h: 24,
-                trial_reminder_72h: 0,
-            };
-            const hoursRemaining = hoursRemainingMap[routineType] ?? 0;
-            let finalResponse = await getRoutineText();
-            if (finalResponse) {
-                if (routineType === 'trial_reminder_72h') {
-                    const stanStoreUrl = process.env['STAN_STORE_URL'];
-                    if (stanStoreUrl) finalResponse += `\n\nTo unlock your bot and resume operations: ${stanStoreUrl}`;
-                }
-                const botToken = await getTenantBotToken(tenantId);
-                if (botToken) {
-                    const chatIds = await getTenantChatIds(tenantId);
-                    const bot = new TelegramBot(botToken);
-                    for (const cid of chatIds) {
-                        await bot.sendMessage(cid, finalResponse).catch(err =>
-                            console.error(`[AI Routine] Failed to send reminder to ${cid}:`, err.message)
-                        );
-                    }
-                }
-                if (tenant.email) {
-                    await sendTrialReminderEmail(tenant.email, hoursRemaining).catch(err =>
-                        console.error(`[AI Routine] Failed to send trial reminder email to ${tenant.email}:`, err.message)
-                    );
-                }
-                if (routineType === 'trial_reminder_72h') {
-                    const botState: Record<string, any> = (await getBotState<Record<string, any>>(tenantId, 'key_state.json')) ?? {};
-                    botState.tenantPaused = true;
-                    await setBotState(tenantId, 'key_state.json', botState);
                 }
             }
         } else {
