@@ -4,24 +4,28 @@
 
 ---
 
-## Current Session State (2026-04-01 — Session 4 IN PROGRESS)
+## Current Session State (2026-04-01 — Session 5 COMPLETE)
 
-- **PR #75 MERGED** — Stan Store integration audit: Gemini circuit breaker, email copy fix ("Start Setup Wizard →"), `MAGIC_LINK_SECRET` + `DATABASE_READ_URL` secrets added to deploy script, `specs/STAN_STORE_AUDIT.md` committed.
-- **PR #121 MERGED** — Ripped out 72-hour trial reminder system entirely (email.ts, ai.ts, queue.ts, tests). Pivoted to 7-day money-back guarantee — no more free trial.
-- **PR #46 CLOSED** — Email support agent, stale.
-- **Stop hook removed** — `send_messages_to_letta.ts` Stop hook deleted from `~/.claude/settings.json`. No more LETTA_API_KEY errors on every action.
-- **PRs #117–#120 MERGED (Session 3)** — Admin dashboard, Grok health fix, docs, migration 022 crash fix, SOUL voice enforcement.
+### PRs #122–#131 merged this session. Key changes:
+- **INTERNAL_API_URL** set in deploy script (#123) — was fataling on every tool call since launch
+- **Voice overhaul** (#126, #127, #128) — rules wall replaced with conversation examples; raw tool data stripped from Gemini responses; woody "23 more hours" responses gone
+- **Morning hunt report** (#129) — daily_scout now pushes proactive Telegram/LINE message at 7 AM UTC
+- **Admin dashboard** (#130, #131) — timeout fixed, token persists in localStorage, 5min refresh
+- **Relevance gate** (#125) — data refinery now blocks gaming/fiction noise
+- **3 paying customers** activated: Debbie, Jeff Mack, John (Thailand) — all `pending_setup`, send `wizard.tigerclaw.io`
 
-### Open for Session 5
-- **PRs #74, #78, #77** — data quality (unblocked, do next session)
-- **First paying customer** — Pick from waiting list, activate.
-- **bot_ai_keys dead write** — Wizard writes here, runtime reads `bot_ai_config`. Small cleanup PR.
+### Open for Session 6
+- **Remaining Stan Store customers** — chana.loh, nancylimsk, lily.vergara paid but not onboarded
+- **First customer live** — confirm Debbie/Jeff/John complete wizard
+- **Customer-facing dashboard** — critical for churn reduction (Brent's priority)
+- **bot_ai_keys dead write** — small cleanup PR when convenient
 
 ### Active Business Context
-- **Max Steingart:** White label deal, 30% affiliate via Stan Store.
-- **John / Bryson International Group:** 21,000 LINE distributors in Thailand.
-- **Jeff Mack:** Demo PASSED. Bot AWAKE and hunting.
-- **Data Refinery:** Mining operations active. FallbackIntelligence active for dry pipelines.
+- **Max Steingart:** White label deal, 30% affiliate via Stan Store. Must sell 10 first.
+- **John / Bryson International Group:** 21,000 LINE distributors in Thailand. `vijohn@hotmail.com`, pending_setup.
+- **Jeff Mack:** `jeffmackte@gmail.com`, $147 Pro, pending_setup.
+- **Debbie:** `justagreatdirector@outlook.com`, pending_setup.
+- **Data Refinery:** 10,500+ facts, relevance gate live, nightly BullMQ run at 2 AM UTC.
 
 ---
 
