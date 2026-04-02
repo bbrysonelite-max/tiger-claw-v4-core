@@ -1,6 +1,6 @@
 # Tiger Claw V4 — Core Architecture
 
-**Last updated:** 2026-04-01 (Session 5)
+**Last updated:** 2026-04-02 (Session 6)
 **Status:** LIVE. Locked. Do not rewrite.
 
 ---
@@ -124,7 +124,30 @@ Handled in `tiger_keys.ts` and `ai.ts`.
 
 ---
 
-## 8. Morning Hunt Report (Added 2026-04-01)
+## 8. Customer Self-Service (Added 2026-04-02)
+
+### Customer Dashboard
+`wizard.tigerclaw.io/dashboard?slug={slug}` — React page served by Vercel.
+
+- **Inline key update:** `POST /dashboard/:slug/update-key` — validates, encrypts, writes to `bot_ai_config`. No wizard redirect.
+- **Recent leads:** last 5 rows from `tenant_leads` — name, score, status, time found.
+- **LINE setup modal:** 5-step guided setup embedded in page.
+- Dashboard URL delivered via: (1) wizard completion screen after hatch, (2) `/dashboard` slash command in-bot.
+
+### Slash Commands (`api/src/services/slashCommands.ts`)
+Intercept in `queue.ts` Telegram worker **before** Gemini. Zero AI cost.
+
+| Command | Behavior |
+|---------|----------|
+| `/start`, `/dashboard` | Sends `wizard.tigerclaw.io/dashboard?slug=…` URL |
+| `/status` | Key health + lead count + last active |
+| `/help` | Command list |
+
+`registerBotCommands(botToken)` called at provisioner hatch → menu registered with Telegram automatically.
+
+---
+
+## 10. Morning Hunt Report (Added 2026-04-01)
 
 `daily_scout` routine fires at 7 AM UTC for every active tenant. After `tiger_scout` runs, Tiger composes a morning message and sends it via Telegram or LINE. Language of Hope fires if pipeline is empty — no silent runs.
 
@@ -132,7 +155,7 @@ Previously: `runToolLoop` result was discarded (`return ''`). Now: `accumulatedT
 
 ---
 
-## 9. Provisioning Flow (Updated 2026-03-30)
+## 11. Provisioning Flow (Updated 2026-03-30)
 
 1. `POST /wizard/hatch` validates botId, subscription, AI key
 2. Activates subscription (`pending_setup` → `active`)
@@ -147,7 +170,7 @@ Previously: `runToolLoop` result was discarded (`return ''`). Now: `accumulatedT
 
 ---
 
-## 9. Security & Isolation
+## 12. Security & Isolation
 
 - SQL queries never built from LLM output
 - Tenant data siloed to tenant-specific schemas (`t_{uuid}`)
@@ -158,7 +181,7 @@ Previously: `runToolLoop` result was discarded (`return ''`). Now: `accumulatedT
 
 ---
 
-## 10. Deployment
+## 13. Deployment
 
 ### API (Cloud Run)
 Triggered automatically by GitHub Actions on merge to `main`.
