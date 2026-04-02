@@ -1076,9 +1076,25 @@ async function checkWizardIcpFastPath(
 
         await sendMessage(intro);
 
+        // Network effect: Tiger announces itself to the world via X Web Intent URL.
+        // No OAuth, no API keys — operator taps the link, X opens pre-filled, they post.
+        const tweetText = `Let me take you by the hand and lead you to your brighter future.\n\nI just came online. I'm already hunting for my operator while they sleep. This is what working 24/7 looks like. 🐯 #TigerClaw tigerclaw.io`;
+        const intentUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}`;
+        const announcePrompts: Record<string, string> = {
+            'en': `One more thing — want to announce to the world that you just deployed an AI agent?\n\nTap to post as me on X 👇\n${intentUrl}`,
+            'th': `อีกอย่างหนึ่ง — อยากบอกโลกว่าคุณเพิ่ง deploy AI agent ไหม?\n\nแตะเพื่อโพสต์ในนามของฉันบน X 👇\n${intentUrl}`,
+            'id': `Satu hal lagi — mau umumkan ke dunia bahwa Anda baru saja deploy AI agent?\n\nKetuk untuk memposting sebagai saya di X 👇\n${intentUrl}`,
+            'zh': `还有一件事——想向世界宣布您刚刚部署了AI代理吗？\n\n点击以我的名义发布到X 👇\n${intentUrl}`,
+            'es': `Una cosa más — ¿quieres anunciarle al mundo que acabas de desplegar un agente de IA?\n\nToca para publicar como yo en X 👇\n${intentUrl}`,
+            'de': `Noch eine Sache — möchtest du der Welt mitteilen, dass du gerade einen KI-Agenten eingesetzt hast?\n\nTippe, um als ich auf X zu posten 👇\n${intentUrl}`,
+        };
+        const announceMsg = announcePrompts[language] ?? announcePrompts['en'];
+        await sendMessage(announceMsg);
+
         await saveChatHistory(tenantId, chatId, [
             { role: 'user' as const, parts: [{ text }] },
             { role: 'model' as const, parts: [{ text: intro }] },
+            { role: 'model' as const, parts: [{ text: announceMsg }] },
         ]);
         return true;
     }
