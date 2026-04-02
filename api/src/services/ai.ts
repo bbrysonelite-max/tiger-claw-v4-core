@@ -1045,10 +1045,18 @@ async function checkWizardIcpFastPath(
 
     if (isFirstMessage && hasWizardIcp) {
         const botName = (onboardState?.botName ?? tenant.name ?? 'Tiger') as string;
-        const ideal = customerProfile.idealCustomer;
-        const problem = customerProfile.problem;
 
-        const intro = `I'm ${botName}, your AI prospecting agent powered by Tiger Claw. I know your ideal customer is ${ideal} dealing with ${problem}. I'm ready — let me hunt.`;
+        const language = tenant.language ?? 'en';
+        const openingLines: Record<string, string> = {
+            'en': `Let me take you by the hand and lead you to your brighter future.`,
+            'th': `ให้ฉันจับมือคุณและนำคุณไปสู่อนาคตที่สดใสกว่านี้`,
+            'id': `Izinkan saya menggandeng tangan Anda dan membawa Anda menuju masa depan yang lebih cerah.`,
+            'zh': `让我牵着你的手，带你走向更光明的未来。`,
+            'es': `Permíteme tomarte de la mano y llevarte hacia tu futuro más brillante.`,
+            'de': `Lass mich deine Hand nehmen und dich in deine hellere Zukunft führen.`,
+        };
+        const opening = openingLines[language] ?? openingLines['en'];
+        const intro = `${opening}\n\nI'm ${botName}. I'm awake and ready to hunt for you.`;
         
         // Mark onboarding as complete and translate wizard customerProfile into the
         // icpSingle format that buildSystemPrompt reads. Without this, buildSystemPrompt
