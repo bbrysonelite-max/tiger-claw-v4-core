@@ -192,6 +192,15 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
       steps.push(`Leader Core active: Browser [ON], Memory [ON], Evolution [ON]`);
       console.log(`[provisioner] Agent ${tenant.slug} is now AWAKE and ready to hunt.`);
 
+      // Register slash commands so they appear in the Telegram bot menu
+      try {
+        const { registerBotCommands } = await import('./slashCommands.js');
+        await registerBotCommands(resolvedBotToken);
+        steps.push('Slash commands registered (/dashboard /status /help)');
+      } catch (cmdErr) {
+        console.warn('[provisioner] setMyCommands failed (non-fatal):', cmdErr);
+      }
+
       if (input.email === "brentbryson@me.com") {
         const ADMIN_CHAT_ID = parseInt(process.env["ADMIN_TELEGRAM_CHAT_ID"] || "0");
         if (ADMIN_CHAT_ID) {
