@@ -1,6 +1,6 @@
 # Tiger Claw V4 — Core Architecture
 
-**Last updated:** 2026-04-01 (Session 4)
+**Last updated:** 2026-04-01 (Session 5)
 **Status:** LIVE. Locked. Do not rewrite.
 
 ---
@@ -42,7 +42,7 @@ Tiger Claw V4 is **stateless**. There are no long-running Docker containers per 
 3. `startFocus()` — writes `focus_state` Redis key
 4. `buildSystemPrompt(tenant)` (async) — injects memory context including ICP data
 5. `getChatHistory()` — loads history + prepends `chat_memory` summary if exists
-6. Gemini function-calling loop via `runToolLoop()`
+6. Gemini function-calling loop via `runToolLoop()` — **only `{ output }` is returned to Gemini** from tool results; raw data fields are stripped to prevent woody/technical responses
 7. `saveChatHistory()` — saves turns, triggers Sawtooth compression if threshold exceeded
 8. `completeFocus()` — triggers compression if tool call count >= 12
 9. Fire-and-forget: `factExtractionQueue.add()` for async fact extraction
@@ -119,12 +119,20 @@ Handled in `tiger_keys.ts` and `ai.ts`.
 | `telegram-webhooks` | `telegramWorker` | Telegram message processing |
 | `line-webhooks` | `lineWorker` | LINE message processing |
 | `fact-extraction` | `factExtractionWorker` | Async fact anchor extraction |
-| `ai-routines` | `routineWorker` | Scout, nurture, value-gap check-ins, weekly check-ins, Strike/Postiz routines |
+| `ai-routines` | `routineWorker` | Scout (+ morning report), nurture, value-gap check-ins, weekly check-ins, Strike/Postiz routines |
 | `global-cron` | `cronWorker` | Heartbeat scheduler (every minute) |
 
 ---
 
-## 8. Provisioning Flow (Updated 2026-03-30)
+## 8. Morning Hunt Report (Added 2026-04-01)
+
+`daily_scout` routine fires at 7 AM UTC for every active tenant. After `tiger_scout` runs, Tiger composes a morning message and sends it via Telegram or LINE. Language of Hope fires if pipeline is empty — no silent runs.
+
+Previously: `runToolLoop` result was discarded (`return ''`). Now: `accumulatedText` is captured and pushed to operator.
+
+---
+
+## 9. Provisioning Flow (Updated 2026-03-30)
 
 1. `POST /wizard/hatch` validates botId, subscription, AI key
 2. Activates subscription (`pending_setup` → `active`)
