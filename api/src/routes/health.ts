@@ -6,6 +6,7 @@ import { Router, type Request, type Response } from "express";
 import { execSync } from "child_process";
 import { createClient } from "redis";
 import { getPool } from "../services/db.js";
+import { provisionWorker, telegramWorker, routineWorker } from "../services/queue.js";
 import * as os from "os";
 
 const router = Router();
@@ -57,10 +58,18 @@ router.get("/", async (_req: Request, res: Response) => {
   const usedMemPercent = Math.round(((totalMemMb - freeMemMb) / totalMemMb) * 100);
   const loadAvg = os.loadavg()[0];
 
-  // Healthy = Postgres + Redis up. Pool low is a warning, not a hard failure.
+  // Workers
+  const workersEnabled = process.env["ENABLE_WORKERS"] === "true";
+  const workersRunning = !!(provisionWorker && telegramWorker && routineWorker);
+  checks["workers"] = workersEnabled
+    ? (workersRunning ? "ok" : "error: ENABLE_WORKERS=true but workers not running")
+    : "disabled";
+
+  // Healthy = Postgres + Redis up + workers running.
   const healthy =
     checks["postgres"] === "ok" &&
-    checks["redis"] === "ok";
+    checks["redis"] === "ok" &&
+    checks["workers"] === "ok";
 
   res.status(healthy ? 200 : 503).json({
     status: healthy ? "ok" : "degraded",
