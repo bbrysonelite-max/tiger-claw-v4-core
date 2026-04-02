@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import {
     Bot, MessageCircle, Shield, Settings, ExternalLink,
     Activity, Zap, Globe, ArrowRight, Loader2, AlertCircle,
-    CheckCircle2, XCircle, Clock, Key, RefreshCw, Copy, Check,
+    CheckCircle2, XCircle, Clock, Key, RefreshCw, Copy, Check, Users,
 } from "lucide-react";
 
 import { API_BASE } from "@/lib/config";
@@ -48,6 +48,17 @@ interface DashboardData {
     };
     wizardUrl: string;
     channelConfigUrl: string;
+    dashboardUrl: string;
+    leads: {
+        total: number;
+        recent: Array<{
+            name: string;
+            score: number;
+            status: string;
+            foundAt: string;
+            profileUrl: string | null;
+        }>;
+    };
 }
 
 export default function DashboardPage() {
@@ -55,6 +66,12 @@ export default function DashboardPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
     const [lineWizardOpen, setLineWizardOpen] = useState(false);
+    const [keyFormOpen, setKeyFormOpen] = useState(false);
+    const [keyInput, setKeyInput] = useState("");
+    const [keyProvider, setKeyProvider] = useState("google");
+    const [keySaving, setKeySaving] = useState(false);
+    const [keySaved, setKeySaved] = useState(false);
+    const [keyError, setKeyError] = useState("");
 
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
@@ -78,6 +95,35 @@ export default function DashboardPage() {
             .catch((e) => setError(`Could not reach server: ${e.message}`))
             .finally(() => setLoading(false));
     }, []);
+
+    const saveKey = async () => {
+        if (!data || !keyInput.trim()) return;
+        setKeySaving(true);
+        setKeyError("");
+        try {
+            const res = await fetch(`${API_BASE}/dashboard/${data.tenant.slug}/update-key`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ key: keyInput.trim(), provider: keyProvider }),
+            });
+            const json = await res.json();
+            if (json.success) {
+                setKeySaved(true);
+                setKeyFormOpen(false);
+                setKeyInput("");
+                // Refresh dashboard data
+                fetch(`${API_BASE}/dashboard/${data.tenant.slug}`)
+                    .then(r => r.json())
+                    .then(d => { if (!d.error) setData(d); });
+            } else {
+                setKeyError(json.error ?? "Failed to save key");
+            }
+        } catch {
+            setKeyError("Network error");
+        } finally {
+            setKeySaving(false);
+        }
+    };
 
     if (loading) {
         return (
@@ -240,20 +286,100 @@ export default function DashboardPage() {
                                     </p>
                                 </div>
                             </div>
-                            {(data.apiKey.health === 'dead' || !data.apiKey.configured) && (
-                                <a
-                                    href={data.apiKey.health === 'dead' ? `/wizard/${data.tenant.slug}?step=3` : "https://aistudio.google.com/apikey"}
-                                    target={data.apiKey.health === 'dead' ? undefined : "_blank"}
-                                    rel="noopener noreferrer"
-                                    className={`inline-flex items-center gap-1 text-sm font-semibold hover:underline whitespace-nowrap ${data.apiKey.health === 'dead' ? 'text-red-500' : 'text-amber-400'}`}
-                                >
-                                    {data.apiKey.health === 'dead' ? "Fix Key" : "Get API Key"}
-                                    <ExternalLink className="h-3 w-3" />
-                                </a>
-                            )}
+                            <button
+                                onClick={() => { setKeyFormOpen(!keyFormOpen); setKeyError(""); setKeySaved(false); }}
+                                className={`inline-flex items-center gap-1 text-sm font-semibold hover:underline whitespace-nowrap ${data.apiKey.health === 'dead' ? 'text-red-500' : 'text-amber-400'}`}
+                            >
+                                {keySaved ? "Updated!" : data.apiKey.configured ? "Update Key" : "Add Key"}
+                                <Key className="h-3 w-3" />
+                            </button>
                         </div>
                     </div>
+
+                    {keyFormOpen && (
+                        <div className="mt-4 bg-black/40 border border-white/10 rounded-xl p-5 space-y-4">
+                            <p className="text-white/50 text-sm">Paste your API key below. It will be validated and encrypted before saving.</p>
+                            <div className="flex gap-3">
+                                <select
+                                    value={keyProvider}
+                                    onChange={e => setKeyProvider(e.target.value)}
+                                    className="bg-black/50 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white outline-none focus:border-primary transition-colors"
+                                >
+                                    <option value="google">Google Gemini</option>
+                                    <option value="openai">OpenAI</option>
+                                    <option value="grok">Grok</option>
+                                </select>
+                                <input
+                                    type="password"
+                                    value={keyInput}
+                                    onChange={e => setKeyInput(e.target.value)}
+                                    placeholder="Paste API key..."
+                                    className="flex-1 bg-black/50 border border-white/10 rounded-lg px-3 py-2.5 text-sm font-mono outline-none focus:border-primary transition-colors"
+                                />
+                                <button
+                                    onClick={saveKey}
+                                    disabled={keySaving || !keyInput.trim()}
+                                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-primary text-black font-semibold text-sm hover:bg-primary/90 transition-colors disabled:opacity-50"
+                                >
+                                    {keySaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Shield className="h-4 w-4" />}
+                                    {keySaving ? "Saving..." : "Save"}
+                                </button>
+                            </div>
+                            {keyError && <p className="text-red-400 text-sm">{keyError}</p>}
+                            <p className="text-white/20 text-xs">
+                                Get a free key at{" "}
+                                <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">aistudio.google.com/apikey</a>
+                            </p>
+                        </div>
+                    )}
                 </motion.div>
+
+                {/* Recent Leads */}
+                {data.leads && data.leads.total > 0 && (
+                    <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.08 }}
+                    >
+                        <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+                            <Users className="h-5 w-5 text-white/50" />
+                            Recent Leads
+                            <span className="ml-auto text-sm font-normal text-white/30">{data.leads.total} total</span>
+                        </h3>
+                        <div className="space-y-3">
+                            {data.leads.recent.map((lead, i) => (
+                                <div key={i} className="bg-zinc-900/50 border border-white/5 rounded-xl px-5 py-4 flex items-center gap-4">
+                                    <div className="h-9 w-9 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center flex-shrink-0">
+                                        <span className="text-sm font-bold text-primary">{lead.name?.charAt(0)?.toUpperCase() ?? "?"}</span>
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2">
+                                            {lead.profileUrl ? (
+                                                <a href={lead.profileUrl} target="_blank" rel="noopener noreferrer" className="font-semibold text-white hover:text-primary transition-colors truncate">
+                                                    {lead.name}
+                                                </a>
+                                            ) : (
+                                                <span className="font-semibold text-white truncate">{lead.name}</span>
+                                            )}
+                                            <span className={`text-xs px-2 py-0.5 rounded-full border flex-shrink-0 ${lead.status === 'qualified' ? 'bg-[#22c55e]/10 text-[#22c55e] border-[#22c55e]/20' : 'bg-white/5 text-white/40 border-white/10'}`}>
+                                                {lead.status}
+                                            </span>
+                                        </div>
+                                        <p className="text-white/30 text-xs mt-0.5">{timeAgo(lead.foundAt)}</p>
+                                    </div>
+                                    {lead.score != null && (
+                                        <div className="text-right flex-shrink-0">
+                                            <div className={`text-lg font-bold ${lead.score >= 80 ? 'text-[#22c55e]' : lead.score >= 50 ? 'text-amber-400' : 'text-white/40'}`}>
+                                                {lead.score}
+                                            </div>
+                                            <div className="text-white/20 text-xs">score</div>
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    </motion.div>
+                )}
 
                 {/* Channels */}
                 <motion.div
