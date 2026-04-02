@@ -191,6 +191,11 @@ export const telegramWorker = SHOULD_RUN_WORKERS ? new Worker(
                     return { success: true, skipped: true };
                 }
 
+                // Slash command fast-path — intercept before Gemini
+                const { handleSlashCommand } = await import('./slashCommands.js');
+                const handled = await handleSlashCommand(tenantId, botToken, chatId, text);
+                if (handled) return { success: true };
+
                 // Delegate to the Stateless AI engine
                 const { processTelegramMessage } = await import('./ai.js');
                 await processTelegramMessage(tenantId, botToken, chatId, text);
