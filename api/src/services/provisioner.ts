@@ -188,6 +188,21 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
         console.warn(`[provisioner] Telegram rebrand failed (non-fatal):`, rebrandErr);
       }
 
+      // Save bot username to DB so dashboard links work immediately after hatch
+      try {
+        const meRes = await tgFetch(`https://api.telegram.org/bot${resolvedBotToken}/getMe`);
+        const meData = await meRes.json() as { ok: boolean; result?: { username?: string } };
+        if (meData.ok && meData.result?.username) {
+          await getPool().query(
+            `UPDATE tenants SET bot_username = $1 WHERE id = $2`,
+            [meData.result.username, tenant.id]
+          );
+          steps.push(`Bot username saved: @${meData.result.username}`);
+        }
+      } catch (meErr) {
+        console.warn(`[provisioner] getMe failed (non-fatal):`, meErr);
+      }
+
       steps.push(`Telegram webhook attached to Master API router successfully.`);
       steps.push(`Leader Core active: Browser [ON], Memory [ON], Evolution [ON]`);
       console.log(`[provisioner] Agent ${tenant.slug} is now AWAKE and ready to hunt.`);
