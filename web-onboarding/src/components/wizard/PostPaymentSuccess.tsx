@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { CheckCircle2, ArrowRight, Loader2, MessageCircle } from "lucide-react";
+import { CheckCircle2, ArrowRight, MessageCircle } from "lucide-react";
 import type { WizardState } from "../OnboardingModal";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface PostPaymentSuccessProps {
     state: WizardState;
@@ -11,19 +11,36 @@ interface PostPaymentSuccessProps {
 }
 
 import { API_BASE } from "@/lib/config";
+
+const STEPS = [
+    { label: "Subscription confirmed", detail: "Payment verified — you're in." },
+    { label: "Bot registered", detail: "Tiger has a name. Your token is live." },
+    { label: "ICP loaded", detail: "Tiger knows exactly who to hunt for." },
+    { label: "First hunt begins at dawn", detail: "Morning report incoming at 7 AM UTC." },
+];
+
+// Each step shows for ~7 seconds. Total runtime: 28s — well inside the 30s provisioning window.
+const STEP_INTERVAL_MS = 7000;
+
 export default function PostPaymentSuccess({ state, onClose }: PostPaymentSuccessProps) {
     const [status, setStatus] = useState<"deploying" | "live" | "timeout" | "error">("deploying");
     const [botUsername, setBotUsername] = useState<string | null>(null);
     const [telegramLink, setTelegramLink] = useState<string | null>(null);
     const [dashboardUrl, setDashboardUrl] = useState<string | null>(null);
+    const [currentStep, setCurrentStep] = useState(0);
 
-    // Poll /wizard/bot-status using botId (Stan Store flow — no Stripe session_id).
+    // Animate through steps while deploying
+    useEffect(() => {
+        if (status !== "deploying") return;
+        if (currentStep >= STEPS.length - 1) return;
+        const t = setTimeout(() => setCurrentStep((s) => s + 1), STEP_INTERVAL_MS);
+        return () => clearTimeout(t);
+    }, [currentStep, status]);
+
+    // Poll /wizard/bot-status
     useEffect(() => {
         const botId = state.botId;
-        if (!botId) {
-            setStatus("error");
-            return;
-        }
+        if (!botId) { setStatus("error"); return; }
 
         let retries = 0;
         const MAX_RETRIES = 40; // 2 minutes
@@ -39,19 +56,12 @@ export default function PostPaymentSuccess({ state, onClose }: PostPaymentSucces
                 if (data.status === "live") {
                     setBotUsername(data.botUsername ?? null);
                     setTelegramLink(data.telegramLink ?? (data.botUsername ? `https://t.me/${data.botUsername}` : null));
-                    if (data.tenantSlug) {
-                        setDashboardUrl(`/dashboard?slug=${encodeURIComponent(data.tenantSlug)}`);
-                    }
+                    if (data.tenantSlug) setDashboardUrl(`/dashboard?slug=${encodeURIComponent(data.tenantSlug)}`);
                     setStatus("live");
                     return;
                 }
-                if (data.status === "error") {
-                    setStatus("error");
-                    return;
-                }
-            } catch {
-                // Keep polling on network errors
-            }
+                if (data.status === "error") { setStatus("error"); return; }
+            } catch { /* keep polling */ }
             if (!isMounted) return;
             retries++;
             if (retries < MAX_RETRIES) {
@@ -61,54 +71,97 @@ export default function PostPaymentSuccess({ state, onClose }: PostPaymentSucces
             }
         };
         poll();
-        return () => {
-            isMounted = false;
-            clearTimeout(pollTimer);
-        };
+        return () => { isMounted = false; clearTimeout(pollTimer); };
     }, [state.botId]);
 
     return (
         <div className="flex flex-col items-center justify-center p-12 text-center relative overflow-hidden">
-            {/* Background Glows */}
             {status === "live" && (
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-primary/20 rounded-full blur-[100px] mix-blend-screen pointer-events-none transition-all duration-1000" />
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-primary/20 rounded-full blur-[100px] mix-blend-screen pointer-events-none" />
             )}
 
+            {/* Icon */}
             <motion.div
                 initial={{ scale: 0.8, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 transition={{ type: "spring", stiffness: 200, damping: 20 }}
-                className="relative z-10"
+                className="relative z-10 mb-6"
             >
                 {status === "deploying" ? (
-                    <div className="h-24 w-24 rounded-full bg-white/5 border border-white/10 flex items-center justify-center mx-auto mb-6 shadow-inner relative overflow-hidden">
+                    <div className="h-24 w-24 rounded-full bg-white/5 border border-white/10 flex items-center justify-center mx-auto shadow-inner relative overflow-hidden">
                         <div className="absolute inset-0 border-t-2 border-primary rounded-full animate-spin" />
                         <BotIcon />
                     </div>
                 ) : (
-                    <div className="h-24 w-24 rounded-full bg-primary flex items-center justify-center mx-auto mb-6 text-black shadow-[0_0_50px_rgba(249,115,22,0.4)]">
+                    <div className="h-24 w-24 rounded-full bg-primary flex items-center justify-center mx-auto text-black shadow-[0_0_50px_rgba(249,115,22,0.4)]">
                         <CheckCircle2 className="h-12 w-12" />
                     </div>
                 )}
             </motion.div>
 
-            <h2 className="text-3xl font-black mb-4 relative z-10 text-white">
-                {status === "deploying" ? "Provisioning..." :
+            <h2 className="text-3xl font-black mb-2 relative z-10 text-white">
+                {status === "deploying" ? "Tiger is waking up." :
                  status === "live" ? "Agent Deployed" :
                  status === "timeout" ? "Still Deploying..." :
                  "Session Error"}
             </h2>
 
-            <p className="text-white/90 text-lg mb-8 max-w-md mx-auto relative z-10 !leading-relaxed">
-                {status === "deploying"
-                    ? `Setting up ${state.botName || "your agent"} on our infrastructure. This usually takes 10-30 seconds.`
-                    : status === "live"
-                    ? `Your agent is live and ready to start prospecting.`
-                    : status === "timeout"
-                    ? `Your payment was received. Your agent is still being set up — check your email for confirmation or refresh this page in a minute.`
-                    : `We couldn't verify your payment session. Please contact support if you were charged.`}
-            </p>
+            {/* Deploying: step-by-step progress */}
+            {status === "deploying" && (
+                <div className="w-full max-w-sm mt-6 mb-4 relative z-10 space-y-3 text-left">
+                    {STEPS.map((step, i) => {
+                        const done = i < currentStep;
+                        const active = i === currentStep;
+                        return (
+                            <motion.div
+                                key={i}
+                                initial={{ opacity: 0, x: -8 }}
+                                animate={{ opacity: i <= currentStep ? 1 : 0.25, x: 0 }}
+                                transition={{ duration: 0.4, delay: i === currentStep ? 0 : 0 }}
+                                className="flex items-start gap-3"
+                            >
+                                <div className="mt-0.5 flex-shrink-0">
+                                    {done ? (
+                                        <CheckCircle2 className="w-5 h-5 text-primary" />
+                                    ) : active ? (
+                                        <div className="w-5 h-5 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+                                    ) : (
+                                        <div className="w-5 h-5 rounded-full border border-white/20" />
+                                    )}
+                                </div>
+                                <div>
+                                    <p className={`text-sm font-bold ${active ? "text-white" : done ? "text-white/70" : "text-white/30"}`}>
+                                        {step.label}
+                                    </p>
+                                    <AnimatePresence>
+                                        {active && (
+                                            <motion.p
+                                                initial={{ opacity: 0, height: 0 }}
+                                                animate={{ opacity: 1, height: "auto" }}
+                                                exit={{ opacity: 0, height: 0 }}
+                                                className="text-xs text-white/60 mt-0.5"
+                                            >
+                                                {step.detail}
+                                            </motion.p>
+                                        )}
+                                    </AnimatePresence>
+                                </div>
+                            </motion.div>
+                        );
+                    })}
+                </div>
+            )}
 
+            {/* Timeout / error copy */}
+            {(status === "timeout" || status === "error") && (
+                <p className="text-white/90 text-lg mb-8 max-w-md mx-auto relative z-10 !leading-relaxed">
+                    {status === "timeout"
+                        ? `Your agent is still being set up — check your email or refresh in a minute.`
+                        : `We couldn't verify your session. Contact support if you were charged.`}
+                </p>
+            )}
+
+            {/* Live state */}
             {status === "live" && (
                 <motion.div
                     initial={{ opacity: 0, y: 10 }}
@@ -119,7 +172,7 @@ export default function PostPaymentSuccess({ state, onClose }: PostPaymentSucces
                         <div className="h-16 w-16 bg-[#22c55e]/10 rounded-full flex items-center justify-center border border-[#22c55e]/20 shadow-[0_0_20px_rgba(34,197,94,0.2)]">
                             <MessageCircle className="h-8 w-8 text-[#22c55e]" />
                         </div>
-                        
+
                         <div className="space-y-2">
                             <h4 className="font-black text-2xl text-white flex items-center justify-center gap-3">
                                 <span className="relative flex h-3 w-3">
@@ -142,7 +195,7 @@ export default function PostPaymentSuccess({ state, onClose }: PostPaymentSucces
                             >
                                 START CHAT ON TELEGRAM <ArrowRight className="h-6 w-6" />
                             </a>
-                            
+
                             {dashboardUrl && (
                                 <a
                                     href={dashboardUrl}
@@ -152,18 +205,16 @@ export default function PostPaymentSuccess({ state, onClose }: PostPaymentSucces
                                 </a>
                             )}
                         </div>
-                        
+
                         <p className="text-[10px] text-white/70 uppercase tracking-[0.2em] font-bold text-center mt-2">
                             Send /start to your bot
                         </p>
 
-                        {/* Optional Enhancements Section */}
                         <div className="w-full mt-6 pt-6 border-t border-white/10 text-left">
                             <h5 className="text-[11px] font-black uppercase tracking-widest text-primary mb-4 flex items-center justify-between">
                                 Optional Enhancements
                                 <span className="text-white/70 text-[9px] bg-white/5 px-2 py-1 rounded">Do this later</span>
                             </h5>
-                            
                             <div className="space-y-4">
                                 <div className="p-4 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-colors group cursor-pointer">
                                     <div className="flex items-center justify-between mb-1">
@@ -174,7 +225,6 @@ export default function PostPaymentSuccess({ state, onClose }: PostPaymentSucces
                                     </div>
                                     <p className="text-xs text-white/80">Deploy a mirrored brain directly into any WhatsApp number.</p>
                                 </div>
-                                
                                 <div className="p-4 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-colors group cursor-pointer">
                                     <div className="flex items-center justify-between mb-1">
                                         <span className="font-bold text-sm text-white flex items-center gap-2">

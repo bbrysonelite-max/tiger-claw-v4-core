@@ -1,6 +1,6 @@
 # START HERE — Tiger Claw Session Brief
 
-**Last Updated:** 2026-04-02 (Session 6 — customer dashboard, slash commands)
+**Last Updated:** 2026-04-01 (Session 5 — voice overhaul, morning report, admin dashboard, customer onboarding)
 **Author:** Claude Sonnet 4.6
 
 ---
@@ -11,7 +11,6 @@ AI sales agent SaaS. Customers buy on Stan Store, walk through a 5-step wizard t
 
 - **API:** Cloud Run (us-central1), project `hybrid-matrix-472500-k5`
 - **Wizard + Admin:** Next.js on Vercel at `wizard.tigerclaw.io`
-- **Customer Dashboard:** `wizard.tigerclaw.io/dashboard?slug=their-slug`
 - **Admin Dashboard:** `wizard.tigerclaw.io/admin` — token via `gcloud secrets versions access latest --secret="tiger-claw-admin-token" --project="hybrid-matrix-472500-k5"`
 - **Repo:** `github.com/bbrysonelite-max/tiger-claw-v4-core`
 - **Architecture:** BYOB (customer's Telegram token) + BYOK (customer's AI key)
@@ -38,90 +37,47 @@ All three: send `wizard.tigerclaw.io` — wizard finds their purchase by email.
 
 ---
 
-## Session 6 PRs (2026-04-02)
+## Session 5 PRs (2026-04-01)
 
 | PR | What It Fixed |
 |----|--------------|
-| #133 | Customer dashboard — inline key update form (replaces wizard redirect), recent leads section, fix key write to `bot_ai_config` |
-| #134 | Slash commands — `/dashboard`, `/status`, `/help` intercept before Gemini; `setMyCommands` registers menu at hatch |
-
----
-
-## Session 5 PRs (2026-04-01) — reference
-
-| PR | What It Fixed |
-|----|--------------|
-| #122 | value-gap JOIN type cast — `varchar = uuid` crash |
-| #123 | `INTERNAL_API_URL` missing from deploy script |
-| #124 | bot_pool removed from `/health` |
-| #125 | Relevance gate in data refinery |
+| #122 | value-gap JOIN type cast — `varchar = uuid` crash, check-ins broken for all tenants since launch |
+| #123 | `INTERNAL_API_URL` missing from deploy — tiger_keys/hive/onboard/settings fataling on every call |
+| #124 | bot_pool removed from `/health` — V4 has no pool, was always `critical: 0` (false alarm) |
+| #125 | Relevance gate in data refinery — second Gemini call blocks gaming/fiction noise before save |
 | #126 | Tiger voice overhaul — 5 conversation examples replace 40-line rules wall |
-| #127 | tiger_scout rate limit reason hidden from Gemini |
-| #128 | Only `output` string sent to Gemini |
-| #129 | Morning hunt report at 7 AM UTC |
-| #130 | Admin dashboard timeout fix |
-| #131 | Admin dashboard UX — localStorage token, 5min refresh |
+| #127 | tiger_scout rate limit reason hidden from Gemini — stopped "23 more hours" responses |
+| #128 | Only `output` string sent to Gemini — strips raw tool data that produced woody responses |
+| #129 | Morning hunt report — `daily_scout` now pushes proactive Telegram/LINE message at 7 AM UTC |
+| #130 | Admin dashboard timeout — N+1 getBotState calls replaced with single query |
+| #131 | Admin dashboard UX — localStorage token, 5min refresh, new agents today stat |
 
 ---
 
-## Customer Dashboard
-
-**URL pattern:** `wizard.tigerclaw.io/dashboard?slug=their-slug`
-
-Delivered to customers:
-1. **Wizard completion screen** — "Access Admin Dashboard" button appears after hatch (already wired)
-2. **Slash command** — customer types `/dashboard` in their bot, gets the URL back instantly
-3. **Manually** — for Debbie/Jeff/John who hatched before PR #134, look up their slug and send directly:
-   ```sql
-   SELECT slug FROM tenants WHERE email IN ('justagreatdirector@outlook.com','jeffmackte@gmail.com','vijohn@hotmail.com');
-   ```
-
-Dashboard features:
-- Inline AI key update (no wizard redirect) — provider selector + key input + Save
-- Key validated server-side, encrypted, stored in `bot_ai_config`
-- Recent leads section (last 5, score + status + time found)
-- LINE setup modal
-- Bot status + channel health
-
----
-
-## Slash Commands (PR #134)
-
-New file: `api/src/services/slashCommands.ts`
-
-| Command | Response |
-|---------|---------|
-| `/start` or `/dashboard` | Dashboard URL + one-line prompt |
-| `/status` | Key health · lead count · last active |
-| `/help` | Full command list |
-
-Commands intercept in `queue.ts` before Gemini — zero AI cost. Unknown commands pass through normally.
-`registerBotCommands()` called at provisioner hatch → menu appears in Telegram automatically.
-
-**Existing bots (Debbie/Jeff/John):** need `registerBotCommands` called manually against their tokens. Either wait for re-provision or run one-off.
-
----
-
-## The Woody Response Fix (Session 5 Context)
+## The Woody Response Fix (Important Context)
 
 Three layers were causing "I can't do that for 23 more hours" type responses:
-1. **System prompt** (PR #126): Replaced 40-line rules wall with 5 conversation examples.
-2. **Tool data leak** (PRs #127, #128): Only `{ output }` passed to Gemini now — raw data fields stripped.
-3. **SOUL.md** intact, loaded in every prompt.
+
+1. **System prompt** (PR #126): Replaced 40-line NEVER/banned-phrases rules wall with 5 real conversation examples. Rules made Gemini play it safe. Examples train the voice.
+2. **Tool data leak** (PRs #127, #128): `tiger_scout` was returning `reason: "Last scheduled scan was 23 hours ago"` in the data payload. `runToolLoop` was passing the full tool object to Gemini. Gemini read the technical fields and paraphrased them. Fix: only `{ output }` is passed to Gemini now.
+3. **SOUL.md** is unchanged and fully loaded in every prompt — the brand vision is intact.
 
 ---
 
-## Morning Hunt Report (Live)
+## Morning Hunt Report (Now Live)
 
-`daily_scout` fires at 7 AM UTC. Tiger scouts, composes a morning message, sends via Telegram or LINE. Language of Hope fires if pipeline empty.
+`daily_scout` was silently running tiger_scout at 7 AM UTC and discarding Gemini's response (`return ''`). Operators never heard back.
+
+Now: Tiger composes a morning message after scouting and sends it via Telegram or LINE. Every operator wakes up to a report from their bot. Language of Hope fires if pipeline is empty — never dead air.
 
 ---
 
 ## Admin Dashboard
 
 **URL:** `wizard.tigerclaw.io/admin`
-**Token:** see above (gcloud command). Stored in localStorage — no re-entry on refresh.
-**Refresh:** every 5 minutes.
+**Token:** see above (gcloud command). Stored in localStorage after first login — no re-entry needed on refresh.
+**Refresh:** every 5 minutes (was 60s — was causing timeout loop)
+**Shows:** active agents, +N new today, messages 24h, platform cost, mine health, full tenant fleet with email/status/leads
 
 ---
 
@@ -133,20 +89,18 @@ Three layers were causing "I can't do that for 23 more hours" type responses:
 4. **StepCustomerProfile** — ICP data
 5. **StepReviewPayment** — "Hatch"
 
-Post-hatch: ICP fast-path sends confident intro, skips calibration interview.
+First message after hatch: ICP fast-path sends confident intro, skips calibration interview entirely.
 
 ---
 
-## Open Work (Session 7)
+## Open Work (Session 6)
 
 | Item | Priority |
 |------|----------|
-| Merge PR #134 (slash commands) | HIGH |
 | Activate remaining Stan Store customers (chana, nancy, lily) | HIGH |
-| Confirm Debbie / Jeff / John complete wizard and hatch | HIGH |
-| Register slash commands on pre-#134 bots manually | MEDIUM |
 | `bot_ai_keys` dead write cleanup | LOW |
-| Navigation recovery — dashboard link kills wizard state | LOW |
+| Customer-facing dashboard (reduce Telegram token friction) | MEDIUM |
+| Navigation recovery — dashboard link kills wizard state | MEDIUM |
 
 ---
 

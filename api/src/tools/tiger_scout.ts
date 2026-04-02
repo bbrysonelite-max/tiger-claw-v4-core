@@ -1230,10 +1230,11 @@ async function handleHunt(
   // Rate limit check
   const rateCheck = checkRateLimit(scoutState, mode);
   if (!rateCheck.allowed) {
+    logger.info("tiger_scout: rate limit hit", { reason: rateCheck.reason });
     return {
       ok: true,
       output: `I ran hard recently — locked out for a few hours. Here's what I can do right now while I wait: check your pipeline for anyone ready to re-engage, review nurture sequences, or draft outreach for warm leads. What would be most useful?`,
-      data: { skipped: true, reason: rateCheck.reason },
+      data: { skipped: true },
     };
   }
 

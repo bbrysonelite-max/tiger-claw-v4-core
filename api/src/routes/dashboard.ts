@@ -13,7 +13,7 @@ import {
 } from "../services/db.js";
 import { hiveAttributionLabel } from "../services/hiveEmitter.js";
 import { validateAIKey } from "../services/ai.js";
-import { upsertBYOKConfig } from "../services/db.js";
+import { addAIKey } from "../services/db.js";
 import { encryptToken } from "../services/pool.js";
 
 const router = Router();
@@ -177,13 +177,13 @@ router.post("/:slug/update-key", async (req: Request, res: Response) => {
 
         const encrypted = encryptToken(key);
         const preview = `${key.slice(0, 4)}...${key.slice(-4)}`;
-        await upsertBYOKConfig({
+        await addAIKey({
             botId: tenant.id,
             provider,
             model: model ?? (provider === 'google' ? 'gemini-2.0-flash' : 'gpt-4o-mini'),
             encryptedKey: encrypted,
             keyPreview: preview,
-            connectionType: 'byok',
+            priority: 1,
         });
 
         await getPool().query(
