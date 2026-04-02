@@ -41,6 +41,7 @@ interface AdminMetrics {
     foundingMembers: number;
     totalHiveSignals: number;
     totalHiveEvents: number;
+    newAgentsToday: number;
 }
 
 interface ConversationStats {
@@ -61,7 +62,10 @@ interface CostStats {
 // --- Main Component ---
 
 export default function AdminDashboard() {
-    const [token, setToken] = useState<string>("");
+    const [token, setToken] = useState<string>(() => {
+        if (typeof window !== "undefined") return localStorage.getItem("tc_admin_token") ?? "";
+        return "";
+    });
     const [isAuthorized, setIsAuthorized] = useState(false);
     const [loading, setLoading] = useState(false);
     const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
@@ -116,21 +120,29 @@ export default function AdminDashboard() {
             setCosts(cost);
             setLastUpdated(new Date());
             setIsAuthorized(true);
+            localStorage.setItem("tc_admin_token", authToken);
         } catch (err: any) {
             console.error("Dashboard fetch error:", err);
             setError(err.message);
             if (err.message === "Invalid admin token") {
                 setIsAuthorized(false);
+                localStorage.removeItem("tc_admin_token");
             }
         } finally {
             setLoading(false);
         }
     }, []);
 
-    // Auto-refresh every 60 seconds
+    // Auto-login if token saved, auto-refresh every 5 minutes
+    useEffect(() => {
+        if (token && !isAuthorized) {
+            fetchData(token);
+        }
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
     useEffect(() => {
         if (isAuthorized && token) {
-            const interval = setInterval(() => fetchData(token), 60000);
+            const interval = setInterval(() => fetchData(token), 300000);
             return () => clearInterval(interval);
         }
     }, [isAuthorized, token, fetchData]);
@@ -249,11 +261,11 @@ export default function AdminDashboard() {
                     </div>
                     
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
-                        <StatCard 
-                            title="Active Tenants"
+                        <StatCard
+                            title="Active Agents"
                             value={metrics?.activeTenants?.toString() || "—"}
                             icon={<Users className="h-6 w-6 text-blue-400" />}
-                            trend={`${metrics?.foundingMembers || 0} Founders`}
+                            trend={`+${metrics?.newAgentsToday || 0} today`}
                         />
                         <StatCard 
                             title="Messages (24h)"
