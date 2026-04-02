@@ -216,18 +216,20 @@ router.get("/metrics", requireAdmin, async (_req: Request, res: Response) => {
     const { getPool: pg } = await import("../services/db.js");
     const pool = pg();
 
-    const [founders, signals, events, fleets] = await Promise.all([
+    const [founders, signals, events, fleets, newToday] = await Promise.all([
       pool.query(`SELECT COUNT(*) as cx FROM tenants WHERE is_founding_member = true`),
       pool.query(`SELECT COUNT(*) as cx FROM hive_signals`),
       pool.query(`SELECT COUNT(*) as cx FROM hive_events`),
-      pool.query(`SELECT COUNT(*) as cx FROM tenants WHERE status = 'active'`)
+      pool.query(`SELECT COUNT(*) as cx FROM tenants WHERE status IN ('active','onboarding','live')`),
+      pool.query(`SELECT COUNT(*) as cx FROM tenants WHERE created_at >= NOW() - INTERVAL '24 hours'`),
     ]);
 
     return res.json({
       activeTenants: parseInt(fleets.rows[0].cx, 10),
       foundingMembers: parseInt(founders.rows[0].cx, 10),
       totalHiveSignals: parseInt(signals.rows[0].cx, 10),
-      totalHiveEvents: parseInt(events.rows[0].cx, 10)
+      totalHiveEvents: parseInt(events.rows[0].cx, 10),
+      newAgentsToday: parseInt(newToday.rows[0].cx, 10),
     });
   } catch (err) {
     console.error("[admin] GET /metrics error:", err);
