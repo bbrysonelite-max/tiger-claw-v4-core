@@ -27,6 +27,8 @@ spec:
               value: "4000"
             - name: NODE_ENV
               value: production
+            - name: ENABLE_WORKERS
+              value: "true"
           # Secrets injected via Secret Manager — set these up in GCP Console:
           # DATABASE_URL, REDIS_URL, GOOGLE_API_KEY, STRIPE_SECRET_KEY,
           # STRIPE_WEBHOOK_SECRET, ADMIN_TOKEN, TELEGRAM_WEBHOOK_SECRET,
