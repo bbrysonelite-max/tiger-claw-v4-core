@@ -183,8 +183,7 @@ router.post("/:slug/update-key", async (req: Request, res: Response) => {
             model: model ?? (provider === 'google' ? 'gemini-2.0-flash' : 'gpt-4o-mini'),
             encryptedKey: encrypted,
             keyPreview: preview,
-            connectionType: 'byok',
-            isPrimary: true,
+            priority: 1,
         });
 
         await getPool().query(
