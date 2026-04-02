@@ -51,7 +51,7 @@ if (!process.env.CI) {
 }
 
 // Inject mock environment variables globally BEFORE any test runs
-process.env.DATABASE_URL = 'postgresql://test:test@localhost:5432/test_db';
+process.env.DATABASE_URL = process.env.DATABASE_URL ?? 'postgresql://tiger:tiger@localhost:5432/tiger_test';
 process.env.REDIS_URL = 'redis://localhost:6379';
 process.env.TIGER_CLAW_API_URL = 'http://localhost:4000';
 process.env.STRIPE_SECRET_KEY = 'sk_test_123';
