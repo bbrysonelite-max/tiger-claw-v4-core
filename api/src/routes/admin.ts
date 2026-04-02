@@ -300,53 +300,47 @@ router.get("/flavors", requireAdmin, async (_req: Request, res: Response) => {
 
 router.get("/dashboard/tenants", requireAdmin, async (_req: Request, res: Response) => {
   try {
-    const { getPool, getBotState } = await import("../services/db.js");
+    const { getPool } = await import("../services/db.js");
     const pool = getPool();
-    
+
     const result = await pool.query(`
-      SELECT 
+      SELECT
         t.id,
         t.name,
         t.slug,
         t.status,
+        t.flavor,
+        t.preferred_channel,
         t.canary_group,
         t.last_activity_at,
-        b.bot_username
+        t.created_at,
+        u.email,
+        s.status AS subscription_status,
+        s.plan_tier,
+        COUNT(l.id) AS lead_count
       FROM tenants t
-      LEFT JOIN bot_pool b ON b.tenant_id = t.id AND b.status = 'assigned'
+      LEFT JOIN users u ON u.id = t.user_id
+      LEFT JOIN subscriptions s ON s.tenant_id = t.id
+      LEFT JOIN tenant_leads l ON l.tenant_id = t.id::text
+      GROUP BY t.id, u.email, s.status, s.plan_tier
       ORDER BY t.created_at DESC
     `);
-    
-    // Resolve dynamic onboarding state per tenant schema mapping
-    const dashboardData = await Promise.all(result.rows.map(async (row) => {
-      let onboardingComplete = (row.status === 'active' || row.status === 'live');
-      let onboardingPhase = 'incomplete';
-      
-      if (!onboardingComplete) {
-        try {
-          const state = await getBotState<any>(row.id, "onboard_state.json");
-          if (state && state.phase === 'complete') {
-             onboardingComplete = true;
-             onboardingPhase = 'complete';
-          } else if (state && state.phase) {
-             onboardingPhase = state.phase;
-          }
-        } catch(e) { /* schema likely not fully populated */ }
-      } else {
-        onboardingPhase = 'complete';
-      }
 
-      return {
-        id: row.id,
-        name: row.name,
-        slug: row.slug,
-        isCanary: row.canary_group,
-        botUsername: row.bot_username ? `@${row.bot_username}` : 'Unassigned',
-        status: row.status,
-        onboardingComplete,
-        onboardingPhase,
-        lastActive: row.last_activity_at ? new Date(row.last_activity_at).toISOString() : 'Never',
-      };
+    const dashboardData = result.rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      slug: row.slug,
+      email: row.email ?? 'unknown',
+      status: row.status,
+      subscriptionStatus: row.subscription_status ?? 'none',
+      planTier: row.plan_tier ?? 'unknown',
+      flavor: row.flavor,
+      preferredChannel: row.preferred_channel,
+      isCanary: row.canary_group,
+      onboardingComplete: ['active', 'live', 'onboarding'].includes(row.status),
+      leadCount: parseInt(row.lead_count ?? '0', 10),
+      lastActive: row.last_activity_at ? new Date(row.last_activity_at).toISOString() : 'Never',
+      createdAt: new Date(row.created_at).toISOString(),
     }));
 
     return res.json({ tenants: dashboardData });
