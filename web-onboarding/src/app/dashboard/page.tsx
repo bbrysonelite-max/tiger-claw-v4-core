@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import {
     Bot, MessageCircle, Shield, Settings, ExternalLink,
     Activity, Zap, Globe, ArrowRight, Loader2, AlertCircle,
-    CheckCircle2, XCircle, Clock, Key, RefreshCw, Copy, Check, Users,
+    CheckCircle2, XCircle, Clock, Key, Copy, Check, Users,
 } from "lucide-react";
 
 import { API_BASE } from "@/lib/config";
@@ -65,7 +65,6 @@ export default function DashboardPage() {
     const [data, setData] = useState<DashboardData | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
-    const [lineWizardOpen, setLineWizardOpen] = useState(false);
     const [keyFormOpen, setKeyFormOpen] = useState(false);
     const [keyInput, setKeyInput] = useState("");
     const [keyProvider, setKeyProvider] = useState("google");
@@ -391,7 +390,7 @@ export default function DashboardPage() {
                         <Globe className="h-5 w-5 text-white/50" />
                         Channels
                     </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <ChannelCard
                             name="Telegram"
                             emoji="✈️"
@@ -409,31 +408,8 @@ export default function DashboardPage() {
                             enabled={data.channels.whatsapp.enabled}
                             detail={data.channels.whatsapp.enabled ? "Enabled" : "Coming soon"}
                         />
-                        <button
-                            onClick={() => setLineWizardOpen(true)}
-                            className="text-left w-full"
-                        >
-                            <ChannelCard
-                                name="LINE"
-                                emoji="🟢"
-                                enabled={data.channels.line.configured}
-                                detail={data.channels.line.configured ? "Configured" : "Set up now →"}
-                                clickable
-                            />
-                        </button>
                     </div>
                 </motion.div>
-
-                {/* LINE Wizard Modal */}
-                {lineWizardOpen && data && (
-                    <LineWizardModal
-                        slug={data.tenant.slug}
-                        webhookUrl={data.channels.line.webhookUrl}
-                        configured={data.channels.line.configured}
-                        onClose={() => setLineWizardOpen(false)}
-                        botTelegramLink={data.bot.telegramLink}
-                    />
-                )}
 
                 {/* Quick Actions */}
                 <motion.div
@@ -446,13 +422,6 @@ export default function DashboardPage() {
                         Quick Actions
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <ActionCard
-                            title="Channel Configuration"
-                            description="Configure WhatsApp, LINE, and other channels"
-                            href={data.channelConfigUrl}
-                            icon={<Globe className="h-5 w-5" />}
-                            external
-                        />
                         <ActionCard
                             title="Talk to Your Bot"
                             description="Send a message to start a conversation"
