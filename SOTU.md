@@ -281,4 +281,22 @@ curl -X POST https://api.tigerclaw.io/admin/fix-all-webhooks \
 
 ---
 
-*This document is the single source of truth. If it conflicts with another document, this one is correct. Update it at the end of each session.*
+---
+
+## MANDATORY: Session Protocol for Every Agent
+
+**Before you write a single line of code, read this entire file.**
+
+This is not optional. This is the entry point. No other document takes precedence.
+
+**At the end of every session, you must update this file.** A session is not complete until SOTU.md reflects the new state of the project. Specifically, update:
+
+1. **Last updated** date at the top
+2. **Current Tenant Fleet** — pull live data from `GET /admin/fleet` and replace the table
+3. **Known Open Issues** — mark resolved items done, add any new issues discovered
+4. **What Happened** section — add a brief entry for the session: what was built, what PRs were merged, what was deployed
+5. Any **architecture changes**, new tools registered, or constraint additions
+
+If a session ends without updating SOTU.md, the next agent starts blind. That is the failure mode this document exists to prevent.
+
+**This document is the single source of truth. If it conflicts with any other document, this one is correct. All other session docs (START_HERE.md, STATE_OF_THE_TIGER_PATH_FORWARD.md) are superseded by this file.**
