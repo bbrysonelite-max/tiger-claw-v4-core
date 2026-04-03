@@ -407,6 +407,7 @@ Opt-in, privacy-respecting leaderboard across the fleet. Operators see how their
 | ~~Old 5-step wizard (OnboardingModal)~~ | ✅ RETIRED — root page redirects to `/signup` |
 | ~~LINE + Channel Config on customer dashboard~~ | ✅ REMOVED — dashboard shows Telegram + WhatsApp only |
 | Stan Store receipt email — append `?email={{customer_email}}` to link | Quick — Brent does in Stan Store admin. Code already reads it. |
+| **Vercel auto-deploy from GitHub is broken** — project root dir is misconfigured (doubling `web-onboarding/web-onboarding`). Until fixed, deploy wizard manually: `VERCEL_PROJECT_ID=prj_7Y7IZeI6uCmhX95QF0AVC0wRnsFY VERCEL_ORG_ID=team_sknWq0TNjp6Fe4g7j5cgb4Mf vercel deploy --prod` from repo root. Fix: update Root Directory in Vercel project settings to empty. | Ops — fix when convenient |
 | **Always call `/admin/fix-all-webhooks` after every API deploy** — TELEGRAM_WEBHOOK_SECRET mismatch will kill all bots silently | Ops discipline — add to checklist |
 | ~~**RELIABILITY SPRINT Sprint 1** — all 4 items DONE~~ | ✅ COMPLETE |
 | ~~Stripe Redis idempotency fails open~~ | ✅ Fixed |
