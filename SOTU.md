@@ -1,6 +1,6 @@
 # Tiger Claw — State of the Union
 
-**Last updated:** 2026-04-03 (Session 6 — Phase 1 live, fleet cleaned, reliability sprint complete)
+**Last updated:** 2026-04-03 (Session 6 — ongoing)
 **Read this first. Read nothing else until you have finished this file.**
 
 ---
@@ -247,6 +247,18 @@ The 5-step wizard is replaced by a single-page signup at `wizard.tigerclaw.io/si
 
 **Stan Store link updated:** `wizard.tigerclaw.io` → `wizard.tigerclaw.io/signup` (Brent updated in Stan Store admin).
 
+### Session 6 — Later (2026-04-03 afternoon)
+
+| PR / Action | Description |
+|---|---|
+| PR #171 | Remove 3-per-day cap language from tiger_briefing — was telling operator "need 3 more to hit daily minimum" |
+| PR #172 | Fix admin test — add pool mock to reset-conversation (CI green) |
+| PR #173 | Soft ICP fallback at hatch — empty idealPerson auto-populates from FLAVOR_DEFAULT_ICP, 12 flavors covered |
+| DB action | Purged 11,170 pre-gate contaminated facts from market_intelligence. 1,345 clean post-gate facts remain. Mine refills nightly. |
+| Copy | "60 Seconds" → "2 Minutes" across wizard frontend (layout, landing page, signup page) |
+| Copy | Removed "Enterprise V4.0" navbar label from wizard |
+| John cleanup | Terminated duplicate john-mnic5pc1 (same bot token as john-69cd9564). john-69cd9564 reset to onboarding + pending_setup subscription. Webhook live. |
+
 ### Session 6 Wrap — Reliability sprint confirmed complete, John fully cleaned up
 
 **Reliability Sprint 1 — all 4 items were already deployed before context compaction.** Audit verified against live code; every fix confirmed in place:
@@ -375,16 +387,21 @@ These were identified 2026-04-03 before building Phase 1. Address one at a time.
 | ~~LINE + Channel Config on customer dashboard~~ | ✅ REMOVED — dashboard shows Telegram + WhatsApp only |
 | Stan Store receipt email — append `?email={{customer_email}}` to link | Quick — Brent does in Stan Store admin. Code already reads it. |
 | **Always call `/admin/fix-all-webhooks` after every API deploy** — TELEGRAM_WEBHOOK_SECRET mismatch will kill all bots silently | Ops discipline — add to checklist |
-| ~~**RELIABILITY SPRINT Sprint 1** — all 4 items DONE (see below)~~ | ✅ COMPLETE |
-| ~~Stripe Redis idempotency fails open~~ | ✅ Fixed — fails closed with 503 |
-| ~~`resumeTenant()` doesn't check setWebhook success~~ | ✅ Fixed — checks `tgData.ok`, fires admin alert |
-| ~~Telegram enqueue failure not alerted~~ | ✅ Fixed — `sendAdminAlert` on enqueue fail |
-| ~~LINE webhook errors swallowed~~ | ✅ Fixed — `[ALERT]` + `sendAdminAlert` in catch |
-| ~~Add 'onboarding' to cron status filter~~ | ✅ Fixed — cron heartbeat + value-gap both include 'onboarding' |
-| ICP validation before phase=complete — can finish with empty profile, scout targets nobody | Medium (Sprint 2) |
+| ~~**RELIABILITY SPRINT Sprint 1** — all 4 items DONE~~ | ✅ COMPLETE |
+| ~~Stripe Redis idempotency fails open~~ | ✅ Fixed |
+| ~~`resumeTenant()` doesn't check setWebhook success~~ | ✅ Fixed |
+| ~~Telegram enqueue failure not alerted~~ | ✅ Fixed |
+| ~~LINE webhook errors swallowed~~ | ✅ Fixed |
+| ~~Add 'onboarding' to cron status filter~~ | ✅ Fixed |
+| ~~ICP validation blocks hatch with empty profile~~ | ✅ Fixed — soft fallback auto-populates from flavor defaults (PR #173, pending merge) |
+| ~~3-per-day cap language in tiger_briefing output~~ | ✅ Fixed — removed from bot output (PR #171) |
+| ~~Pre-gate mine contamination~~ | ✅ Fixed — 11,170 bad facts purged, 1,345 clean post-gate facts remain |
+| ~~admin test reset-conversation missing mock~~ | ✅ Fixed — CI green (PR #172) |
 | setWebhook not re-called on onboarding→active transition | Medium (Sprint 2) |
 | Email webhook processes any sender, not just tenants | Medium (Sprint 2) |
-| **Same-token duplicate bots** — if a customer re-signs up with the same email AND same bot token, two tenant records share one Telegram token. Only the last setWebhook wins. Detection: fix-all-webhooks returns "Too Many Requests" on the second registration. Fix: terminate the duplicate. | Ops awareness |
+| **Same-token duplicate bots** — if a customer re-signs up with same email + same bot token, two records share one Telegram token. Fix: terminate the duplicate. Detection: fix-all-webhooks returns "Too Many Requests" on second registration. | Ops awareness |
+| Wizard frontend navbar "Enterprise V4.0" label removed | ✅ Done |
+| "60 Seconds" → "2 Minutes" across wizard frontend | ✅ Done |
 | Customer-facing dashboard | Phase 2 |
 | LINE channel support | Phase 2 or 3 — deliberately deferred. Code exists, do not delete. LINE requires a LINE Official Account (business registration at developers.line.biz) — customers must bring a Channel Access Token and Channel Secret. Personal LINE accounts cannot connect to the API. Add back via customer dashboard when there is demonstrated demand. |
 | Multi-provider AI keys in signup (OpenAI, Grok, OpenRouter) | Phase 2 via customer dashboard — Gemini only in Phase 1 |
