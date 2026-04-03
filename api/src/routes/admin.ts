@@ -65,17 +65,15 @@ router.use(requireAdmin);
 // Reads TELEGRAM_WEBHOOK_SECRET from env and includes it in the setWebhook call.
 router.post("/fix-all-webhooks", async (req: Request, res: Response) => {
   try {
-    // V4 arch: bot tokens live in bot_pool (encrypted), not on the tenants table.
-    // JOIN bot_pool to get the encrypted token, then decrypt before calling Telegram.
-    // NOTE: legacy V3 tenants may still have status='live' in the DB.
+    // BYOB arch: bot tokens are stored plaintext in tenants.bot_token.
+    // Only process tenants that have a bot_token (Telegram). LINE-only tenants have null.
     const rows = await getPool().query(`
-      SELECT t.id, t.slug, bp.bot_token AS encrypted_token
-      FROM tenants t
-      INNER JOIN bot_pool bp ON bp.tenant_id = t.id AND bp.status = 'assigned'
-      WHERE t.status IN ('active', 'onboarding', 'suspended', 'live')
+      SELECT id, slug, bot_token
+      FROM tenants
+      WHERE status IN ('active', 'onboarding', 'suspended', 'live')
+        AND bot_token IS NOT NULL
     `);
 
-    const { decryptToken } = await import("../services/pool.js");
     const webhookSecret = process.env["TELEGRAM_WEBHOOK_SECRET"];
     const baseUrl = (process.env["TIGER_CLAW_API_URL"] ?? "https://api.tigerclaw.io").replace(/\/$/, "");
 
@@ -84,7 +82,7 @@ router.post("/fix-all-webhooks", async (req: Request, res: Response) => {
 
     for (const row of rows.rows) {
       try {
-        const token = decryptToken(row.encrypted_token);
+        const token = row.bot_token as string;
         const webhookUrl = `${baseUrl}/webhooks/telegram/${row.id}`;
 
         const body: Record<string, string> = { url: webhookUrl };
