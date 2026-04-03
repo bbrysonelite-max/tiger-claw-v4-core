@@ -1,6 +1,6 @@
 # Tiger Claw — State of the Union
 
-**Last updated:** 2026-04-03 (Session 6 — bug fixes, SOTU created, Phase 1 spec written)
+**Last updated:** 2026-04-03 (Session 6 — Phase 1 signup live, Teddy woke up, webhook secret fixed)
 **Read this first. Read nothing else until you have finished this file.**
 
 ---
@@ -189,43 +189,65 @@ One email can own multiple bots. Each Stan Store purchase creates a fresh `bot_i
 
 ---
 
-## Current Tenant Fleet (as of 2026-04-03)
+## Current Tenant Fleet (as of 2026-04-03 end of session)
 
-| Email | Slug | Status | Channel |
+| Slug | Status | Bot | Notes |
 |---|---|---|---|
-| `vijohn@hotmail.com` | `john-mnic5pc1` | onboarding | telegram |
-| `vijohn@hotmail.com` | `john-69cd9564` | **active** | telegram |
-| `bbryson@me.com` | `bbryson-mnhl9y5z` | onboarding | telegram |
-| `bbryson@me.com` | `brent-bryson-mni9u75z` | pending | telegram |
-| `jeffmackte@gmail.com` | `jeff-mack-69cd955d` | pending | telegram |
-| `justagreatdirector@outlook.com` | `justagreatdirector-mne9xtna` | pending | telegram |
-| `phaitoon2010@gmail.com` | `phaitoon2010-mnflobh4` | onboarding | telegram |
-| `phaitoon2010@gmail.com` | `phaitoon2010-mnf0nh7y` | onboarding | telegram |
-| `phaitoon2010@gmail.com` | `phaitoon2010-mne9vd0y` | onboarding | telegram |
+| `brent-bryson-mnjd321r` | onboarding | @Testtigerfour_bot "Teddy" | ✅ Phase 1 flow end-to-end test — PASSED |
+| `brent-bryson-mnjbj7r5` | onboarding | @Scoutsignup3_bot | Orphan from failed test attempt |
+| `brent-bryson-mnj9oxp1` | pending | Unassigned | Orphan from failed test attempt |
+| `brent-bryson-mni9u75z` | onboarding | @Singlepagescout_bot | Prior test bot |
+| `bbryson-mnhl9y5z` | onboarding | @Bryson007_bot | Webhook: Unauthorized (bad token) |
+| `john-mnic5pc1` | onboarding | @BGJN8_bot | John / Thailand |
+| `john-69cd9564` | **active** | @BGJN8_bot | John — only fully active customer |
+| `jeff-mack-69cd955d` | pending | Unassigned | Jeff Mack — paid, not onboarded |
+| `justagreatdirector-mne9xtna` | pending | Unassigned | Debbie — paid, not onboarded |
+| `phaitoon2010-mnflobh4` | onboarding | Unassigned | Beta tester |
+| `phaitoon2010-mnf0nh7y` | onboarding | Unassigned | Beta tester |
+| `phaitoon2010-mne9vd0y` | onboarding | Unassigned | Beta tester |
 
-**Paying customers with live bots:** John (`john-69cd9564`, active). All others are pending or in onboarding without a completed wizard.
-
-All 9 tenants are `network-marketer` flavor. No other flavors have been used by real customers yet.
+**Only paying customer with a live active bot:** John (`john-69cd9564`).
+**Jeff Mack and Debbie:** paid, `pending` — need outreach to send them through `wizard.tigerclaw.io/signup`.
 
 ---
 
 ## What Happened on April 3, 2026 (Session 6)
 
-**Six bugs from the April 2 failure fixed and deployed (PRs #145–#148):**
+### Earlier in session (bugs from April 2 fixed)
+**Six bugs fixed and deployed (PRs #145–#148):**
 - `fix-all-webhooks` was silently processing 0 tenants (wrong JOIN for BYOB arch) — fixed
 - Telegram token validation had no timeout — 8s AbortController added
 - LINE setup had no warning about Official Account requirement — warning added
 - Provisioning suspension fired no admin alert — Telegram alert now fires immediately on failure
 - Admin dashboard showed blank on API errors — error now displayed, auto-refresh every 30s added
-- "Fix Webhooks" button added to admin dashboard — no more curl commands on live calls
+- "Fix Webhooks" button added to admin dashboard
 
-**Post-deploy:** `fix-all-webhooks` run against prod — all 4 active/onboarding Telegram tenants re-registered with secret token.
+**SOTU.md created.** Phase 1 spec written and approved (`specs/PHASE_1_SIGNUP.md`).
 
-**SOTU.md created** — this document. Replaces START_HERE.md, STATE_OF_THE_TIGER_PATH_FORWARD.md, and session state in CLAUDE.md as the single source of truth.
+### Phase 1 Signup — Built, Deployed, and Proven (PRs #156–#165)
 
-**dramatic-failure.md committed to repo** — April 2 post-mortem is part of the permanent record.
+The 5-step wizard is replaced by a single-page signup at `wizard.tigerclaw.io/signup`.
 
-**Phase 1 spec written and approved** — `specs/PHASE_1_SIGNUP.md`. Single-page self-serve signup. Ready to build.
+**Flow:** Stan Store purchase → email gate → form (name, flavor, bot token, Gemini key, ICP) → Launch → Telegram bot wakes up.
+
+**PRs merged:**
+| PR | Description |
+|---|---|
+| #156 | Phase 1 signup page — single-page flow |
+| #157 | Fix 4 CI test failures (ai, admin, dashboard, provisioner) |
+| #158–#163 | Fix verify-purchase endpoint, payload fields, hatch response, botToken field, aiKey inline, HatchResponse type |
+| #164 | Remove X/Twitter announcement; add "Your agent will be live in 60 seconds." tagline |
+| #165 | Fix TELEGRAM_WEBHOOK_SECRET trim — trailing newline caused permanent secret mismatch |
+
+**Post-deploy:** `/admin/fix-all-webhooks` called — all 12 tenants re-registered with trimmed secret.
+
+**End-to-end test PASSED:** `@Testtigerfour_bot` ("Teddy Tiger Claw") provisioned via the new signup page. Bot responded in Telegram: *"Good to be seen. This is going to be great."*
+
+**Stan Store link updated:** `wizard.tigerclaw.io` → `wizard.tigerclaw.io/signup` (Brent updated in Stan Store admin).
+
+### Key learnings
+- `TELEGRAM_WEBHOOK_SECRET` in GCP Secret Manager may have a trailing newline. After any deploy, always call `/admin/fix-all-webhooks` to re-register webhooks with the current (trimmed) secret. This is now standard post-deploy protocol.
+- The trim fix (#165) ensures the comparison always works going forward.
 
 ---
 
@@ -262,11 +284,11 @@ These were identified 2026-04-03 before building Phase 1. Address one at a time.
 
 | # | Concern | Status |
 |---|---|---|
-| 1 | **Entry point email** — Does Stan Store actually send customers a link after purchase? What URL is in that email? If the link goes to the old wizard or doesn't exist, the new signup page is invisible. **Test: buy a $1 agent on Stan Store and see what arrives.** | 🔴 Active — testing now |
-| 2 | **Pending customers** — Jeff Mack, Debbie, Spain customer are in `pending` status and have paid. They need to be onboarded before more time passes or they request refunds. | ⏳ Deferred until #1 resolved |
-| 3 | **Mine validation** — 10,833 facts in production but never spot-checked for quality. The mine is a key differentiator. Before telling customers it exists, verify that 20-30 facts are actually useful. | ⏳ Deferred |
-| 4 | **Morning report never seen by a real customer** — Built and deployed in Session 5, but every tenant is a test account or incomplete onboard. Brent should receive a real morning report from his own bot before customers are told to expect one. | ⏳ Deferred |
-| 5 | **Price and positioning** — $97/$147 Stan Store vs. Founding 50 at $50/month are unreconciled. The signup page copy must match what's being sold. Decide before the page goes live. | ⏳ Deferred |
+| 1 | **Entry point email** — Does Stan Store actually send customers a link after purchase? What URL is in that email? | ✅ Resolved — Stan Store link updated to `wizard.tigerclaw.io/signup`. Flow confirmed live. |
+| 2 | **Pending customers** — Jeff Mack, Debbie are in `pending` status and have paid. They need to be sent through the signup page. | 🔴 Active — send them `wizard.tigerclaw.io/signup` |
+| 3 | **Mine validation** — 10,833 facts in production but never spot-checked for quality. | ⏳ Deferred |
+| 4 | **Morning report never seen by a real customer** — Built and deployed, but no real customer has completed onboarding and seen a report. | ⏳ Deferred |
+| 5 | **Price and positioning** — $97/$147 Stan Store vs. Founding 50 at $50/month are unreconciled. | ⏳ Deferred |
 
 ---
 
@@ -295,7 +317,10 @@ These were identified 2026-04-03 before building Phase 1. Address one at a time.
 | `bot_ai_keys` dead write — wizard writes here, runtime reads `bot_ai_config` | Low |
 | Stan Store needs replacing with Lemon Squeezy or Paddle (international VAT) | High (before next international customer) |
 | Past customers owed bots: `chana.loh@gmail.com`, `nancylimsk@gmail.com`, `lily.vergara@gmail.com` — paid, never onboarded | High |
-| **Self-serve single-page signup** | **Phase 1 — spec complete, ready to build. See `specs/PHASE_1_SIGNUP.md`** |
+| Jeff Mack + Debbie — paid, `pending`, never onboarded — send `wizard.tigerclaw.io/signup` | High |
+| ~~Self-serve single-page signup~~ | ✅ DONE — `wizard.tigerclaw.io/signup` live and tested 2026-04-03 |
+| Orphan bots: `brent-bryson-mnjbj7r5`, `brent-bryson-mnj9oxp1` — dead test bots | Low — cleanup when convenient |
+| **Always call `/admin/fix-all-webhooks` after every API deploy** — TELEGRAM_WEBHOOK_SECRET mismatch will kill all bots silently | Ops discipline — add to checklist |
 | Customer-facing dashboard | Phase 2 |
 | LINE channel support | Phase 2 or 3 — deliberately deferred. Code exists, do not delete. LINE requires a LINE Official Account (business registration at developers.line.biz) — customers must bring a Channel Access Token and Channel Secret. Personal LINE accounts cannot connect to the API. Add back via customer dashboard when there is demonstrated demand. |
 | Multi-provider AI keys in signup (OpenAI, Grok, OpenRouter) | Phase 2 via customer dashboard — Gemini only in Phase 1 |
@@ -311,7 +336,8 @@ GCP_PROJECT_ID=hybrid-matrix-472500-k5 bash ./ops/deploy-cloudrun.sh
 # Deploy frontend (wizard + admin dashboard)
 GCP_PROJECT_ID=hybrid-matrix-472500-k5 bash ./ops/deploy-frontend.sh
 
-# Re-register all tenant webhooks with secret (run after any API deploy)
+# ⚠️  MANDATORY after every API deploy — re-registers all webhooks with correct secret
+# Without this, TELEGRAM_WEBHOOK_SECRET mismatch will silently kill all bots
 curl -X POST https://api.tigerclaw.io/admin/fix-all-webhooks \
   -H "Authorization: Bearer <ADMIN_TOKEN>"
 # Or: use the "Fix Webhooks" button on wizard.tigerclaw.io/admin/dashboard
