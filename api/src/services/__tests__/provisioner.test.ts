@@ -86,6 +86,7 @@ describe('provisionTenant', () => {
     mockCreateTenant.mockResolvedValue(MOCK_TENANT);
     mockGetPoolQuery.mockResolvedValue({ rows: [] });
     mockFetch.mockResolvedValue({ json: () => Promise.resolve({ ok: true }) });
+    mockSendAdminAlert.mockResolvedValue(undefined);
     vi.stubGlobal('fetch', mockFetch);
   });
 
@@ -172,6 +173,7 @@ describe('provisionTenant — webhook failure diagnostics', () => {
     mockGetTenantBySlug.mockResolvedValue(null);
     mockCreateTenant.mockResolvedValue(MOCK_TENANT);
     mockGetPoolQuery.mockResolvedValue({ rows: [] });
+    mockSendAdminAlert.mockResolvedValue(undefined);
     vi.stubGlobal('fetch', mockFetch);
   });
 

@@ -260,7 +260,7 @@ describe('GET /admin/dashboard/tenants', () => {
       rows: [{
         id: 't1', name: 'Brent Bryson', slug: 'brent', status: 'active',
         canary_group: true, last_activity_at: new Date('2026-03-20T10:00:00Z'),
-        bot_username: 'TigerTestBot',
+        bot_username: 'TigerTestBot', created_at: new Date('2026-03-01T00:00:00Z'),
       }],
     })
 
@@ -285,6 +285,7 @@ describe('GET /admin/dashboard/tenants', () => {
       rows: [{
         id: 't2', name: 'New User', slug: 'new-user', status: 'onboarding',
         canary_group: false, last_activity_at: null, bot_username: null,
+        created_at: new Date('2026-03-01T00:00:00Z'),
       }],
     })
     mockDb.getBotState.mockResolvedValue({ phase: 'identity' })

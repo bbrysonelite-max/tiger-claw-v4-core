@@ -12,6 +12,7 @@ const mockDb = vi.hoisted(() => ({
   getBYOKStatus: vi.fn(),
   getFoundingMemberDisplay: vi.fn(),
   getHiveSignalWithFallback: vi.fn(),
+  getPool: vi.fn(() => ({ query: vi.fn().mockResolvedValue({ rows: [] }) })),
 }))
 
 vi.mock('../../services/db.js', () => mockDb)
