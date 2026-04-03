@@ -405,8 +405,8 @@ router.post("/fleet/:tenantId/report", async (req: Request, res: Response) => {
   try {
     const tenant = await resolveTenant(req.params["tenantId"]!);
     if (!tenant) return res.status(404).json({ error: "Tenant not found" });
-    if (tenant.status !== "active") {
-      return res.status(400).json({ error: "Tenant is not active" });
+    if (["pending", "terminated", "suspended"].includes(tenant.status)) {
+      return res.status(400).json({ error: `Cannot trigger report for tenant in status: ${tenant.status}` });
     }
     const triggered = await triggerContainerWebhook(tenant, "tiger_briefing", { action: "generate" });
     await logAdminEvent("manual_report", tenant.id, { triggered });
