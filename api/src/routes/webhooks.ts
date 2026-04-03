@@ -232,7 +232,7 @@ router.post("/telegram/:tenantId", webhookLimiter, async (req: Request, res: Res
   // Telegram sends X-Telegram-Bot-Api-Secret-Token on every update when the bot
   // was registered with setWebhook({ secret_token: TELEGRAM_WEBHOOK_SECRET }).
   // Any request missing or mismatching this header is rejected immediately.
-  const TELEGRAM_WEBHOOK_SECRET = process.env["TELEGRAM_WEBHOOK_SECRET"];
+  const TELEGRAM_WEBHOOK_SECRET = process.env["TELEGRAM_WEBHOOK_SECRET"]?.trim();
   if (TELEGRAM_WEBHOOK_SECRET) {
     const incomingSecret = req.headers["x-telegram-bot-api-secret-token"];
     if (incomingSecret !== TELEGRAM_WEBHOOK_SECRET) {

@@ -159,7 +159,7 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
       const webhookUrl = `${baseUrl}/webhooks/telegram/${tenant.id}`;
 
       // Call Telegram API to set the webhook (Use POST with JSON to avoid URL encoding issues)
-      const webhookSecret = process.env["TELEGRAM_WEBHOOK_SECRET"];
+      const webhookSecret = process.env["TELEGRAM_WEBHOOK_SECRET"]?.trim();
       const tgResponse = await tgFetch(`https://api.telegram.org/bot${resolvedBotToken}/setWebhook`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -332,7 +332,7 @@ export async function resumeTenant(tenant: Tenant): Promise<"active" | "onboardi
     if (!baseUrl) throw new Error("[FATAL] TIGER_CLAW_API_URL environment variable is required");
     const webhookUrl = `${baseUrl}/webhooks/telegram/${tenant.id}`;
 
-    const webhookSecret = process.env["TELEGRAM_WEBHOOK_SECRET"];
+    const webhookSecret = process.env["TELEGRAM_WEBHOOK_SECRET"]?.trim();
     try {
       const tgResponse = await tgFetch(`https://api.telegram.org/bot${tenant.botToken}/setWebhook`, {
         method: "POST",

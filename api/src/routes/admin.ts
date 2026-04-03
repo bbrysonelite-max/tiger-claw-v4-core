@@ -74,7 +74,7 @@ router.post("/fix-all-webhooks", async (req: Request, res: Response) => {
         AND bot_token IS NOT NULL
     `);
 
-    const webhookSecret = process.env["TELEGRAM_WEBHOOK_SECRET"];
+    const webhookSecret = process.env["TELEGRAM_WEBHOOK_SECRET"]?.trim();
     const baseUrl = (process.env["TIGER_CLAW_API_URL"] ?? "https://api.tigerclaw.io").replace(/\/$/, "");
 
     console.log(`[fix-webhooks] Re-binding ${rows.rows.length} tenants. Secret: ${webhookSecret ? "✅ wired" : "⚠️  missing"}`);
