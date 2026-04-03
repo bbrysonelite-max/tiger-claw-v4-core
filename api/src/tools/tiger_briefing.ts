@@ -510,17 +510,6 @@ function assembleBriefing(data: BriefingData): string {
     lines.push(``);
   }
 
-  // ---- Section 7: 3-Per-Day Rule check ----
-  const THREE_PER_DAY_MINIMUM = 3;
-  if (data.activeConversations < THREE_PER_DAY_MINIMUM) {
-    const deficit = THREE_PER_DAY_MINIMUM - data.activeConversations;
-    lines.push(
-      `📊 3-PER-DAY CHECK: ${data.activeConversations} active conversation${data.activeConversations === 1 ? "" : "s"}. ` +
-      `Need ${deficit} more to hit the daily minimum. Run tiger_scout to find more leads.`
-    );
-    lines.push(``);
-  }
-
   // ---- Section 8: Aftercare ----
   if (data.aftercareAlerts.length > 0) {
     lines.push(`🏆 AFTERCARE ALERTS`);
@@ -543,8 +532,7 @@ function assembleBriefing(data: BriefingData): string {
     data.newQualified.length === 0 &&
     !hasRecs &&
     !hasWarnings &&
-    !hasAftercare &&
-    data.activeConversations >= THREE_PER_DAY_MINIMUM
+    !hasAftercare
   ) {
     lines.push(`All quiet overnight. ${data.activeConversations} active conversation${data.activeConversations === 1 ? "" : "s"} in flight.`);
     lines.push(`Run tiger_scout to refresh the pipeline.`);
