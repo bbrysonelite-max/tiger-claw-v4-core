@@ -403,13 +403,15 @@ function SignupForm({ email, botId }: SignupFormProps) {
       const payload = {
         botId,
         name: form.agentName.trim(),
+        email,
         flavor: form.flavor,
         telegramBotToken: form.telegramToken.trim(),
         aiKey: form.aiKey.trim(),
         customerProfile: {
-          whoTheyAre: form.whoTheyAre.trim(),
-          whatTheyWant: form.whatTheyWant.trim(),
-          whereTheyAre: form.whereTheyAre.trim(),
+          idealCustomer: form.whoTheyAre.trim(),
+          problem: form.whatTheyWant.trim(),
+          notWorking: "",
+          whereToFind: form.whereTheyAre.trim(),
         },
         preferredChannel: "telegram" as const,
         region: "us-en",
