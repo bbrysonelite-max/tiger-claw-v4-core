@@ -102,9 +102,11 @@ const FLAVORS: Flavor[] = [
 // ---------------------------------------------------------------------------
 
 interface VerifyResponse {
-  valid: boolean;
+  ok?: boolean;
+  valid?: boolean;
   botId?: string;
   message?: string;
+  error?: string;
 }
 
 interface HatchResponse {
@@ -162,17 +164,19 @@ function EmailGate({ prefillEmail, onVerified }: EmailGateProps) {
       setErrorMsg("");
 
       try {
-        const res = await fetch(
-          `${API_URL}/wizard/auth/verify-purchase?email=${encodeURIComponent(trimmed)}`
-        );
+        const res = await fetch(`${API_URL}/auth/verify-purchase`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: trimmed }),
+        });
         const data: VerifyResponse = await res.json();
 
-        if (data.valid && data.botId) {
+        if ((data.ok || data.valid) && data.botId) {
           onVerified(trimmed, data.botId);
         } else {
           setStatus("error");
           setErrorMsg(
-            data.message ||
+            data.message || data.error ||
               "We couldn't find a purchase for this email. Contact support at support@tigerclaw.io."
           );
         }
