@@ -1,6 +1,6 @@
 # Tiger Claw — State of the Union
 
-**Last updated:** 2026-04-03
+**Last updated:** 2026-04-03 (Session 6 — bug fixes, SOTU created, Phase 1 spec written)
 **Read this first. Read nothing else until you have finished this file.**
 
 ---
@@ -194,7 +194,7 @@ One email can own multiple bots. Each Stan Store purchase creates a fresh `bot_i
 | Email | Slug | Status | Channel |
 |---|---|---|---|
 | `vijohn@hotmail.com` | `john-mnic5pc1` | onboarding | telegram |
-| `vijohn@hotmail.com` | `john-69cd9564` | active | telegram |
+| `vijohn@hotmail.com` | `john-69cd9564` | **active** | telegram |
 | `bbryson@me.com` | `bbryson-mnhl9y5z` | onboarding | telegram |
 | `bbryson@me.com` | `brent-bryson-mni9u75z` | pending | telegram |
 | `jeffmackte@gmail.com` | `jeff-mack-69cd955d` | pending | telegram |
@@ -204,6 +204,28 @@ One email can own multiple bots. Each Stan Store purchase creates a fresh `bot_i
 | `phaitoon2010@gmail.com` | `phaitoon2010-mne9vd0y` | onboarding | telegram |
 
 **Paying customers with live bots:** John (`john-69cd9564`, active). All others are pending or in onboarding without a completed wizard.
+
+All 9 tenants are `network-marketer` flavor. No other flavors have been used by real customers yet.
+
+---
+
+## What Happened on April 3, 2026 (Session 6)
+
+**Six bugs from the April 2 failure fixed and deployed (PRs #145–#148):**
+- `fix-all-webhooks` was silently processing 0 tenants (wrong JOIN for BYOB arch) — fixed
+- Telegram token validation had no timeout — 8s AbortController added
+- LINE setup had no warning about Official Account requirement — warning added
+- Provisioning suspension fired no admin alert — Telegram alert now fires immediately on failure
+- Admin dashboard showed blank on API errors — error now displayed, auto-refresh every 30s added
+- "Fix Webhooks" button added to admin dashboard — no more curl commands on live calls
+
+**Post-deploy:** `fix-all-webhooks` run against prod — all 4 active/onboarding Telegram tenants re-registered with secret token.
+
+**SOTU.md created** — this document. Replaces START_HERE.md, STATE_OF_THE_TIGER_PATH_FORWARD.md, and session state in CLAUDE.md as the single source of truth.
+
+**dramatic-failure.md committed to repo** — April 2 post-mortem is part of the permanent record.
+
+**Phase 1 spec written and approved** — `specs/PHASE_1_SIGNUP.md`. Single-page self-serve signup. Ready to build.
 
 ---
 
@@ -259,9 +281,10 @@ This is not a coding problem yet. It is the next decision to make.
 | `bot_ai_keys` dead write — wizard writes here, runtime reads `bot_ai_config` | Low |
 | Stan Store needs replacing with Lemon Squeezy or Paddle (international VAT) | High (before next international customer) |
 | Past customers owed bots: `chana.loh@gmail.com`, `nancylimsk@gmail.com`, `lily.vergara@gmail.com` — paid, never onboarded | High |
-| No self-serve onboarding (single-page form) | **Phase 1 — in planning** |
-| Customer-facing dashboard (operators can see their bot's activity) | Phase 2 |
-| LINE channel support | Phase 2 or 3 — deliberately deferred. Code exists, do not delete. LINE requires a LINE Official Account (business registration at developers.line.biz) — customers must bring a Channel Access Token and Channel Secret. Personal LINE accounts cannot connect to the API. Add back via the customer dashboard when there is demonstrated demand. |
+| **Self-serve single-page signup** | **Phase 1 — spec complete, ready to build. See `specs/PHASE_1_SIGNUP.md`** |
+| Customer-facing dashboard | Phase 2 |
+| LINE channel support | Phase 2 or 3 — deliberately deferred. Code exists, do not delete. LINE requires a LINE Official Account (business registration at developers.line.biz) — customers must bring a Channel Access Token and Channel Secret. Personal LINE accounts cannot connect to the API. Add back via customer dashboard when there is demonstrated demand. |
+| Multi-provider AI keys in signup (OpenAI, Grok, OpenRouter) | Phase 2 via customer dashboard — Gemini only in Phase 1 |
 
 ---
 
