@@ -29,17 +29,24 @@ export default function StepChannelSetup({ state, updateState, onNext }: Channel
             setValidating(true);
             setBotUsername(null);
             setValidationError("");
+            const controller = new AbortController();
+            const deadline = setTimeout(() => controller.abort(), 8000);
             try {
-                const res = await fetch(`https://api.telegram.org/bot${token}/getMe`);
+                const res = await fetch(`https://api.telegram.org/bot${token}/getMe`, { signal: controller.signal });
                 const data = await res.json();
                 if (data.ok) {
                     setBotUsername(data.result.username);
                 } else {
                     setValidationError("Invalid token — double-check it in @BotFather.");
                 }
-            } catch {
-                setValidationError("Could not reach Telegram. Check your connection.");
+            } catch (err) {
+                if (err instanceof Error && err.name === "AbortError") {
+                    setValidationError("Validation timed out — check your connection and try again.");
+                } else {
+                    setValidationError("Could not reach Telegram. Check your connection.");
+                }
             } finally {
+                clearTimeout(deadline);
                 setValidating(false);
             }
         }, 700);
@@ -159,6 +166,12 @@ export default function StepChannelSetup({ state, updateState, onNext }: Channel
                         <h4 className="text-xl font-bold text-white">LINE</h4>
                         <span className="text-xs text-white/80 font-bold uppercase tracking-widest border border-white/20 rounded px-1.5 py-0.5">Optional</span>
                     </div>
+                    <p className="text-sm text-amber-400/90 mb-3 font-medium">
+                        Requires a <strong>LINE Official Account</strong> — personal LINE accounts cannot connect to the API.{" "}
+                        <a href="https://developers.line.biz/en/docs/messaging-api/getting-started/" target="_blank" rel="noopener noreferrer" className="underline">
+                            Create one at developers.line.biz
+                        </a>
+                    </p>
                     <input
                         type="password"
                         value={state.lineToken || ""}
