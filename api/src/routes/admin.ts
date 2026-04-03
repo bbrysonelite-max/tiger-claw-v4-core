@@ -890,8 +890,13 @@ router.post("/fleet/:tenantId/reset-conversation", async (req: Request, res: Res
     if (!tenant) return res.status(404).json({ error: "Tenant not found" });
     const { clearTenantChatHistory } = await import("../services/ai.js");
     const cleared = await clearTenantChatHistory(tenant.id);
+    // Also wipe onboard_state so the bot greets them fresh
+    await getPool().query(
+      `DELETE FROM tenant_states WHERE tenant_id = $1 AND state_key = 'onboard_state.json'`,
+      [tenant.id]
+    );
     await logAdminEvent("conversation_reset", tenant.id, { keys_cleared: cleared });
-    return res.json({ ok: true, keys_cleared: cleared });
+    return res.json({ ok: true, keys_cleared: cleared, onboard_state_cleared: true });
   } catch (err) {
     return res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
   }
