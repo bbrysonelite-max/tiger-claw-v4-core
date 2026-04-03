@@ -51,7 +51,7 @@ function HomeContent() {
           className="text-6xl md:text-8xl font-black tracking-tighter mb-6 leading-tight max-w-4xl mx-auto"
         >
           Deploy Your <br className="hidden md:block" />
-          <span className="gradient-text">Agent in 60 Seconds</span>
+          <span className="gradient-text">Agent in 2 Minutes</span>
         </motion.h1>
 
         <motion.p

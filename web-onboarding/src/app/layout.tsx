@@ -5,7 +5,7 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
-  title: "Tiger Claw | Deploy Your Agent in 60 Seconds",
+  title: "Tiger Claw | Deploy Your Agent in 2 Minutes",
   description: "Enterprise BYOK Agent Infrastructure. High availability, maximum privacy.",
 };
 

@@ -472,7 +472,7 @@ function SignupForm({ email, botId }: SignupFormProps) {
             Launch Your Tiger Agent
           </h1>
           <p className="text-orange-400 font-semibold text-sm mb-1">
-            Your agent will be live in 60 seconds.
+            Your agent will be live in about 2 minutes.
           </p>
           <p className="text-white/50 text-sm">
             Setting up for <span className="text-white/70">{email}</span>
