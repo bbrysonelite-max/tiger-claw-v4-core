@@ -426,7 +426,7 @@ function SignupForm({ email, botId }: SignupFormProps) {
 
       const data: HatchResponse = await res.json();
 
-      if (res.ok && data.success) {
+      if (res.ok && (data.success || data.ok)) {
         setSuccess({
           agentName: form.agentName.trim(),
           botUsername: data.botUsername || telegramUsername || form.agentName.trim(),
