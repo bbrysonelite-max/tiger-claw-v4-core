@@ -1,6 +1,6 @@
 # Tiger Claw — State of the Union
 
-**Last updated:** 2026-04-03 (Session 6 — Phase 1 signup live, Teddy woke up, webhook secret fixed)
+**Last updated:** 2026-04-03 (Session 6 — Phase 1 live, fleet cleaned, reliability sprint complete)
 **Read this first. Read nothing else until you have finished this file.**
 
 ---
@@ -193,21 +193,12 @@ One email can own multiple bots. Each Stan Store purchase creates a fresh `bot_i
 
 | Slug | Status | Bot | Notes |
 |---|---|---|---|
-| `brent-bryson-mnjd321r` | onboarding | @Testtigerfour_bot "Teddy" | ✅ Phase 1 flow end-to-end test — PASSED |
-| `brent-bryson-mnjbj7r5` | onboarding | @Scoutsignup3_bot | Orphan from failed test attempt |
-| `brent-bryson-mnj9oxp1` | pending | Unassigned | Orphan from failed test attempt |
-| `brent-bryson-mni9u75z` | onboarding | @Singlepagescout_bot | Prior test bot |
-| `bbryson-mnhl9y5z` | onboarding | @Bryson007_bot | Webhook: Unauthorized (bad token) |
-| `john-mnic5pc1` | onboarding | @BGJN8_bot | John / Thailand |
-| `john-69cd9564` | **active** | @BGJN8_bot | John — only fully active customer |
-| `jeff-mack-69cd955d` | pending | Unassigned | Jeff Mack — paid, not onboarded |
-| `justagreatdirector-mne9xtna` | pending | Unassigned | Debbie — paid, not onboarded |
-| `phaitoon2010-mnflobh4` | onboarding | Unassigned | Beta tester |
-| `phaitoon2010-mnf0nh7y` | onboarding | Unassigned | Beta tester |
-| `phaitoon2010-mne9vd0y` | onboarding | Unassigned | Beta tester |
+| `brent-bryson-mnjd321r` | onboarding | @Testtigerfour_bot "Teddy" | Brent's test bot — onboarding in progress |
+| `john-69cd9564` | onboarding | @BGJN8_bot | John — reset fresh, subscription pending_setup, webhook live. Send `wizard.tigerclaw.io/signup` |
+| `jeff-mack-69cd955d` | pending | Unassigned | Jeff Mack — paid, send `wizard.tigerclaw.io/signup` |
+| `justagreatdirector-mne9xtna` | pending | Unassigned | Debbie — paid, send `wizard.tigerclaw.io/signup` |
 
-**Only paying customer with a live active bot:** John (`john-69cd9564`).
-**Jeff Mack and Debbie:** paid, `pending` — need outreach to send them through `wizard.tigerclaw.io/signup`.
+`john-mnic5pc1` — **TERMINATED** (duplicate created when John re-signed up; shared same bot token as john-69cd9564, causing webhook conflicts). All test bots and Toon bots deprovisioned. Fleet is clean.
 
 ---
 
@@ -256,9 +247,59 @@ The 5-step wizard is replaced by a single-page signup at `wizard.tigerclaw.io/si
 
 **Stan Store link updated:** `wizard.tigerclaw.io` → `wizard.tigerclaw.io/signup` (Brent updated in Stan Store admin).
 
+### Session 6 Wrap — Reliability sprint confirmed complete, John fully cleaned up
+
+**Reliability Sprint 1 — all 4 items were already deployed before context compaction.** Audit verified against live code; every fix confirmed in place:
+- Stripe Redis fails closed (503) ✅
+- `resumeTenant()` checks `tgData.ok` + fires admin alert ✅  
+- Telegram enqueue failure fires admin alert ✅
+- LINE webhook catch fires admin alert ✅
+- Cron heartbeat includes 'onboarding' ✅
+
+**John duplicate bot cleanup:**
+- PR #170 deploy confirmed live (uptime 105s after deploy)
+- `reset-conversation` run on `john-69cd9564` — both Redis and PostgreSQL onboard_state cleared (`onboard_state_cleared: true`)
+- `john-mnic5pc1` created this morning (John re-signed up with same bot token) — TERMINATED to eliminate webhook conflict
+- `john-69cd9564` status → `onboarding`, subscription → `pending_setup` — ready for wizard
+- fix-all-webhooks run — both active bots clean (2 processed, 2 fixed)
+- Root cause documented: same-token duplicate is detectable when fix-all-webhooks returns "Too Many Requests" on second registration
+
+**Send John:** `wizard.tigerclaw.io/signup` with email `vijohn@hotmail.com`
+
+### Later in session — Fleet cleanup, John reset, reliability sprint (PRs #168–#170)
+
+| PR | Description |
+|---|---|
+| #168 | Allow manual report trigger for onboarding tenants (not just active) |
+| #169 | Daily scout waterfall — never idle, never report failure. Rate-limited? Fall through to search → mine → cold outreach. Never mention empty pipeline. |
+| #170 | reset-conversation now clears PostgreSQL onboard_state too, not just Redis |
+
+**Fleet cleanup:**
+- Deprovisioned 4 dead test bots in Brent's name (tokens deleted from BotFather)
+- Deprovisioned all 3 Phaitoon/Toon bots — no debris from beta
+- Brent deleted 22 bot tokens from BotFather, kept only Teddy
+
+**John reset:**
+- `john-69cd9564` was deprovisioned by accident, immediately restored via suspend→resume
+- Full reset run: Redis chat history + onboard_state cleared
+- John starts fresh — bot will greet him day-one when he messages it
+- Send John: `wizard.tigerclaw.io/dashboard?slug=john-69cd9564`
+
+**Morning report confirmed working:**
+- Triggered manually via `/admin/fleet/:tenantId/report`
+- Bot pushed proactively to Telegram (not a reply — unprompted)
+- Rate-limited on first run (no leads yet) — waterfall fix (#169) addresses this
+- Real test: 7 AM UTC tomorrow after Teddy completes onboarding
+
+**Stan Store cleanup:**
+- Both products updated to `wizard.tigerclaw.io/signup`
+- `?email=` pre-fill already built in signup page — Stan Store just needs to append it
+- Lemon Squeezy migration in progress (Brent)
+
 ### Key learnings
 - `TELEGRAM_WEBHOOK_SECRET` in GCP Secret Manager may have a trailing newline. After any deploy, always call `/admin/fix-all-webhooks` to re-register webhooks with the current (trimmed) secret. This is now standard post-deploy protocol.
 - The trim fix (#165) ensures the comparison always works going forward.
+- `reset-conversation` previously only cleared Redis — useless for bots whose state lives in PostgreSQL. Now clears both.
 
 ---
 
@@ -328,13 +369,22 @@ These were identified 2026-04-03 before building Phase 1. Address one at a time.
 | `bot_ai_keys` dead write — wizard writes here, runtime reads `bot_ai_config` | Low |
 | Stan Store needs replacing with Lemon Squeezy or Paddle (international VAT) | High (before next international customer) |
 | Past customers owed bots: `chana.loh@gmail.com`, `nancylimsk@gmail.com`, `lily.vergara@gmail.com` — paid, never onboarded | High |
-| Jeff Mack + Debbie — paid, `pending`, never onboarded — send `wizard.tigerclaw.io/signup` | High |
+| Jeff Mack + Debbie — paid, `pending`, never onboarded — send `wizard.tigerclaw.io/signup` | High — Brent doing outreach |
 | ~~Self-serve single-page signup~~ | ✅ DONE — `wizard.tigerclaw.io/signup` live and tested 2026-04-03 |
 | ~~Old 5-step wizard (OnboardingModal)~~ | ✅ RETIRED — root page redirects to `/signup` |
 | ~~LINE + Channel Config on customer dashboard~~ | ✅ REMOVED — dashboard shows Telegram + WhatsApp only |
 | Stan Store receipt email — append `?email={{customer_email}}` to link | Quick — Brent does in Stan Store admin. Code already reads it. |
-| Orphan bots: `brent-bryson-mnjbj7r5`, `brent-bryson-mnj9oxp1` — dead test bots | Low — cleanup when convenient |
 | **Always call `/admin/fix-all-webhooks` after every API deploy** — TELEGRAM_WEBHOOK_SECRET mismatch will kill all bots silently | Ops discipline — add to checklist |
+| ~~**RELIABILITY SPRINT Sprint 1** — all 4 items DONE (see below)~~ | ✅ COMPLETE |
+| ~~Stripe Redis idempotency fails open~~ | ✅ Fixed — fails closed with 503 |
+| ~~`resumeTenant()` doesn't check setWebhook success~~ | ✅ Fixed — checks `tgData.ok`, fires admin alert |
+| ~~Telegram enqueue failure not alerted~~ | ✅ Fixed — `sendAdminAlert` on enqueue fail |
+| ~~LINE webhook errors swallowed~~ | ✅ Fixed — `[ALERT]` + `sendAdminAlert` in catch |
+| ~~Add 'onboarding' to cron status filter~~ | ✅ Fixed — cron heartbeat + value-gap both include 'onboarding' |
+| ICP validation before phase=complete — can finish with empty profile, scout targets nobody | Medium (Sprint 2) |
+| setWebhook not re-called on onboarding→active transition | Medium (Sprint 2) |
+| Email webhook processes any sender, not just tenants | Medium (Sprint 2) |
+| **Same-token duplicate bots** — if a customer re-signs up with the same email AND same bot token, two tenant records share one Telegram token. Only the last setWebhook wins. Detection: fix-all-webhooks returns "Too Many Requests" on the second registration. Fix: terminate the duplicate. | Ops awareness |
 | Customer-facing dashboard | Phase 2 |
 | LINE channel support | Phase 2 or 3 — deliberately deferred. Code exists, do not delete. LINE requires a LINE Official Account (business registration at developers.line.biz) — customers must bring a Channel Access Token and Channel Secret. Personal LINE accounts cannot connect to the API. Add back via customer dashboard when there is demonstrated demand. |
 | Multi-provider AI keys in signup (OpenAI, Grok, OpenRouter) | Phase 2 via customer dashboard — Gemini only in Phase 1 |
