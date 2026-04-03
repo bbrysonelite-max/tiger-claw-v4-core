@@ -259,8 +259,9 @@ This is not a coding problem yet. It is the next decision to make.
 | `bot_ai_keys` dead write — wizard writes here, runtime reads `bot_ai_config` | Low |
 | Stan Store needs replacing with Lemon Squeezy or Paddle (international VAT) | High (before next international customer) |
 | Past customers owed bots: `chana.loh@gmail.com`, `nancylimsk@gmail.com`, `lily.vergara@gmail.com` — paid, never onboarded | High |
-| No self-serve onboarding (single-page form) | Blocking scale |
-| Customer-facing dashboard (operators can see their bot's activity without asking Brent) | Medium |
+| No self-serve onboarding (single-page form) | **Phase 1 — in planning** |
+| Customer-facing dashboard (operators can see their bot's activity) | Phase 2 |
+| LINE channel support | Phase 2 or 3 — deliberately deferred. Code exists, do not delete. LINE requires a LINE Official Account (business registration at developers.line.biz) — customers must bring a Channel Access Token and Channel Secret. Personal LINE accounts cannot connect to the API. Add back via the customer dashboard when there is demonstrated demand. |
 
 ---
 
