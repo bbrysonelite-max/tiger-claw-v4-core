@@ -110,7 +110,8 @@ interface VerifyResponse {
 }
 
 interface HatchResponse {
-  success: boolean;
+  ok?: boolean;
+  success?: boolean;
   tenant?: {
     slug: string;
     name: string;
