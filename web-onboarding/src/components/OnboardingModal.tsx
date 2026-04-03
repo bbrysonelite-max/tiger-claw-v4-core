@@ -140,6 +140,7 @@ export default function OnboardingModal({ onClose, initialEmail, initialBotId, i
                         {step > 1 && !isDeploying && (
                             <button
                                 onClick={handleBack}
+                                aria-label="Go back"
                                 className="p-2 hover:bg-white/10 rounded-full transition-colors text-white/90 hover:text-white"
                             >
                                 <ArrowLeft className="w-5 h-5" />

@@ -30,7 +30,16 @@ test.describe('Mobile Wizard — Full Flow (Stan Store)', () => {
             });
         });
 
-        // validate-key — simulates a valid Google AI key
+        // Telegram getMe — validates the bot token in StepChannelSetup
+        await page.route('**/api.telegram.org/**', async (route) => {
+            await route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({ ok: true, result: { username: 'mobile_test_bot' } }),
+            });
+        });
+
+        // validate-key — simulates a valid AI key
         await page.route('**/wizard/validate-key', async (route) => {
             await route.fulfill({
                 status: 200,
@@ -67,11 +76,11 @@ test.describe('Mobile Wizard — Full Flow (Stan Store)', () => {
         await page.goto('/');
 
         // ── Email verification ────────────────────────────────────────────────
-        const emailInput = page.getByPlaceholder(/email/i).first();
+        const emailInput = page.getByPlaceholder(/your@email\.com/i).first();
         await expect(emailInput).toBeVisible({ timeout: 10000 });
         await emailInput.fill('mobile-test@example.com');
 
-        const verifyBtn = page.getByRole('button', { name: /verify|get started|launch|continue/i }).first();
+        const verifyBtn = page.getByRole('button', { name: /set up my agent/i }).first();
         await verifyBtn.click();
 
         // ── Wizard opens ──────────────────────────────────────────────────────
@@ -93,36 +102,39 @@ test.describe('Mobile Wizard — Full Flow (Stan Store)', () => {
         // Bot Name
         await page.getByPlaceholder('e.g. Prospect Scout').fill('MobileBot');
 
-        await page.getByRole('button', { name: /continue/i }).click();
+        await page.getByRole('button', { name: /next/i }).first().click();
 
         // ── Step 2: Channel Setup ─────────────────────────────────────────────
         await expect(page.getByText('Step 2 of 5')).toBeVisible({ timeout: 5000 });
         await expect(page.getByText('Connect Your Channel')).toBeVisible();
 
-        // Enter Telegram bot token
+        // Enter Telegram bot token — component validates via Telegram API after 700ms
         await page.getByPlaceholder(/paste bot token/i).fill('1234567890:AAFtest-mobile-token-for-e2e');
 
-        await page.getByRole('button', { name: /continue/i }).click();
+        // Wait for Telegram validation to complete (checkmark appears)
+        await expect(page.getByText(/@mobile_test_bot.*Verified/i)).toBeVisible({ timeout: 5000 });
+
+        await page.getByRole('button', { name: /^next$/i }).click();
 
         // ── Step 3: AI Connection ─────────────────────────────────────────────
         await expect(page.getByText('Step 3 of 5')).toBeVisible({ timeout: 5000 });
 
-        // Enter Google API key and validate
-        await page.getByPlaceholder(/AIza/i).fill('AIzaTestKeyMobileE2E12345');
-        await page.getByRole('button', { name: /validate key/i }).click();
-        await expect(page.getByText(/validated/i)).toBeVisible({ timeout: 10000 });
+        // Enter AI key and install (Gemini is default provider)
+        await page.getByPlaceholder(/paste your.*key/i).fill('AIzaTestKeyMobileE2E12345');
+        await page.getByRole('button', { name: /^install$/i }).click();
+        await expect(page.getByText(/verified/i)).toBeVisible({ timeout: 10000 });
 
-        await page.getByRole('button', { name: /continue/i }).click();
+        await page.getByRole('button', { name: /^continue$/i }).click();
 
         // ── Step 4: Customer Profile ──────────────────────────────────────────
         await expect(page.getByText('Step 4 of 5')).toBeVisible({ timeout: 5000 });
 
-        await page.getByPlaceholder(/who is your ideal customer/i).fill('Women 30-55 interested in health');
-        await page.getByPlaceholder(/what problem do they have/i).first().fill('Struggling with aging skin');
-        await page.getByPlaceholder(/what.*not working/i).first().fill('Cheap products that fail');
-        await page.getByPlaceholder(/where do they hang out/i).first().fill('Facebook groups, Instagram');
+        await page.getByPlaceholder(/Women 30-55/i).fill('Women 30-55 interested in health');
+        await page.getByPlaceholder(/Wrinkles/i).fill('Struggling with aging skin');
+        await page.getByPlaceholder(/Cheap products/i).fill('Cheap products that fail');
+        await page.getByPlaceholder(/Facebook groups, Instagram, TikTok/i).fill('Facebook groups, Instagram');
 
-        await page.getByRole('button', { name: /continue/i }).click();
+        await page.getByRole('button', { name: /^next$/i }).click();
 
         // ── Step 5: Review & Hatch ────────────────────────────────────────────
         await expect(page.getByText('Step 5 of 5')).toBeVisible({ timeout: 5000 });
@@ -136,7 +148,7 @@ test.describe('Mobile Wizard — Full Flow (Stan Store)', () => {
 
         // ── PostPaymentSuccess ────────────────────────────────────────────────
         // Bot-status mock returns live immediately
-        await expect(page.getByText('Agent Deployed')).toBeVisible({ timeout: 15000 });
+        await expect(page.getByText('Agent Activated')).toBeVisible({ timeout: 15000 });
         await expect(page.getByText('@mobile_test_bot')).toBeVisible();
         await expect(page.getByRole('link', { name: /start chat on telegram/i })).toBeVisible();
     });
@@ -153,30 +165,31 @@ test.describe('Mobile Wizard — Full Flow (Stan Store)', () => {
 
         await page.goto('/');
 
-        const emailInput = page.getByPlaceholder(/email/i).first();
+        const emailInput = page.getByPlaceholder(/your@email\.com/i).first();
         await emailInput.fill('mobile-test@example.com');
-        await page.getByRole('button', { name: /verify|get started|launch|continue/i }).first().click();
+        await page.getByRole('button', { name: /set up my agent/i }).first().click();
 
         await expect(page.getByText('Step 1 of 5')).toBeVisible({ timeout: 10000 });
         await page.getByRole('button', { name: /network marketing/i }).click();
         await page.getByPlaceholder('e.g. Brent Bryson').fill('Mobile Tester');
         await page.getByPlaceholder('you@example.com').fill('mobile-test@example.com');
         await page.getByPlaceholder('e.g. Prospect Scout').fill('MobileBot');
-        await page.getByRole('button', { name: /continue/i }).click();
+        await page.getByRole('button', { name: /next/i }).first().click();
 
         await page.getByPlaceholder(/paste bot token/i).fill('1234567890:AAFtest-token');
-        await page.getByRole('button', { name: /continue/i }).click();
+        await expect(page.getByText(/@mobile_test_bot.*Verified/i)).toBeVisible({ timeout: 5000 });
+        await page.getByRole('button', { name: /^next$/i }).click();
 
-        await page.getByPlaceholder(/AIza/i).fill('AIzaTestKey12345');
-        await page.getByRole('button', { name: /validate key/i }).click();
-        await expect(page.getByText(/validated/i)).toBeVisible({ timeout: 10000 });
-        await page.getByRole('button', { name: /continue/i }).click();
+        await page.getByPlaceholder(/paste your.*key/i).fill('AIzaTestKey12345');
+        await page.getByRole('button', { name: /^install$/i }).click();
+        await expect(page.getByText(/verified/i)).toBeVisible({ timeout: 10000 });
+        await page.getByRole('button', { name: /^continue$/i }).click();
 
-        await page.getByPlaceholder(/who is your ideal customer/i).fill('Test customer');
-        await page.getByPlaceholder(/what problem do they have/i).first().fill('Test problem');
-        await page.getByPlaceholder(/what.*not working/i).first().fill('Test failing');
-        await page.getByPlaceholder(/where do they hang out/i).first().fill('Facebook');
-        await page.getByRole('button', { name: /continue/i }).click();
+        await page.getByPlaceholder(/Women 30-55/i).fill('Test customer');
+        await page.getByPlaceholder(/Wrinkles/i).fill('Test problem');
+        await page.getByPlaceholder(/Cheap products/i).fill('Test failing');
+        await page.getByPlaceholder(/Facebook groups, Instagram, TikTok/i).fill('Facebook');
+        await page.getByRole('button', { name: /^next$/i }).click();
 
         await page.getByRole('button', { name: /activate agent now/i }).click();
 
@@ -188,20 +201,20 @@ test.describe('Mobile Wizard — Full Flow (Stan Store)', () => {
     test('back button works on every step', async ({ page }) => {
         await page.goto('/');
 
-        const emailInput = page.getByPlaceholder(/email/i).first();
+        const emailInput = page.getByPlaceholder(/your@email\.com/i).first();
         await emailInput.fill('mobile-test@example.com');
-        await page.getByRole('button', { name: /verify|get started|launch|continue/i }).first().click();
+        await page.getByRole('button', { name: /set up my agent/i }).first().click();
 
         await expect(page.getByText('Step 1 of 5')).toBeVisible({ timeout: 10000 });
         await page.getByRole('button', { name: /network marketing/i }).click();
         await page.getByPlaceholder('e.g. Brent Bryson').fill('Mobile Tester');
         await page.getByPlaceholder('you@example.com').fill('mobile-test@example.com');
         await page.getByPlaceholder('e.g. Prospect Scout').fill('MobileBot');
-        await page.getByRole('button', { name: /continue/i }).click();
+        await page.getByRole('button', { name: /next/i }).first().click();
 
         // On step 2 — back button should return to step 1
         await expect(page.getByText('Step 2 of 5')).toBeVisible({ timeout: 5000 });
-        await page.getByRole('button', { name: /back/i }).click();
+        await page.getByRole('button', { name: /go back/i }).click();
         await expect(page.getByText('Step 1 of 5')).toBeVisible();
         await expect(page.getByText('Identity & Niche')).toBeVisible();
     });
