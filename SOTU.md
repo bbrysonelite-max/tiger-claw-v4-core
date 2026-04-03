@@ -224,6 +224,17 @@ One email can own multiple bots. Each Stan Store purchase creates a fresh `bot_i
 
 **SOTU.md created.** Phase 1 spec written and approved (`specs/PHASE_1_SIGNUP.md`).
 
+### Later in session — Dashboard and Landing Page Polish (PRs #166–#167)
+
+| PR | Description |
+|---|---|
+| #166 | Remove LINE channel card and Channel Config quick action from customer dashboard |
+| #167 | Refresh root landing page — email redirects to `/signup`, tighten copy, remove old 5-step wizard modal |
+
+- `wizard.tigerclaw.io` root page now dead-ends to `/signup` — old `OnboardingModal` is fully retired
+- Customer dashboard: Telegram + WhatsApp only. No LINE, no "Founding Member", no Channel Config link.
+- `?email=` pre-fill on signup page was already built — Stan Store just needs to append it to the receipt link
+
 ### Phase 1 Signup — Built, Deployed, and Proven (PRs #156–#165)
 
 The 5-step wizard is replaced by a single-page signup at `wizard.tigerclaw.io/signup`.
@@ -319,6 +330,9 @@ These were identified 2026-04-03 before building Phase 1. Address one at a time.
 | Past customers owed bots: `chana.loh@gmail.com`, `nancylimsk@gmail.com`, `lily.vergara@gmail.com` — paid, never onboarded | High |
 | Jeff Mack + Debbie — paid, `pending`, never onboarded — send `wizard.tigerclaw.io/signup` | High |
 | ~~Self-serve single-page signup~~ | ✅ DONE — `wizard.tigerclaw.io/signup` live and tested 2026-04-03 |
+| ~~Old 5-step wizard (OnboardingModal)~~ | ✅ RETIRED — root page redirects to `/signup` |
+| ~~LINE + Channel Config on customer dashboard~~ | ✅ REMOVED — dashboard shows Telegram + WhatsApp only |
+| Stan Store receipt email — append `?email={{customer_email}}` to link | Quick — Brent does in Stan Store admin. Code already reads it. |
 | Orphan bots: `brent-bryson-mnjbj7r5`, `brent-bryson-mnj9oxp1` — dead test bots | Low — cleanup when convenient |
 | **Always call `/admin/fix-all-webhooks` after every API deploy** — TELEGRAM_WEBHOOK_SECRET mismatch will kill all bots silently | Ops discipline — add to checklist |
 | Customer-facing dashboard | Phase 2 |
