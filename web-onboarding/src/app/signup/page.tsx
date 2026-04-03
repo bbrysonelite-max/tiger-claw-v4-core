@@ -405,7 +405,7 @@ function SignupForm({ email, botId }: SignupFormProps) {
         name: form.agentName.trim(),
         email,
         flavor: form.flavor,
-        telegramBotToken: form.telegramToken.trim(),
+        botToken: form.telegramToken.trim(),
         aiKey: form.aiKey.trim(),
         customerProfile: {
           idealCustomer: form.whoTheyAre.trim(),
