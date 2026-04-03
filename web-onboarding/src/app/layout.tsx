@@ -28,9 +28,6 @@ export default function RootLayout({
             <div className="font-bold text-xl tracking-tight flex items-center gap-2">
               <span className="text-primary text-2xl">⚡️</span> Tiger Claw
             </div>
-            <div className="text-sm font-medium text-white/60">
-              Enterprise V4.0
-            </div>
           </div>
         </header>
 
