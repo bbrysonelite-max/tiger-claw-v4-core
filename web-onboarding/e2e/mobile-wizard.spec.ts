@@ -219,4 +219,58 @@ test.describe('Mobile Wizard — Full Flow (Stan Store)', () => {
         await expect(page.getByText('Identity & Niche')).toBeVisible();
     });
 
+    test('LINE channel — completes full flow without Telegram token', async ({ page }) => {
+        await page.goto('/');
+
+        const emailInput = page.getByPlaceholder(/your@email\.com/i).first();
+        await emailInput.fill('john-line-test@example.com');
+        await page.getByRole('button', { name: /set up my agent/i }).first().click();
+
+        await expect(page.getByText('Step 1 of 5')).toBeVisible({ timeout: 10000 });
+
+        // Step 1: Identity
+        await page.getByRole('button', { name: /network marketing/i }).click();
+        await page.getByPlaceholder('e.g. Brent Bryson').fill('John LINE');
+        await page.getByPlaceholder('you@example.com').fill('john-line-test@example.com');
+        await page.getByPlaceholder('e.g. Prospect Scout').fill('JohnBot');
+        await page.getByRole('button', { name: /next/i }).first().click();
+
+        // Step 2: Channel Setup — LINE only, no Telegram token
+        await expect(page.getByText('Step 2 of 5')).toBeVisible({ timeout: 5000 });
+        await expect(page.getByText('Connect Your Channel')).toBeVisible();
+
+        await page.getByPlaceholder('Channel Access Token').fill('test-line-channel-access-token');
+        await page.getByPlaceholder('Channel Secret').fill('test-line-channel-secret');
+
+        // LINE doesn't require external validation — Next button enables immediately
+        await page.getByRole('button', { name: /^next$/i }).click();
+
+        // Step 3: AI Connection
+        await expect(page.getByText('Step 3 of 5')).toBeVisible({ timeout: 5000 });
+        await page.getByPlaceholder(/paste your.*key/i).fill('AIzaTestKeyLineE2E12345');
+        await page.getByRole('button', { name: /^install$/i }).click();
+        await expect(page.getByText(/verified/i)).toBeVisible({ timeout: 10000 });
+        await page.getByRole('button', { name: /^continue$/i }).click();
+
+        // Step 4: Customer Profile
+        await expect(page.getByText('Step 4 of 5')).toBeVisible({ timeout: 5000 });
+        await page.getByPlaceholder(/Women 30-55/i).fill('Thai professionals 30-50');
+        await page.getByPlaceholder(/Wrinkles/i).fill('No passive income');
+        await page.getByPlaceholder(/Cheap products/i).fill('Traditional jobs with no upside');
+        await page.getByPlaceholder(/Facebook groups, Instagram, TikTok/i).fill('LINE groups, Facebook');
+        await page.getByRole('button', { name: /^next$/i }).click();
+
+        // Step 5: Review & Hatch
+        await expect(page.getByText('Step 5 of 5')).toBeVisible({ timeout: 5000 });
+        await expect(page.getByText('HATCH YOUR TIGER')).toBeVisible();
+
+        const hatchBtn = page.getByRole('button', { name: /activate agent now/i });
+        await expect(hatchBtn).toBeEnabled();
+        await hatchBtn.click();
+
+        // PostPaymentSuccess — bot-status mock returns live
+        await expect(page.getByText('Agent Activated')).toBeVisible({ timeout: 15000 });
+        await expect(page.getByRole('link', { name: /start chat on telegram/i })).toBeVisible();
+    });
+
 });
