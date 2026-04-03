@@ -115,6 +115,59 @@ function identityQuestion(key: keyof IdentityAnswers, profession: string): strin
   return questions[key];
 }
 
+// Default ICP per flavor — used when a customer hatches without completing the ICP interview.
+// Keeps the bot aimed at something real rather than launching blind with "ideal customer: —".
+const FLAVOR_DEFAULT_ICP: Record<string, { idealPerson: string; problemFaced: string }> = {
+  "network-marketer": {
+    idealPerson: "A motivated professional aged 30–55 who wants to build side income or replace their job. They're entrepreneurial but haven't found the right vehicle yet. They value flexibility and helping others.",
+    problemFaced: "They're stuck in a job that doesn't give them freedom or growth. They want more income but don't know where to start or who to trust.",
+  },
+  "real-estate": {
+    idealPerson: "A first-time or move-up homebuyer aged 28–50, employed, with a growing family or lifestyle need driving the purchase. They're actively searching but feel overwhelmed by the process.",
+    problemFaced: "They don't know how to navigate the market, what they can actually afford, or who to trust. They need a guide, not a salesperson.",
+  },
+  "health-wellness": {
+    idealPerson: "A health-conscious adult aged 25–55 who has tried diets or supplements before but hasn't found lasting results. They're motivated by how they feel, not just how they look.",
+    problemFaced: "They feel tired, stuck, or frustrated with products that overpromise. They want something that actually works and that they can trust.",
+  },
+  "mortgage-broker": {
+    idealPerson: "A homebuyer or homeowner aged 30–55 looking to purchase, refinance, or access equity. They're financially responsible but confused by rates, lenders, and the approval process.",
+    problemFaced: "They don't know how to compare lenders, fear hidden fees, and want someone in their corner who isn't just trying to close a deal.",
+  },
+  "airbnb-host": {
+    idealPerson: "A property owner aged 30–60 with one or more properties they want to monetize. They may be new to short-term rentals or struggling to optimize an existing listing.",
+    problemFaced: "They're leaving money on the table — poor pricing strategy, low occupancy, or bad reviews — and don't know how to fix it.",
+  },
+  "plumber": {
+    idealPerson: "A homeowner aged 30–65 with an urgent or planned plumbing need — from a dripping faucet to a full water heater replacement. They prioritize reliability and fair pricing over the cheapest option.",
+    problemFaced: "They've been burned by unreliable contractors before. They need someone licensed, trustworthy, and responsive — and they don't know where to find them.",
+  },
+  "interior-designer": {
+    idealPerson: "A homeowner or renter aged 28–55 planning a renovation or redesign. They have a vision but lack the expertise to execute it — and a budget they don't want to waste.",
+    problemFaced: "They're overwhelmed by choices, afraid of making expensive mistakes, and don't know how to translate their Pinterest board into a real room.",
+  },
+  "personal-trainer": {
+    idealPerson: "An adult aged 25–55 who wants to lose weight, build strength, or feel better but struggles with consistency. They've tried gyms before and quit.",
+    problemFaced: "Generic programs don't stick. They need accountability, a plan built for their life, and someone who will adapt when things don't go perfectly.",
+  },
+  "candle-maker": {
+    idealPerson: "A consumer aged 25–50 who values artisan, handcrafted products and prefers to support small businesses. They buy gifts regularly and care about scent, quality, and story.",
+    problemFaced: "Mass-market candles feel generic and cheap. They want something with character and craft that they can feel good about giving or keeping.",
+  },
+  "baker": {
+    idealPerson: "A local customer aged 25–60 looking for custom cakes, baked goods, or specialty items for events, celebrations, or everyday indulgence. They value quality over convenience.",
+    problemFaced: "Grocery store baked goods feel impersonal. They want real ingredients, real craft, and someone who will get their vision right.",
+  },
+  "gig-economy": {
+    idealPerson: "A person aged 20–45 looking to earn flexible income on their own schedule. They may be between jobs, a student, a parent, or simply want financial cushion beyond their primary income.",
+    problemFaced: "They don't know which platforms are worth their time, how to maximize earnings, or how to avoid common gig-work pitfalls.",
+  },
+  "lawyer": {
+    idealPerson: "An individual or small business owner aged 30–65 facing a legal situation they can't navigate alone — from contracts and disputes to estate planning and compliance.",
+    problemFaced: "They don't know if they need a lawyer, what it will cost, or who to trust. They're intimidated by the process and afraid of being overcharged.",
+  },
+};
+
 // ICP question keys match ICPAnswers field names (in order)
 const ICP_QUESTION_KEYS: (keyof ICPAnswers)[] = [
   "idealPerson",
@@ -772,18 +825,26 @@ async function handleNaming(
   const botName = response.trim();
   state.botName = botName;
 
-  // CRITICAL: ICP must be non-empty before we mark onboarding complete.
-  // A blank idealPerson means the system prompt says "ideal customer: —" forever
-  // and the scout targets nobody. Block here as a last-resort safety net.
+  // ICP safety net: if idealPerson is empty, auto-populate from flavor defaults rather than
+  // blocking the customer. A bot that launches with a sensible default ICP is better than
+  // a bot that never launches or a bot that launches targeting nobody ("ideal customer: —").
   const customerICP = state.icpSingle ?? state.icpCustomer;
   const builderICP = state.icpBuilder;
-  const hasCustomerICP = !!customerICP?.idealPerson?.trim();
-  const hasBuilderICP = !builderICP || !!builderICP?.idealPerson?.trim();
-  if (!hasCustomerICP || !hasBuilderICP) {
-    return {
-      ok: true,
-      output: `⚠️ We need to complete your Ideal Customer Profile before I can go live. Who is your ideal customer? (Describe them in a few sentences.)`,
-      data: { phase: "icp_single", progressPercent: 30 },
+  const flavorDefault = FLAVOR_DEFAULT_ICP[state.flavor ?? "network-marketer"] ?? FLAVOR_DEFAULT_ICP["network-marketer"];
+
+  if (!customerICP?.idealPerson?.trim()) {
+    const target = state.icpSingle ? "icpSingle" : "icpCustomer";
+    (state as any)[target] = {
+      ...(state as any)[target],
+      idealPerson: flavorDefault.idealPerson,
+      problemFaced: (state as any)[target]?.problemFaced?.trim() || flavorDefault.problemFaced,
+    };
+  }
+  if (builderICP && !builderICP.idealPerson?.trim()) {
+    state.icpBuilder = {
+      ...state.icpBuilder,
+      idealPerson: flavorDefault.idealPerson,
+      problemFaced: state.icpBuilder?.problemFaced?.trim() || flavorDefault.problemFaced,
     };
   }
 
