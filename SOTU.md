@@ -356,6 +356,27 @@ These were identified 2026-04-03 before building Phase 1. Address one at a time.
 
 ---
 
+## Future Vision (Do Not Build Yet — Capture Only)
+
+These ideas emerged from live use. They are NOT on the roadmap yet. They go here so they are never lost.
+
+### Reflexion Loop — Agents That Learn
+Each agent accumulates outcome data: which approaches closed leads, which got ghosted, which objection handlers worked. That data feeds back into `fact_anchors` (per-agent) and `hive_signals` (fleet-wide). The agent wakes up each morning slightly smarter than yesterday.
+
+**What's already there:** `fact_anchors`, `hive_signals`, `tiger_convert`, lead scoring history, morning report.  
+**What's missing:** The feedback loop closing — outcome signals flowing back into the agent's behavior.  
+**When to build:** After 10+ agents have hatched and generated real outcome data to learn from.
+
+### Agent Leaderboard — The Competition
+Opt-in, privacy-respecting leaderboard across the fleet. Operators see how their agent ranks on leads surfaced, pipeline activity, conversion rate, scout velocity. For a downline of 21,000 distributors — imagine the motivation. The leaderboard and the Reflexion Loop are connected: the best-performing agents teach the fleet.
+
+**What's already there:** All the underlying data exists per-tenant.  
+**When to build:** After Reflexion Loop is live and there are enough agents to make rankings meaningful.
+
+**Do not mention either of these publicly until they are built.**
+
+---
+
 ## Engineering Constraints (Non-Negotiable)
 
 - `main` is branch-protected. Always create a `feat/` or `fix/` branch and use `gh pr create`. Never push directly to main.
