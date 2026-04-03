@@ -235,6 +235,10 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
     await updateTenantStatus(tenant.id, "suspended", {
       suspendedReason: `Webhook attachment failed: ${errMsg}`,
     });
+    await logAdminEvent("suspend", tenant.id, { reason: `Webhook attachment failed: ${errMsg}` });
+    await sendAdminAlert(
+      `⛔ PROVISIONING FAILED\nTenant: ${tenant.slug} (${input.email ?? "no email"})\nReason: ${errMsg}\nAction: Go to /admin/dashboard → find tenant → Resume after fixing the issue.`
+    ).catch(() => {}); // non-fatal — don't let alert failure mask the real error
 
     return {
       success: false,
