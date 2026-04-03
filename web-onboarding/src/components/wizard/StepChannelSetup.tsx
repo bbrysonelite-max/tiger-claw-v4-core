@@ -29,8 +29,10 @@ export default function StepChannelSetup({ state, updateState, onNext }: Channel
             setValidating(true);
             setBotUsername(null);
             setValidationError("");
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 8000);
             try {
-                const res = await fetch(`https://api.telegram.org/bot${token}/getMe`);
+                const res = await fetch(`https://api.telegram.org/bot${token}/getMe`, { signal: controller.signal });
                 const data = await res.json();
                 if (data.ok) {
                     setBotUsername(data.result.username);
@@ -40,6 +42,7 @@ export default function StepChannelSetup({ state, updateState, onNext }: Channel
             } catch {
                 setValidationError("Could not reach Telegram. Check your connection.");
             } finally {
+                clearTimeout(timeout);
                 setValidating(false);
             }
         }, 700);
