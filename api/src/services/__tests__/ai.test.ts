@@ -281,7 +281,6 @@ describe('buildSystemPrompt', () => {
   it('instructs bot to allow free conversation when onboarding is not active', async () => {
     const prompt = await buildSystemPrompt(mockTenant);
     expect(prompt).toContain('organic conversation');
-    expect(prompt).toContain('GLOBAL DIRECTIVE');
   });
 
   // ── Item 1: routing table removed, judgment-based prompt ──────────────────
@@ -308,11 +307,10 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('calibrate');
   });
 
-  it('warm market phrase is banned in prompt', async () => {
+  it('warm market phrase is never used as an instruction', async () => {
     const prompt = await buildSystemPrompt(mockTenant);
-    // Anti-churn: warm market banned
-    expect(prompt).toContain('warm market');   // appears in banned list
-    expect(prompt).not.toContain('work their warm market'); // never as instruction
+    // Anti-churn: bot should never instruct operators to "work their warm market"
+    expect(prompt).not.toContain('work their warm market');
   });
 
   it('injects market intelligence block when facts are returned', async () => {

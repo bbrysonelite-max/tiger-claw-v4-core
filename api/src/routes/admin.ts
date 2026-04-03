@@ -300,7 +300,7 @@ router.get("/flavors", requireAdmin, async (_req: Request, res: Response) => {
 
 router.get("/dashboard/tenants", requireAdmin, async (_req: Request, res: Response) => {
   try {
-    const { getPool } = await import("../services/db.js");
+    const { getPool, getBotState } = await import("../services/db.js");
     const pool = getPool();
 
     const result = await pool.query(`
@@ -314,6 +314,7 @@ router.get("/dashboard/tenants", requireAdmin, async (_req: Request, res: Respon
         t.canary_group,
         t.last_activity_at,
         t.created_at,
+        t.bot_username,
         u.email,
         s.status AS subscription_status,
         s.plan_tier,
@@ -326,21 +327,33 @@ router.get("/dashboard/tenants", requireAdmin, async (_req: Request, res: Respon
       ORDER BY t.created_at DESC
     `);
 
-    const dashboardData = result.rows.map((row) => ({
-      id: row.id,
-      name: row.name,
-      slug: row.slug,
-      email: row.email ?? 'unknown',
-      status: row.status,
-      subscriptionStatus: row.subscription_status ?? 'none',
-      planTier: row.plan_tier ?? 'unknown',
-      flavor: row.flavor,
-      preferredChannel: row.preferred_channel,
-      isCanary: row.canary_group,
-      onboardingComplete: ['active', 'live', 'onboarding'].includes(row.status),
-      leadCount: parseInt(row.lead_count ?? '0', 10),
-      lastActive: row.last_activity_at ? new Date(row.last_activity_at).toISOString() : 'Never',
-      createdAt: new Date(row.created_at).toISOString(),
+    const dashboardData = await Promise.all(result.rows.map(async (row) => {
+      const isComplete = ['active', 'live'].includes(row.status);
+      let onboardingPhase = isComplete ? 'complete' : 'unknown';
+      if (!isComplete) {
+        try {
+          const botState = await getBotState<{ phase?: string }>(row.id, "onboard_state.json");
+          if (botState?.phase) onboardingPhase = botState.phase;
+        } catch {}
+      }
+      return {
+        id: row.id,
+        name: row.name,
+        slug: row.slug,
+        email: row.email ?? 'unknown',
+        status: row.status,
+        subscriptionStatus: row.subscription_status ?? 'none',
+        planTier: row.plan_tier ?? 'unknown',
+        flavor: row.flavor,
+        preferredChannel: row.preferred_channel,
+        isCanary: row.canary_group,
+        botUsername: row.bot_username ? `@${row.bot_username}` : 'Unassigned',
+        onboardingComplete: isComplete,
+        onboardingPhase,
+        leadCount: parseInt(row.lead_count ?? '0', 10),
+        lastActive: row.last_activity_at ? new Date(row.last_activity_at).toISOString() : 'Never',
+        createdAt: new Date(row.created_at).toISOString(),
+      };
     }));
 
     return res.json({ tenants: dashboardData });
