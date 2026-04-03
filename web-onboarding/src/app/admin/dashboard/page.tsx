@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   Activity, AlertTriangle, Bot, CheckCircle2, ChevronDown, ChevronRight,
-  Database, Eye, LogOut, MessageSquare, Pause, Play, RefreshCw, Shield, Zap,
+  Database, Eye, Link, LogOut, MessageSquare, Pause, Play, RefreshCw, Shield, Zap,
 } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://api.tigerclaw.io";
@@ -144,6 +144,7 @@ export default function FleetDashboard() {
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
   const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
   const [expandedTenant, setExpandedTenant] = useState<string | null>(null);
+  const [webhookFixResult, setWebhookFixResult] = useState<string | null>(null);
 
   const headers = useCallback(
     () => ({ "Content-Type": "application/json", Authorization: `Bearer ${token}` }),
@@ -167,11 +168,15 @@ export default function FleetDashboard() {
         return;
       }
 
-      if (poolRes.ok) setPool(await poolRes.json());
-      if (fleetRes.ok) {
-        const data = await fleetRes.json();
-        setTenants(data.tenants ?? []);
+      if (!fleetRes.ok) {
+        const body = await fleetRes.json().catch(() => ({})) as { error?: string };
+        setError(`Fleet API error ${fleetRes.status}: ${body.error ?? "unknown"}`);
+        return;
       }
+
+      if (poolRes.ok) setPool(await poolRes.json());
+      const fleetData = await fleetRes.json();
+      setTenants(fleetData.tenants ?? []);
       if (convoRes.ok) setConversations(await convoRes.json());
       setLastRefreshed(new Date());
     } catch {
@@ -189,6 +194,13 @@ export default function FleetDashboard() {
       fetchAll(saved);
     }
   }, [fetchAll]);
+
+  // Auto-refresh every 30s so data stays live during operations
+  useEffect(() => {
+    if (!isAuthenticated || !token) return;
+    const interval = setInterval(() => fetchAll(token), 30_000);
+    return () => clearInterval(interval);
+  }, [isAuthenticated, token, fetchAll]);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -219,6 +231,26 @@ export default function FleetDashboard() {
       await fetchAll(token);
     } finally {
       setActionLoading((prev) => ({ ...prev, [key]: false }));
+    }
+  };
+
+  const fixAllWebhooks = async () => {
+    setActionLoading((prev) => ({ ...prev, "fix-webhooks": true }));
+    setWebhookFixResult(null);
+    try {
+      const res = await fetch(`${API_URL}/admin/fix-all-webhooks`, { method: "POST", headers: headers() });
+      const data = await res.json() as { ok: boolean; processed: number; secretWired: boolean; results: { slug: string; status: string; msg?: string }[] };
+      const failed = data.results.filter((r) => r.status !== "fixed");
+      if (failed.length === 0) {
+        setWebhookFixResult(`✅ ${data.processed} webhook${data.processed !== 1 ? "s" : ""} fixed. Secret wired: ${data.secretWired ? "yes" : "NO — check TELEGRAM_WEBHOOK_SECRET env var"}`);
+      } else {
+        setWebhookFixResult(`⚠️ ${data.processed - failed.length}/${data.processed} fixed. Failed: ${failed.map((r) => `${r.slug} (${r.msg})`).join(", ")}`);
+      }
+      await fetchAll(token);
+    } catch {
+      setWebhookFixResult("❌ Request failed — check API connection");
+    } finally {
+      setActionLoading((prev) => ({ ...prev, "fix-webhooks": false }));
     }
   };
 
@@ -284,6 +316,15 @@ export default function FleetDashboard() {
             </span>
           )}
           <button
+            onClick={fixAllWebhooks}
+            disabled={!!actionLoading["fix-webhooks"]}
+            title="Re-register all Telegram webhooks with the secret token"
+            className="flex items-center gap-1.5 text-zinc-400 hover:text-orange-400 text-sm transition-colors disabled:opacity-50"
+          >
+            <Link className={`w-4 h-4 ${actionLoading["fix-webhooks"] ? "animate-pulse" : ""}`} />
+            Fix Webhooks
+          </button>
+          <button
             onClick={() => fetchAll(token)}
             disabled={loading}
             className="flex items-center gap-1.5 text-zinc-400 hover:text-white text-sm transition-colors disabled:opacity-50"
@@ -312,6 +353,14 @@ export default function FleetDashboard() {
                 <span className="text-red-300 text-sm">{alarm}</span>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Webhook fix result */}
+        {webhookFixResult && (
+          <div className="bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 flex items-start justify-between gap-2">
+            <span className="text-zinc-300 text-sm">{webhookFixResult}</span>
+            <button onClick={() => setWebhookFixResult(null)} className="text-zinc-600 hover:text-zinc-400 text-xs shrink-0">✕</button>
           </div>
         )}
 
