@@ -267,7 +267,6 @@ These were identified 2026-04-03 before building Phase 1. Address one at a time.
 | 3 | **Mine validation** — 10,833 facts in production but never spot-checked for quality. The mine is a key differentiator. Before telling customers it exists, verify that 20-30 facts are actually useful. | ⏳ Deferred |
 | 4 | **Morning report never seen by a real customer** — Built and deployed in Session 5, but every tenant is a test account or incomplete onboard. Brent should receive a real morning report from his own bot before customers are told to expect one. | ⏳ Deferred |
 | 5 | **Price and positioning** — $97/$147 Stan Store vs. Founding 50 at $50/month are unreconciled. The signup page copy must match what's being sold. Decide before the page goes live. | ⏳ Deferred |
-| 6 | **Payment platform migration** — Stan Store must be replaced with Lemon Squeezy or Paddle (merchant of record) before scaling internationally. International customers (Thailand, Spain, EU) create VAT/GST liability if Stan Store remains. This migration will change the entry point email and may remove or change the one-email-field gate on the signup page. **Do not build Phase 1 assuming Stan Store is permanent.** The email verification step should be easy to remove or replace. | Phase 2 — investigate during Phase 1 build |
 
 ---
 

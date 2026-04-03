@@ -29,29 +29,18 @@ If that works without Brent in the room, Phase 1 is complete.
 
 ---
 
-## Payment Platform Note (Read Before Building)
-
-Stan Store will be replaced with Lemon Squeezy or Paddle in Phase 2 (merchant of record — required for international VAT compliance). That migration may change the entry point entirely and could remove the email verification step below. **Build the email gate as an isolated, removable component.** The rest of the page must not depend on it structurally.
-
----
-
 ## Entry Point
 
 **No change to the Stan Store → Zapier → webhook flow.** That works.
 
-After payment, Stan Store sends the customer an email. The link in that email goes to `wizard.tigerclaw.io` with no parameters — Stan Store cannot pass the email in the URL. This was confirmed by testing on 2026-04-03.
+After payment, the customer receives an email with a link:
+```
+wizard.tigerclaw.io/signup?email=their@email.com
+```
 
-The page opens with a single gate field before the form renders:
+When the page loads, it silently calls `/wizard/auth/verify-purchase` in the background. If the purchase is valid, the form unlocks. If not, it shows a clear message: "We couldn't find a purchase for this email. Contact support."
 
-> **Welcome to Tiger Claw.**
-> Enter the email you used to purchase and we'll get your agent configured.
-> `[ your@email.com ]` `[ Continue → ]`
-
-On Continue, the page calls `/wizard/auth/verify-purchase?email={email}`. If the purchase is valid, the gate disappears and the full form renders. If not: "No purchase found for this email. Check your Stan Store receipt or contact support."
-
-**Build this gate as a standalone isolated component.** When the platform migrates to Lemon Squeezy or Paddle in Phase 2, this gate will likely be removed or replaced. The form sections below must not depend on it structurally.
-
-The customer never creates a password. The email they type is the key.
+The customer never sees a login screen. No username. No password. The link is the key.
 
 ---
 
