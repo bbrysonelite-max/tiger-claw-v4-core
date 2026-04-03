@@ -256,6 +256,20 @@ This is not a coding problem yet. It is the next decision to make.
 
 ---
 
+## Pre-Launch Concerns (Address in Order)
+
+These were identified 2026-04-03 before building Phase 1. Address one at a time. Do not build past concern #1 until it is resolved.
+
+| # | Concern | Status |
+|---|---|---|
+| 1 | **Entry point email** — Does Stan Store actually send customers a link after purchase? What URL is in that email? If the link goes to the old wizard or doesn't exist, the new signup page is invisible. **Test: buy a $1 agent on Stan Store and see what arrives.** | 🔴 Active — testing now |
+| 2 | **Pending customers** — Jeff Mack, Debbie, Spain customer are in `pending` status and have paid. They need to be onboarded before more time passes or they request refunds. | ⏳ Deferred until #1 resolved |
+| 3 | **Mine validation** — 10,833 facts in production but never spot-checked for quality. The mine is a key differentiator. Before telling customers it exists, verify that 20-30 facts are actually useful. | ⏳ Deferred |
+| 4 | **Morning report never seen by a real customer** — Built and deployed in Session 5, but every tenant is a test account or incomplete onboard. Brent should receive a real morning report from his own bot before customers are told to expect one. | ⏳ Deferred |
+| 5 | **Price and positioning** — $97/$147 Stan Store vs. Founding 50 at $50/month are unreconciled. The signup page copy must match what's being sold. Decide before the page goes live. | ⏳ Deferred |
+
+---
+
 ## Engineering Constraints (Non-Negotiable)
 
 - `main` is branch-protected. Always create a `feat/` or `fix/` branch and use `gh pr create`. Never push directly to main.
