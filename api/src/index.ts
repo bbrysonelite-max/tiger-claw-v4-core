@@ -227,8 +227,23 @@ async function runHealthMonitor(): Promise<void> {
 // ---------------------------------------------------------------------------
 
 async function main(): Promise<void> {
-  // Run versioned SQL migrations first (GAP-8 — must run before schema init)
-  await runMigrations();
+  // Run versioned SQL migrations with retry — Cloud SQL proxy can be slow to start
+  // and if it's not ready, a single attempt would crash the container on first deploy.
+  const MAX_MIGRATION_ATTEMPTS = 5;
+  for (let attempt = 1; attempt <= MAX_MIGRATION_ATTEMPTS; attempt++) {
+    try {
+      await runMigrations();
+      break;
+    } catch (err: any) {
+      if (attempt === MAX_MIGRATION_ATTEMPTS) {
+        console.error(`[startup] runMigrations failed after ${MAX_MIGRATION_ATTEMPTS} attempts:`, err.message);
+        throw err;
+      }
+      const delayMs = Math.min(1000 * 2 ** attempt, 30000);
+      console.warn(`[startup] runMigrations attempt ${attempt} failed — retrying in ${delayMs}ms:`, err.message);
+      await new Promise(r => setTimeout(r, delayMs));
+    }
+  }
 
   // Initialize PostgreSQL schema (legacy CREATE TABLE IF NOT EXISTS fallback)
   await initSchema();
