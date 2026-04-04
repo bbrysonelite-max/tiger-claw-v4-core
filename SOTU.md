@@ -1,7 +1,63 @@
 # Tiger Claw — State of the Union
 
-**Last updated:** 2026-04-03 (Session 6 — COMPLETE)
+**Last updated:** 2026-04-03 (Session 6 — audit performed end of session)
 **Read this first. Read nothing else until you have finished this file.**
+
+---
+
+## Standing Orders for Every AI Reading This File
+
+**No lying. No assuming. No guessing.**
+
+- Do not claim a feature works unless you have tested it live and seen a 200.
+- Do not claim a bug is fixed unless you have verified the fix in production logs.
+- Do not mark a session "COMPLETE" if known broken items remain unresolved.
+- If you do not know the state of something, say so explicitly.
+- The operator is running a real business with real paying customers. False confidence causes real damage.
+
+---
+
+## Live System Audit — 2026-04-03 (End of Session 6)
+
+Results of a full live test of every external dependency. This is ground truth.
+
+### ✅ Working
+
+| Service | Notes |
+|---------|-------|
+| Cloud Run API | Healthy — postgres, redis, disk, workers all OK |
+| PostgreSQL | OK |
+| Redis + BullMQ | OK |
+| `GOOGLE_API_KEY` (platform) | 200 — active |
+| `PLATFORM_ONBOARDING_KEY` | 200 — active |
+| `STRIPE_SECRET_KEY` | 200 — account live |
+| `STRIPE_WEBHOOK_SECRET` | Present (whsec_…) |
+| Admin Telegram bot | OK — @AlienProbeadmin_bot responds |
+| Reddit public API | 200 — accessible |
+| `MAGIC_LINK_SECRET` | Present |
+| `ENCRYPTION_KEY` | Present |
+| `TIGER_CLAW_HIVE_TOKEN` | Present |
+| Resend domain | tigerclaw.io verified, sending enabled |
+
+### ❌ Broken — Must Fix Before Claiming Product Is Ready
+
+| Service | Status | Impact |
+|---------|--------|--------|
+| `SERPER_KEY_1/2/3` | ALL 403 | **Scout finds zero prospects on every tenant.** Facebook and LINE web fallback are dead. Reddit via Serper is dead. Bot appears to work but does nothing. |
+| `PLATFORM_EMERGENCY_KEY` | Expired — "API key expired" | Emergency AI fallback chain is broken. If platform key hits quota, there is no backup. |
+| `STRIPE_PRICE_BYOK` | `price_placeholder_replace_me` | Stripe checkout is broken. No new customer can complete payment via Stripe. |
+| `RESEND_API_KEY` | Not in deploy script | Transactional emails (provisioning receipts, welcome emails, first-lead notifications) are not delivered in production. Secret exists in GCP but is never injected into Cloud Run. |
+| `ZAPIER_WEBHOOK_SECRET` | Not in GCP secrets, not in deploy script | Stan Store webhook runs unauthenticated. Any POST to `/webhooks/stan-store` will be accepted without verification. Active security gap. |
+
+### ⚠️ Needs Investigation
+
+| Item | Issue |
+|------|-------|
+| Reddit in tiger_scout | Public API returns 200 in direct test, but scout logs show 403. May be User-Agent or rate-limit issue specific to Cloud Run egress IP. Needs live scout log analysis. |
+| `nurture_check` routine | Logs show `nurture_check` is calling `tiger_scout` — that is wrong. nurture_check should work the existing pipeline, not run a scout. |
+| Admin dashboard path | SOTU previously listed `wizard.tigerclaw.io/admin/dashboard`. Correct path is `wizard.tigerclaw.io/admin`. |
+| Vercel auto-deploy | Broken — wizard must be deployed manually until Root Directory is fixed in Vercel project settings. |
+| LINE provisioning | PR #107 was noted as open. Status of merge is unconfirmed. |
 
 ---
 
