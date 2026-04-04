@@ -209,14 +209,26 @@ async function draftReply(
 // Database: Store drafts
 // ---------------------------------------------------------------------------
 
-async function storeDraft(draft: Omit<StrikeDraft, "created_at">): Promise<void> {
+async function storeDraft(draft: Omit<StrikeDraft, "created_at">): Promise<boolean> {
   const pool = getWritePool();
+  // Guard: verify fact_id exists in market_intelligence before inserting.
+  // Gemini can hallucinate UUIDs when calling tiger_strike_draft without first
+  // calling tiger_strike_harvest — this prevents a FK violation crash.
+  const check = await getReadPool().query(
+    `SELECT id FROM market_intelligence WHERE id = $1 LIMIT 1`,
+    [draft.fact_id]
+  );
+  if (check.rowCount === 0) {
+    console.warn(`[tiger_strike_draft] Skipping draft — fact_id ${draft.fact_id} not found in market_intelligence`);
+    return false;
+  }
   await pool.query(
     `INSERT INTO strike_drafts (id, fact_id, tenant_id, platform, source_url, entity_label, fact_summary, drafted_reply, engagement_score, status)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
      ON CONFLICT (id) DO UPDATE SET drafted_reply = $8, engagement_score = $9, status = $10`,
     [draft.id, draft.fact_id, draft.tenant_id, draft.platform, draft.source_url, draft.entity_label, draft.fact_summary, draft.drafted_reply, draft.engagement_score, draft.status],
   );
+  return true;
 }
 
 async function listDrafts(tenantId: string, status?: string): Promise<StrikeDraft[]> {
@@ -311,8 +323,8 @@ async function execute(
             created_at: new Date().toISOString(),
           };
 
-          await storeDraft(draft);
-          drafts.push(draft);
+          const stored = await storeDraft(draft);
+          if (stored) drafts.push(draft);
         }
 
         logger.info(`tiger_strike_draft: drafted ${drafts.length}, skipped ${skipped.length}`, { tenantId });
