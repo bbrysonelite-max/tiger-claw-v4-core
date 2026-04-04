@@ -356,8 +356,12 @@ function computeCompositeScore(
   oar: "builder" | "customer"
 ): number {
   const w = oar === "builder" ? BUILDER_WEIGHTS : CUSTOMER_WEIGHTS;
-  // Engagement is 0 at discovery — only profileFit and intentSignals count
-  return Math.min(100, Math.round(profileFit * w.profileFit + intentScore * w.intentSignals));
+  // Engagement is 0 at discovery. Normalize remaining weights to sum to 1.0
+  // so the score can reach 100 on strong profileFit + intent alone.
+  const activeWeight = w.profileFit + w.intentSignals;
+  const pf = w.profileFit / activeWeight;
+  const is_ = w.intentSignals / activeWeight;
+  return Math.min(100, Math.round(profileFit * pf + intentScore * is_));
 }
 
 async function buildAndSaveLead(
