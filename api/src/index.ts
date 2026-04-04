@@ -59,8 +59,14 @@ const PORT = Number(process.env["PORT"] ?? 4000);
 // ---------------------------------------------------------------------------
 
 // CORS — must be before raw body parsers so preflight OPTIONS requests are handled
-// We use origin: true to dynamically reflect the requesting origin.
-// Since the API uses stateless Bearer tokens exclusively (no cookies), CSRF is mitigated.
+// Public routes: reflect origin (stateless Bearer tokens, no cookies = no CSRF risk).
+// /admin routes: locked to the wizard origin only.
+const WIZARD_ORIGIN = process.env["WIZARD_ORIGIN"] ?? "https://wizard.tigerclaw.io";
+app.use("/admin", cors({
+  origin: WIZARD_ORIGIN,
+  methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+}));
 app.use(cors({
   origin: true,
   methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],

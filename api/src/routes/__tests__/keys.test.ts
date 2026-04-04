@@ -6,29 +6,53 @@ import express from 'express'
 const mockFetch = vi.fn()
 vi.stubGlobal('fetch', mockFetch)
 
-async function buildApp() {
-  const { default: keysRouter } = await import('../../routes/keys.js')
-  const app = express()
-  app.use(express.json())
-  app.use('/keys', keysRouter)
-  return app
-}
+const mockVerifySessionToken = vi.hoisted(() => vi.fn())
 
-beforeEach(() => {
+// Mock verifySessionToken so tests don't need a real HMAC session
+vi.mock('../../routes/auth.js', () => ({
+  verifySessionToken: mockVerifySessionToken,
+  default: { post: vi.fn() },
+}))
+
+const VALID_SESSION = 'test-session-token'
+
+let app: express.Express
+
+beforeEach(async () => {
   vi.resetAllMocks()
   vi.stubGlobal('fetch', mockFetch)
+  mockVerifySessionToken.mockReturnValue({ email: 'test@example.com', botId: 'bot-1', userId: 'user-1', expires: Date.now() + 86400000 })
+  const { default: keysRouter } = await import('../../routes/keys.js')
+  app = express()
+  app.use(express.json())
+  app.use('/keys', keysRouter)
 })
+
+async function buildApp() {
+  return app
+}
 
 // ---------------------------------------------------------------------------
 // POST /keys/validate
 // ---------------------------------------------------------------------------
 describe('POST /keys/validate', () => {
+  it('returns 401 without a session token', async () => {
+    mockVerifySessionToken.mockReturnValueOnce(null)
+    const app = await buildApp()
+    const res = await request(app)
+      .post('/keys/validate')
+      .send({ provider: 'google', key: 'GAPI-good-key' })
+    expect(res.status).toBe(401)
+    expect(mockFetch).not.toHaveBeenCalled()
+  })
+
   it('returns valid:true for a working Google API key', async () => {
     const app = await buildApp()
     mockFetch.mockResolvedValueOnce({ ok: true, status: 200 })
 
     const res = await request(app)
       .post('/keys/validate')
+      .set('x-session-token', VALID_SESSION)
       .send({ provider: 'google', key: 'GAPI-good-key' })
 
     expect(res.status).toBe(200)
@@ -41,6 +65,7 @@ describe('POST /keys/validate', () => {
 
     const res = await request(app)
       .post('/keys/validate')
+      .set('x-session-token', VALID_SESSION)
       .send({ provider: 'google', key: 'GAPI-bad-key' })
 
     expect(res.status).toBe(200)
@@ -49,11 +74,11 @@ describe('POST /keys/validate', () => {
 
   it('returns valid:false for a key that gets 401 from Gemini', async () => {
     const app = await buildApp()
-    // 401 isn't explicitly checked in keys, it falls back to network_error, but tests assume it
     mockFetch.mockResolvedValueOnce({ ok: false, status: 401 })
 
     const res = await request(app)
       .post('/keys/validate')
+      .set('x-session-token', VALID_SESSION)
       .send({ provider: 'google', key: 'GAPI-expired-key' })
 
     expect(res.status).toBe(200)
@@ -65,6 +90,7 @@ describe('POST /keys/validate', () => {
 
     const res = await request(app)
       .post('/keys/validate')
+      .set('x-session-token', VALID_SESSION)
       .send({ provider: 'google' })
 
     expect(res.status).toBe(400)
@@ -76,6 +102,7 @@ describe('POST /keys/validate', () => {
 
     const res = await request(app)
       .post('/keys/validate')
+      .set('x-session-token', VALID_SESSION)
       .send({ provider: 'google', key: '' })
 
     expect(res.status).toBe(400)
@@ -87,23 +114,25 @@ describe('POST /keys/validate', () => {
 
     const res = await request(app)
       .post('/keys/validate')
+      .set('x-session-token', VALID_SESSION)
       .send({ provider: 'google', key: 'GAPI-some-key' })
 
     expect(res.status).toBe(500)
   })
 
-  it('calls the Gemini listModels endpoint for validation', async () => {
+  it('calls the Gemini listModels endpoint with key in header, not URL', async () => {
     const app = await buildApp()
     mockFetch.mockResolvedValueOnce({ ok: true, status: 200 })
 
     await request(app)
       .post('/keys/validate')
+      .set('x-session-token', VALID_SESSION)
       .send({ provider: 'google', key: 'GAPI-test-key' })
 
     expect(mockFetch).toHaveBeenCalledOnce()
-    const [url] = mockFetch.mock.calls[0]
+    const [url, options] = mockFetch.mock.calls[0]
     expect(url).toContain('generativelanguage.googleapis.com')
-    expect(url).toContain('GAPI-test-key')
-
+    expect(url).not.toContain('GAPI-test-key') // key must NOT be in URL
+    expect(options?.headers?.['x-goog-api-key']).toBe('GAPI-test-key')
   })
 })

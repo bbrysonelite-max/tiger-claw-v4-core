@@ -1,19 +1,36 @@
 import { Request, Response, NextFunction } from "express";
+import { timingSafeEqual } from "crypto";
 import TelegramBot from "node-telegram-bot-api";
 
 // ─── Shared Admin Auth ────────────────────────────────────────────────────────
 
 const ADMIN_TOKEN = process.env["ADMIN_TOKEN"] ?? "";
 
+if (process.env["NODE_ENV"] === "production" && ADMIN_TOKEN.length < 32) {
+  throw new Error("[FATAL] ADMIN_TOKEN must be at least 32 characters in production.");
+}
+
 export function requireAdmin(req: Request, res: Response, next: NextFunction): void {
   const auth = req.headers["authorization"] ?? "";
-  const token = auth.startsWith("Bearer ") ? auth.slice(7) : auth;
-  
-  if (token === ADMIN_TOKEN) {
+  const incoming = auth.startsWith("Bearer ") ? auth.slice(7) : auth;
+
+  // Constant-time comparison prevents timing oracle attacks
+  let authorized = false;
+  try {
+    if (incoming.length > 0 && ADMIN_TOKEN.length > 0) {
+      const a = Buffer.from(incoming);
+      const b = Buffer.from(ADMIN_TOKEN);
+      authorized = a.length === b.length && timingSafeEqual(a, b);
+    }
+  } catch {
+    authorized = false;
+  }
+
+  if (authorized) {
     next();
     return;
   }
-  
+
   res.status(401).json({ error: "Unauthorized" });
 }
 
