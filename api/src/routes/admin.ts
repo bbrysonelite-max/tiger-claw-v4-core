@@ -218,7 +218,7 @@ router.get("/metrics", requireAdmin, async (_req: Request, res: Response) => {
       pool.query(`SELECT COUNT(*) as cx FROM tenants WHERE is_founding_member = true`),
       pool.query(`SELECT COUNT(*) as cx FROM hive_signals`),
       pool.query(`SELECT COUNT(*) as cx FROM hive_events`),
-      pool.query(`SELECT COUNT(*) as cx FROM tenants WHERE status IN ('active','onboarding','live')`),
+      pool.query(`SELECT COUNT(*) as cx FROM tenants WHERE status IN ('active','live')`),
       pool.query(`SELECT COUNT(*) as cx FROM tenants WHERE created_at >= NOW() - INTERVAL '24 hours'`),
     ]);
 
