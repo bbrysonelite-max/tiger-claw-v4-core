@@ -1,6 +1,6 @@
 # Tiger Claw V4 — Core Architecture
 
-**Last updated:** 2026-04-03 (Session 6)
+**Last updated:** 2026-04-04 (Session 8)
 **Status:** LIVE. Locked. Do not rewrite.
 
 ---
@@ -21,17 +21,19 @@ Tiger Claw V4 is **stateless**. No long-running Docker containers per tenant. No
 
 | Component | Technology | Actual Status |
 |---|---|---|
-| Compute | Google Cloud Run, Node.js/Express, port 4000 | ✅ Live |
+| Compute | Google Cloud Run, Node.js/Express, port 4000 | ✅ Live. Revision 00310-pjx |
 | Database | Cloud SQL PostgreSQL HA — `tiger_claw_shared` | ✅ Live |
 | Cache & Queues | Cloud Redis HA + BullMQ (8 queues) | ✅ Live |
 | AI Provider | Gemini 2.0 Flash — `@google/generative-ai` SDK | ✅ Live. **LOCKED — do not switch to 2.5-flash** (GCP function-calling bug) |
 | Frontend (signup + dashboard) | Next.js on Vercel — `wizard.tigerclaw.io` | ✅ Live. **Vercel auto-deploy is BROKEN — deploy manually** |
 | Frontend (website) | Static HTML — `tigerclaw.io` | ✅ Live |
-| Payments | **Stan Store only** | ✅ Active. Customer pays → gets email with link → `wizard.tigerclaw.io/signup` → email verified self-contained in DB. No Zapier. No Stripe. |
-| Email (Resend) | Resend — `tigerclaw.io` domain verified | ⚠️ Domain verified but `RESEND_API_KEY` is **not in the deploy script** — emails not delivered in production |
-| Stripe | Placeholder | ❌ Not used. `STRIPE_PRICE_BYOK` = `price_placeholder_replace_me`. Do not wire up without a decision. |
-| Zapier | Dead code | ❌ Not used. `/webhooks/stan-store` and `ZAPIER_WEBHOOK_SECRET` are dead code. |
-| LINE | Deferred | ❌ Phase 2/3. Code preserved. LINE Official Account (business registration) required — personal accounts cannot connect. |
+| Payments | **Stan Store only** | ✅ Active. No Zapier. No Stripe. |
+| Email (Resend) | Resend — `tigerclaw.io` domain verified | ✅ Live. `RESEND_API_KEY` in deploy script since Session 7. First production email confirmed delivered. |
+| Serper (search) | 3 keys: `SERPER_KEY_1/2/3` | ✅ All confirmed working |
+| Reddit (mine source) | Public JSON API | ❌ 403 from Cloud Run egress. Serper fallback active and working. |
+| Stripe | Placeholder | ❌ Not used. Do not wire up. |
+| Zapier | Dead code | ❌ Not used. `/webhooks/stan-store` dead code. |
+| LINE | Deferred | ❌ Phase 2/3. Code preserved. LINE Official Account required. |
 | GCP Project | `hybrid-matrix-472500-k5` | |
 | Multi-region | `us-central1` (primary) + `asia-southeast1`. Global HTTPS LB at `api.tigerclaw.io` (IP: `34.54.146.69`) | ✅ Live |
 
@@ -41,25 +43,26 @@ Tiger Claw V4 is **stateless**. No long-running Docker containers per tenant. No
 
 ```
 Customer pays on Stan Store
-  → Stan Store sends confirmation email
-  → Email contains link: wizard.tigerclaw.io/signup
-  → Customer enters purchase email
+  → Stan Store sends confirmation email with wizard.tigerclaw.io/signup link
+  → Customer enters purchase email on /signup
   → POST /auth/verify-purchase
-      → if no DB record: creates one on-demand (stan_store_self_serve_...)
-      → if active record: creates second bot (multi-agent path)
+      → if no DB record: creates one on-demand
+      → if active record exists: creates new bot (multi-agent path)
   → Session token issued
   → Customer fills single-page form: agent name, niche, ICP, Telegram bot token, AI key
   → POST /wizard/hatch
   → BullMQ tenant-provisioning job
-  → Provisioner: registers Telegram webhook, sets bot name/description, status → onboarding
-  → First message: ICP fast-path intro (confident, no interview)
+  → Provisioner: registers Telegram webhook (with TELEGRAM_WEBHOOK_SECRET), sets bot name/description
+  → status → onboarding
+  → First message: confident ICP-based intro, no interview
 ```
 
-**The 5-step wizard is retired for new customers.** `/signup` is the entry point. The old wizard steps still exist in code but are not the primary flow.
+**BYOB (Bring Your Own Bot):** Customer provides their own Telegram bot token. No pool. No bottleneck.
+**BYOK (Bring Your Own Key):** Customer provides their own Gemini API key. Platform key is fallback only.
 
 ---
 
-## 4. Core Intelligence (The Brain — 26 Tools)
+## 4. Core Intelligence (The Brain — 25 Tools)
 
 - Tools live in `api/src/tools/`
 - Every tool uses `ToolContext` (`api/src/tools/ToolContext.ts`)
@@ -67,16 +70,26 @@ Customer pays on Stan Store
 - **Tools missing from `toolsMap` in `ai.ts` cause infinite loops — always register new tools**
 - Scoring threshold: **80** — not configurable
 
+### Registered Tools (25)
+tiger_onboard, tiger_scout, tiger_contact, tiger_aftercare, tiger_briefing, tiger_convert, tiger_export, tiger_email, tiger_hive, tiger_import, tiger_keys, tiger_lead, tiger_move, tiger_note, tiger_nurture, tiger_objection, tiger_score, tiger_score_1to10, tiger_search, tiger_settings, tiger_drive_list, tiger_strike_harvest, tiger_strike_draft, tiger_strike_engage, tiger_refine
+
+### Intentionally NOT Registered
+- `tiger_gmail_send` — removed Session 8. Gemini must never send from operator's personal Gmail without explicit human approval. File preserved in `api/src/tools/tiger_google_workspace.ts`.
+- `tiger_postiz` — removed Session 8. Social media broadcasting is not Tiger's job. File preserved in `api/src/tools/tiger_postiz.ts`.
+
 ### Tool Loop
 1. Incoming message → `processTelegramMessage` (LINE deferred)
 2. ICP Fast-Path Check — if `onboard_state.json` has `customerProfile` and onboarding incomplete, skip `tiger_onboard()`, send confident intro
 3. `startFocus()` — writes `focus_state` Redis key
-4. `buildSystemPrompt(tenant)` (async) — injects ICP, hive patterns, lead stats, market intel
+4. `buildSystemPrompt(tenant)` (async — always `await` it) — injects ICP, hive patterns, lead stats, market intel
 5. `getChatHistory()` — loads history + `chat_memory` summary
 6. Gemini function-calling loop via `runToolLoop()` — **only `{ output }` passed to Gemini**, raw data stripped
 7. `saveChatHistory()` — triggers Sawtooth compression if threshold exceeded
 8. `completeFocus()` — triggers compression if tool calls ≥ 12
 9. Fire-and-forget: `factExtractionQueue.add()`
+
+### Tool Behavior Rules
+- When a tool fails or returns an error: **do not report the failure to the operator. Do not ask what to do next. Silently try the next best action.** (Enforced in system prompt — added Session 7 PR #185)
 
 ---
 
@@ -98,6 +111,7 @@ Customer pays on Stan Store
 | `scout_state.json` | Scout run timestamps, burst count, lead totals |
 | `onboard_state.json` | Onboarding answers + ICP pre-loaded at hatch |
 | `fact_anchors` | Extracted business facts from conversations |
+| `score_1to10_sessions.json` | 1-10 scoring framework sessions |
 
 ### Dynamic System Prompt (`buildSystemPrompt`)
 Async. Loads 4 signals in `Promise.all()`. DB failure = graceful degradation.
@@ -115,7 +129,9 @@ Async. Loads 4 signals in `Promise.all()`. DB failure = graceful degradation.
 | 1 | Platform Onboarding Key | 50 msg/day |
 | 2 | Tenant Primary BYOK | Unlimited |
 | 3 | Tenant Fallback BYOK | Unlimited |
-| 4 | Platform Emergency Key | ❌ **EXPIRED** — must be renewed |
+| 4 | Platform Emergency Key | ✅ Active (renewed Session 7) |
+
+Dead key detection fires admin Telegram alert via `sendAdminAlert()` → `ADMIN_TELEGRAM_BOT_TOKEN` / `ADMIN_TELEGRAM_CHAT_ID`.
 
 ---
 
@@ -129,39 +145,73 @@ Async. Loads 4 signals in `Promise.all()`. DB failure = graceful degradation.
 | `fact-extraction` | Async fact anchor extraction |
 | `ai-routines` | Scout, nurture, value-gap, check-ins |
 | `global-cron` | Heartbeat scheduler (every minute) |
+| `market-mining` | Daily intelligence mine (2 AM UTC) |
+| `market-intelligence-batch` | Batch fact processing |
 
 `ENABLE_WORKERS=true` must be set in deploy. It is. Do not remove it.
+
+### Cron Schedule (global-cron heartbeat, every minute)
+- **2 AM UTC** — `global_market_mining` job enqueued (date-stamped jobId prevents duplicates)
+- **8 AM UTC** — Platform key health check; fires admin alert if expired
+- **Hourly** — nurture checks, value-gap checks, daily scout (for eligible tenants)
+
+### Mine Status
+- `GET /admin/mine/status` — returns `{ isRunning, queueDepth, lastRun: { flavorsProcessed, postsFound, factsSaved, completedAt } }`
+- `POST /admin/mine/run` — triggers immediate mine run (bypasses 2 AM cron)
+- Mine worker logs `mine_complete` to `admin_events` on success
 
 ---
 
 ## 8. Scout Architecture
 
-- **Burst mode**: user-triggered on-demand runs (default when mode not specified). Max 3/day, min 1h between.
+- **Burst mode**: user-triggered on-demand runs. Max 3/day, min 1h between.
 - **Scheduled mode**: nightly cron at 5 AM tenant time. Must be passed explicitly: `mode: 'scheduled'`.
-- Sources: Reddit (public JSON), Facebook Groups via Serper, LINE OpenChat via Serper
-- **All 3 Serper keys currently return 403 — scout finds zero prospects on every tenant**
-- Reddit public API accessible but returning 403 from Cloud Run egress — under investigation
+- **Sources (in order):**
+  1. Reddit public JSON (currently 403 from Cloud Run egress — fallback active)
+  2. Serper fallback (`SERPER_KEY_2`) — confirmed working
+- Scoring threshold: **80**. Scoring uses profileFit + intentSignals only when engagement data absent (weights normalized — fixed Session 7 PR #180).
 
 ---
 
 ## 9. Admin
 
-- **Dashboard URL:** `wizard.tigerclaw.io/admin` (not /admin/dashboard)
+- **Dashboard URL:** `wizard.tigerclaw.io/admin`
+- **Fleet ops URL:** `wizard.tigerclaw.io/admin/dashboard`
 - **Token:** `gcloud secrets versions access latest --secret="tiger-claw-admin-token" --project="hybrid-matrix-472500-k5"`
-- **Mandatory post-deploy:** `POST /admin/fix-all-webhooks` after every API deploy
+- **Webhook fix:** `POST /admin/fix-all-webhooks` — idempotent. TELEGRAM_WEBHOOK_SECRET now baked into deploy so this is a safety net, not mandatory.
+- **Active tenant count:** `/admin/metrics` counts `status IN ('active', 'live')` only. `onboarding` and `pending` do NOT count as active.
+
+### Key Admin Endpoints
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /admin/fleet` | All tenants with status |
+| `GET /admin/platform-health` | Live probe of all 10 services |
+| `GET /admin/pipeline/health` | Data mine health (facts/24h, stale verticals) |
+| `GET /admin/mine/status` | Current mine queue state + last run result |
+| `POST /admin/mine/run` | Trigger immediate mine run |
+| `POST /admin/fix-all-webhooks` | Re-register all Telegram webhooks |
+| `POST /admin/fleet/:id/report` | Trigger manual scout for a tenant |
+| `POST /admin/fleet/:id/suspend` | Suspend a tenant |
+| `POST /admin/fleet/:id/resume` | Resume a tenant |
 
 ---
 
 ## 10. Deployment
 
 ### API (Cloud Run)
-GitHub Actions deploys on merge to `main`. **No AI agent is to push directly to main.** All changes via `feat/` branch + PR.
+```bash
+GCP_PROJECT_ID=hybrid-matrix-472500-k5 bash ./ops/deploy-cloudrun.sh
+```
 
 ### Wizard (Vercel)
 **Auto-deploy is broken.** Deploy manually from Vercel dashboard until Root Directory setting is fixed.
 
 ### Post-Deploy Protocol (mandatory, every time)
 ```bash
+# Verify health
+curl https://api.tigerclaw.io/health
+
+# Fix webhooks (idempotent — just confirms secret is wired)
 ADMIN_TOKEN=$(gcloud secrets versions access latest --secret="tiger-claw-admin-token" --project="hybrid-matrix-472500-k5")
 curl -X POST https://api.tigerclaw.io/admin/fix-all-webhooks \
   -H "Authorization: Bearer $ADMIN_TOKEN"
@@ -169,18 +219,26 @@ curl -X POST https://api.tigerclaw.io/admin/fix-all-webhooks \
 
 ---
 
-## 11. Known Broken — Do Not Claim Otherwise
+## 11. Test Coverage
 
-| Service | Status | Fix Required |
-|---------|--------|-------------|
-| Serper keys (all 3) | 403 | New keys from serper.dev |
-| Platform emergency Gemini key | Expired | Renew in GCP secrets |
-| Resend email in production | Not in deploy script | Add `RESEND_API_KEY` to deploy-cloudrun.sh |
-| Stripe | Placeholder | Decision needed — not a current priority |
-| Zapier | Dead code | Can be removed when convenient |
-| nurture_check calling tiger_scout | Wrong behavior | Bug — not yet fixed |
-| Vercel auto-deploy | Broken | Fix Root Directory in Vercel settings |
+- **455 tests** across 42 test files. All passing as of Session 8.
+- Every tool in `toolsMap` has test coverage.
+- Run: `npm test` from `api/`
+- CI runs on every PR push.
 
 ---
 
-> **Note to all agents:** Architecture is locked. No RAG. No containers. No OpenClaw. No switching AI providers. If you see a TypeScript error, fix the interface — do not rewrite the system.
+## 12. Known Broken / Not Built
+
+| Item | Status |
+|------|--------|
+| Reddit mine source | ❌ 403 from Cloud Run egress. Serper fallback working. |
+| Vercel auto-deploy | ❌ Broken. Deploy wizard manually. |
+| Stripe | ❌ Placeholder. Not used. |
+| Zapier | ❌ Dead code. |
+| LINE | ❌ Deferred. Requires LINE Official Account. |
+| Customer-facing dashboard | ❌ Not built. Phase 2. |
+
+---
+
+> **Note to all agents:** Architecture is locked. No RAG. No containers. No OpenClaw. No switching AI providers. If you see a TypeScript error, fix the interface — do not rewrite the system. `tiger_gmail_send` and `tiger_postiz` are intentionally absent from toolsMap — do not re-add them.

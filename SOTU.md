@@ -1,6 +1,6 @@
 # Tiger Claw — State of the Union
 
-**Last updated:** 2026-04-04 (End of Session 7 — 10 critical bugs fixed, platform fully green)
+**Last updated:** 2026-04-04 (End of Session 8 — tool safety audit, mine dashboard, broken window cleanup)
 **This is the single source of truth. Read nothing else until you finish this file.**
 
 ---
@@ -20,7 +20,7 @@
 
 1. Read this file top to bottom
 2. Run `curl https://api.tigerclaw.io/health` — confirm postgres, redis, workers all OK
-3. Check platform health: `GET /admin/platform-health` with admin token — all 10 services should be green
+3. Check platform health: `GET /admin/platform-health` with admin token — all services should be green
 4. Pull current fleet: `GET /admin/fleet` with admin token
 5. Do not touch anything until you know what is broken and what is not
 
@@ -35,7 +35,9 @@ AI sales agent SaaS. Customer pays on Stan Store → gets email with link → `w
 
 **The value proposition:** Your bot hunts while you sleep.
 
-**Confirmed working 2026-04-04:** Scout found 10 prospects, 1 qualified (score 80) on Facebook Groups. Bot responded intelligently, checked pipeline, surfaced a lead with Hive intelligence applied.
+**Confirmed working 2026-04-04:** Scout found prospects on Facebook Groups via Serper fallback. Bot responded intelligently, checked pipeline, surfaced leads with Hive intelligence applied. First production email ever delivered confirmed.
+
+**Immediate go-to-market:** Operator (Brent) + Jeff Mack + John (Thailand) have access to ~60,000 NuSkin distributors. Target: get first 10 running, watch for one week, then expand to next 40.
 
 ---
 
@@ -70,7 +72,7 @@ Customer pays on Stan Store
 | Payments | Stan Store | Direct. No Zapier. No Stripe. |
 | Search / Scout | Serper | `SERPER_KEY_1/2/3` — all confirmed working |
 | Mine fallback | Serper KEY_2 | Reddit primary, Serper fallback when Reddit 403s |
-| Email | Resend | Domain verified. `RESEND_API_KEY` now in deploy script — emails live. |
+| Email | Resend | Domain verified. `RESEND_API_KEY` in deploy script — emails live. |
 | GCP Project | `hybrid-matrix-472500-k5` | |
 | Multi-region | `us-central1` (primary) + `asia-southeast1` | Global LB at `api.tigerclaw.io` (IP: `34.54.146.69`) |
 
@@ -78,20 +80,22 @@ Customer pays on Stan Store
 
 ## Live Service Status
 
-Last verified 2026-04-04 (Session 7):
+Last verified 2026-04-04 (Session 8):
 
 | Service | Status | Notes |
 |---------|--------|-------|
-| Cloud Run, Postgres, Redis | ✅ | Healthy |
+| Cloud Run, Postgres, Redis | ✅ | Healthy. Revision 00310-pjx |
 | Workers | ✅ | ENABLE_WORKERS=true confirmed |
 | Serper keys (x3) | ✅ | All confirmed working |
 | Platform Gemini key | ✅ | Active |
 | Platform onboarding key | ✅ | Active |
 | Platform emergency key | ✅ | Renewed Session 7 |
-| Admin Telegram bot | ✅ | @AlienProbeadmin_bot — alerts now firing correctly |
-| Resend | ✅ | RESEND_API_KEY added to deploy script Session 7 — emails now live |
+| Admin Telegram bot | ✅ | @AlienProbeadmin_bot — alerts firing correctly |
+| Resend | ✅ | RESEND_API_KEY in deploy script — first production email confirmed delivered |
+| TELEGRAM_WEBHOOK_SECRET | ✅ | In deploy script since #175 — secretWired: true confirmed post-deploy |
 | Reddit (market miner) | ❌ | 403 from Cloud Run egress. Serper fallback active. Reddit API key awaiting approval. |
 | Stripe | ❌ | Placeholder. Not used. |
+| Vercel auto-deploy | ❌ | Root Directory not set correctly — deploy wizard manually |
 
 ---
 
@@ -104,8 +108,24 @@ Last known state 2026-04-04:
 | Slug | Status | Bot | Notes |
 |------|--------|-----|-------|
 | `brent-bryson-mnjd321r` | onboarding | @Testtigerfour_bot "Teddy" | Brent's test bot. Scout confirmed live. |
+| `justagreatdirector-mne9xtna` | pending | — | Debbie — needs to complete wizard |
 
-Jeff Mack and John (Thailand) were wiped from DB end of Session 7 for clean re-onboarding via wizard.
+Jeff Mack and John (Thailand) were wiped from DB end of Session 7 for clean re-onboarding via wizard. They have not re-onboarded yet.
+
+**Active agents (status = 'active' or 'live'):** 0 — Teddy is in `onboarding` status, not yet `active`.
+
+---
+
+## Tool Registry (25 tools — as of Session 8)
+
+All tools live in `api/src/tools/`. All must be registered in `toolsMap` in `ai.ts` or Gemini enters an infinite loop.
+
+**Registered in toolsMap:**
+tiger_onboard, tiger_scout, tiger_contact, tiger_aftercare, tiger_briefing, tiger_convert, tiger_export, tiger_email, tiger_hive, tiger_import, tiger_keys, tiger_lead, tiger_move, tiger_note, tiger_nurture, tiger_objection, tiger_score, tiger_score_1to10, tiger_search, tiger_settings, tiger_drive_list, tiger_strike_harvest, tiger_strike_draft, tiger_strike_engage, tiger_refine
+
+**Intentionally NOT registered (tool files exist but Gemini cannot call them):**
+- `tiger_gmail_send` — removed Session 8. Gemini must never send from operator's personal Gmail without human approval.
+- `tiger_postiz` — removed Session 8. Social media broadcasting is not Tiger's job.
 
 ---
 
@@ -114,8 +134,8 @@ Jeff Mack and John (Thailand) were wiped from DB end of Session 7 for clean re-o
 | Item | Priority |
 |------|----------|
 | Jeff Mack and John need to complete wizard fresh | IMMEDIATE |
+| Debbie (justagreatdirector) needs to complete wizard | IMMEDIATE |
 | Vercel auto-deploy broken — deploy wizard manually until Root Directory fixed | OPS |
-| `nurture_check` now correctly calls tiger_nurture — monitor logs to confirm | VERIFY |
 | Add per-tenant health indicators to admin dashboard fleet table | NEXT |
 | Add per-tenant drill-down in admin dashboard | NEXT |
 | source_url missing index on market_intelligence table | MEDIUM |
@@ -126,27 +146,30 @@ Jeff Mack and John (Thailand) were wiped from DB end of Session 7 for clean re-o
 | Remove Zapier dead code | LOW |
 | Remove Stripe dead code | LOW |
 | Past customers owed bots: `chana.loh@gmail.com`, `nancylimsk@gmail.com`, `lily.vergara@gmail.com` | WHEN READY |
-| **GitHub branch hygiene** — stale branches remain. Rule: delete branch on merge (now enforced). | CLEANUP |
+| GitHub branch hygiene — stale branches remain. Rule: delete branch on merge (now enforced). | CLEANUP |
+| Affiliate/referral tracking — Max Steingart deal (30% affiliate). Hold until he sells first 10. | DEFERRED |
 
 ---
 
-## Session 7 — What Was Done (2026-04-04)
+## Session 8 — What Was Done (2026-04-04)
 
-**Full audit by 6 parallel sub-agents** revealed 14 broken items including things broken since launch.
+Continued from Session 7. Platform was fully green at session start.
 
-**PRs merged this session (#174–#183):**
-- #174 — Serper fallback for market miner (Reddit dead 6 days)
-- #175 — TELEGRAM_WEBHOOK_SECRET wired into deploy (post-deploy webhook fix now optional, not mandatory)
-- #176 — RESEND_API_KEY in deploy, admin alert env var names fixed, nurture_check prompt fixed
-- #177 — Dead key alerts routed through sendAdminAlert (not UUID)
-- #178 — 72-hour duplicate account window removed
-- #179 — Slug collision guard in wizard hatch
-- #180 — Scoring ceiling fixed (engagement weight normalized)
-- #181 — tiger_refine registered in toolsMap
-- #182 — getTenant() wrapped in try/catch in webhook hot path
-- #183 — CI test updated to match new rate limit message
+**PRs merged this session (#186–#187):**
+- #186 — Mine engine controls in admin dashboard: `GET /admin/mine/status`, `POST /admin/mine/run`, live running indicator + Run Now button, mine_complete admin event logging
+- #187 — Tool safety audit + broken window cleanup:
+  - Tests added for all 5 previously untested tools (tiger_email, tiger_gmail_send, tiger_drive_list, tiger_postiz, tiger_refine, tiger_score_1to10) — 43 new tests, 455 total
+  - `tiger_gmail_send` removed from toolsMap — Gemini must not send from operator's personal Gmail
+  - `tiger_postiz` removed from toolsMap — social broadcasting is not Tiger's job
+  - `/admin/metrics` activeTenants fixed — was counting 'onboarding' as active, now only counts 'active' and 'live'
+  - tiger_strike_draft test fixed — FK check mock was missing
 
-**Platform state at session end:** All 10 services green. 412/412 tests passing. CI green.
+**Also discussed this session:**
+- White label / affiliate deal with Max Steingart — holding at referral model until he sells first 10
+- Platform scaling ceiling is ~500 active bots before DB needs attention — plenty of runway
+- Immediate go-to-market focus: get first 10 from Brent/Jeff/John NuSkin network running for one week
+
+**Platform state at session end:** All services green. 455/455 tests passing. CI green. Revision 00310-pjx live.
 
 ---
 
@@ -156,7 +179,7 @@ Jeff Mack and John (Thailand) were wiped from DB end of Session 7 for clean re-o
 # 1. Deploy API
 GCP_PROJECT_ID=hybrid-matrix-472500-k5 bash ./ops/deploy-cloudrun.sh
 
-# 2. Fix all webhooks (still good practice — now idempotent, not mandatory)
+# 2. Fix all webhooks (now idempotent — TELEGRAM_WEBHOOK_SECRET is in deploy script)
 ADMIN_TOKEN=$(gcloud secrets versions access latest --secret="tiger-claw-admin-token" --project="hybrid-matrix-472500-k5")
 curl -X POST https://api.tigerclaw.io/admin/fix-all-webhooks \
   -H "Authorization: Bearer $ADMIN_TOKEN"
@@ -179,6 +202,7 @@ curl -X POST https://api.tigerclaw.io/admin/fix-all-webhooks \
 - Cloud SQL proxy runs on port **5433** locally, not 5432.
 - One PR per fix. Test before opening a PR. Delete branch after merge.
 - The Mac cluster at `192.168.0.2` is offline only. Cloud Run never calls it.
+- `tiger_gmail_send` and `tiger_postiz` are NOT in toolsMap by design. Do not re-add them without explicit operator approval.
 
 ---
 
@@ -188,7 +212,9 @@ curl -X POST https://api.tigerclaw.io/admin/fix-all-webhooks \
 
 **Agent Leaderboard:** Opt-in fleet ranking by leads surfaced, pipeline activity, conversion rate. Build after Reflexion Loop is live.
 
-Do not mention either publicly until built.
+**Affiliate tracking:** Simple `?ref=` tag on signup URL, stored on subscription. Build when Max actually sends his first customer.
+
+Do not mention any of these publicly until built.
 
 ---
 

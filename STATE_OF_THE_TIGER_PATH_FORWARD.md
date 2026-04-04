@@ -1,6 +1,6 @@
 # State of the Tiger — Path Forward
 
-**Last Updated:** 2026-04-03 (Session 6)
+**Last Updated:** 2026-04-04 (Session 8)
 
 **No lying. No assuming. No guessing.**
 
@@ -20,6 +20,46 @@
 | 8 | Launch Day Hardening | ✅ Done (Session 5) |
 | 9 | April 2 Failure Recovery | ✅ Done (Session 6) |
 | 10 | Phase 1 Self-Serve Signup | ✅ Built and deployed (Session 6) |
+| 11 | Silent Failure Audit + Full Platform Green | ✅ Done (Session 7) |
+| 12 | Tool Safety Audit + Admin Mine Controls | ✅ Done (Session 8) |
+
+---
+
+## Current Focus
+
+**Get first 10 customers running.** Operator + Jeff Mack + John (Thailand) have access to ~60,000 NuSkin distributors. Target: first 10 onboarded, running for one week, no fires. Then expand to next 40.
+
+Jeff, John, and Debbie all need to complete the wizard. Links go to `wizard.tigerclaw.io/signup`.
+
+---
+
+## Session 8 — What Was Done (2026-04-04)
+
+| PR | Fix |
+|----|-----|
+| #186 | Mine engine controls in admin dashboard — live status indicator, Run Now button, last run stats, `mine_complete` admin event logging |
+| #187 | Tool safety audit: 43 new tests (455 total), tiger_gmail_send + tiger_postiz removed from toolsMap, active agent count fixed in /admin/metrics, tiger_strike_draft test fixed |
+
+---
+
+## Session 7 — What Was Done (2026-04-04)
+
+Full audit by 6 parallel sub-agents revealed 14 broken items including things broken since launch.
+
+| PR | Fix |
+|----|-----|
+| #174 | Serper fallback for market miner (Reddit dead 6 days) |
+| #175 | TELEGRAM_WEBHOOK_SECRET wired into deploy (post-deploy webhook fix now idempotent, not mandatory) |
+| #176 | RESEND_API_KEY in deploy, admin alert env var names fixed, nurture_check prompt fixed |
+| #177 | Dead key alerts routed through sendAdminAlert (not UUID) |
+| #178 | 72-hour duplicate account window removed |
+| #179 | Slug collision guard in wizard hatch |
+| #180 | Scoring ceiling fixed (engagement weight normalized) |
+| #181 | tiger_refine registered in toolsMap |
+| #182 | getTenant() wrapped in try/catch in webhook hot path |
+| #183 | CI test updated to match new rate limit message |
+| #184 | tiger_strike_draft FK validation — prevents hallucinated fact UUIDs crashing inserts |
+| #185 | System prompt rule: never report tool failures to operator, never ask "what's it gonna be?" |
 
 ---
 
@@ -27,7 +67,7 @@
 
 ### April 2 — Post-Zoom Failure Fixes
 
-On April 2, a live Zoom onboarding call with John (Thailand) failed completely. See `dramatic-failure.md` for the full account. These fixes followed immediately:
+On April 2, a live Zoom onboarding call with John (Thailand) failed completely. These fixes followed immediately:
 
 | PR | Fix |
 |----|-----|
@@ -47,9 +87,9 @@ On April 2, a live Zoom onboarding call with John (Thailand) failed completely. 
 
 | PR | Fix |
 |----|-----|
-| #145 | `fix-all-webhooks` was JOINing `bot_pool` (doesn't exist in BYOB arch) — returned 0 rows every time, registered nothing |
-| #146 | 8s timeout on Telegram token validation (kills infinite spinner) + LINE Official Account warning |
-| #147 | Provisioning suspension now sends admin alert — was silent |
+| #145 | `fix-all-webhooks` was JOINing `bot_pool` (doesn't exist in BYOB arch) — returned 0 rows every time |
+| #146 | 8s timeout on Telegram token validation + LINE Official Account warning |
+| #147 | Provisioning suspension now sends admin alert |
 | #148 | Admin dashboard surfaces API errors instead of blank |
 | #149–#155 | Docs: SOTU as single source of truth, LINE deferred, Phase 1 PRD, Stan Store flow confirmed |
 | #156 | Phase 1 single-page `/signup` built |
@@ -61,21 +101,12 @@ On April 2, a live Zoom onboarding call with John (Thailand) failed completely. 
 | #162 | Check `data.ok` not `data.success` in hatch response |
 | #163 | `ok` field added to `HatchResponse` type |
 | #164 | X/Twitter announcement removed; signup tagline added |
-| #165 | `TELEGRAM_WEBHOOK_SECRET` trailing newline fix — was killing all bots after every deploy |
+| #165 | `TELEGRAM_WEBHOOK_SECRET` trailing newline fix |
 | #166 | LINE removed from customer dashboard |
-| #167 | Root page redirects to `/signup`, copy tightened |
+| #167 | Root page redirects to `/signup` |
 | #168 | Manual report trigger allowed for onboarding tenants |
-| #169 | Daily scout waterfall — never reports failure, never idles |
+| #169 | Daily scout waterfall — never reports failure |
 | #170 | Reset-conversation clears `onboard_state` from PostgreSQL |
-
-### This Session (2026-04-03 evening)
-| Change | What |
-|--------|------|
-| Scout mode default | Changed from `scheduled` to `burst` — user-triggered runs were blocked by 23h cooldown |
-| Admin endpoint | `POST /admin/fleet/:tenantId/clear-circuit-breaker` added |
-| Short magic links | `GET /go/:code` redirect — tokens no longer exposed in shareable URLs |
-| Full live audit | All external services tested. Results in ARCHITECTURE.md. |
-| SOTU, START_HERE, ARCHITECTURE, STATE_OF_THE_TIGER updated | Honest current state |
 
 ---
 
@@ -83,12 +114,9 @@ On April 2, a live Zoom onboarding call with John (Thailand) failed completely. 
 
 | Item | Impact | Fix |
 |------|--------|-----|
-| All 3 Serper keys (403) | Scout finds zero prospects on every tenant — core product function is broken | New keys from serper.dev |
-| Platform emergency Gemini key (expired) | No AI fallback if platform key quota hit | Renew GCP secret |
-| Resend not in deploy script | No transactional emails in production | Add to deploy-cloudrun.sh |
-| nurture_check calls tiger_scout incorrectly | Wrong routine behavior | Code fix needed |
-| Reddit 403 from Cloud Run | Scout source down | Investigate egress IP / User-Agent |
+| Jeff / John / Debbie not onboarded | No paying customers running | Send them wizard link |
 | Vercel auto-deploy broken | Wizard must be deployed manually | Fix Root Directory in Vercel settings |
+| Reddit 403 from Cloud Run egress | Mine uses Serper fallback (working) | Awaiting Reddit API approval |
 
 ---
 
@@ -98,28 +126,23 @@ On April 2, a live Zoom onboarding call with John (Thailand) failed completely. 
 |------|----------|
 | Remove Zapier dead code (`/webhooks/stan-store`, `ZAPIER_WEBHOOK_SECRET`) | LOW |
 | Remove Stripe dead code (`STRIPE_*` env vars, `/webhooks/stripe`) | LOW |
-| `bot_ai_keys` dead write (wizard writes here, runtime reads `bot_ai_config`) | LOW |
-| ~25 dead BotFather test bots need `/deletebot` cleanup | LOW |
+| source_url missing index on market_intelligence table | MEDIUM |
+| factExtractionWorker failures produce no admin alert | MEDIUM |
+| marketIntelligenceWorker failures produce no admin alert | MEDIUM |
+| WIZARD_SESSION_SECRET not in deploy script (safe via fallback) | LOW |
 | Stan Store → Lemon Squeezy/Paddle (international VAT) | DEFERRED |
-| LINE Phase 2 (requires LINE Official Account — customer-side requirement) | DEFERRED |
-| Customer-facing dashboard (Phase 2) | DEFERRED |
+| LINE Phase 2 (requires LINE Official Account) | DEFERRED |
+| Customer-facing dashboard | DEFERRED |
+| Affiliate tracking for Max Steingart deal | DEFERRED — build when he sends first customer |
 
 ---
 
-## Session 5 — What Was Done (2026-04-01)
+## Deferred Features (Do Not Build Yet)
 
-| PR | Fix |
-|----|-----|
-| #122 | value-gap JOIN type cast (`varchar = uuid`) crash |
-| #123 | `INTERNAL_API_URL` missing from deploy — tiger_keys/hive/onboard/settings fataling |
-| #124 | Remove `bot_pool` from `/health` — V4 has no pool |
-| #125 | Relevance gate — blocks gaming/fiction facts from Data Moat |
-| #126 | Voice overhaul — examples replace 40-line rules wall |
-| #127 | tiger_scout rate limit reason hidden from Gemini |
-| #128 | Only `output` string passed to Gemini |
-| #129 | Morning hunt report at 7 AM UTC |
-| #130 | Admin dashboard timeout fix |
-| #131 | Admin dashboard UX — localStorage token, 5min refresh |
+- **Reflexion Loop** — outcome signals feed back into fact_anchors. Build after 10+ agents have real data.
+- **Agent Leaderboard** — opt-in fleet ranking. Build after Reflexion Loop.
+- **White label** — hold at affiliate/referral model until Max sells 10.
+- **Partner portal / rev share automation** — only if white label deal proves out.
 
 ---
 
@@ -131,16 +154,17 @@ On April 2, a live Zoom onboarding call with John (Thailand) failed completely. 
 | Cloud Run | `tiger-claw-api` (us-central1 primary, asia-southeast1 secondary) |
 | Cloud SQL proxy | port **5433** locally, user `botcraft`, DB `tiger_claw_shared` |
 | Admin | `wizard.tigerclaw.io/admin` |
-| Deploys (API) | GitHub Actions on merge to main |
+| Deploys (API) | `GCP_PROJECT_ID=hybrid-matrix-472500-k5 bash ./ops/deploy-cloudrun.sh` |
 | Deploys (Wizard) | Manual — Vercel auto-deploy is broken |
-| Post-deploy | Always run `POST /admin/fix-all-webhooks` |
+| Post-deploy | Run `POST /admin/fix-all-webhooks` (idempotent — webhook secret now baked into deploy) |
 
 ---
 
 ## Rules of Engagement
 
 1. One PR per fix. No chaining.
-2. `feat/` branches only. No AI agent pushes to main.
+2. `feat/` or `fix/` branches only. No AI agent pushes to main.
 3. Architecture is LOCKED. No RAG, no containers, no OpenClaw.
 4. No new features without a customer asking for it.
 5. No session is marked COMPLETE if known broken items remain unresolved.
+6. `tiger_gmail_send` and `tiger_postiz` are intentionally NOT in toolsMap. Do not re-add.
