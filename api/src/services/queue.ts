@@ -589,6 +589,12 @@ export const miningWorker = SHOULD_RUN_WORKERS ? new Worker(
             const { runMarketMining } = await import('./market_miner.js');
             const result = await runMarketMining();
             console.log(`[Mining] Run complete — flavors: ${result.flavorsProcessed}, posts: ${result.postsFound}, facts: ${result.factsSaved}`);
+            const { logAdminEvent } = await import('./db.js');
+            await logAdminEvent('mine_complete', undefined, {
+                flavorsProcessed: result.flavorsProcessed,
+                postsFound: result.postsFound,
+                factsSaved: result.factsSaved,
+            }).catch(() => {});
         } catch (err) {
             console.error('[Mining] Run failed:', err);
             throw err;

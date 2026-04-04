@@ -78,6 +78,32 @@ export default function AdminDashboard() {
     const [convos, setConvos] = useState<ConversationStats | null>(null);
     const [costs, setCosts] = useState<CostStats | null>(null);
     const [platformHealth, setPlatformHealth] = useState<{ name: string; status: "ok" | "error"; message: string }[] | null>(null);
+    const [mineStatus, setMineStatus] = useState<{ isRunning: boolean; queueDepth: number; lastRun: { flavorsProcessed: number; postsFound: number; factsSaved: number; completedAt: string } | null } | null>(null);
+    const [mineTriggering, setMineTriggering] = useState(false);
+
+    const fetchMineStatus = useCallback(async (authToken: string) => {
+        const headers = { "Authorization": `Bearer ${authToken}` };
+        fetch(`${API_BASE}/admin/mine/status`, { headers })
+            .then(r => r.ok ? r.json() : null)
+            .then(data => { if (data) setMineStatus(data); })
+            .catch(() => {});
+    }, []);
+
+    const triggerMine = useCallback(async () => {
+        if (!token || mineTriggering) return;
+        setMineTriggering(true);
+        try {
+            const res = await fetch(`${API_BASE}/admin/mine/run`, {
+                method: "POST",
+                headers: { "Authorization": `Bearer ${token}` },
+            });
+            if (res.ok) {
+                setMineStatus(prev => prev ? { ...prev, isRunning: true } : { isRunning: true, queueDepth: 0, lastRun: null });
+            }
+        } catch { /* ignore */ } finally {
+            setMineTriggering(false);
+        }
+    }, [token, mineTriggering]);
 
     const fetchData = useCallback(async (authToken: string) => {
         setLoading(true);
@@ -115,6 +141,9 @@ export default function AdminDashboard() {
                 .then(r => r.ok ? r.json() : null)
                 .then(data => { if (data?.services) setPlatformHealth(data.services); })
                 .catch(() => {});
+
+            // Mine status — fire separately, never block main dashboard load
+            fetchMineStatus(authToken);
             
             // Merge conversation stats into tenant data for the fleet table
             const tenantList = t.tenants.map((tenant: any) => ({
@@ -389,7 +418,7 @@ export default function AdminDashboard() {
                                     {pipeline?.totalFacts?.toLocaleString() || "—"}
                                 </p>
                             </div>
-                            
+
                             <div className="grid grid-cols-2 gap-8">
                                 <div className="space-y-1">
                                     <p className="text-white/20 text-[10px] font-black uppercase tracking-[0.2em]">Last 24h</p>
@@ -404,9 +433,49 @@ export default function AdminDashboard() {
                                     </p>
                                 </div>
                             </div>
-                            
+
+                            {/* Mine Engine Status */}
+                            <div className="bg-zinc-800/60 border border-white/5 rounded-[1.5rem] p-6 space-y-4">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <span className="relative flex h-2.5 w-2.5">
+                                            {mineStatus?.isRunning ? (
+                                                <>
+                                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                                                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-400" />
+                                                </>
+                                            ) : (
+                                                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-white/20" />
+                                            )}
+                                        </span>
+                                        <p className="text-white/40 text-[10px] font-black uppercase tracking-widest">
+                                            {mineStatus?.isRunning ? "Mining Now" : "Mine Engine"}
+                                        </p>
+                                    </div>
+                                    <button
+                                        onClick={triggerMine}
+                                        disabled={mineTriggering || mineStatus?.isRunning}
+                                        className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg border border-amber-500/30 text-amber-400 hover:bg-amber-500/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                    >
+                                        {mineTriggering ? <Loader2 className="h-3 w-3 animate-spin" /> : <Database className="h-3 w-3" />}
+                                        {mineStatus?.isRunning ? "Running" : "Run Now"}
+                                    </button>
+                                </div>
+                                {mineStatus?.lastRun && (
+                                    <div className="space-y-1 border-t border-white/5 pt-4">
+                                        <p className="text-white/20 text-[9px] font-black uppercase tracking-widest">Last Run — {timeAgo(mineStatus.lastRun.completedAt)}</p>
+                                        <p className="text-white/50 text-[11px] font-mono">
+                                            {mineStatus.lastRun.flavorsProcessed} flavors · {mineStatus.lastRun.postsFound} posts · <span className="text-green-400">+{mineStatus.lastRun.factsSaved} facts</span>
+                                        </p>
+                                    </div>
+                                )}
+                                {!mineStatus?.lastRun && (
+                                    <p className="text-white/20 text-[10px]">No completed runs recorded yet.</p>
+                                )}
+                            </div>
+
                             {pipeline?.staleVerticals && pipeline.staleVerticals.length > 0 && (
-                                <motion.div 
+                                <motion.div
                                     initial={{ opacity: 0, scale: 0.95 }}
                                     animate={{ opacity: 1, scale: 1 }}
                                     className="bg-red-500/5 border border-red-500/20 rounded-[1.5rem] p-6 flex items-start gap-4"
