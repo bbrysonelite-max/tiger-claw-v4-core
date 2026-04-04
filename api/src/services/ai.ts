@@ -33,11 +33,10 @@ import { tiger_score }       from '../tools/tiger_score.js';
 import { tiger_score_1to10 } from '../tools/tiger_score_1to10.js';
 import { tiger_search }      from '../tools/tiger_search.js';
 import { tiger_settings }    from '../tools/tiger_settings.js';
-import { tiger_gmail_send, tiger_drive_list } from '../tools/tiger_google_workspace.js';
+import { tiger_drive_list } from '../tools/tiger_google_workspace.js';
 import { tiger_strike_harvest } from "../tools/tiger_strike_harvest.js";
 import { tiger_strike_draft } from "../tools/tiger_strike_draft.js";
 import { tiger_strike_engage } from "../tools/tiger_strike_engage.js";
-import { tiger_postiz } from "../tools/tiger_postiz.js";
 import { tiger_refine } from "../tools/tiger_refine.js";
 
 // ─── Safety constants ────────────────────────────────────────────────────────
@@ -163,12 +162,10 @@ const toolsMap = {
     tiger_score_1to10,
     tiger_search,
     tiger_settings,
-    tiger_gmail_send,
     tiger_drive_list,
     tiger_strike_harvest,
     tiger_strike_draft,
     tiger_strike_engage,
-    tiger_postiz,
     tiger_refine,
 };
 // Fix: Use STRICT @google/generative-ai Type enums to prevent silent JSON stripping
@@ -898,14 +895,6 @@ export async function buildSystemPrompt(tenant: any): Promise<string> {
         `2. tiger_strike_draft — Drafts contextual replies in the operator's voice. Always present drafts for review before sending. Never auto-approve.`,
         ``,
         `3. tiger_strike_engage — Generates zero-cost Web Intent URLs for approved drafts. The operator clicks the link to post. After posting, ask them to confirm so the learning loop can track results.`,
-        ``,
-        `━━━━ TIGER POSTIZ — SOCIAL MEDIA BROADCASTING ━━━━`,
-        `Use tiger_postiz to manage the operator's public social media presence (LinkedIn, X, IG, etc.):`,
-        `- list_channels: See which social accounts the operator has connected.`,
-        `- schedule_post: Draft and schedule high-value insights or authority-building content.`,
-        `- get_analytics: Track how the operator's audience is growing and engaging.`,
-        ``,
-        `STRATEGY: Use tiger_postiz to broadcast refined market intelligence from the Data Moat. This establishes the operator as a market leader and drives inbound leads.`,
         ``,
         `Pipeline order: harvest → draft → review → engage → confirm.`,
         `Never skip the review step. The operator must see and approve every reply before it goes out.`,
