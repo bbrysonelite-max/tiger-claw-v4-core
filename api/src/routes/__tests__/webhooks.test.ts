@@ -113,12 +113,20 @@ const SUSPENDED_TENANT = { ...ACTIVE_TENANT, status: 'suspended' };
 
 // ─── POST /webhooks/telegram/:tenantId ────────────────────────────────────────
 
+// Shared secret used across all Telegram webhook tests
+const TEST_TELEGRAM_SECRET = 'test-webhook-secret';
+
 describe('POST /webhooks/telegram/:tenantId', () => {
   let app: Express;
 
   beforeEach(async () => {
     vi.clearAllMocks();
+    process.env['TELEGRAM_WEBHOOK_SECRET'] = TEST_TELEGRAM_SECRET;
     app = await buildTestApp();
+  });
+
+  afterEach(() => {
+    delete process.env['TELEGRAM_WEBHOOK_SECRET'];
   });
 
   it('returns 200 (silent ack) when tenant is not found', async () => {
@@ -126,6 +134,7 @@ describe('POST /webhooks/telegram/:tenantId', () => {
 
     const res = await request(app)
       .post('/webhooks/telegram/nonexistent-id')
+      .set('x-telegram-bot-api-secret-token', TEST_TELEGRAM_SECRET)
       .send({ update_id: 1 });
 
     expect(res.status).toBe(200);
@@ -137,6 +146,7 @@ describe('POST /webhooks/telegram/:tenantId', () => {
 
     const res = await request(app)
       .post('/webhooks/telegram/tenant-abc-123')
+      .set('x-telegram-bot-api-secret-token', TEST_TELEGRAM_SECRET)
       .send({ update_id: 1 });
 
     expect(res.status).toBe(200);
@@ -148,6 +158,7 @@ describe('POST /webhooks/telegram/:tenantId', () => {
 
     const res = await request(app)
       .post('/webhooks/telegram/tenant-abc-123')
+      .set('x-telegram-bot-api-secret-token', TEST_TELEGRAM_SECRET)
       .send({ update_id: 1 });
 
     expect(res.status).toBe(200);
@@ -160,6 +171,7 @@ describe('POST /webhooks/telegram/:tenantId', () => {
     const payload = { message: { chat: { id: 123 }, text: 'hello' } };
     const res = await request(app)
       .post('/webhooks/telegram/tenant-abc-123')
+      .set('x-telegram-bot-api-secret-token', TEST_TELEGRAM_SECRET)
       .send(payload);
 
     expect(res.status).toBe(200);
@@ -178,6 +190,7 @@ describe('POST /webhooks/telegram/:tenantId', () => {
 
     const res = await request(app)
       .post('/webhooks/telegram/tenant-abc-123')
+      .set('x-telegram-bot-api-secret-token', TEST_TELEGRAM_SECRET)
       .send({ message: { text: 'hi' } });
 
     expect(res.status).toBe(200);
@@ -189,6 +202,7 @@ describe('POST /webhooks/telegram/:tenantId', () => {
 
     await request(app)
       .post('/webhooks/telegram/tenant-abc-123')
+      .set('x-telegram-bot-api-secret-token', TEST_TELEGRAM_SECRET)
       .send({ update_id: 99 });
 
     const queueCall = mockTelegramQueueAdd.mock.calls[0];
@@ -197,12 +211,33 @@ describe('POST /webhooks/telegram/:tenantId', () => {
     expect(opts.backoff).toEqual({ type: 'exponential', delay: 2000 });
   });
 
+  it('returns 503 when TELEGRAM_WEBHOOK_SECRET is not configured', async () => {
+    delete process.env['TELEGRAM_WEBHOOK_SECRET'];
+    app = await buildTestApp(); // rebuild without secret set
+
+    const res = await request(app)
+      .post('/webhooks/telegram/tenant-abc-123')
+      .send({ update_id: 1 });
+
+    expect(res.status).toBe(503);
+  });
+
+  it('returns 401 when secret header is wrong', async () => {
+    const res = await request(app)
+      .post('/webhooks/telegram/tenant-abc-123')
+      .set('x-telegram-bot-api-secret-token', 'wrong-secret')
+      .send({ update_id: 1 });
+
+    expect(res.status).toBe(401);
+  });
+
   it('returns 500 when queue.add throws', async () => {
     mockGetTenant.mockResolvedValue(ACTIVE_TENANT);
     mockTelegramQueueAdd.mockRejectedValue(new Error('Redis down'));
 
     const res = await request(app)
       .post('/webhooks/telegram/tenant-abc-123')
+      .set('x-telegram-bot-api-secret-token', TEST_TELEGRAM_SECRET)
       .send({ update_id: 1 });
 
     expect(res.status).toBe(500);

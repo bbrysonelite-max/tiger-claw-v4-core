@@ -240,7 +240,10 @@ router.post("/telegram/:tenantId", webhookLimiter, async (req: Request, res: Res
       return res.status(401).json({ error: "Unauthorized" });
     }
   } else {
-    console.warn("[webhooks] TELEGRAM_WEBHOOK_SECRET not set — webhook signature validation is DISABLED. Set this env var immediately.");
+    // Hard reject — running without a webhook secret means any attacker can inject
+    // arbitrary Telegram payloads to any tenant. Refuse to process rather than warn.
+    console.error("[webhooks] CRITICAL: TELEGRAM_WEBHOOK_SECRET is not set. Rejecting all Telegram webhooks.");
+    return res.status(503).json({ error: "Webhook validation not configured on this server." });
   }
 
   // Ensure tenant exists and is active/live/onboarding
