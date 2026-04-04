@@ -47,7 +47,7 @@ import {
   getPoolStatus,
   getBotPoolEntryByUsername,
 } from "../services/pool.js";
-import { connection as redisConnection } from "../services/queue.js";
+import { connection as redisConnection, miningQueue } from "../services/queue.js";
 import { requireAdmin, sendAdminAlert } from "../services/admin_shared.js";
 
 const router = Router();
@@ -1135,6 +1135,52 @@ router.get("/pipeline/health", async (_req: Request, res: Response) => {
   } catch (err) {
     console.error("[admin] GET /pipeline/health error:", err);
     return res.status(500).json({ healthy: false, error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+// ── GET /admin/mine/status ───────────────────────────────────────────────────
+// Returns current mine queue state + last completed run stats.
+router.get("/mine/status", async (_req: Request, res: Response) => {
+  try {
+    const [active, waiting] = await Promise.all([
+      miningQueue.getActive(),
+      miningQueue.getWaiting(),
+    ]);
+    const isRunning = active.length > 0;
+
+    // Pull last mine_complete event from admin_events
+    const pool = getPool();
+    const evtRes = await pool.query(
+      `SELECT metadata, created_at FROM admin_events
+       WHERE event_type = 'mine_complete'
+       ORDER BY created_at DESC LIMIT 1`
+    );
+    const lastRun = evtRes.rows[0]
+      ? { ...evtRes.rows[0].metadata, completedAt: evtRes.rows[0].created_at }
+      : null;
+
+    return res.json({ isRunning, queueDepth: waiting.length, lastRun });
+  } catch (err) {
+    console.error("[admin] GET /mine/status error:", err);
+    return res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+// ── POST /admin/mine/run ─────────────────────────────────────────────────────
+// Enqueue an immediate mine run (bypasses 2 AM cron schedule).
+router.post("/mine/run", async (_req: Request, res: Response) => {
+  try {
+    const jobId = `market_mining_manual_${Date.now()}`;
+    const job = await miningQueue.add('global_market_mining', {}, {
+      jobId,
+      removeOnComplete: true,
+      removeOnFail: true,
+    });
+    console.log(`[admin] Manual mine run enqueued — jobId: ${job.id}`);
+    return res.json({ ok: true, jobId: job.id });
+  } catch (err) {
+    console.error("[admin] POST /mine/run error:", err);
+    return res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
   }
 });
 
