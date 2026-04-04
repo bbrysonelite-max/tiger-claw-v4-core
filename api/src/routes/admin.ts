@@ -1175,12 +1175,12 @@ router.get("/mine/status", async (_req: Request, res: Response) => {
     // Pull last mine_complete event from admin_events
     const pool = getPool();
     const evtRes = await pool.query(
-      `SELECT metadata, created_at FROM admin_events
-       WHERE event_type = 'mine_complete'
+      `SELECT details, created_at FROM admin_events
+       WHERE action = 'mine_complete'
        ORDER BY created_at DESC LIMIT 1`
     );
     const lastRun = evtRes.rows[0]
-      ? { ...evtRes.rows[0].metadata, completedAt: evtRes.rows[0].created_at }
+      ? { ...evtRes.rows[0].details, completedAt: evtRes.rows[0].created_at }
       : null;
 
     return res.json({ isRunning, queueDepth: waiting.length, lastRun });
