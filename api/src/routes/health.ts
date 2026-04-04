@@ -65,11 +65,14 @@ router.get("/", async (_req: Request, res: Response) => {
     ? (workersRunning ? "ok" : "error: ENABLE_WORKERS=true but workers not running")
     : "disabled";
 
-  // Healthy = Postgres + Redis up + workers running.
+  // Healthy = Postgres + Redis up. Workers healthy only if ENABLE_WORKERS=true.
+  // A server with workers intentionally disabled (API-only role) is still healthy.
+  const workerCheck = checks["workers"];
+  const workersOk = workerCheck === "ok" || workerCheck === "disabled";
   const healthy =
     checks["postgres"] === "ok" &&
     checks["redis"] === "ok" &&
-    checks["workers"] === "ok";
+    workersOk;
 
   res.status(healthy ? 200 : 503).json({
     status: healthy ? "ok" : "degraded",

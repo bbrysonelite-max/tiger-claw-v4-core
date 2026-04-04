@@ -1072,6 +1072,26 @@ router.delete("/skills/:id", async (req: Request, res: Response) => {
 // ── GET /admin/pipeline/health ───────────────────────────────────────────────
 // NEW for Admin Dashboard: returns market intelligence pipeline health metrics
 // Answers: "Is the mine healthy?"
+// ── GET /admin/fleet/stuck ────────────────────────────────────────────────────
+// Returns tenants that have been stuck in 'pending' or 'onboarding' for >10 minutes.
+// Indicates a provisioning job that was enqueued but never completed.
+router.get("/fleet/stuck", async (_req: Request, res: Response) => {
+  try {
+    const pool = getPool();
+    const result = await pool.query(`
+      SELECT id, name, slug, email, status, flavor, created_at,
+             EXTRACT(EPOCH FROM (NOW() - created_at)) / 60 AS stuck_minutes
+      FROM tenants
+      WHERE status IN ('pending', 'onboarding')
+        AND created_at < NOW() - INTERVAL '10 minutes'
+      ORDER BY created_at ASC
+    `);
+    return res.json({ ok: true, stuckTenants: result.rows, count: result.rowCount });
+  } catch (err) {
+    return res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
 router.get("/pipeline/health", async (_req: Request, res: Response) => {
   try {
     const pool = getPool();
