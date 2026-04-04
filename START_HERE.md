@@ -1,123 +1,118 @@
 # START HERE — Tiger Claw Session Brief
 
-**Last Updated:** 2026-04-01 (Session 5 — voice overhaul, morning report, admin dashboard, customer onboarding)
-**Author:** Claude Sonnet 4.6
+**Last Updated:** 2026-04-03 (Session 6)
+
+**Read this first. Then read ARCHITECTURE.md if you need system detail. Do not read anything else until you have finished this file.**
+
+**Standing orders: No lying. No assuming. No guessing. Do not mark anything working unless you have tested it live.**
 
 ---
 
 ## What Is Tiger Claw?
 
-AI sales agent SaaS. Customers buy on Stan Store, walk through a 5-step wizard to configure their bot + AI key + customer profile, hit "Hatch," and get a live AI sales agent. Built on Cloud Run, PostgreSQL, Redis/BullMQ, Gemini/OpenAI.
+AI sales agent SaaS. Customer pays on Stan Store → gets email with link → `wizard.tigerclaw.io/signup` → single-page form → bot hatches in 60 seconds. Bot prospects for them on Telegram around the clock.
 
-- **API:** Cloud Run (us-central1), project `hybrid-matrix-472500-k5`
-- **Wizard + Admin:** Next.js on Vercel at `wizard.tigerclaw.io`
-- **Admin Dashboard:** `wizard.tigerclaw.io/admin` — token via `gcloud secrets versions access latest --secret="tiger-claw-admin-token" --project="hybrid-matrix-472500-k5"`
+- **API:** `https://api.tigerclaw.io` — Cloud Run, `hybrid-matrix-472500-k5`, `us-central1` + `asia-southeast1`
+- **Signup + Dashboard + Admin:** `wizard.tigerclaw.io` — Next.js on Vercel
+- **Admin:** `wizard.tigerclaw.io/admin` — token via `gcloud secrets versions access latest --secret="tiger-claw-admin-token" --project="hybrid-matrix-472500-k5"`
 - **Repo:** `github.com/bbrysonelite-max/tiger-claw-v4-core`
-- **Architecture:** BYOB (customer's Telegram token) + BYOK (customer's AI key)
 - **DB:** Cloud SQL proxy port **5433** locally (NOT 5432), user `botcraft`, DB `tiger_claw_shared`, password `TigerClaw2026Secure`
+- **No AI agent pushes to main.** All changes via `feat/` branch + PR.
 
 ---
 
-## Current State: LAUNCH DAY — PAYING CUSTOMERS BEING ACTIVATED
+## Current Payment Flow
 
-### Customers Ready to Hatch (pending_setup, wizard link sent)
+Stan Store is the merchant of record. No Zapier. No Stripe.
 
-| Customer | Email | Paid | Channel |
-|----------|-------|------|---------|
-| Debbie | `justagreatdirector@outlook.com` | $97 Mar 10 | Telegram |
-| Jeff Mack | `jeffmackte@gmail.com` | $147 Mar 26 (Pro) | Telegram |
-| John (Thailand) | `vijohn@hotmail.com` | $97 Feb+Mar | LINE (th-th) |
+```
+Customer pays on Stan Store
+→ Stan Store sends confirmation email with link to wizard.tigerclaw.io/signup
+→ Customer clicks link, enters purchase email
+→ /auth/verify-purchase creates DB record on-demand if none exists
+→ Customer completes single-page form and hatches
+```
 
-All three: send `wizard.tigerclaw.io` — wizard finds their purchase by email.
-
-### Other Stan Store customers owed agents (not yet in DB)
-- `chana.loh@gmail.com` — paid $97 twice
-- `nancylimsk@gmail.com` — paid $97 Mar 2
-- `lily.vergara@gmail.com` — paid $97 twice
+Stan Store needs to be replaced with Lemon Squeezy or Paddle for international VAT compliance. Not a current priority.
 
 ---
 
-## Session 5 PRs (2026-04-01)
+## What Is and Is Not Working Right Now
 
-| PR | What It Fixed |
-|----|--------------|
-| #122 | value-gap JOIN type cast — `varchar = uuid` crash, check-ins broken for all tenants since launch |
-| #123 | `INTERNAL_API_URL` missing from deploy — tiger_keys/hive/onboard/settings fataling on every call |
-| #124 | bot_pool removed from `/health` — V4 has no pool, was always `critical: 0` (false alarm) |
-| #125 | Relevance gate in data refinery — second Gemini call blocks gaming/fiction noise before save |
-| #126 | Tiger voice overhaul — 5 conversation examples replace 40-line rules wall |
-| #127 | tiger_scout rate limit reason hidden from Gemini — stopped "23 more hours" responses |
-| #128 | Only `output` string sent to Gemini — strips raw tool data that produced woody responses |
-| #129 | Morning hunt report — `daily_scout` now pushes proactive Telegram/LINE message at 7 AM UTC |
-| #130 | Admin dashboard timeout — N+1 getBotState calls replaced with single query |
-| #131 | Admin dashboard UX — localStorage token, 5min refresh, new agents today stat |
+### ✅ Working
+- Cloud Run API (postgres, redis, workers, queues all healthy)
+- Platform Gemini key + onboarding key
+- Telegram bot delivery
+- Single-page `/signup` onboarding flow
+- Admin dashboard (`wizard.tigerclaw.io/admin`)
+- Magic links (short form: `api.tigerclaw.io/go/:code`)
+- Scout runs (burst mode, correct default as of today)
+- Morning hunt report (7 AM UTC)
+- Slash commands (`/dashboard`, `/status`, `/help`)
+- Customer dashboard (inline key update, leads view)
 
----
-
-## The Woody Response Fix (Important Context)
-
-Three layers were causing "I can't do that for 23 more hours" type responses:
-
-1. **System prompt** (PR #126): Replaced 40-line NEVER/banned-phrases rules wall with 5 real conversation examples. Rules made Gemini play it safe. Examples train the voice.
-2. **Tool data leak** (PRs #127, #128): `tiger_scout` was returning `reason: "Last scheduled scan was 23 hours ago"` in the data payload. `runToolLoop` was passing the full tool object to Gemini. Gemini read the technical fields and paraphrased them. Fix: only `{ output }` is passed to Gemini now.
-3. **SOUL.md** is unchanged and fully loaded in every prompt — the brand vision is intact.
-
----
-
-## Morning Hunt Report (Now Live)
-
-`daily_scout` was silently running tiger_scout at 7 AM UTC and discarding Gemini's response (`return ''`). Operators never heard back.
-
-Now: Tiger composes a morning message after scouting and sends it via Telegram or LINE. Every operator wakes up to a report from their bot. Language of Hope fires if pipeline is empty — never dead air.
+### ❌ Broken — Do Not Claim Otherwise
+| What | Impact |
+|------|--------|
+| All 3 Serper keys (403) | Scout finds zero prospects on every tenant. Core product function is broken. |
+| Platform emergency Gemini key (expired) | No AI fallback if platform key hits quota |
+| Resend not in deploy script | Zero transactional emails in production |
+| Vercel auto-deploy broken | Wizard must be deployed manually |
+| nurture_check incorrectly calls tiger_scout | Wrong behavior, not yet fixed |
+| Reddit returning 403 from Cloud Run | Scout source down, cause under investigation |
 
 ---
 
-## Admin Dashboard
+## Current Tenant Fleet
 
-**URL:** `wizard.tigerclaw.io/admin`
-**Token:** see above (gcloud command). Stored in localStorage after first login — no re-entry needed on refresh.
-**Refresh:** every 5 minutes (was 60s — was causing timeout loop)
-**Shows:** active agents, +N new today, messages 24h, platform cost, mine health, full tenant fleet with email/status/leads
-
----
-
-## Wizard Flow (5 Steps)
-
-1. **StepIdentity** — niche, bot name, operator name, email
-2. **StepChannelSetup** — Telegram + LINE (at least one required)
-3. **StepAIConnection** — BYOK key + validation
-4. **StepCustomerProfile** — ICP data
-5. **StepReviewPayment** — "Hatch"
-
-First message after hatch: ICP fast-path sends confident intro, skips calibration interview entirely.
+| Slug | Status | Bot | Notes |
+|------|--------|-----|-------|
+| `brent-bryson-mnjd321r` | onboarding | @Testtigerfour_bot "Teddy" | Brent's test bot |
+| `john-69cd9564` | onboarding | @BGJN8_bot | John — webhook live, has ICP |
+| `jeff-mack-69cd955d` | pending | Unassigned | Jeff Mack — magic link sent |
+| `justagreatdirector-mne9xtna` | pending | Unassigned | Debbie — magic link sent |
+| `john-mnic5pc1` | terminated | — | John's duplicate — terminated |
 
 ---
 
-## Open Work (Session 6)
+## What LINE Actually Requires
 
-| Item | Priority |
-|------|----------|
-| Activate remaining Stan Store customers (chana, nancy, lily) | HIGH |
-| `bot_ai_keys` dead write cleanup | LOW |
-| Customer-facing dashboard (reduce Telegram token friction) | MEDIUM |
-| Navigation recovery — dashboard link kills wizard state | MEDIUM |
+LINE requires a **LINE Official Account** — a business registration at developers.line.biz with a Channel Access Token and Channel Secret. Personal LINE accounts cannot connect to the API. This was the cause of the April 2 Zoom failure. LINE is **deferred to Phase 2/3**. Code is preserved but not exposed in the UI.
 
 ---
 
-## Active Business
+## Session History (PR Summary)
 
-| Deal | Contact | Status |
-|------|---------|--------|
-| White Label | Max Steingart | 30% affiliate via Stan Store. Must sell 10 first. |
-| LINE Distribution | John / Bryson International Group | 21,000 LINE distributors in Thailand |
-| Pro customer | Jeff Mack | $147 paid, pending_setup |
+| Session | PRs | Key Work |
+|---------|-----|---------|
+| 1–2 | #93–#110 | Initial build |
+| 3 | #111–#120 | Fire test fixes, market intel, voice |
+| 4 | #121 | Remove trial system |
+| 5 (2026-04-01) | #122–#131 | INTERNAL_API_URL fix, value-gap, voice overhaul, morning report, admin dashboard |
+| 6 (2026-04-02/03) | #132–#170 | ENABLE_WORKERS fix, customer dashboard, slash commands, April 2 Zoom failure fixes, single-page signup, LINE deferred, TELEGRAM_WEBHOOK_SECRET trailing newline fix, scout waterfall |
+
+---
+
+## Open Work
+
+| Item | Priority | Status |
+|------|----------|--------|
+| New Serper keys | CRITICAL | Blocked on Brent — get from serper.dev |
+| Renew platform emergency Gemini key | HIGH | Update GCP secret |
+| Add RESEND_API_KEY to deploy script | HIGH | One-line fix |
+| Fix nurture_check calling tiger_scout | MEDIUM | Bug |
+| Fix Vercel Root Directory setting | MEDIUM | Vercel project settings |
+| Remove Zapier dead code | LOW | Cleanup when convenient |
+| Stan Store → Lemon Squeezy migration | LOW | Not a current priority |
 
 ---
 
 ## Rules of Engagement
 
-1. One PR per fix. No chaining.
-2. Never push to main directly. Always `feat/` + `gh pr create`.
-3. Architecture is LOCKED. No RAG, no containers, no OpenClaw.
+1. One PR per fix. No chaining unrelated changes.
+2. Never push to main directly. Always `feat/` + PR.
+3. Architecture is LOCKED. No RAG. No containers. No OpenClaw.
 4. No new features without a customer asking for it.
-5. The mission: paying customers get a live bot that works.
+5. No agent marks anything "COMPLETE" if known broken items remain.
+6. Mandatory post-deploy: `POST /admin/fix-all-webhooks`
+7. Wizard deploys manually — Vercel auto-deploy is broken.
