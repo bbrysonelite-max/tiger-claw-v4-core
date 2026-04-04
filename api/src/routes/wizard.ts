@@ -281,6 +281,7 @@ router.post("/hatch", async (req: Request, res: Response) => {
     }, {
       attempts: 5,
       backoff: { type: 'exponential', delay: 10000 },
+      jobId: `provision-${botId}`, // dedup guard — Zapier retry or double-submit is rejected
     });
 
     console.log(`[wizard] 🚀 Agent Hatch triggered for ${email} (Bot: ${botId})`);
