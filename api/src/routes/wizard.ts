@@ -68,6 +68,7 @@ const HatchSchema = z.object({
   lineToken: z.string().optional(), // LINE channel access token
   lineChannelSecret: z.string().optional(), // LINE channel secret (for webhook signature verification)
   hiveOptIn: z.boolean().optional(),
+  aiKey: z.string().optional(), // Phase 1 single-page signup: key provided inline at hatch time
   customerProfile: CustomerProfileSchema,
 });
 
@@ -152,7 +153,7 @@ router.post("/hatch", async (req: Request, res: Response) => {
   if (!parsed.success) {
     return res.status(400).json({ error: "Invalid payload.", details: parsed.error.format() });
   }
-  const { botId, name, email, flavor, language, timezone, preferredChannel, region, hiveOptIn, botToken, lineToken, lineChannelSecret, customerProfile } = parsed.data;
+  const { botId, name, email, flavor, language, timezone, preferredChannel, region, hiveOptIn, botToken, lineToken, lineChannelSecret, customerProfile, aiKey } = parsed.data;
 
   // ── Pre-flight checks ───────────────────────────────────────────────────────
   // Validate all preconditions before any database writes or queue operations.
@@ -183,6 +184,21 @@ router.post("/hatch", async (req: Request, res: Response) => {
     }
     const userId = subResult.rows[0].user_id as string;
 
+    // 3b. Phase 1 single-page signup: if aiKey is provided inline, validate and install it now
+    //     before pre-flight check 4. The 5-step wizard installs keys via /wizard/validate-key;
+    //     the single-page flow sends the key as part of the hatch payload.
+    if (aiKey) {
+      const { valid: keyValid, error: keyError } = await validateAIKey("google", aiKey);
+      if (!keyValid) {
+        return res.status(400).json({ error: keyError ?? "Invalid Gemini API key. Check the key and try again.", field: "aiKey" });
+      }
+      const encrypted = encryptToken(aiKey);
+      const preview = `${aiKey.slice(0, 4)}...${aiKey.slice(-4)}`;
+      await addAIKey({ botId, provider: "google", model: "gemini-2.0-flash", encryptedKey: encrypted, keyPreview: preview, priority: 0 });
+      await upsertBYOKConfig({ botId, connectionType: "byok", provider: "google", model: "gemini-2.0-flash", encryptedKey: encrypted, keyPreview: preview });
+      console.log(`[hatch] Inline AI key installed for botId=${botId}`);
+    }
+
     // 4. BYOK key must be configured
     const keyResult = await getPool().query(
       `SELECT 1 FROM bot_ai_config WHERE tenant_id = $1 LIMIT 1`,
@@ -195,7 +211,14 @@ router.post("/hatch", async (req: Request, res: Response) => {
 
     // ── All pre-flight checks passed ─────────────────────────────────────────
 
-    const slug = tenant.slug || name.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 30);
+    let slug = tenant.slug || name.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 30);
+    // Guard against slug collision: if slug belongs to a different tenant, append a random suffix.
+    if (!tenant.slug) {
+      const existing = await getTenantBySlug(slug);
+      if (existing && existing.id !== tenant.id) {
+        slug = `${slug}-${Math.random().toString(36).slice(2, 7)}`;
+      }
+    }
     const finalRegion = region || (language === "th" ? "th-th" : "us-en");
     const channel = preferredChannel || (lineToken && !botToken ? "line" : null) || tenant.preferredChannel || "telegram";
 

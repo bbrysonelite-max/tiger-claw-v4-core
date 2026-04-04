@@ -203,6 +203,7 @@ describe('POST /admin/fleet/:tenantId/reset-conversation', () => {
     const app = await buildApp()
     mockDb.getTenantBySlug.mockResolvedValue({ id: 't1', slug: 'canary-1' })
     mockDb.logAdminEvent.mockResolvedValue(undefined)
+    mockDb.getPool.mockReturnValue({ query: vi.fn().mockResolvedValue({ rowCount: 1 }) })
 
     // Mock the ai.ts clearTenantChatHistory import
     vi.doMock('../../services/ai.js', () => ({
@@ -217,6 +218,7 @@ describe('POST /admin/fleet/:tenantId/reset-conversation', () => {
     expect(res.body.ok).toBe(true)
     // keys_cleared may be 0 if dynamic import mock doesn't propagate — just check shape
     expect(typeof res.body.keys_cleared).toBe('number')
+    expect(res.body.onboard_state_cleared).toBe(true)
   })
 
   it('returns 404 for unknown tenant', async () => {
@@ -260,7 +262,7 @@ describe('GET /admin/dashboard/tenants', () => {
       rows: [{
         id: 't1', name: 'Brent Bryson', slug: 'brent', status: 'active',
         canary_group: true, last_activity_at: new Date('2026-03-20T10:00:00Z'),
-        bot_username: 'TigerTestBot',
+        bot_username: 'TigerTestBot', created_at: new Date('2026-03-01T00:00:00Z'),
       }],
     })
 
@@ -285,6 +287,7 @@ describe('GET /admin/dashboard/tenants', () => {
       rows: [{
         id: 't2', name: 'New User', slug: 'new-user', status: 'onboarding',
         canary_group: false, last_activity_at: null, bot_username: null,
+        created_at: new Date('2026-03-01T00:00:00Z'),
       }],
     })
     mockDb.getBotState.mockResolvedValue({ phase: 'identity' })

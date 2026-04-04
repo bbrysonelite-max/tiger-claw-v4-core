@@ -47,7 +47,7 @@ import {
   getPoolStatus,
   getBotPoolEntryByUsername,
 } from "../services/pool.js";
-import { connection as redisConnection } from "../services/queue.js";
+import { connection as redisConnection, miningQueue } from "../services/queue.js";
 import { requireAdmin, sendAdminAlert } from "../services/admin_shared.js";
 
 const router = Router();
@@ -65,18 +65,16 @@ router.use(requireAdmin);
 // Reads TELEGRAM_WEBHOOK_SECRET from env and includes it in the setWebhook call.
 router.post("/fix-all-webhooks", async (req: Request, res: Response) => {
   try {
-    // V4 arch: bot tokens live in bot_pool (encrypted), not on the tenants table.
-    // JOIN bot_pool to get the encrypted token, then decrypt before calling Telegram.
-    // NOTE: legacy V3 tenants may still have status='live' in the DB.
+    // BYOB arch: bot tokens are stored plaintext in tenants.bot_token.
+    // Only process tenants that have a bot_token (Telegram). LINE-only tenants have null.
     const rows = await getPool().query(`
-      SELECT t.id, t.slug, bp.bot_token AS encrypted_token
-      FROM tenants t
-      INNER JOIN bot_pool bp ON bp.tenant_id = t.id AND bp.status = 'assigned'
-      WHERE t.status IN ('active', 'onboarding', 'suspended', 'live')
+      SELECT id, slug, bot_token
+      FROM tenants
+      WHERE status IN ('active', 'onboarding', 'suspended', 'live')
+        AND bot_token IS NOT NULL
     `);
 
-    const { decryptToken } = await import("../services/pool.js");
-    const webhookSecret = process.env["TELEGRAM_WEBHOOK_SECRET"];
+    const webhookSecret = process.env["TELEGRAM_WEBHOOK_SECRET"]?.trim();
     const baseUrl = (process.env["TIGER_CLAW_API_URL"] ?? "https://api.tigerclaw.io").replace(/\/$/, "");
 
     console.log(`[fix-webhooks] Re-binding ${rows.rows.length} tenants. Secret: ${webhookSecret ? "✅ wired" : "⚠️  missing"}`);
@@ -84,7 +82,7 @@ router.post("/fix-all-webhooks", async (req: Request, res: Response) => {
 
     for (const row of rows.rows) {
       try {
-        const token = decryptToken(row.encrypted_token);
+        const token = row.bot_token as string;
         const webhookUrl = `${baseUrl}/webhooks/telegram/${row.id}`;
 
         const body: Record<string, string> = { url: webhookUrl };
@@ -216,18 +214,20 @@ router.get("/metrics", requireAdmin, async (_req: Request, res: Response) => {
     const { getPool: pg } = await import("../services/db.js");
     const pool = pg();
 
-    const [founders, signals, events, fleets] = await Promise.all([
+    const [founders, signals, events, fleets, newToday] = await Promise.all([
       pool.query(`SELECT COUNT(*) as cx FROM tenants WHERE is_founding_member = true`),
       pool.query(`SELECT COUNT(*) as cx FROM hive_signals`),
       pool.query(`SELECT COUNT(*) as cx FROM hive_events`),
-      pool.query(`SELECT COUNT(*) as cx FROM tenants WHERE status = 'active'`)
+      pool.query(`SELECT COUNT(*) as cx FROM tenants WHERE status IN ('active','live')`),
+      pool.query(`SELECT COUNT(*) as cx FROM tenants WHERE created_at >= NOW() - INTERVAL '24 hours'`),
     ]);
 
     return res.json({
       activeTenants: parseInt(fleets.rows[0].cx, 10),
       foundingMembers: parseInt(founders.rows[0].cx, 10),
       totalHiveSignals: parseInt(signals.rows[0].cx, 10),
-      totalHiveEvents: parseInt(events.rows[0].cx, 10)
+      totalHiveEvents: parseInt(events.rows[0].cx, 10),
+      newAgentsToday: parseInt(newToday.rows[0].cx, 10),
     });
   } catch (err) {
     console.error("[admin] GET /metrics error:", err);
@@ -302,50 +302,57 @@ router.get("/dashboard/tenants", requireAdmin, async (_req: Request, res: Respon
   try {
     const { getPool, getBotState } = await import("../services/db.js");
     const pool = getPool();
-    
+
     const result = await pool.query(`
-      SELECT 
+      SELECT
         t.id,
         t.name,
         t.slug,
         t.status,
+        t.flavor,
+        t.preferred_channel,
         t.canary_group,
         t.last_activity_at,
-        b.bot_username
+        t.created_at,
+        t.bot_username,
+        u.email,
+        s.status AS subscription_status,
+        s.plan_tier,
+        COUNT(l.id) AS lead_count
       FROM tenants t
-      LEFT JOIN bot_pool b ON b.tenant_id = t.id AND b.status = 'assigned'
+      LEFT JOIN users u ON u.id = t.user_id
+      LEFT JOIN subscriptions s ON s.tenant_id = t.id
+      LEFT JOIN tenant_leads l ON l.tenant_id = t.id::text
+      GROUP BY t.id, u.email, s.status, s.plan_tier
       ORDER BY t.created_at DESC
     `);
-    
-    // Resolve dynamic onboarding state per tenant schema mapping
-    const dashboardData = await Promise.all(result.rows.map(async (row) => {
-      let onboardingComplete = (row.status === 'active' || row.status === 'live');
-      let onboardingPhase = 'incomplete';
-      
-      if (!onboardingComplete) {
-        try {
-          const state = await getBotState<any>(row.id, "onboard_state.json");
-          if (state && state.phase === 'complete') {
-             onboardingComplete = true;
-             onboardingPhase = 'complete';
-          } else if (state && state.phase) {
-             onboardingPhase = state.phase;
-          }
-        } catch(e) { /* schema likely not fully populated */ }
-      } else {
-        onboardingPhase = 'complete';
-      }
 
+    const dashboardData = await Promise.all(result.rows.map(async (row) => {
+      const isComplete = ['active', 'live'].includes(row.status);
+      let onboardingPhase = isComplete ? 'complete' : 'unknown';
+      if (!isComplete) {
+        try {
+          const botState = await getBotState<{ phase?: string }>(row.id, "onboard_state.json");
+          if (botState?.phase) onboardingPhase = botState.phase;
+        } catch {}
+      }
       return {
         id: row.id,
         name: row.name,
         slug: row.slug,
+        email: row.email ?? 'unknown',
+        status: row.status,
+        subscriptionStatus: row.subscription_status ?? 'none',
+        planTier: row.plan_tier ?? 'unknown',
+        flavor: row.flavor,
+        preferredChannel: row.preferred_channel,
         isCanary: row.canary_group,
         botUsername: row.bot_username ? `@${row.bot_username}` : 'Unassigned',
-        status: row.status,
-        onboardingComplete,
+        onboardingComplete: isComplete,
         onboardingPhase,
+        leadCount: parseInt(row.lead_count ?? '0', 10),
         lastActive: row.last_activity_at ? new Date(row.last_activity_at).toISOString() : 'Never',
+        createdAt: new Date(row.created_at).toISOString(),
       };
     }));
 
@@ -398,8 +405,8 @@ router.post("/fleet/:tenantId/report", async (req: Request, res: Response) => {
   try {
     const tenant = await resolveTenant(req.params["tenantId"]!);
     if (!tenant) return res.status(404).json({ error: "Tenant not found" });
-    if (tenant.status !== "active") {
-      return res.status(400).json({ error: "Tenant is not active" });
+    if (["pending", "terminated", "suspended"].includes(tenant.status)) {
+      return res.status(400).json({ error: `Cannot trigger report for tenant in status: ${tenant.status}` });
     }
     const triggered = await triggerContainerWebhook(tenant, "tiger_briefing", { action: "generate" });
     await logAdminEvent("manual_report", tenant.id, { triggered });
@@ -883,8 +890,13 @@ router.post("/fleet/:tenantId/reset-conversation", async (req: Request, res: Res
     if (!tenant) return res.status(404).json({ error: "Tenant not found" });
     const { clearTenantChatHistory } = await import("../services/ai.js");
     const cleared = await clearTenantChatHistory(tenant.id);
+    // Also wipe onboard_state so the bot greets them fresh
+    await getPool().query(
+      `DELETE FROM tenant_states WHERE tenant_id = $1 AND state_key = 'onboard_state.json'`,
+      [tenant.id]
+    );
     await logAdminEvent("conversation_reset", tenant.id, { keys_cleared: cleared });
-    return res.json({ ok: true, keys_cleared: cleared });
+    return res.json({ ok: true, keys_cleared: cleared, onboard_state_cleared: true });
   } catch (err) {
     return res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
   }
@@ -1126,6 +1138,52 @@ router.get("/pipeline/health", async (_req: Request, res: Response) => {
   }
 });
 
+// ── GET /admin/mine/status ───────────────────────────────────────────────────
+// Returns current mine queue state + last completed run stats.
+router.get("/mine/status", async (_req: Request, res: Response) => {
+  try {
+    const [active, waiting] = await Promise.all([
+      miningQueue.getActive(),
+      miningQueue.getWaiting(),
+    ]);
+    const isRunning = active.length > 0;
+
+    // Pull last mine_complete event from admin_events
+    const pool = getPool();
+    const evtRes = await pool.query(
+      `SELECT metadata, created_at FROM admin_events
+       WHERE event_type = 'mine_complete'
+       ORDER BY created_at DESC LIMIT 1`
+    );
+    const lastRun = evtRes.rows[0]
+      ? { ...evtRes.rows[0].metadata, completedAt: evtRes.rows[0].created_at }
+      : null;
+
+    return res.json({ isRunning, queueDepth: waiting.length, lastRun });
+  } catch (err) {
+    console.error("[admin] GET /mine/status error:", err);
+    return res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+// ── POST /admin/mine/run ─────────────────────────────────────────────────────
+// Enqueue an immediate mine run (bypasses 2 AM cron schedule).
+router.post("/mine/run", async (_req: Request, res: Response) => {
+  try {
+    const jobId = `market_mining_manual_${Date.now()}`;
+    const job = await miningQueue.add('global_market_mining', {}, {
+      jobId,
+      removeOnComplete: true,
+      removeOnFail: true,
+    });
+    console.log(`[admin] Manual mine run enqueued — jobId: ${job.id}`);
+    return res.json({ ok: true, jobId: job.id });
+  } catch (err) {
+    console.error("[admin] POST /mine/run error:", err);
+    return res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
 // ── GET /admin/magic-link?email=... ──────────────────────────────────────────
 // Generate a signed magic link for any email. Use this when manually
 // onboarding a customer or re-sending a link.
@@ -1134,10 +1192,110 @@ router.get("/magic-link", async (req: Request, res: Response) => {
   if (!email) return res.status(400).json({ error: "email query param is required" });
 
   const frontendUrl = process.env["FRONTEND_URL"] ?? "https://wizard.tigerclaw.io";
+  const apiUrl = process.env["API_URL"] ?? "https://api.tigerclaw.io";
   const { token, expires } = generateMagicToken(email);
-  const url = `${frontendUrl}?email=${encodeURIComponent(email)}&token=${token}&expires=${expires}`;
+  const fullUrl = `${frontendUrl}?email=${encodeURIComponent(email)}&token=${token}&expires=${expires}`;
 
-  return res.json({ url, expires: new Date(expires).toISOString() });
+  // Store under a short code in Redis (same TTL as token)
+  const code = token.slice(0, 10);
+  const ttlSeconds = Math.floor((expires - Date.now()) / 1000);
+  await redisConnection.set(`magic_short:${code}`, fullUrl, "EX", ttlSeconds);
+
+  const shortUrl = `${apiUrl}/go/${code}`;
+  return res.json({ url: shortUrl, expires: new Date(expires).toISOString() });
+});
+
+// ── POST /admin/fleet/:tenantId/clear-circuit-breaker ────────────────────────
+router.post("/fleet/:tenantId/clear-circuit-breaker", async (req: Request, res: Response) => {
+  const { tenantId } = req.params;
+  try {
+    const errKey = `circuit_breaker:gemini:errors:${tenantId}`;
+    const tripKey = `circuit_breaker:gemini:tripped:${tenantId}`;
+    const deleted = await redisConnection.del(errKey, tripKey);
+    console.log(`[admin] Cleared circuit breaker for ${tenantId} (${deleted} keys deleted)`);
+    return res.json({ ok: true, tenantId, keysDeleted: deleted });
+  } catch (err) {
+    return res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+// ── GET /admin/platform-health ───────────────────────────────────────────────
+// Live test every platform-level dependency. Green/red per service.
+// Does NOT test per-tenant BYOB/BYOK — those are the operator's responsibility.
+router.get("/platform-health", async (_req: Request, res: Response) => {
+  const timeout = (ms: number) => new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error("timeout")), ms)
+  );
+
+  const check = async (name: string, fn: () => Promise<string>): Promise<{ name: string; status: "ok" | "error"; message: string }> => {
+    try {
+      const message = await Promise.race([fn(), timeout(5000)]);
+      return { name, status: "ok", message };
+    } catch (err) {
+      return { name, status: "error", message: err instanceof Error ? err.message : String(err) };
+    }
+  };
+
+  const serperTest = async (key: string | undefined, label: string) => {
+    if (!key) throw new Error("not configured");
+    const r = await fetch("https://google.serper.dev/search", {
+      method: "POST",
+      headers: { "X-API-KEY": key, "Content-Type": "application/json" },
+      body: JSON.stringify({ q: "test", num: 1 }),
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return `${label} — ok`;
+  };
+
+  const geminiTest = async (key: string | undefined, label: string) => {
+    if (!key) throw new Error("not configured");
+    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`);
+    if (!r.ok) {
+      const body = await r.json().catch(() => ({}));
+      throw new Error((body as any)?.error?.message ?? `HTTP ${r.status}`);
+    }
+    return `${label} — ok`;
+  };
+
+  const results = await Promise.all([
+    check("Serper Key 1",      () => serperTest(process.env["SERPER_KEY_1"], "key-1")),
+    check("Serper Key 2",      () => serperTest(process.env["SERPER_KEY_2"], "key-2")),
+    check("Serper Key 3",      () => serperTest(process.env["SERPER_KEY_3"], "key-3")),
+    check("Gemini Platform",   () => geminiTest(process.env["GOOGLE_API_KEY"], "platform key")),
+    check("Gemini Onboarding", () => geminiTest(process.env["PLATFORM_ONBOARDING_KEY"], "onboarding key")),
+    check("Gemini Emergency",  () => geminiTest(process.env["PLATFORM_EMERGENCY_KEY"], "emergency key")),
+    check("Admin Telegram Bot", async () => {
+      const token = process.env["ADMIN_TELEGRAM_BOT_TOKEN"];
+      if (!token) throw new Error("not configured");
+      const r = await fetch(`https://api.telegram.org/bot${token}/getMe`);
+      const body = await r.json() as any;
+      if (!body.ok) throw new Error(body.description ?? "failed");
+      return `@${body.result.username}`;
+    }),
+    check("Resend Email", async () => {
+      const key = process.env["RESEND_API_KEY"];
+      if (!key) throw new Error("RESEND_API_KEY not set in environment");
+      const r = await fetch("https://api.resend.com/domains", {
+        headers: { Authorization: `Bearer ${key}` },
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const body = await r.json() as any;
+      const verified = body.data?.find((d: any) => d.status === "verified");
+      return verified ? `${verified.name} verified` : "no verified domain";
+    }),
+    check("PostgreSQL", async () => {
+      const pool = getPool();
+      await pool.query("SELECT 1");
+      return "ok";
+    }),
+    check("Redis", async () => {
+      await redisConnection.ping();
+      return "ok";
+    }),
+  ]);
+
+  const allOk = results.every(r => r.status === "ok");
+  return res.json({ ok: allOk, services: results, checkedAt: new Date().toISOString() });
 });
 
 // ── POST /admin/flush-redis ───────────────────────────────────────────────────

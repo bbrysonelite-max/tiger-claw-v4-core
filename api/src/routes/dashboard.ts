@@ -8,9 +8,13 @@ import {
     getTenantBotUsername,
     getBYOKStatus,
     getFoundingMemberDisplay,
-    getHiveSignalWithFallback
+    getHiveSignalWithFallback,
+    getPool,
 } from "../services/db.js";
 import { hiveAttributionLabel } from "../services/hiveEmitter.js";
+import { validateAIKey } from "../services/ai.js";
+import { addAIKey } from "../services/db.js";
+import { encryptToken } from "../services/pool.js";
 
 const router = Router();
 
@@ -24,8 +28,19 @@ router.get("/:slug", async (req: Request, res: Response) => {
         return res.status(404).json({ error: "Tenant not found" });
     }
 
-    const botUsername = await getTenantBotUsername(tenant.id);
-    const keyStatus = await getBYOKStatus(tenant.id);
+    const pool = getPool();
+    const [botUsernameResult, keyStatus, leadsResult] = await Promise.all([
+        getTenantBotUsername(tenant.id),
+        getBYOKStatus(tenant.id),
+        pool.query(`
+            SELECT name, score, status, created_at, profile_url
+            FROM tenant_leads
+            WHERE tenant_id = $1
+            ORDER BY created_at DESC
+            LIMIT 5
+        `, [tenant.id]).catch(() => ({ rows: [] })),
+    ]);
+    const botUsername = botUsernameResult;
 
     // Build LINE webhook URL for the 5-step wizard
     const apiBase = process.env["TIGER_CLAW_API_URL"];
@@ -82,7 +97,17 @@ router.get("/:slug", async (req: Request, res: Response) => {
             benchmarks: {} as any,
             icp: null as any
         },
-        // URLs for wizard integrations
+        leads: {
+            total: leadsResult.rows.length,
+            recent: leadsResult.rows.map(r => ({
+                name: r.name,
+                score: r.score,
+                status: r.status,
+                foundAt: r.created_at,
+                profileUrl: r.profile_url ?? null,
+            })),
+        },
+        dashboardUrl: `${process.env['FRONTEND_URL'] ?? 'https://wizard.tigerclaw.io'}/dashboard?slug=${tenant.slug}`,
         wizardUrl: `/wizard/${tenant.slug}`,
         channelConfigUrl: `${apiBase}/wizard/${tenant.slug}`,
     };
@@ -130,6 +155,47 @@ router.get("/:slug", async (req: Request, res: Response) => {
     console.error("[dashboard] GET /:slug error:", err instanceof Error ? err.message : err);
     return res.status(500).json({ error: "Internal server error" });
   }
+});
+
+// POST /dashboard/:slug/update-key — inline key update, no wizard required
+router.post("/:slug/update-key", async (req: Request, res: Response) => {
+    try {
+        const slug = req.params["slug"]!;
+        const { key, provider, model } = req.body as { key: string; provider: string; model?: string };
+
+        if (!key || !provider) {
+            return res.status(400).json({ error: "key and provider are required" });
+        }
+
+        const tenant = await getTenantBySlug(slug);
+        if (!tenant) return res.status(404).json({ error: "Tenant not found" });
+
+        const { valid, error: validationError } = await validateAIKey(provider, key);
+        if (!valid) {
+            return res.status(400).json({ error: validationError ?? "Key validation failed" });
+        }
+
+        const encrypted = encryptToken(key);
+        const preview = `${key.slice(0, 4)}...${key.slice(-4)}`;
+        await addAIKey({
+            botId: tenant.id,
+            provider,
+            model: model ?? (provider === 'google' ? 'gemini-2.0-flash' : 'gpt-4o-mini'),
+            encryptedKey: encrypted,
+            keyPreview: preview,
+            priority: 1,
+        });
+
+        await getPool().query(
+            `UPDATE tenants SET key_health = 'healthy' WHERE id = $1`,
+            [tenant.id]
+        );
+
+        return res.json({ success: true, preview });
+    } catch (err) {
+        console.error("[dashboard] POST update-key error:", err);
+        return res.status(500).json({ error: "Failed to update key" });
+    }
 });
 
 export default router;

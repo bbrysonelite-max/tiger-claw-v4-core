@@ -1,130 +1,148 @@
 # State of the Tiger — Path Forward
 
-**Last Updated:** 2026-04-01 (Session 4 — Stan Store audit, trial system removal, Stop hook killed)
-**Author:** Claude Sonnet 4.6
+**Last Updated:** 2026-04-04 (Session 8)
+
+**No lying. No assuming. No guessing.**
 
 ---
 
 ## Phase Status
 
-### Phase 7 — SOCIAL MOAT & BRAND SOUL (COMPLETE)
-
-**Phase 1 — Container Health** ✅
-**Phase 2 — Database Cleanup** ✅
-**Phase 3 — BYOK Key Path** ✅
-**Phase 4 — Wizard Hatch Fixes** ✅
-**Phase 5 — Wizard Completion & Hardening** ✅
-**Phase 6 — Fire Test** ✅
-- Jeff Mack demo PASSED 3/30
-- 5+ real agents hatched and hunting
-
-**Phase 7 — Social Moat & Brand Soul (3/31)** ✅
-- Admin Dashboard (Operator Command Center) at /admin (PR #117)
-- Grok/OpenRouter key health detection fix (PR #117)
-- SOUL.md integration — Brand voice & mission injected into every agent
-- FallbackIntelligence — Vertical-specific hope-infused facts for dry mines
-- Postiz Integration — Autonomous social broadcasting tool (tiger_postiz)
-- Postiz Key Management — Secure storage and configuration via tiger_settings
+| Phase | Description | Status |
+|-------|-------------|--------|
+| 1 | Container Health | ✅ Done |
+| 2 | Database Cleanup | ✅ Done |
+| 3 | BYOK Key Path | ✅ Done |
+| 4 | Wizard Hatch Fixes | ✅ Done |
+| 5 | Wizard Completion & Hardening | ✅ Done |
+| 6 | Fire Test | ✅ Passed 2026-03-29 |
+| 7 | Social Moat & Brand Soul | ✅ Done |
+| 8 | Launch Day Hardening | ✅ Done (Session 5) |
+| 9 | April 2 Failure Recovery | ✅ Done (Session 6) |
+| 10 | Phase 1 Self-Serve Signup | ✅ Built and deployed (Session 6) |
+| 11 | Silent Failure Audit + Full Platform Green | ✅ Done (Session 7) |
+| 12 | Tool Safety Audit + Admin Mine Controls | ✅ Done (Session 8) |
 
 ---
 
-## Fire Test Findings (2026-03-30)
+## Current Focus
 
-### Bugs Found & Fixed During Walkthrough
+**Get first 10 customers running.** Operator + Jeff Mack + John (Thailand) have access to ~60,000 NuSkin distributors. Target: first 10 onboarded, running for one week, no fires. Then expand to next 40.
 
-| # | Bug | Root Cause | Fix | Status |
-|---|-----|-----------|-----|--------|
-| 1 | Bot shows "bbryson" not wizard name | `provisioner.ts` UPDATE missing `name` in SET | Added `name = $1` to UPDATE | Deploying |
-| 2 | Bot asks ICP questions manually | `ai.ts` didn't check `onboard_state.json` for pre-loaded `customerProfile` | Added `checkWizardIcpFastPath` to both message handlers | Deploying |
-| 3 | Email prefix used as name | `auth.ts` uses `email.split("@")[0]` — correct as placeholder | Fixed by Bug 1 (provisioner overwrites at hatch) | Deploying |
-| 4 | "No pending subscription" on ACTIVATE | `lookupPurchaseByEmail` returned stale bot | Multi-agent branch in auth.ts (PR #110) | ✅ Deployed |
-| 5 | Bot_pool spam alerts every 30s | `EMPTY_COOLDOWN_MS: 0` + always-empty V4 table | Removed pool check + POOL_ALERT from index.ts | ✅ Deployed |
-| 6 | Wizard text unreadable (low contrast) | `text-white/40` through `/80` classes | All opacity bumped to /70–/100 | ✅ Deployed |
-| 7 | "Total Due Today $147" scare copy | Looked like new charge | "Your Plan" + green "Paid via Stan Store" | ✅ Deployed |
-| 8 | "AI Computations" jargon | Confusing label | Changed to "AI Provider" | ✅ Deployed |
-
-### UX Issues Still Open
-
-| Issue | Priority |
-|-------|----------|
-| Clicking dashboard/admin link loses wizard state | MEDIUM |
-| "Connected" text should be green | LOW |
+Jeff, John, and Debbie all need to complete the wizard. Links go to `wizard.tigerclaw.io/signup`.
 
 ---
 
-## Next Steps (Session 4 — In Progress)
+## Session 8 — What Was Done (2026-04-04)
 
-1. ~~**PR #75**~~ **MERGED** — Stan Store integration audit.
-2. ~~**PR #46**~~ **CLOSED** as stale.
-3. **First paying customer** — pick from waiting list, activate.
-4. **PRs #74, #78, #77** — data mine quality (now unblocked).
-5. **Fix `bot_ai_keys` dead write** — small cleanup PR.
-6. ~~**LETTA_API_KEY hook error**~~ **FIXED** — `LETTA_API_KEY` added to `~/.zprofile`. Takes effect on next shell restart.
+| PR | Fix |
+|----|-----|
+| #186 | Mine engine controls in admin dashboard — live status indicator, Run Now button, last run stats, `mine_complete` admin event logging |
+| #187 | Tool safety audit: 43 new tests (455 total), tiger_gmail_send + tiger_postiz removed from toolsMap, active agent count fixed in /admin/metrics, tiger_strike_draft test fixed |
 
 ---
 
-## Known Issues / Tech Debt
+## Session 7 — What Was Done (2026-04-04)
 
-| Item | Priority | Status | Notes |
-|------|----------|--------|-------|
-| **Grok key health false positive** | — | **FIXED (#117)** | Cron now passes original provider to `validateAIKey`, not SDK alias. |
-| **TypeScript CI errors** | — | **FIXED (Session 3)** | `node-fetch` phantom imports removed. CI Test green. |
-| **Migration 022 crash** | — | **FIXED (#119)** | Wrong column names in admin_events INSERT crashed every Cloud Run startup since #117. |
-| **Tiger voice bleeding** | — | **FIXED (#120)** | SOUL_VOICE_BLOCK now first in every system prompt. "Recruiting" removed from identity. Language of Hope enforced. |
-| `bot_ai_keys` dead write | LOW | Open | Wizard writes here, runtime reads `bot_ai_config`. Cleanup when convenient. |
-| ~25 dead BotFather bots | LOW | Open | Need manual /deletebot cleanup. |
-| Navigation recovery in wizard | MEDIUM | Open | Dashboard link kills wizard state. |
-| LETTA_API_KEY hook error | — | **FIXED** | Added `LETTA_API_KEY` to `~/.zprofile` so hooks inherit it in non-interactive shells. |
-| CI Postgres `role "root"` | INFRA | Open | Pre-existing GitHub Actions infra bug — not our code. TypeScript compile gate works fine. |
+Full audit by 6 parallel sub-agents revealed 14 broken items including things broken since launch.
 
----
-
-## DB State (as of 2026-03-30 5:45 PM MST)
-
-| Tenant | Slug | Status | Channel | Notes |
-|--------|------|--------|---------|-------|
-| `71018251...` | heylookbrentisgolfing | onboarding | Telegram | OpenAI key |
-| `8803b9f4...` | bbryson-mndsgv0q | onboarding | Telegram | Job 3, Google key |
-| (newest) | bbryson-mndudbum | onboarding | Telegram | Job 4, Google key |
+| PR | Fix |
+|----|-----|
+| #174 | Serper fallback for market miner (Reddit dead 6 days) |
+| #175 | TELEGRAM_WEBHOOK_SECRET wired into deploy (post-deploy webhook fix now idempotent, not mandatory) |
+| #176 | RESEND_API_KEY in deploy, admin alert env var names fixed, nurture_check prompt fixed |
+| #177 | Dead key alerts routed through sendAdminAlert (not UUID) |
+| #178 | 72-hour duplicate account window removed |
+| #179 | Slug collision guard in wizard hatch |
+| #180 | Scoring ceiling fixed (engagement weight normalized) |
+| #181 | tiger_refine registered in toolsMap |
+| #182 | getTenant() wrapped in try/catch in webhook hot path |
+| #183 | CI test updated to match new rate limit message |
+| #184 | tiger_strike_draft FK validation — prevents hallucinated fact UUIDs crashing inserts |
+| #185 | System prompt rule: never report tool failures to operator, never ask "what's it gonna be?" |
 
 ---
 
-## Merged PRs (Full Session History)
+## Session 6 — What Was Done (2026-04-02 / 2026-04-03)
 
-| PR | Description | Date |
-|----|-------------|------|
-| #93 | fix: secrets.ts EISDIR | 3/23 |
-| #94 | feat: BYOK key observability | 3/23 |
-| #95 | fix: activateSubscription loud failure | 3/24 |
-| #96 | feat: hatch pre-flight validation | 3/24 |
-| #97 | fix: userId in provisioning queue | 3/24 |
-| #98 | fix: clear stale frontend state | 3/24 |
-| #99 | feat: Stan Store on-demand records | 3/25 |
-| #100 | feat: StepCustomerProfile ICP | 3/25 |
-| #101 | feat: network-marketer prospect section | 3/25 |
-| #102 | feat: ICP first-message bypass | 3/26 |
-| #103 | feat: LINE end-to-end | 3/26 |
-| #104 | fix: LINE-only bot validation | 3/27 |
-| #105 | feat: wizard readability overhaul | 3/27 |
-| #106 | fix: LINE-only provisioning | 3/28 |
-| #107 | feat: preferredChannel type fix | 3/28 |
-| #108 | fix: Gemini JSON escape sanitization | 3/30 |
-| #109 | feat: admin bot + heartbeat monitor | 3/30 |
-| #110 | fix: wizard UX friction pass + multi-agent | 3/30 |
-| #111 | fix: 3 critical fire test bugs | 3/31 |
-| #112 | feat: intent bridge — market intelligence → buildSystemPrompt | 3/31 |
-| #113 | fix: dashboard display — AI engine label + Telegram dual-state | 3/31 |
-| #114 | fix: wizard ICP fast-path — write icpSingle + botName at hatch | 3/31 |
-| #115 | fix: buildSystemPrompt fallback to customerProfile when icpSingle missing | 3/31 |
-| #116 | fix: Grok model grok-2-1212 → grok-4-1-fast-non-reasoning | 3/31 |
-| #117 | feat: admin dashboard + grok key health fix + SOUL + Postiz | 4/1 |
-| fix (in #117) | fix: remove node-fetch phantom imports — CI Test green | 4/1 |
-| #118 | docs: update all 4 core docs to session 3 state | 4/1 |
-| #119 | fix: migration 022 wrong column names — was crashing every Cloud Run startup | 4/1 |
-| #120 | feat: SOUL.md voice enforcement — SOUL_VOICE_BLOCK first in every prompt | 4/1 |
-| #75 | feat: Stan Store audit — circuit breaker, email copy, deploy secrets, STAN_STORE_AUDIT.md | 4/1 |
-| #121 | fix: remove 72-hour trial reminder system — pivoted to 7-day money-back guarantee | 4/1 |
-| #46 | closed: email support agent — stale | 4/1 |
+### April 2 — Post-Zoom Failure Fixes
+
+On April 2, a live Zoom onboarding call with John (Thailand) failed completely. These fixes followed immediately:
+
+| PR | Fix |
+|----|-----|
+| #136 | `ENABLE_WORKERS` not set — provisioner and all workers silently off since launch |
+| #139 | `ENABLE_WORKERS=true` added to deploy script permanently |
+| #133 | Customer dashboard — inline AI key update + leads section |
+| #134 | Slash commands: `/dashboard`, `/status`, `/help` |
+| #135 | Dashboard type error — `connectionType → priority` |
+| #137 | Hatch spinner → step-by-step progress |
+| #138 | ICP fast-path opening — Soul voice, not raw ICP dump |
+| #140 | Tiger announces on X after hatch (later removed — PR #164) |
+| #141 | Save `bot_username` to DB after provisioning |
+| #142 | CI postgres role fix + worker health check |
+| #143 | Mobile wizard E2E tests (iPhone 13) |
+
+### April 3 — Root Cause Fixes + Phase 1 Build
+
+| PR | Fix |
+|----|-----|
+| #145 | `fix-all-webhooks` was JOINing `bot_pool` (doesn't exist in BYOB arch) — returned 0 rows every time |
+| #146 | 8s timeout on Telegram token validation + LINE Official Account warning |
+| #147 | Provisioning suspension now sends admin alert |
+| #148 | Admin dashboard surfaces API errors instead of blank |
+| #149–#155 | Docs: SOTU as single source of truth, LINE deferred, Phase 1 PRD, Stan Store flow confirmed |
+| #156 | Phase 1 single-page `/signup` built |
+| #157 | CI test failures resolved |
+| #158 | Signup calling wrong verify-purchase endpoint |
+| #159 | Hatch payload missing email + wrong customerProfile fields |
+| #160 | Hatch endpoint accepts `aiKey` inline for Phase 1 flow |
+| #161 | `botToken` not `telegramBotToken` in hatch payload |
+| #162 | Check `data.ok` not `data.success` in hatch response |
+| #163 | `ok` field added to `HatchResponse` type |
+| #164 | X/Twitter announcement removed; signup tagline added |
+| #165 | `TELEGRAM_WEBHOOK_SECRET` trailing newline fix |
+| #166 | LINE removed from customer dashboard |
+| #167 | Root page redirects to `/signup` |
+| #168 | Manual report trigger allowed for onboarding tenants |
+| #169 | Daily scout waterfall — never reports failure |
+| #170 | Reset-conversation clears `onboard_state` from PostgreSQL |
+
+---
+
+## Known Broken — Current
+
+| Item | Impact | Fix |
+|------|--------|-----|
+| Jeff / John / Debbie not onboarded | No paying customers running | Send them wizard link |
+| Vercel auto-deploy broken | Wizard must be deployed manually | Fix Root Directory in Vercel settings |
+| Reddit 403 from Cloud Run egress | Mine uses Serper fallback (working) | Awaiting Reddit API approval |
+
+---
+
+## Tech Debt
+
+| Item | Priority |
+|------|----------|
+| Remove Zapier dead code (`/webhooks/stan-store`, `ZAPIER_WEBHOOK_SECRET`) | LOW |
+| Remove Stripe dead code (`STRIPE_*` env vars, `/webhooks/stripe`) | LOW |
+| source_url missing index on market_intelligence table | MEDIUM |
+| factExtractionWorker failures produce no admin alert | MEDIUM |
+| marketIntelligenceWorker failures produce no admin alert | MEDIUM |
+| WIZARD_SESSION_SECRET not in deploy script (safe via fallback) | LOW |
+| Stan Store → Lemon Squeezy/Paddle (international VAT) | DEFERRED |
+| LINE Phase 2 (requires LINE Official Account) | DEFERRED |
+| Customer-facing dashboard | DEFERRED |
+| Affiliate tracking for Max Steingart deal | DEFERRED — build when he sends first customer |
+
+---
+
+## Deferred Features (Do Not Build Yet)
+
+- **Reflexion Loop** — outcome signals feed back into fact_anchors. Build after 10+ agents have real data.
+- **Agent Leaderboard** — opt-in fleet ranking. Build after Reflexion Loop.
+- **White label** — hold at affiliate/referral model until Max sells 10.
+- **Partner portal / rev share automation** — only if white label deal proves out.
 
 ---
 
@@ -133,18 +151,20 @@
 | Resource | Value |
 |----------|-------|
 | GCP Project | `hybrid-matrix-472500-k5` |
-| Cloud Run | `tiger-claw-api` (us-central1), current revision: 00172+ |
-| Cloud SQL proxy | port **5433** locally (NOT 5432), user `botcraft`, DB `tiger_claw_shared` |
-| DB password | `TigerClaw2026Secure` |
-| Wizard | Next.js on Vercel at `wizard.tigerclaw.io` |
-| GitHub | `bbrysonelite-max/tiger-claw-v4-core` |
-| Deploys | GitHub Actions on merge to main |
+| Cloud Run | `tiger-claw-api` (us-central1 primary, asia-southeast1 secondary) |
+| Cloud SQL proxy | port **5433** locally, user `botcraft`, DB `tiger_claw_shared` |
+| Admin | `wizard.tigerclaw.io/admin` |
+| Deploys (API) | `GCP_PROJECT_ID=hybrid-matrix-472500-k5 bash ./ops/deploy-cloudrun.sh` |
+| Deploys (Wizard) | Manual — Vercel auto-deploy is broken |
+| Post-deploy | Run `POST /admin/fix-all-webhooks` (idempotent — webhook secret now baked into deploy) |
 
 ---
 
-## Agent Rules
+## Rules of Engagement
 
-- One PR per fix. No chaining.
-- feat/ branches only. Never push direct to main.
-- Architecture is **LOCKED**. No RAG, no containers, no OpenClaw.
-- **No new features.** Friction reduction and sales only.
+1. One PR per fix. No chaining.
+2. `feat/` or `fix/` branches only. No AI agent pushes to main.
+3. Architecture is LOCKED. No RAG, no containers, no OpenClaw.
+4. No new features without a customer asking for it.
+5. No session is marked COMPLETE if known broken items remain unresolved.
+6. `tiger_gmail_send` and `tiger_postiz` are intentionally NOT in toolsMap. Do not re-add.

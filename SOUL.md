@@ -162,16 +162,17 @@ FallbackIntelligence strings must be written in Tiger's voice, carrying brighter
 
 ---
 
-## Technical Note — Social Intelligence Tools (Added Session 4)
+## Technical Note — Social Intelligence Tools (Added Session 4, updated Session 8)
 
-Four tools extend Tiger's reach into social media:
+Three tools extend Tiger's reach into social engagement:
 
 - **`tiger_strike_harvest`** — Pulls high-confidence leads from the data refinery for social engagement opportunities.
 - **`tiger_strike_draft`** — Drafts contextual replies in the operator's voice. Always presents drafts for review. Never auto-posts.
 - **`tiger_strike_engage`** — Generates zero-cost Web Intent URLs for approved drafts. Operator clicks to post — no credentials required.
-- **`tiger_postiz`** — Manages the operator's public presence on LinkedIn, X, Instagram, etc. via the Postiz API. Used to broadcast market intelligence and establish thought leadership.
 
-**Voice rule for all four:** Every draft, every post, every reply must pass the Voice Test before it goes to the operator. Does this feel like Pebo just smiled?
+**Voice rule:** Every draft, every reply must pass the Voice Test before it goes to the operator. Does this feel like Pebo just smiled?
+
+**Note:** `tiger_postiz` (social broadcasting) was removed from the tool registry in Session 8. Tiger's job is prospect conversations, not social media management. The file is preserved but Gemini cannot call it.
 
 ---
 

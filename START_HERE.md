@@ -1,186 +1,113 @@
 # START HERE — Tiger Claw Session Brief
 
-**Last Updated:** 2026-04-01 (Session 4 — Stan Store audit, trial system removal, Stop hook killed)
-**Author:** Claude Sonnet 4.6
+**Last Updated:** 2026-04-04 (Session 8)
+
+**Read SOTU.md first. That is the single source of truth. This file is a fast orientation — SOTU has the details.**
+
+**Standing orders: No lying. No assuming. No guessing. Do not mark anything working unless you have tested it live.**
 
 ---
 
 ## What Is Tiger Claw?
 
-AI sales agent SaaS. Customers buy on Stan Store, walk through a 5-step wizard to configure their bot + AI key + customer profile, hit "Hatch," and get a live AI sales agent. Built on Cloud Run, PostgreSQL, Redis/BullMQ, Gemini/OpenAI.
+AI sales agent SaaS. Customer pays on Stan Store → gets email with link → `wizard.tigerclaw.io/signup` → single-page form → bot hatches in ~2 minutes → bot prospects for them on Telegram around the clock.
 
-- **API:** Cloud Run (us-central1), project `hybrid-matrix-472500-k5`
-- **Wizard Frontend:** Next.js on Vercel at `wizard.tigerclaw.io`
+**The value proposition:** Your bot hunts while you sleep.
+
+- **API:** `https://api.tigerclaw.io` — Cloud Run, `hybrid-matrix-472500-k5`, `us-central1` + `asia-southeast1`
+- **Signup + Dashboard + Admin:** `wizard.tigerclaw.io` — Next.js on Vercel
+- **Admin:** `wizard.tigerclaw.io/admin` — token via `gcloud secrets versions access latest --secret="tiger-claw-admin-token" --project="hybrid-matrix-472500-k5"`
 - **Repo:** `github.com/bbrysonelite-max/tiger-claw-v4-core`
-- **Architecture:** BYOB (customer's Telegram token) + BYOK (customer's AI key)
-- **DB password:** `TigerClaw2026Secure` (from Secret Manager: `tiger-claw-database-url`)
-- **Cloud SQL instance:** `tiger-claw-postgres-ha` (proxy port **5433** locally — NOT 5432, DB: `tiger_claw_shared`, user: `botcraft`)
+- **DB:** Cloud SQL proxy port **5433** locally (NOT 5432), user `botcraft`, DB `tiger_claw_shared`, password `TigerClaw2026Secure`
+- **No AI agent pushes to main.** All changes via `feat/` or `fix/` branch + PR.
 
 ---
 
-## Current State: ALL PHASES COMPLETE — FIRST BOT LIVE ✅
+## Current Payment Flow
 
-Captain Tiger Two (`bbryson-mne8ffim`) confirmed live on Telegram at 1:35 AM 2026-03-31.
+Stan Store is the merchant of record. No Zapier. No Stripe.
 
-### Merged PRs — Session 4 (2026-04-01)
-
-| PR | What It Did | Status |
-|----|-------------|--------|
-| #75 | feat: Stan Store audit — Gemini circuit breaker, email copy fix, deploy secrets, STAN_STORE_AUDIT.md | MERGED |
-| #121 | fix: remove 72-hour trial reminder system — pivoted to 7-day money-back guarantee | MERGED |
-| #46 | closed: email support agent stale | CLOSED |
-
-### Merged PRs — Session 3 (2026-04-01)
-
-| PR | What It Did | Status |
-|----|-------------|--------|
-| #117 | feat: admin dashboard at `/admin`, Grok key health fix, SOUL.md integration, Postiz tool | MERGED |
-| fix (in #117) | fix: remove `node-fetch` phantom imports from ai.ts, webhook_dispatcher.ts, tiger_postiz.ts — CI green | MERGED |
-| #118 | docs: update all 4 core docs to session 3 state | MERGED |
-| #119 | fix: migration 022 wrong column names (`event_type`/`metadata` → `action`/`details`) — was crashing every Cloud Run startup since #117 | MERGED |
-| #120 | feat: SOUL.md voice enforcement — SOUL_VOICE_BLOCK first in every system prompt; Tiger's identity, voice rules, Language of Hope table, edification directive, The Voice Test; value_gap_checkin and tiger_scout skip message rewritten | MERGED |
-
-### Merged PRs — Session 2 (2026-03-31)
-
-| PR | What It Did | Status |
-|----|-------------|--------|
-| direct commit | fix: bot greeting CTA — "I'm ready — let me hunt" | MERGED |
-| #116 | fix: Grok model `grok-2-1212` → `grok-4-1-fast-non-reasoning` | MERGED |
-| #115 | fix: `buildSystemPrompt` fallback to `customerProfile` when `icpSingle` missing | MERGED |
-| #114 | fix: wizard ICP fast-path — write `icpSingle` + `botName` at hatch and first message | MERGED |
-| #113 | fix: dashboard display — AI engine label + Telegram dual-state contradiction | MERGED |
-| #112 | feat: intent bridge — market intelligence → `buildSystemPrompt()` | MERGED |
-| #111 | fix: 3 critical fire test bugs | MERGED |
-
-### Merged PRs — Session 1 (2026-03-31 early)
-
-| PR | What It Did | Status |
-|----|-------------|--------|
-| #110 | fix: wizard UX friction pass + multi-agent auth | MERGED |
-| #109 | feat: admin bot + heartbeat monitor | MERGED |
-| #107 | fix: LINE-only provisioning (`preferredChannel` defaulted to `"telegram"`) | MERGED |
-
-### Open PRs (Session 5)
-
-| PR | Title | Priority |
-|----|-------|----------|
-| #74 | Ruthless Relevance Gate for Data Refinery | Data quality — next |
-| #78 | Mine Quality Hardening | Data quality |
-| #77 | Mine Quality Audit | Report |
+```
+Customer pays on Stan Store
+→ Stan Store sends confirmation email with wizard.tigerclaw.io/signup link
+→ Customer enters purchase email on /signup
+→ POST /auth/verify-purchase — creates DB record on-demand
+→ Customer fills form: agent name, niche, ICP, Telegram bot token, Gemini key
+→ POST /wizard/hatch → bot live in ~2 minutes
+```
 
 ---
 
-## Bugs Found During Fire Test (3/30 Evening)
+## What Is and Is Not Working Right Now
 
-### BUG 1: Provisioner Name — FIXED by Gemini (deploying)
-`provisioner.ts` UPDATE query was missing `name` in SET clause. Bot showed email prefix "bbryson" instead of wizard-entered name. Gemini added `name = $1` to the UPDATE.
+### ✅ Working
+- Cloud Run API (postgres, redis, workers all healthy — revision 00310-pjx)
+- Platform Gemini key + onboarding key + emergency key (renewed Session 7)
+- Telegram bot delivery + TELEGRAM_WEBHOOK_SECRET baked into deploy
+- Single-page `/signup` onboarding flow
+- Admin dashboard + fleet dashboard (`wizard.tigerclaw.io/admin`)
+- Mine running nightly at 2 AM UTC — Serper fallback active (Reddit 403'd)
+- Mine controls in admin dashboard — Run Now button, live status, last run stats
+- Scout (burst mode) + morning hunt report (7 AM UTC)
+- Resend email — RESEND_API_KEY in deploy, first production email confirmed
+- Admin alerts via Telegram (@AlienProbeadmin_bot)
+- Slash commands (`/dashboard`, `/status`, `/help`)
+- 455 tests passing, CI green
 
-### BUG 2: ICP Fast-Path — FIXED by Gemini (deploying)
-The ICP data pipeline (wizard → hatch → `onboard_state.json`) was correctly wired, BUT `ai.ts` conversation handler didn't check for pre-loaded `customerProfile` before starting the onboarding interview. Bot said "glitch in the system" and asked ICP questions manually. Gemini added `checkWizardIcpFastPath` to both `processTelegramMessage` and `processLINEMessage`.
-
-### BUG 3: Email Prefix as Name — Resolved by Bug 1 fix
-`auth.ts` uses `email.split("@")[0]` as a placeholder name at purchase time. This is correct behavior — the provisioner now overwrites it with the wizard-provided name at hatch time.
-
----
-
-## Bugs Previously Fixed (3/30 Earlier)
-
-| Bug | Fix | Revision |
-|-----|-----|----------|
-| bot_pool spam alerts every 30s | Removed legacy pool check + POOL_ALERT from index.ts | 00170 |
-| JSON parse errors from Gemini | `sanitizeGeminiJSON()` in geminiGateway.ts | 00168 (PR #108) |
-| "No pending subscription" blocker | Multi-agent auth in auth.ts + SQL reset | 00172 (PR #110) |
-| Wizard contrast/readability | All text-white opacity classes bumped | 00172 (PR #110) |
-| "Total Due Today" scare copy | Changed to "Your Plan" + green "Paid via Stan Store" | 00172 (PR #110) |
-| "AI Computations" jargon | Changed to "AI Provider" | 00172 (PR #110) |
-| One-email-one-bot lock | Multi-agent branch in auth.ts | 00172 (PR #110) |
+### ❌ Broken / Not Built
+| What | Impact |
+|------|--------|
+| Reddit 403 from Cloud Run egress | Mine uses Serper fallback (working) — awaiting Reddit API approval |
+| Vercel auto-deploy broken | Wizard must be deployed manually via Vercel dashboard |
+| Jeff / John / Debbie not onboarded | No customers running yet |
 
 ---
 
-## Wizard Flow (Current — 5 Steps)
+## Current Tenant Fleet
 
-1. **StepIdentity** — niche, bot name, your name, email
-2. **StepChannelSetup** — Telegram (optional) + LINE (optional). At least one required.
-3. **StepAIConnection** — BYOK key install + validation (Gemini free tier available)
-4. **StepCustomerProfile** — ICP: who/problem/not-working/where. Network marketers also get prospect section.
-5. **StepReviewPayment** — order summary + "Hatch" button
+| Slug | Status | Bot | Notes |
+|------|--------|-----|-------|
+| `brent-bryson-mnjd321r` | onboarding | @Testtigerfour_bot "Teddy" | Brent's test bot |
+| `justagreatdirector-mne9xtna` | pending | — | Debbie — needs to complete wizard |
 
----
+Jeff Mack and John (Thailand) were wiped for clean re-onboarding. Send them `wizard.tigerclaw.io/signup`.
 
-## What Happens at Hatch
-
-1. `POST /wizard/hatch` validates botId, subscription, AI key
-2. Activates subscription (`pending_setup` → `active`)
-3. Saves LINE credentials encrypted to tenant record (if provided)
-4. Writes ICP to `onboard_state.json` in **PostgreSQL** `tenant_states` table, **including `icpSingle` and `botName`** (critical — see ICP fix history below)
-5. Enqueues BullMQ provisioning job
-6. Worker: updates tenant (including name), registers Telegram webhook (if token), registers LINE webhook (if creds), sets status → onboarding
-
-## First Message Behavior
-- **Wizard-hatched bots (ICP in onboard_state.json):** Sends confident intro referencing the customer's ICP data, skips onboarding interview entirely
-- **No ICP:** Runs calibration interview as before
+**Active agents (status = 'active' or 'live'):** 0 — no customers have completed onboarding yet.
 
 ---
 
-## UX Issues Still Open (Noted During Fire Test)
+## Session History (PR Summary)
 
-| Issue | Priority | Notes |
-|-------|----------|-------|
-| Clicking "dashboard/admin" link loses wizard state, can't go back | MEDIUM | Navigation recovery needed |
-| "Connected" text on AI provider line should be green | LOW | Visual confirmation |
-
----
-
-## Database State (as of 2026-04-01)
-
-| Tenant | Name | Status | Channel | AI Key |
-|--------|------|--------|---------|--------|
-| `484dbe39...` | bbryson-mne8ffim (Captain Tiger Two) | onboarding | Telegram ✅ | Grok xai-...VBOH ✅ **LIVE** |
-| `71018251...` | heylookbrentisgolfing | onboarding | Telegram ✅ | openai/gpt-4o-mini ✅ |
-| `8803b9f4...` | bbryson | pending | LINE ✅ | ❌ no key |
-
-**No paying customer tenants yet.**
+| Session | PRs | Key Work |
+|---------|-----|---------|
+| 1–4 | #1–#121 | Initial build, fire test, voice, market intel |
+| 5 (2026-04-01) | #122–#131 | INTERNAL_API_URL fix, voice overhaul, morning report, admin dashboard |
+| 6 (2026-04-02/03) | #132–#170 | ENABLE_WORKERS fix, customer dashboard, April 2 Zoom failure fixes, single-page signup |
+| 7 (2026-04-04) | #174–#185 | 14 silent failures fixed, Serper fallback, RESEND_API_KEY, nurture_check, scoring ceiling, FK guard, webhook secret |
+| 8 (2026-04-04) | #186–#187 | Mine dashboard controls, tool safety audit, 43 new tests (455 total), gmail+postiz removed from toolsMap |
 
 ---
 
-## Fire Test Result: ✅ PASSED (2026-03-31 1:35 AM)
+## Open Work
 
-Captain Tiger Two (`bbryson-mne8ffim`) responded on Telegram with correct ICP-aware greeting. No onboarding questions. Name correct. Grok key live.
-
-**Next milestone:** Activate first paying customer from waiting list.
-
----
-
-## Active Deals
-
-| Deal | Contact | Status | Terms |
-|------|---------|--------|-------|
-| White Label | Max Steingart | Negotiating | 30% affiliate commission via Stan Store. Max must sell 10 before Pebo builds. |
-| LINE Distribution | John (Bryson International Group) | Active | 21,000 LINE distributors in Thailand. John is Pebo's own downline. |
-| Demo | Jeff Mack | Bot LIVE and hunting | Demo passed. Paying Stan Store customer. Telegram. |
-
----
-
-## Critical Files
-
-| File | What It Does |
-|------|-------------|
-| `api/src/routes/wizard.ts` | POST /wizard/hatch, POST /wizard/validate-key |
-| `api/src/routes/auth.ts` | POST /auth/verify-purchase (multi-agent support) |
-| `api/src/services/provisioner.ts` | Telegram + LINE webhook registration, name update |
-| `api/src/services/ai.ts` | ICP fast-path bypass, processTelegramMessage, processLINEMessage |
-| `api/src/services/db.ts` | activateSubscription(), createBYOK* |
-| `api/src/services/queue.ts` | provisionWorker, telegramWorker, lineWorker |
-| `web-onboarding/src/components/OnboardingModal.tsx` | WizardState, 5-step orchestration |
-| `web-onboarding/src/components/wizard/StepCustomerProfile.tsx` | ICP collection |
-| `web-onboarding/src/components/wizard/StepReviewPayment.tsx` | Hatch trigger |
+| Item | Priority |
+|------|----------|
+| Jeff, John, Debbie complete wizard | IMMEDIATE |
+| Fix Vercel Root Directory setting | OPS |
+| Per-tenant health indicators in admin fleet table | NEXT |
+| Per-tenant drill-down in admin dashboard | NEXT |
+| Remove Zapier dead code | LOW |
+| Remove Stripe dead code | LOW |
 
 ---
 
 ## Rules of Engagement
 
-1. **One PR per fix.** No chaining.
-2. **Never push directly to main.** Always `feat/` branches + `gh pr create`.
-3. **Stop if something breaks.** Don't stack fixes on a broken deploy.
-4. **No new features.** Reduce friction, provision agents, sell. That's it.
-5. **The mission:** Paying customers get a live bot that works.
+1. One PR per fix. No chaining unrelated changes.
+2. Never push to main directly. Always `feat/` or `fix/` + PR.
+3. Architecture is LOCKED. No RAG. No containers. No OpenClaw. No switching from Gemini 2.0 Flash.
+4. No new features without a customer asking for it.
+5. No agent marks anything "COMPLETE" if known broken items remain.
+6. `tiger_gmail_send` and `tiger_postiz` are intentionally NOT in toolsMap. Do not re-add.
+7. Post-deploy: run `POST /admin/fix-all-webhooks` (idempotent — webhook secret is baked in).
+8. Wizard deploys manually — Vercel auto-deploy is broken.

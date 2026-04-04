@@ -159,7 +159,7 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
       const webhookUrl = `${baseUrl}/webhooks/telegram/${tenant.id}`;
 
       // Call Telegram API to set the webhook (Use POST with JSON to avoid URL encoding issues)
-      const webhookSecret = process.env["TELEGRAM_WEBHOOK_SECRET"];
+      const webhookSecret = process.env["TELEGRAM_WEBHOOK_SECRET"]?.trim();
       const tgResponse = await tgFetch(`https://api.telegram.org/bot${resolvedBotToken}/setWebhook`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -188,9 +188,33 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
         console.warn(`[provisioner] Telegram rebrand failed (non-fatal):`, rebrandErr);
       }
 
+      // Save bot username to DB so dashboard links work immediately after hatch
+      try {
+        const meRes = await tgFetch(`https://api.telegram.org/bot${resolvedBotToken}/getMe`);
+        const meData = await meRes.json() as { ok: boolean; result?: { username?: string } };
+        if (meData.ok && meData.result?.username) {
+          await getPool().query(
+            `UPDATE tenants SET bot_username = $1 WHERE id = $2`,
+            [meData.result.username, tenant.id]
+          );
+          steps.push(`Bot username saved: @${meData.result.username}`);
+        }
+      } catch (meErr) {
+        console.warn(`[provisioner] getMe failed (non-fatal):`, meErr);
+      }
+
       steps.push(`Telegram webhook attached to Master API router successfully.`);
       steps.push(`Leader Core active: Browser [ON], Memory [ON], Evolution [ON]`);
       console.log(`[provisioner] Agent ${tenant.slug} is now AWAKE and ready to hunt.`);
+
+      // Register slash commands so they appear in the Telegram bot menu
+      try {
+        const { registerBotCommands } = await import('./slashCommands.js');
+        await registerBotCommands(resolvedBotToken);
+        steps.push('Slash commands registered (/dashboard /status /help)');
+      } catch (cmdErr) {
+        console.warn('[provisioner] setMyCommands failed (non-fatal):', cmdErr);
+      }
 
       if (input.email === "brentbryson@me.com") {
         const ADMIN_CHAT_ID = parseInt(process.env["ADMIN_TELEGRAM_CHAT_ID"] || "0");
@@ -235,6 +259,10 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
     await updateTenantStatus(tenant.id, "suspended", {
       suspendedReason: `Webhook attachment failed: ${errMsg}`,
     });
+    await logAdminEvent("suspend", tenant.id, { reason: `Webhook attachment failed: ${errMsg}` });
+    await sendAdminAlert(
+      `⛔ PROVISIONING FAILED\nTenant: ${tenant.slug} (${input.email ?? "no email"})\nReason: ${errMsg}\nAction: Go to /admin/dashboard → find tenant → Resume after fixing the issue.`
+    ).catch(() => {}); // non-fatal — don't let alert failure mask the real error
 
     return {
       success: false,
@@ -304,7 +332,7 @@ export async function resumeTenant(tenant: Tenant): Promise<"active" | "onboardi
     if (!baseUrl) throw new Error("[FATAL] TIGER_CLAW_API_URL environment variable is required");
     const webhookUrl = `${baseUrl}/webhooks/telegram/${tenant.id}`;
 
-    const webhookSecret = process.env["TELEGRAM_WEBHOOK_SECRET"];
+    const webhookSecret = process.env["TELEGRAM_WEBHOOK_SECRET"]?.trim();
     try {
       const tgResponse = await tgFetch(`https://api.telegram.org/bot${tenant.botToken}/setWebhook`, {
         method: "POST",

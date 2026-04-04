@@ -191,6 +191,11 @@ export const telegramWorker = SHOULD_RUN_WORKERS ? new Worker(
                     return { success: true, skipped: true };
                 }
 
+                // Slash command fast-path — intercept before Gemini
+                const { handleSlashCommand } = await import('./slashCommands.js');
+                const handled = await handleSlashCommand(tenantId, botToken, chatId, text);
+                if (handled) return { success: true };
+
                 // Delegate to the Stateless AI engine
                 const { processTelegramMessage } = await import('./ai.js');
                 await processTelegramMessage(tenantId, botToken, chatId, text);
@@ -445,17 +450,8 @@ export const cronWorker = SHOULD_RUN_WORKERS ? new Worker(
                             console.log(`[Cron] Key health change for ${tenant.id}: ${tenant.key_health} -> ${currentHealth} (${keyErr ?? 'OK'})`);
                             await updateTenantKeyHealth(tenant.id, currentHealth);
 
-                            if (currentHealth === 'dead' && tenant.bot_token) {
-                                try {
-                                    const bot = new TelegramBot(tenant.bot_token);
-                                    await bot.sendMessage(
-                                        tenant.id, // Assuming tenant.id is used as chatId for the operator's control channel
-                                        `🚨 *Tiger Claw Alert:* your AI key (${aiProvider.provider}) has stopped working. Your agent is now paused.\n\nError: ${keyErr ?? 'Unauthorized'}\n\nPlease update your key at your dashboard: ${process.env['FRONTEND_URL'] ?? 'https://wizard.tigerclaw.io'}/dashboard?slug=${tenant.slug}`,
-                                        { parse_mode: 'Markdown' }
-                                    ).catch(e => console.warn(`[Cron] Failed to notify dead key to tenant ${tenant.id}:`, e.message));
-                                } catch (notifyErr) {
-                                    console.warn(`[Cron] Failed to init bot for health notification:`, notifyErr);
-                                }
+                            if (currentHealth === 'dead') {
+                                await sendAdminAlert(`🔑 Dead key — tenant *${tenant.slug}* (${tenant.email})\nProvider: ${aiProvider.provider}\nError: ${keyErr ?? 'Unauthorized'}\nDashboard: ${process.env['FRONTEND_URL'] ?? 'https://wizard.tigerclaw.io'}/dashboard?slug=${tenant.slug}`);
                             }
                         }
                     }
@@ -593,6 +589,12 @@ export const miningWorker = SHOULD_RUN_WORKERS ? new Worker(
             const { runMarketMining } = await import('./market_miner.js');
             const result = await runMarketMining();
             console.log(`[Mining] Run complete — flavors: ${result.flavorsProcessed}, posts: ${result.postsFound}, facts: ${result.factsSaved}`);
+            const { logAdminEvent } = await import('./db.js');
+            await logAdminEvent('mine_complete', undefined, {
+                flavorsProcessed: result.flavorsProcessed,
+                postsFound: result.postsFound,
+                factsSaved: result.factsSaved,
+            }).catch(() => {});
         } catch (err) {
             console.error('[Mining] Run failed:', err);
             throw err;

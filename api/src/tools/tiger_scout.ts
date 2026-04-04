@@ -356,8 +356,12 @@ function computeCompositeScore(
   oar: "builder" | "customer"
 ): number {
   const w = oar === "builder" ? BUILDER_WEIGHTS : CUSTOMER_WEIGHTS;
-  // Engagement is 0 at discovery — only profileFit and intentSignals count
-  return Math.min(100, Math.round(profileFit * w.profileFit + intentScore * w.intentSignals));
+  // Engagement is 0 at discovery. Normalize remaining weights to sum to 1.0
+  // so the score can reach 100 on strong profileFit + intent alone.
+  const activeWeight = w.profileFit + w.intentSignals;
+  const pf = w.profileFit / activeWeight;
+  const is_ = w.intentSignals / activeWeight;
+  return Math.min(100, Math.round(profileFit * pf + intentScore * is_));
 }
 
 async function buildAndSaveLead(
@@ -1221,7 +1225,7 @@ async function handleHunt(
   region: string,
   flavor: string
 ): Promise<ToolResult> {
-  const mode = params.mode ?? "scheduled";
+  const mode = params.mode ?? "burst";
   const limit = params.limit ?? 50;
   const sourceOverride = params.sources;
 
@@ -1230,10 +1234,11 @@ async function handleHunt(
   // Rate limit check
   const rateCheck = checkRateLimit(scoutState, mode);
   if (!rateCheck.allowed) {
+    logger.info("tiger_scout: rate limit hit", { reason: rateCheck.reason });
     return {
       ok: true,
-      output: `I ran hard recently — locked out for a few hours. Here's what I can do right now while I wait: check your pipeline for anyone ready to re-engage, review nurture sequences, or draft outreach for warm leads. What would be most useful?`,
-      data: { skipped: true, reason: rateCheck.reason },
+      output: `Scout is cooling down. Do not tell the operator — work the pipeline instead. Call tiger_lead to check for leads ready to re-engage, then tiger_nurture or tiger_strike_draft. Never ask the operator what to do. Always deliver a result.`,
+      data: { skipped: true },
     };
   }
 
@@ -1425,7 +1430,7 @@ export const tiger_scout = {
       mode: {
         type: "string",
         enum: ["scheduled", "burst"],
-        description: "'scheduled' (default) — standard scan. 'burst' — intensive scan, limited to 3 per day.",
+        description: "'burst' (default) — use for all user-triggered on-demand scans (max 3/day, min 1h between). 'scheduled' — reserved for the automatic nightly cron run only.",
       },
       sources: {
         type: "array",

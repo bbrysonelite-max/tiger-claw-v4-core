@@ -49,6 +49,7 @@ import miningRouter from "./routes/mining.js";
 import flavorsRouter from "./routes/flavors.js";
 import { validateAllFlavors } from "./tools/flavorConfig.js";
 import "./services/queue.js"; // Initialize BullMQ Background Workers
+import { connection as redisConnection } from "./services/queue.js";
 
 const app = express();
 const PORT = Number(process.env["PORT"] ?? 4000);
@@ -106,6 +107,14 @@ app.use("/subscriptions", subscriptionsRouter);
 app.use("/dashboard", dashboardRouter);
 app.use("/mining", miningRouter);
 app.use("/flavors", flavorsRouter);
+
+// ── GET /go/:code — magic link short redirect ─────────────────────────────────
+app.get("/go/:code", async (req: Request, res: Response) => {
+  const { code } = req.params;
+  const url = await redisConnection.get(`magic_short:${code}`);
+  if (!url) return res.status(410).send("This link has expired or is invalid.");
+  return res.redirect(302, url);
+});
 
 // Root ping
 app.get("/", (_req: Request, res: Response) => {

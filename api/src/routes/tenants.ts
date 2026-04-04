@@ -66,7 +66,7 @@ router.patch("/:tenantId/status", async (req: Request, res: Response) => {
           const botToken = decryptToken(encryptedToken);
           const baseUrl = (process.env["TIGER_CLAW_API_URL"] ?? "").replace(/\/$/, "");
           const webhookUrl = `${baseUrl}/webhooks/telegram/${tenant.id}`;
-          const webhookSecret = process.env["TELEGRAM_WEBHOOK_SECRET"];
+          const webhookSecret = process.env["TELEGRAM_WEBHOOK_SECRET"]?.trim();
           const r = await fetch(`https://api.telegram.org/bot${botToken}/setWebhook`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },

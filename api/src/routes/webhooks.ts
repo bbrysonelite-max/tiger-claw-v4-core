@@ -232,7 +232,7 @@ router.post("/telegram/:tenantId", webhookLimiter, async (req: Request, res: Res
   // Telegram sends X-Telegram-Bot-Api-Secret-Token on every update when the bot
   // was registered with setWebhook({ secret_token: TELEGRAM_WEBHOOK_SECRET }).
   // Any request missing or mismatching this header is rejected immediately.
-  const TELEGRAM_WEBHOOK_SECRET = process.env["TELEGRAM_WEBHOOK_SECRET"];
+  const TELEGRAM_WEBHOOK_SECRET = process.env["TELEGRAM_WEBHOOK_SECRET"]?.trim();
   if (TELEGRAM_WEBHOOK_SECRET) {
     const incomingSecret = req.headers["x-telegram-bot-api-secret-token"];
     if (incomingSecret !== TELEGRAM_WEBHOOK_SECRET) {
@@ -244,7 +244,13 @@ router.post("/telegram/:tenantId", webhookLimiter, async (req: Request, res: Res
   }
 
   // Ensure tenant exists and is active/live/onboarding
-  const tenant = await getTenant(tenantId);
+  let tenant: Awaited<ReturnType<typeof getTenant>>;
+  try {
+    tenant = await getTenant(tenantId);
+  } catch (err) {
+    console.error(`[webhooks] DB error looking up tenant ${tenantId}:`, err);
+    return res.status(200).send("OK"); // Acknowledge to stop Telegram from retrying
+  }
   if (!tenant || !["active", "live", "onboarding"].includes(tenant.status)) {
     console.warn(`[webhooks] Telegram update ignored for inactive tenant: ${tenantId}`);
     return res.status(200).send("OK"); // Acknowledge to stop Telegram from retrying
@@ -288,7 +294,13 @@ router.post("/line/:tenantId", webhookLimiter, async (req: Request, res: Respons
     return res.status(400).json({ error: "tenantId missing" });
   }
 
-  const tenant = await getTenant(tenantId);
+  let tenant: Awaited<ReturnType<typeof getTenant>>;
+  try {
+    tenant = await getTenant(tenantId);
+  } catch (err) {
+    console.error(`[webhooks] DB error looking up tenant ${tenantId} (LINE):`, err);
+    return res.status(200).json({ received: true }); // Acknowledge to stop LINE from retrying
+  }
   if (!tenant || !tenant.lineChannelSecret) {
     // Return 200 to prevent LINE from retrying — tenant simply not configured for LINE
     console.warn(`[webhooks] LINE webhook for unconfigured tenant: ${tenantId}`);

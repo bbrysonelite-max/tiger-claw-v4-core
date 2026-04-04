@@ -41,6 +41,7 @@ interface AdminMetrics {
     foundingMembers: number;
     totalHiveSignals: number;
     totalHiveEvents: number;
+    newAgentsToday: number;
 }
 
 interface ConversationStats {
@@ -61,7 +62,10 @@ interface CostStats {
 // --- Main Component ---
 
 export default function AdminDashboard() {
-    const [token, setToken] = useState<string>("");
+    const [token, setToken] = useState<string>(() => {
+        if (typeof window !== "undefined") return localStorage.getItem("tc_admin_token") ?? "";
+        return "";
+    });
     const [isAuthorized, setIsAuthorized] = useState(false);
     const [loading, setLoading] = useState(false);
     const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
@@ -73,6 +77,33 @@ export default function AdminDashboard() {
     const [tenants, setTenants] = useState<Tenant[] | null>(null);
     const [convos, setConvos] = useState<ConversationStats | null>(null);
     const [costs, setCosts] = useState<CostStats | null>(null);
+    const [platformHealth, setPlatformHealth] = useState<{ name: string; status: "ok" | "error"; message: string }[] | null>(null);
+    const [mineStatus, setMineStatus] = useState<{ isRunning: boolean; queueDepth: number; lastRun: { flavorsProcessed: number; postsFound: number; factsSaved: number; completedAt: string } | null } | null>(null);
+    const [mineTriggering, setMineTriggering] = useState(false);
+
+    const fetchMineStatus = useCallback(async (authToken: string) => {
+        const headers = { "Authorization": `Bearer ${authToken}` };
+        fetch(`${API_BASE}/admin/mine/status`, { headers })
+            .then(r => r.ok ? r.json() : null)
+            .then(data => { if (data) setMineStatus(data); })
+            .catch(() => {});
+    }, []);
+
+    const triggerMine = useCallback(async () => {
+        if (!token || mineTriggering) return;
+        setMineTriggering(true);
+        try {
+            const res = await fetch(`${API_BASE}/admin/mine/run`, {
+                method: "POST",
+                headers: { "Authorization": `Bearer ${token}` },
+            });
+            if (res.ok) {
+                setMineStatus(prev => prev ? { ...prev, isRunning: true } : { isRunning: true, queueDepth: 0, lastRun: null });
+            }
+        } catch { /* ignore */ } finally {
+            setMineTriggering(false);
+        }
+    }, [token, mineTriggering]);
 
     const fetchData = useCallback(async (authToken: string) => {
         setLoading(true);
@@ -104,6 +135,15 @@ export default function AdminDashboard() {
 
             setMetrics(m);
             setPipeline(p);
+
+            // Platform health — fire separately, never block main dashboard load
+            fetch(`${API_BASE}/admin/platform-health`, { headers })
+                .then(r => r.ok ? r.json() : null)
+                .then(data => { if (data?.services) setPlatformHealth(data.services); })
+                .catch(() => {});
+
+            // Mine status — fire separately, never block main dashboard load
+            fetchMineStatus(authToken);
             
             // Merge conversation stats into tenant data for the fleet table
             const tenantList = t.tenants.map((tenant: any) => ({
@@ -116,21 +156,29 @@ export default function AdminDashboard() {
             setCosts(cost);
             setLastUpdated(new Date());
             setIsAuthorized(true);
+            localStorage.setItem("tc_admin_token", authToken);
         } catch (err: any) {
             console.error("Dashboard fetch error:", err);
             setError(err.message);
             if (err.message === "Invalid admin token") {
                 setIsAuthorized(false);
+                localStorage.removeItem("tc_admin_token");
             }
         } finally {
             setLoading(false);
         }
     }, []);
 
-    // Auto-refresh every 60 seconds
+    // Auto-login if token saved, auto-refresh every 5 minutes
+    useEffect(() => {
+        if (token && !isAuthorized) {
+            fetchData(token);
+        }
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
     useEffect(() => {
         if (isAuthorized && token) {
-            const interval = setInterval(() => fetchData(token), 60000);
+            const interval = setInterval(() => fetchData(token), 300000);
             return () => clearInterval(interval);
         }
     }, [isAuthorized, token, fetchData]);
@@ -249,11 +297,11 @@ export default function AdminDashboard() {
                     </div>
                     
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
-                        <StatCard 
-                            title="Active Tenants"
+                        <StatCard
+                            title="Active Agents"
                             value={metrics?.activeTenants?.toString() || "—"}
                             icon={<Users className="h-6 w-6 text-blue-400" />}
-                            trend={`${metrics?.foundingMembers || 0} Founders`}
+                            trend={`+${metrics?.newAgentsToday || 0} today`}
                         />
                         <StatCard 
                             title="Messages (24h)"
@@ -370,7 +418,7 @@ export default function AdminDashboard() {
                                     {pipeline?.totalFacts?.toLocaleString() || "—"}
                                 </p>
                             </div>
-                            
+
                             <div className="grid grid-cols-2 gap-8">
                                 <div className="space-y-1">
                                     <p className="text-white/20 text-[10px] font-black uppercase tracking-[0.2em]">Last 24h</p>
@@ -385,9 +433,49 @@ export default function AdminDashboard() {
                                     </p>
                                 </div>
                             </div>
-                            
+
+                            {/* Mine Engine Status */}
+                            <div className="bg-zinc-800/60 border border-white/5 rounded-[1.5rem] p-6 space-y-4">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <span className="relative flex h-2.5 w-2.5">
+                                            {mineStatus?.isRunning ? (
+                                                <>
+                                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                                                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-400" />
+                                                </>
+                                            ) : (
+                                                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-white/20" />
+                                            )}
+                                        </span>
+                                        <p className="text-white/40 text-[10px] font-black uppercase tracking-widest">
+                                            {mineStatus?.isRunning ? "Mining Now" : "Mine Engine"}
+                                        </p>
+                                    </div>
+                                    <button
+                                        onClick={triggerMine}
+                                        disabled={mineTriggering || mineStatus?.isRunning}
+                                        className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg border border-amber-500/30 text-amber-400 hover:bg-amber-500/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                    >
+                                        {mineTriggering ? <Loader2 className="h-3 w-3 animate-spin" /> : <Database className="h-3 w-3" />}
+                                        {mineStatus?.isRunning ? "Running" : "Run Now"}
+                                    </button>
+                                </div>
+                                {mineStatus?.lastRun && (
+                                    <div className="space-y-1 border-t border-white/5 pt-4">
+                                        <p className="text-white/20 text-[9px] font-black uppercase tracking-widest">Last Run — {timeAgo(mineStatus.lastRun.completedAt)}</p>
+                                        <p className="text-white/50 text-[11px] font-mono">
+                                            {mineStatus.lastRun.flavorsProcessed} flavors · {mineStatus.lastRun.postsFound} posts · <span className="text-green-400">+{mineStatus.lastRun.factsSaved} facts</span>
+                                        </p>
+                                    </div>
+                                )}
+                                {!mineStatus?.lastRun && (
+                                    <p className="text-white/20 text-[10px]">No completed runs recorded yet.</p>
+                                )}
+                            </div>
+
                             {pipeline?.staleVerticals && pipeline.staleVerticals.length > 0 && (
-                                <motion.div 
+                                <motion.div
                                     initial={{ opacity: 0, scale: 0.95 }}
                                     animate={{ opacity: 1, scale: 1 }}
                                     className="bg-red-500/5 border border-red-500/20 rounded-[1.5rem] p-6 flex items-start gap-4"
@@ -431,6 +519,51 @@ export default function AdminDashboard() {
                                 ))}
                             </div>
                         </div>
+                    </div>
+                </section>
+
+                {/* Platform Health */}
+                <section>
+                    <div className="flex items-center gap-3 mb-8">
+                        <div className="h-8 w-8 rounded-lg bg-red-500/10 flex items-center justify-center border border-red-500/20">
+                            <Shield className="h-4 w-4 text-red-400" />
+                        </div>
+                        <h2 className="text-xs font-black text-white/30 uppercase tracking-[0.3em]">Platform Services</h2>
+                        {platformHealth && (
+                            <span className={`ml-auto text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md border ${
+                                platformHealth.every(s => s.status === "ok")
+                                    ? "bg-green-500/10 border-green-500/20 text-green-400"
+                                    : "bg-red-500/10 border-red-500/20 text-red-400"
+                            }`}>
+                                {platformHealth.filter(s => s.status === "ok").length}/{platformHealth.length} OK
+                            </span>
+                        )}
+                    </div>
+                    <div className="bg-zinc-900/50 border border-white/5 rounded-[2rem] overflow-hidden">
+                        {!platformHealth ? (
+                            <div className="p-8 text-white/20 text-xs font-mono text-center">Checking services...</div>
+                        ) : (
+                            <div className="divide-y divide-white/5">
+                                {platformHealth.map(svc => (
+                                    <div key={svc.name} className="flex items-center gap-4 px-8 py-4">
+                                        <div className="relative flex h-2.5 w-2.5 flex-shrink-0">
+                                            {svc.status === "ok" ? (
+                                                <>
+                                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-50" />
+                                                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500" />
+                                                </>
+                                            ) : (
+                                                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500" />
+                                            )}
+                                        </div>
+                                        <span className="text-[11px] font-black text-white/60 uppercase tracking-widest w-40 flex-shrink-0">{svc.name}</span>
+                                        <span className={`text-[10px] font-mono ${svc.status === "ok" ? "text-white/30" : "text-red-400"}`}>
+                                            {svc.message}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 </section>
 

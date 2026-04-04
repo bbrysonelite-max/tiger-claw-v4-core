@@ -63,7 +63,9 @@ TIGER_CLAW_API_URL=TIGER_CLAW_API_URL:latest,\
 SERPER_KEY_1=tiger-claw-serper-key-1:latest,\
 SERPER_KEY_2=tiger-claw-serper-key-2:latest,\
 SERPER_KEY_3=tiger-claw-serper-key-3:latest,\
-MAGIC_LINK_SECRET=tiger-claw-magic-link-secret:latest"
+MAGIC_LINK_SECRET=tiger-claw-magic-link-secret:latest,\
+TELEGRAM_WEBHOOK_SECRET=tiger-claw-telegram-webhook-secret:latest,\
+RESEND_API_KEY=tiger-claw-resend-api-key:latest"
 
 for i in "${!DEPLOY_REGIONS[@]}"; do
   REGION="${DEPLOY_REGIONS[$i]}"
@@ -91,7 +93,7 @@ for i in "${!DEPLOY_REGIONS[@]}"; do
     --startup-probe="httpGet.path=/health,httpGet.port=4000,timeoutSeconds=5,periodSeconds=10,failureThreshold=3" \
     --liveness-probe="httpGet.path=/health,httpGet.port=4000,timeoutSeconds=5,periodSeconds=30,failureThreshold=3" \
     --update-secrets "$SECRETS" \
-    --set-env-vars "INTERNAL_API_URL=https://api.tigerclaw.io"
+    --set-env-vars "INTERNAL_API_URL=https://api.tigerclaw.io,ENABLE_WORKERS=true"
 
   LIVE_URL=$(gcloud run services describe "$SERVICE_NAME" \
     --region "$REGION" \

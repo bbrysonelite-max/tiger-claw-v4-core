@@ -5,7 +5,7 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
-  title: "Tiger Claw | Deploy Your Agent in 60 Seconds",
+  title: "Tiger Claw | Deploy Your Agent in 2 Minutes",
   description: "Enterprise BYOK Agent Infrastructure. High availability, maximum privacy.",
 };
 
@@ -27,9 +27,6 @@ export default function RootLayout({
           <div className="container mx-auto px-6 h-16 flex items-center justify-between">
             <div className="font-bold text-xl tracking-tight flex items-center gap-2">
               <span className="text-primary text-2xl">⚡️</span> Tiger Claw
-            </div>
-            <div className="text-sm font-medium text-white/60">
-              Enterprise V4.0
             </div>
           </div>
         </header>

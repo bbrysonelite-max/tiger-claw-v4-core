@@ -88,7 +88,12 @@ describe('Tiger Strike Pipeline', () => {
   describe('tiger_strike_draft', () => {
     it('generates drafts for facts', async () => {
       const facts = [{ id: 'fact-1', domain: 'Network Marketer', confidence_score: 95, fact_summary: 'Test', source_url: 'https://reddit.com/r/test', category: 'General', entity_label: 'Prospect' }];
-      
+
+      // FK existence check in storeDraft
+      mockQuery.mockResolvedValueOnce({ rows: [{ id: 'fact-1' }], rowCount: 1 });
+      // INSERT draft
+      mockQuery.mockResolvedValueOnce({ rows: [{ id: 'draft-1' }], rowCount: 1 });
+
       // Pass 1: Score, Pass 2: Draft (mocked above)
       const result = await tiger_strike_draft.execute({ action: 'draft', facts }, context);
 

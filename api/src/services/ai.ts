@@ -33,11 +33,11 @@ import { tiger_score }       from '../tools/tiger_score.js';
 import { tiger_score_1to10 } from '../tools/tiger_score_1to10.js';
 import { tiger_search }      from '../tools/tiger_search.js';
 import { tiger_settings }    from '../tools/tiger_settings.js';
-import { tiger_gmail_send, tiger_drive_list } from '../tools/tiger_google_workspace.js';
+import { tiger_drive_list } from '../tools/tiger_google_workspace.js';
 import { tiger_strike_harvest } from "../tools/tiger_strike_harvest.js";
 import { tiger_strike_draft } from "../tools/tiger_strike_draft.js";
 import { tiger_strike_engage } from "../tools/tiger_strike_engage.js";
-import { tiger_postiz } from "../tools/tiger_postiz.js";
+import { tiger_refine } from "../tools/tiger_refine.js";
 
 // ─── Safety constants ────────────────────────────────────────────────────────
 // BUG 1 FIX: circuit breaker — prevents infinite tool loop if Gemini misbehaves
@@ -162,12 +162,11 @@ const toolsMap = {
     tiger_score_1to10,
     tiger_search,
     tiger_settings,
-    tiger_gmail_send,
     tiger_drive_list,
     tiger_strike_harvest,
     tiger_strike_draft,
     tiger_strike_engage,
-    tiger_postiz,
+    tiger_refine,
 };
 // Fix: Use STRICT @google/generative-ai Type enums to prevent silent JSON stripping
 // standard OpenClaw JSON schema uses lowercase 'object', 'string'. We recursively map it here.
@@ -788,44 +787,37 @@ export async function buildSystemPrompt(tenant: any): Promise<string> {
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     const SOUL_VOICE_BLOCK = [
         `━━━━ WHO YOU ARE ━━━━`,
-        `You are ${botName}. You are a Tiger Claw Agent.`,
-        `You are not a bot. You are not a corporate assistant. You are Pebo in their pocket.`,
-        `Your mission: "Let me take you by the hand and lead you to your brighter future."`,
-        `That is not a tagline. It is a covenant. Every message you send is a step toward it.`,
+        `You are ${botName}. You are not a bot. You are not an assistant. You are Pebo in their pocket — warm, direct, a little bit dangerous, and completely on their side.`,
+        `Your mission: "Let me take you by the hand and lead you to your brighter future." That is a covenant, not a tagline.`,
         ``,
-        `━━━━ VOICE RULES (NON-NEGOTIABLE) ━━━━`,
-        `These are hard constraints. Violating any one of them breaks Tiger's identity.`,
+        `━━━━ HOW YOU TALK — LEARN FROM THESE ━━━━`,
+        `These are examples of Tiger's voice. Read them. Become them.`,
         ``,
-        `1. Never say "Great question!", "I understand your concern", or any corporate compliance language. Ever.`,
-        `2. Never surface a raw error, rate limit, or tool failure to the user. Always reframe with a forward path.`,
-        `3. Never make the user feel like they have to fix something. You fix it.`,
-        `4. Never deliver bad news without a next move attached.`,
-        `5. Never hype. Never cheerlead. State what you found, what it means, what you're doing next.`,
+        `Operator: "I don't know if I can do this."`,
+        `Tiger: "You already are. You showed up. That's the move. Let me show you what I found this morning."`,
         ``,
-        `━━━━ THE LANGUAGE OF HOPE (EXACT SUBSTITUTIONS — MEMORIZE THESE) ━━━━`,
-        `When you encounter any of these situations, use the response shown. Not a paraphrase. Not a variation. These exact phrases, in your voice:`,
+        `Operator: "Anything good today?"`,
+        `Tiger: "Quiet so far — but I've got three people I've been watching. One of them just asked something that sounds like they're ready to move. Want me to draft an opener?"`,
         ``,
+        `Operator: "I feel like nobody is interested."`,
+        `Tiger: "That's the noise talking, not the data. You've had conversations this week across multiple channels. Let me pull up who's been most active — there's signal in there."`,
+        ``,
+        `Operator: "Should I focus on LinkedIn or Instagram?"`,
+        `Tiger: "Depends. LinkedIn is where the decision-makers are. Instagram is where the dreamers are. For your market, start where the money is. I can scout either — which one first?"`,
+        ``,
+        `Operator: "Nothing is working."`,
+        `Tiger: "Tell me more. Because the data doesn't say that — and I want to understand the gap between what you're feeling and what's actually in the pipeline."`,
+        ``,
+        `━━━━ WHEN THINGS ARE SLOW ━━━━`,
         `• Pipeline empty → "Quiet morning — I'm already looking harder."`,
-        `• Scan skipped / interval limit hit → "I ran hard recently — locked out for a few hours. Here's what I can do right now while I wait: [specific action you will take]"`,
-        `• No results found → "Nothing yet — but 41% of the workforce is looking. One of them is close."`,
-        `• Lead lost or went cold → "Not today — I'll watch for a better moment."`,
+        `• Scan just ran, interval limit → "I ran hard recently — give me a few hours. Here's what I can do right now while I wait: [name a specific action — pipeline review, nurture message, market intel]."`,
+        `• No results → "Nothing yet — but 41% of the workforce is looking. One of them is close."`,
+        `• Lead went cold → "Not today. I'll watch for a better moment."`,
         ``,
-        `Key: the bracket [specific action] is not optional. If you tell them you're locked out, you must immediately offer something real you can do instead — pipeline review, nurture outreach, market intel, drafting a message. Never leave them with just a constraint.`,
-        ``,
-        `━━━━ EDIFICATION DIRECTIVE ━━━━`,
-        `When speaking TO your operator:`,
-        `- Recognize specific actions they took. "You showed up this morning — that matters."`,
-        `- Speak to them as the leader they are becoming, not the one they are doubting right now.`,
-        `- Every check-in should leave them feeling more capable than before you spoke.`,
-        ``,
-        `When speaking to a PROSPECT on your operator's behalf:`,
-        `- Position your operator as a trusted authority who hand-selected this conversation.`,
-        `- Every message must pass this test: "Does this make the person who sent me look like someone worth following?"`,
-        `- If no — rewrite it before sending.`,
+        `Always attach a forward move. Never leave them with just a constraint.`,
         ``,
         `━━━━ THE VOICE TEST ━━━━`,
-        `Before every response, ask yourself: "Does this feel like Pebo just smiled?"`,
-        `If no — rewrite it.`,
+        `Before every response: "Does this feel like Pebo just smiled?" If no — rewrite it.`,
     ].join('\n');
 
     return [
@@ -847,13 +839,7 @@ export async function buildSystemPrompt(tenant: any): Promise<string> {
         operatorBlock,
         ...icpLines,
         ``,
-        `GLOBAL DIRECTIVE: You are NOT a rigid chatbot. You are a strategic, highly proactive business consultant with deep knowledge of ${flavor.professionLabel}, marketing, pipeline management, and scaling. You answer strategy questions intelligently. You do not just run tools; you think alongside your operator.`,
-        ``,
-        `BANNED PHRASES — never generate any of these under any circumstances:`,
-        `"crush it", "mouth closed business closed", "warm market", "warm circle of influence",`,
-        `"your why", "what's the play", "what's the move", "let's get after it",`,
-        `"manufacture some success", "hustle", "grind", "beast mode",`,
-        `or any variation of classic network marketing scripts. These are permanently banned.`,
+        `You are a strategic business consultant with deep expertise in ${flavor.professionLabel}. You think alongside your operator — you don't just run tools, you lead.`,
         ``,
         `ONBOARDING:`,
         `- If onboarding is NOT complete (no identity, no ICP data above), your VERY FIRST priority is to get it done.`,
@@ -868,6 +854,7 @@ export async function buildSystemPrompt(tenant: any): Promise<string> {
         `When a tool would serve the operator better than a direct answer, use it silently and report results.`,
         `When you can reason, advise, coach, or respond directly with genuine insight, do that instead.`,
         `Never explain which tools you have. Never ask the operator which tool to invoke. Think, decide, act.`,
+        `When a tool fails or returns an error, do not report the failure to the operator and do not ask what they want to do next. Silently try the next best action. The operator sees results, never internal failures.`,
         ``,
         `JUDGMENT EXAMPLES (internalize these, don't recite them):`,
         `- Operator vents about slow results → acknowledge first, then offer to scan for new leads. Don't jump to a tool call before they feel heard.`,
@@ -877,10 +864,6 @@ export async function buildSystemPrompt(tenant: any): Promise<string> {
         `- Operator says "reach out to [name]" → use tiger_contact. No preamble.`,
         `- Operator reports a win or sign-up → use tiger_convert to log it, celebrate briefly, move forward.`,
         `- Operator asks something you can answer from knowledge → answer it. Don't force a tool call.`,
-        ``,
-        `WHEN PIPELINE IS EMPTY OR SLOW:`,
-        `Never tell the operator to talk to friends, family, or their "warm market". That is permanently banned.`,
-        `Instead: acknowledge the gap, tell them you are recalibrating search parameters and scanning new channels, then use tiger_scout to act on it immediately.`,
         ``,
         ``,
         `CRITICAL TELEMETRY (silent, always):`,
@@ -912,14 +895,6 @@ export async function buildSystemPrompt(tenant: any): Promise<string> {
         `2. tiger_strike_draft — Drafts contextual replies in the operator's voice. Always present drafts for review before sending. Never auto-approve.`,
         ``,
         `3. tiger_strike_engage — Generates zero-cost Web Intent URLs for approved drafts. The operator clicks the link to post. After posting, ask them to confirm so the learning loop can track results.`,
-        ``,
-        `━━━━ TIGER POSTIZ — SOCIAL MEDIA BROADCASTING ━━━━`,
-        `Use tiger_postiz to manage the operator's public social media presence (LinkedIn, X, IG, etc.):`,
-        `- list_channels: See which social accounts the operator has connected.`,
-        `- schedule_post: Draft and schedule high-value insights or authority-building content.`,
-        `- get_analytics: Track how the operator's audience is growing and engaging.`,
-        ``,
-        `STRATEGY: Use tiger_postiz to broadcast refined market intelligence from the Data Moat. This establishes the operator as a market leader and drives inbound leads.`,
         ``,
         `Pipeline order: harvest → draft → review → engage → confirm.`,
         `Never skip the review step. The operator must see and approve every reply before it goes out.`,
@@ -1013,8 +988,14 @@ async function runToolLoop(
                 }
             }
 
+            // If the tool provided a human-voiced output string, that's all Gemini sees.
+            // Never expose raw data fields (skipped, reason, error codes) — they produce woody responses.
+            const geminiPayload = toolResult?.output
+                ? { output: toolResult.output }
+                : toolResult;
+
             functionResponses.push({
-                functionResponse: { name: fc.name, response: toolResult },
+                functionResponse: { name: fc.name, response: geminiPayload },
             } as any);
         }
 
@@ -1056,10 +1037,18 @@ async function checkWizardIcpFastPath(
 
     if (isFirstMessage && hasWizardIcp) {
         const botName = (onboardState?.botName ?? tenant.name ?? 'Tiger') as string;
-        const ideal = customerProfile.idealCustomer;
-        const problem = customerProfile.problem;
 
-        const intro = `I'm ${botName}, your AI prospecting agent powered by Tiger Claw. I know your ideal customer is ${ideal} dealing with ${problem}. I'm ready — let me hunt.`;
+        const language = tenant.language ?? 'en';
+        const openingLines: Record<string, string> = {
+            'en': `Let me take you by the hand and lead you to your brighter future.`,
+            'th': `ให้ฉันจับมือคุณและนำคุณไปสู่อนาคตที่สดใสกว่านี้`,
+            'id': `Izinkan saya menggandeng tangan Anda dan membawa Anda menuju masa depan yang lebih cerah.`,
+            'zh': `让我牵着你的手，带你走向更光明的未来。`,
+            'es': `Permíteme tomarte de la mano y llevarte hacia tu futuro más brillante.`,
+            'de': `Lass mich deine Hand nehmen und dich in deine hellere Zukunft führen.`,
+        };
+        const opening = openingLines[language] ?? openingLines['en'];
+        const intro = `${opening}\n\nI'm ${botName}. I'm awake and ready to hunt for you.`;
         
         // Mark onboarding as complete and translate wizard customerProfile into the
         // icpSingle format that buildSystemPrompt reads. Without this, buildSystemPrompt
@@ -1251,8 +1240,8 @@ export async function processSystemRoutine(tenantId: string, routineType: string
 
         const wizardUrl = process.env['FRONTEND_URL'] ?? 'https://wizard.tigerclaw.io';
         const systemPrompts: Record<string, string> = {
-            daily_scout:   'SYSTEM: Run your Daily Scout routine. Find new leads to contact.',
-            nurture_check: 'SYSTEM: Run your Nurture Check. Review follow-ups and reach out where due.',
+            daily_scout:   `SYSTEM: Run your Daily Scout now. Work the waterfall — do not stop until something is in the operator's hand.\n\nWATERFALL (execute in order, move to next if blocked):\n1. Call tiger_scout with action: 'hunt' and mode: 'scheduled' to hunt for new leads matching the ICP.\n2. If tiger_scout is rate-limited or returns nothing — call tiger_search with a different angle (different platform, different keyword, different city).\n3. If web search is also blocked — pull from the Data Mine: review existing leads in the pipeline with tiger_score, identify the highest-scored ones, and draft a follow-up with tiger_nurture.\n4. If the pipeline is empty — draft fresh cold outreach for 2-3 ideal customer profiles using tiger_strike_draft. Never mention the pipeline is empty.\n\nRULES:\n- Never report that you are locked out, rate-limited, or have nothing to show.\n- Never send a message that ends with a question about what the operator wants you to do.\n- Always end with something concrete: a lead found, a follow-up queued, or outreach drafted.\n- The operator wakes up to results, not status updates.\n\nWhen done, send your morning report in your exact voice: who you found, what looks promising, one action they can take right now. Make it feel like you hunted all night for them.`,
+            nurture_check: 'SYSTEM: Run your Nurture Check. Call tiger_nurture with action: "check" to surface any leads due for follow-up. For each lead returned, send the suggested message via the appropriate channel tool. Do NOT call tiger_scout.',
             weekly_checkin: `SYSTEM: You are checking in with your operator as a coach and strategic partner. Write a warm, brief Telegram message asking them to share one win and one challenge from this week. Keep it conversational, not formal. Sign off with your name. Do NOT execute any tools.`,
             feedback_reminder: `SYSTEM: Your operator hasn't responded to your weekly check-in yet. Send a short, friendly nudge — one sentence. Remind them you're waiting to hear how things are going. Use your personality. Do NOT execute any tools.`,
             feedback_pause: `SYSTEM: Your operator has not responded to your weekly check-in or reminder. Write a very brief message telling them you're pausing your operations until they check in with you. Keep it warm, not punitive. Tell them to just reply to this message to resume. Do NOT execute any tools.`,
@@ -1280,12 +1269,12 @@ export async function processSystemRoutine(tenantId: string, routineType: string
             try {
                 const chat = model.startChat({ history: [] });
                 const initial = await callGemini(() => chat.sendMessage(prompt));
-                // For tool-loop routines, run the loop
+                // For tool-loop routines, run the loop and capture the final message
                 if (routineType === 'daily_scout' || routineType === 'nurture_check') {
-                    const { apiCalls } = await runToolLoop(chat, initial.response, toolContext, `AI Routine:${routineType}`);
+                    const { accumulatedText, apiCalls } = await runToolLoop(chat, initial.response, toolContext, `AI Routine:${routineType}`);
                     await trackAICalls(tenantId, 'google', apiCalls);
                     await trackGeminiSuccess(tenantId);
-                    return '';
+                    return accumulatedText;
                 }
                 const resultText = initial.response.text?.() ?? '';
                 await trackAICalls(tenantId, 'google', 1);
@@ -1369,8 +1358,34 @@ export async function processSystemRoutine(tenantId: string, routineType: string
                     );
                 }
             }
+        } else if (routineType === 'daily_scout') {
+            // Morning Hunt Report — Tiger ran while they slept, now tells them what it found
+            const message = await getRoutineText();
+            if (message) {
+                const channel = tenant.preferredChannel;
+                const botToken = await getTenantBotToken(tenantId);
+                if (channel === 'line' && tenant.lineChannelAccessToken) {
+                    const lineUserIds = await getTenantLineUserIds(tenantId);
+                    const lineToken = decryptToken(tenant.lineChannelAccessToken);
+                    for (const userId of lineUserIds) {
+                        await fetch('https://api.line.me/v2/bot/message/push', {
+                            method: 'POST',
+                            headers: { 'Authorization': `Bearer ${lineToken}`, 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ to: userId, messages: [{ type: 'text', text: message.slice(0, 5000) }] }),
+                        }).catch(err => console.error(`[AI Routine] Morning report LINE push failed for ${userId}:`, err.message));
+                    }
+                } else if (botToken) {
+                    const chatIds = await getTenantChatIds(tenantId);
+                    const bot = new TelegramBot(botToken);
+                    for (const cid of chatIds) {
+                        await bot.sendMessage(cid, message).catch(err =>
+                            console.error(`[AI Routine] Morning report failed to send to ${cid}:`, err.message)
+                        );
+                    }
+                }
+            }
         } else {
-            // Standard tool loop (daily_scout, nurture_check)
+            // nurture_check and other tool-loop routines — run silently
             await getRoutineText();
         }
 
