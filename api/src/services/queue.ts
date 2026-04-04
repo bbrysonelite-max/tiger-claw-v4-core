@@ -35,7 +35,14 @@ console.log('[Queue] BullMQ market-intelligence-batch queue configured.');
 // Stan Store pre-sale setup queue — creates DB records + sends magic link email.
 // Kept separate from tenant-provisioning (which attaches the Telegram webhook)
 // because the customer triggers provisioning later via the wizard.
-export const onboardingQueue = new Queue('stan-store-onboarding', { connection: connection as any });
+export const onboardingQueue = new Queue('stan-store-onboarding', {
+    connection: connection as any,
+    defaultJobOptions: {
+        attempts: 5,
+        backoff: { type: 'exponential', delay: 10000 },
+        removeOnFail: false, // keep failed jobs for inspection — paying customer data
+    },
+});
 console.log('[Queue] BullMQ stan-store-onboarding queue configured.');
 
 export interface OnboardingJobData {
