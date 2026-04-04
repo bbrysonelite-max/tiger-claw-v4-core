@@ -77,6 +77,7 @@ export default function AdminDashboard() {
     const [tenants, setTenants] = useState<Tenant[] | null>(null);
     const [convos, setConvos] = useState<ConversationStats | null>(null);
     const [costs, setCosts] = useState<CostStats | null>(null);
+    const [platformHealth, setPlatformHealth] = useState<{ name: string; status: "ok" | "error"; message: string }[] | null>(null);
 
     const fetchData = useCallback(async (authToken: string) => {
         setLoading(true);
@@ -108,6 +109,12 @@ export default function AdminDashboard() {
 
             setMetrics(m);
             setPipeline(p);
+
+            // Platform health — fire separately, never block main dashboard load
+            fetch(`${API_BASE}/admin/platform-health`, { headers })
+                .then(r => r.ok ? r.json() : null)
+                .then(data => { if (data?.services) setPlatformHealth(data.services); })
+                .catch(() => {});
             
             // Merge conversation stats into tenant data for the fleet table
             const tenantList = t.tenants.map((tenant: any) => ({
@@ -443,6 +450,51 @@ export default function AdminDashboard() {
                                 ))}
                             </div>
                         </div>
+                    </div>
+                </section>
+
+                {/* Platform Health */}
+                <section>
+                    <div className="flex items-center gap-3 mb-8">
+                        <div className="h-8 w-8 rounded-lg bg-red-500/10 flex items-center justify-center border border-red-500/20">
+                            <Shield className="h-4 w-4 text-red-400" />
+                        </div>
+                        <h2 className="text-xs font-black text-white/30 uppercase tracking-[0.3em]">Platform Services</h2>
+                        {platformHealth && (
+                            <span className={`ml-auto text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md border ${
+                                platformHealth.every(s => s.status === "ok")
+                                    ? "bg-green-500/10 border-green-500/20 text-green-400"
+                                    : "bg-red-500/10 border-red-500/20 text-red-400"
+                            }`}>
+                                {platformHealth.filter(s => s.status === "ok").length}/{platformHealth.length} OK
+                            </span>
+                        )}
+                    </div>
+                    <div className="bg-zinc-900/50 border border-white/5 rounded-[2rem] overflow-hidden">
+                        {!platformHealth ? (
+                            <div className="p-8 text-white/20 text-xs font-mono text-center">Checking services...</div>
+                        ) : (
+                            <div className="divide-y divide-white/5">
+                                {platformHealth.map(svc => (
+                                    <div key={svc.name} className="flex items-center gap-4 px-8 py-4">
+                                        <div className="relative flex h-2.5 w-2.5 flex-shrink-0">
+                                            {svc.status === "ok" ? (
+                                                <>
+                                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-50" />
+                                                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500" />
+                                                </>
+                                            ) : (
+                                                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500" />
+                                            )}
+                                        </div>
+                                        <span className="text-[11px] font-black text-white/60 uppercase tracking-widest w-40 flex-shrink-0">{svc.name}</span>
+                                        <span className={`text-[10px] font-mono ${svc.status === "ok" ? "text-white/30" : "text-red-400"}`}>
+                                            {svc.message}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 </section>
 
