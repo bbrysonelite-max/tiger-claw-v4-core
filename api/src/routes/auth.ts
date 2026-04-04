@@ -16,7 +16,14 @@ const router = Router();
 const SESSION_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 function getSessionSecret(): string {
-  return process.env["WIZARD_SESSION_SECRET"] ?? process.env["MAGIC_LINK_SECRET"] ?? process.env["ADMIN_TOKEN"] ?? "dev-secret";
+  const secret = process.env["WIZARD_SESSION_SECRET"] ?? process.env["MAGIC_LINK_SECRET"];
+  if (!secret) {
+    if (process.env["NODE_ENV"] === "production") {
+      throw new Error("[auth] WIZARD_SESSION_SECRET must be set in production.");
+    }
+    return "dev-secret-local-only";
+  }
+  return secret;
 }
 
 function generateSessionToken(email: string, botId: string, userId: string): { sessionToken: string; expires: number } {
