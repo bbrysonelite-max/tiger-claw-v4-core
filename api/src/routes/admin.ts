@@ -1146,10 +1146,17 @@ router.get("/magic-link", async (req: Request, res: Response) => {
   if (!email) return res.status(400).json({ error: "email query param is required" });
 
   const frontendUrl = process.env["FRONTEND_URL"] ?? "https://wizard.tigerclaw.io";
+  const apiUrl = process.env["API_URL"] ?? "https://api.tigerclaw.io";
   const { token, expires } = generateMagicToken(email);
-  const url = `${frontendUrl}?email=${encodeURIComponent(email)}&token=${token}&expires=${expires}`;
+  const fullUrl = `${frontendUrl}?email=${encodeURIComponent(email)}&token=${token}&expires=${expires}`;
 
-  return res.json({ url, expires: new Date(expires).toISOString() });
+  // Store under a short code in Redis (same TTL as token)
+  const code = token.slice(0, 10);
+  const ttlSeconds = Math.floor((expires - Date.now()) / 1000);
+  await redisConnection.set(`magic_short:${code}`, fullUrl, "EX", ttlSeconds);
+
+  const shortUrl = `${apiUrl}/go/${code}`;
+  return res.json({ url: shortUrl, expires: new Date(expires).toISOString() });
 });
 
 // ── POST /admin/fleet/:tenantId/clear-circuit-breaker ────────────────────────
