@@ -12,6 +12,7 @@
 - Do not mark a session complete if known broken items remain.
 - The operator is running a real business. False confidence causes real damage.
 - No AI agent pushes directly to `main`. All changes via `feat/` or `fix/` branch + PR.
+- "I merged it" means nothing until confirmed. After every PR, verify with `gh pr view <number>` that state is `MERGED`. After every deploy, verify health endpoint returns 200 and check the logs. Do not tell the operator something is done until you have proof it is done.
 
 ---
 
