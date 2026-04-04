@@ -89,7 +89,7 @@ Last known state as of 2026-04-03:
 | Platform emergency key | ❌ | Expired — must be renewed in GCP secrets |
 | Admin Telegram bot | ✅ | @AlienProbeadmin_bot |
 | Resend | ⚠️ | Domain verified, but `RESEND_API_KEY` not in deploy script — not live in production |
-| Reddit (market miner) | ❌ | 403 from Cloud Run egress IP. Reddit API key applied for — awaiting approval (~1 week) |
+| Reddit (market miner) | ❌ | 403 from Cloud Run egress IP. Reddit API key applied for — awaiting approval (applied ~1 week ago, no response yet as of 2026-04-03). Mine cannot refill until approved. Follow up with Reddit. |
 | Stripe | ❌ | Placeholder. `STRIPE_PRICE_BYOK=price_placeholder_replace_me`. Not used. |
 | Zapier | ❌ | Dead code. Not used. |
 
