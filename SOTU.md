@@ -1,6 +1,6 @@
 # Tiger Claw — State of the Union
 
-**Last updated:** 2026-04-04 (End of Session 9 — full reliability & security audit, no PRs merged, audit-april-4th.md written)
+**Last updated:** 2026-04-04 (End of Sessions 9+10 — full audit sprint complete. All 57 issues resolved or deferred. PRs #189–#204 merged.)
 **This is the single source of truth. Read nothing else until you finish this file.**
 
 ---
@@ -16,18 +16,16 @@
 
 ---
 
-## ⚠️ AUDIT BACKLOG — Read Before Touching Any Code
+## ✅ AUDIT SPRINT COMPLETE
 
-A full reliability & security audit was completed Session 9 (2026-04-04). **57 issues found (26 HIGH, 22 MED, 9 LOW).** The full document is at `audit-april-4th.md` in the repo root.
+Full reliability & security audit was completed Session 9 (2026-04-04). **57 issues found. All resolved or explicitly deferred.** Details at `audit-april-4th.md`.
 
-**Three items are actively broken in production right now:**
-1. **`bot_ai_keys.bot_id` column wrong name** — `addAIKey()` fails on every call. Multi-key rotation is dead. Fix: migration 023, one SQL line. (`P1-1`)
-2. **`activateSubscription` fires before queue job is enqueued** — Redis blip = paying customer with active subscription and no bot, no recovery. (`P1-2`)
-3. **`stan-store-onboarding` worker has zero retries** — single DB hiccup permanently orphans a customer. (`P1-3`)
+**Remaining open items from the audit:**
+- **P2-15** (MED): Telegram/LINE webhook workers have zero retries — transient 429 drops a user message. Low urgency.
+- **P3-3** (MED): Tenant delete does not cancel Stan Store subscription — needs Stan Store API research. Deferred.
+- **P3-7** (MED): Burst counter TOCTOU race (multi-instance Cloud Run). Deferred until multi-instance is confirmed.
 
-**Do not onboard new customers before P1-1, P1-2, P1-3 are shipped.**
-
-Read `audit-april-4th.md` for the full phase-by-phase fix plan with exact file/line references and code-level instructions.
+**Platform is safe to onboard new customers as of PRs #189–#204.**
 
 ---
 
@@ -148,19 +146,8 @@ tiger_onboard, tiger_scout, tiger_contact, tiger_aftercare, tiger_briefing, tige
 
 **IMPORTANT:** The full audit backlog (57 issues, phased fix plan) is in `audit-april-4th.md`. The items below are a summary of the highest-priority items plus the pre-existing backlog.
 
-### Audit Phase 1 — Fix Before Next Customer (all OPEN)
-| Item | ID |
-|------|----|
-| `bot_ai_keys.bot_id` column never renamed — `addAIKey()` broken, multi-key rotation dead | P1-1 |
-| `activateSubscription` fires before `provisionQueue.add()` — orphaned subscriptions on Redis blip | P1-2 |
-| `stan-store-onboarding` worker has zero retries despite claiming 5 | P1-3 |
-| No Serper key rotation — 429 = silent empty results, `SERPER_KEY_3` unused in miner | P1-4 |
-| `reddit_scout.mjs` has zero Serper fallback | P1-5 |
-| Empty AI reply sends user silence — no fallback message | P1-6 |
-| Telegram webhook validation skipped when env var unset (code check; env var IS wired in prod) | P1-7 |
-| `verify-purchase` issues session tokens for any email, no purchase proof, no rate limit | P1-8 |
-| `ADMIN_TOKEN` in session-signing fallback chain | P1-9 |
-| `fc.args` not validated before Gemini tool dispatch — malformed args cause silent retry loops | P1-10 |
+### Audit Sprint — COMPLETE (PRs #189–#204)
+All Phase 1 and Phase 2 items shipped. All Phase 3 items shipped except P2-15, P3-3, P3-7 (see audit notes above). See `audit-april-4th.md` for full status.
 
 ### Pre-Existing Backlog
 | Item | Priority |
