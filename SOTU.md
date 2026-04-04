@@ -1,6 +1,6 @@
 # Tiger Claw — State of the Union
 
-**Last updated:** 2026-04-03 (Session 6 — ongoing)
+**Last updated:** 2026-04-03 (Session 6 — COMPLETE)
 **Read this first. Read nothing else until you have finished this file.**
 
 ---
@@ -246,6 +246,32 @@ The 5-step wizard is replaced by a single-page signup at `wizard.tigerclaw.io/si
 **End-to-end test PASSED:** `@Testtigerfour_bot` ("Teddy Tiger Claw") provisioned via the new signup page. Bot responded in Telegram: *"Good to be seen. This is going to be great."*
 
 **Stan Store link updated:** `wizard.tigerclaw.io` → `wizard.tigerclaw.io/signup` (Brent updated in Stan Store admin).
+
+### Session 6 — End of Day (2026-04-03)
+
+**All PRs merged and deployed. Fleet clean. Platform ready.**
+
+| Item | Status |
+|---|---|
+| PR #171 — Remove 3-per-day cap from tiger_briefing | ✅ Merged + deployed |
+| PR #172 — Fix admin test mock | ✅ Merged |
+| PR #173 — Soft ICP fallback at hatch | ✅ Merged + deployed |
+| Mine purge — 11,170 bad pre-gate facts removed | ✅ Done |
+| "60 Seconds" → "2 Minutes" across wizard frontend | ✅ Live on wizard.tigerclaw.io |
+| "Enterprise V4.0" navbar label removed | ✅ Live |
+| setWebhook on onboarding→active confirmed already built | ✅ No action needed |
+| Reflexion Loop + Agent Leaderboard captured as future vision | ✅ In SOTU |
+| Vercel auto-deploy broken — manual command documented | ⚠️ Known issue |
+
+**Fleet (end of session):**
+- `brent-bryson-mnjd321r` (Teddy) — onboarding, webhook live
+- `john-69cd9564` — onboarding, pending_setup, webhook live
+
+**Next session priorities:**
+1. Get Debbie, Jeff, John through wizard — self-serve proof
+2. Watch mine quality as it refills nightly
+3. Fix Vercel auto-deploy root directory in project settings
+4. Sprint 2: email webhook sender validation (low urgency)
 
 ### Session 6 — Later (2026-04-03 afternoon)
 
