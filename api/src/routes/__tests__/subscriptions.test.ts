@@ -6,7 +6,7 @@ const mockQuery = vi.hoisted(() => vi.fn().mockResolvedValue({ rows: [{id: 'b1'}
 
 const mockDb = vi.hoisted(() => ({
   createBYOKUser: vi.fn(),
-  findOrCreateBYOKBot: vi.fn(),
+  createBYOKBot: vi.fn(),
   getPool: vi.fn(() => ({ query: mockQuery })),
 }))
 
@@ -43,7 +43,7 @@ describe('POST /subscriptions/register', () => {
   it('creates a BYOK user and bot, returns botId', async () => {
     const app = await buildApp()
     mockDb.createBYOKUser.mockResolvedValue('u1')
-    mockDb.findOrCreateBYOKBot.mockResolvedValue('b1')
+    mockDb.createBYOKBot.mockResolvedValue('b1')
 
     const res = await request(app)
       .post('/subscriptions/register')
@@ -52,7 +52,7 @@ describe('POST /subscriptions/register', () => {
     expect(res.status).toBe(200)
     expect(res.body.botId).toBe('b1')
     expect(mockDb.createBYOKUser).toHaveBeenCalledWith('user@example.com', 'Test User')
-    expect(mockDb.findOrCreateBYOKBot).toHaveBeenCalledWith('u1', 'Test User', 'Sales')
+    expect(mockDb.createBYOKBot).toHaveBeenCalledWith('u1', 'Test User', 'Sales')
   })
 
   it('returns 400 when missing required fields', async () => {
