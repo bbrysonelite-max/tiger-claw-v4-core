@@ -1146,10 +1146,110 @@ router.get("/magic-link", async (req: Request, res: Response) => {
   if (!email) return res.status(400).json({ error: "email query param is required" });
 
   const frontendUrl = process.env["FRONTEND_URL"] ?? "https://wizard.tigerclaw.io";
+  const apiUrl = process.env["API_URL"] ?? "https://api.tigerclaw.io";
   const { token, expires } = generateMagicToken(email);
-  const url = `${frontendUrl}?email=${encodeURIComponent(email)}&token=${token}&expires=${expires}`;
+  const fullUrl = `${frontendUrl}?email=${encodeURIComponent(email)}&token=${token}&expires=${expires}`;
 
-  return res.json({ url, expires: new Date(expires).toISOString() });
+  // Store under a short code in Redis (same TTL as token)
+  const code = token.slice(0, 10);
+  const ttlSeconds = Math.floor((expires - Date.now()) / 1000);
+  await redisConnection.set(`magic_short:${code}`, fullUrl, "EX", ttlSeconds);
+
+  const shortUrl = `${apiUrl}/go/${code}`;
+  return res.json({ url: shortUrl, expires: new Date(expires).toISOString() });
+});
+
+// ── POST /admin/fleet/:tenantId/clear-circuit-breaker ────────────────────────
+router.post("/fleet/:tenantId/clear-circuit-breaker", async (req: Request, res: Response) => {
+  const { tenantId } = req.params;
+  try {
+    const errKey = `circuit_breaker:gemini:errors:${tenantId}`;
+    const tripKey = `circuit_breaker:gemini:tripped:${tenantId}`;
+    const deleted = await redisConnection.del(errKey, tripKey);
+    console.log(`[admin] Cleared circuit breaker for ${tenantId} (${deleted} keys deleted)`);
+    return res.json({ ok: true, tenantId, keysDeleted: deleted });
+  } catch (err) {
+    return res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+// ── GET /admin/platform-health ───────────────────────────────────────────────
+// Live test every platform-level dependency. Green/red per service.
+// Does NOT test per-tenant BYOB/BYOK — those are the operator's responsibility.
+router.get("/platform-health", async (_req: Request, res: Response) => {
+  const timeout = (ms: number) => new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error("timeout")), ms)
+  );
+
+  const check = async (name: string, fn: () => Promise<string>): Promise<{ name: string; status: "ok" | "error"; message: string }> => {
+    try {
+      const message = await Promise.race([fn(), timeout(5000)]);
+      return { name, status: "ok", message };
+    } catch (err) {
+      return { name, status: "error", message: err instanceof Error ? err.message : String(err) };
+    }
+  };
+
+  const serperTest = async (key: string | undefined, label: string) => {
+    if (!key) throw new Error("not configured");
+    const r = await fetch("https://google.serper.dev/search", {
+      method: "POST",
+      headers: { "X-API-KEY": key, "Content-Type": "application/json" },
+      body: JSON.stringify({ q: "test", num: 1 }),
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return `${label} — ok`;
+  };
+
+  const geminiTest = async (key: string | undefined, label: string) => {
+    if (!key) throw new Error("not configured");
+    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`);
+    if (!r.ok) {
+      const body = await r.json().catch(() => ({}));
+      throw new Error((body as any)?.error?.message ?? `HTTP ${r.status}`);
+    }
+    return `${label} — ok`;
+  };
+
+  const results = await Promise.all([
+    check("Serper Key 1",      () => serperTest(process.env["SERPER_KEY_1"], "key-1")),
+    check("Serper Key 2",      () => serperTest(process.env["SERPER_KEY_2"], "key-2")),
+    check("Serper Key 3",      () => serperTest(process.env["SERPER_KEY_3"], "key-3")),
+    check("Gemini Platform",   () => geminiTest(process.env["GOOGLE_API_KEY"], "platform key")),
+    check("Gemini Onboarding", () => geminiTest(process.env["PLATFORM_ONBOARDING_KEY"], "onboarding key")),
+    check("Gemini Emergency",  () => geminiTest(process.env["PLATFORM_EMERGENCY_KEY"], "emergency key")),
+    check("Admin Telegram Bot", async () => {
+      const token = process.env["ADMIN_TELEGRAM_BOT_TOKEN"];
+      if (!token) throw new Error("not configured");
+      const r = await fetch(`https://api.telegram.org/bot${token}/getMe`);
+      const body = await r.json() as any;
+      if (!body.ok) throw new Error(body.description ?? "failed");
+      return `@${body.result.username}`;
+    }),
+    check("Resend Email", async () => {
+      const key = process.env["RESEND_API_KEY"];
+      if (!key) throw new Error("RESEND_API_KEY not set in environment");
+      const r = await fetch("https://api.resend.com/domains", {
+        headers: { Authorization: `Bearer ${key}` },
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const body = await r.json() as any;
+      const verified = body.data?.find((d: any) => d.status === "verified");
+      return verified ? `${verified.name} verified` : "no verified domain";
+    }),
+    check("PostgreSQL", async () => {
+      const pool = getPool();
+      await pool.query("SELECT 1");
+      return "ok";
+    }),
+    check("Redis", async () => {
+      await redisConnection.ping();
+      return "ok";
+    }),
+  ]);
+
+  const allOk = results.every(r => r.status === "ok");
+  return res.json({ ok: allOk, services: results, checkedAt: new Date().toISOString() });
 });
 
 // ── POST /admin/flush-redis ───────────────────────────────────────────────────

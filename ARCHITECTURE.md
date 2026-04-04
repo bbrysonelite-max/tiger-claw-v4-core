@@ -1,57 +1,86 @@
 # Tiger Claw V4 — Core Architecture
 
-**Last updated:** 2026-04-01 (Session 5)
+**Last updated:** 2026-04-03 (Session 6)
 **Status:** LIVE. Locked. Do not rewrite.
+
+---
+
+## Standing Rule
+
+**No lying. No assuming. No guessing.** If you do not know the state of something, say so. Do not mark things working unless you have tested them live.
 
 ---
 
 ## 1. The Paradigm
 
-Tiger Claw V4 is **stateless**. There are no long-running Docker containers per tenant. There is no RAG. There is no OpenClaw. There is no Mini-RAG. The entire platform operates as a shared-nothing Node.js Google Cloud Run API (`api/`). One process handles all tenants. Context is resolved per-request.
+Tiger Claw V4 is **stateless**. No long-running Docker containers per tenant. No RAG. No OpenClaw. No Mini-RAG. One shared Node.js Cloud Run process handles all tenants. Context is resolved per-request.
 
 ---
 
 ## 2. Component Stack
 
-| Component | Technology | Notes |
+| Component | Technology | Actual Status |
 |---|---|---|
-| Compute | Google Cloud Run | Node.js/Express, port 4000 |
-| Database | Google Cloud SQL (PostgreSQL HA) | `tiger_claw_shared` |
-| Cache & Queues | Google Cloud Redis HA + BullMQ | 8 queues |
-| AI Provider | Google Gemini 2.0 Flash | `@google/generative-ai` SDK — LOCKED. gemini-2.5-flash has a GCP function-calling bug. |
-| Frontend (wizard) | Next.js on **Vercel** | `wizard.tigerclaw.io` — `web-onboarding/` subdirectory. NOT Cloud Run. |
-| Frontend (website) | Static HTML on Vercel | `tigerclaw.io` — `tiger-bot-website` repo |
-| Payments | Stan Store | Stan Store webhook → Zapier → `POST /webhooks/stan-store`. `X-Zapier-Secret` header required. |
-| Email | Resend | Provisioning receipts, notifications |
+| Compute | Google Cloud Run, Node.js/Express, port 4000 | ✅ Live |
+| Database | Cloud SQL PostgreSQL HA — `tiger_claw_shared` | ✅ Live |
+| Cache & Queues | Cloud Redis HA + BullMQ (8 queues) | ✅ Live |
+| AI Provider | Gemini 2.0 Flash — `@google/generative-ai` SDK | ✅ Live. **LOCKED — do not switch to 2.5-flash** (GCP function-calling bug) |
+| Frontend (signup + dashboard) | Next.js on Vercel — `wizard.tigerclaw.io` | ✅ Live. **Vercel auto-deploy is BROKEN — deploy manually** |
+| Frontend (website) | Static HTML — `tigerclaw.io` | ✅ Live |
+| Payments | **Stan Store only** | ✅ Active. Customer pays → gets email with link → `wizard.tigerclaw.io/signup` → email verified self-contained in DB. No Zapier. No Stripe. |
+| Email (Resend) | Resend — `tigerclaw.io` domain verified | ⚠️ Domain verified but `RESEND_API_KEY` is **not in the deploy script** — emails not delivered in production |
+| Stripe | Placeholder | ❌ Not used. `STRIPE_PRICE_BYOK` = `price_placeholder_replace_me`. Do not wire up without a decision. |
+| Zapier | Dead code | ❌ Not used. `/webhooks/stan-store` and `ZAPIER_WEBHOOK_SECRET` are dead code. |
+| LINE | Deferred | ❌ Phase 2/3. Code preserved. LINE Official Account (business registration) required — personal accounts cannot connect. |
 | GCP Project | `hybrid-matrix-472500-k5` | |
-| Cloud Run Services | `tiger-claw-api` | Multi-region: `us-central1` (primary) + `asia-southeast1`. Global HTTPS LB at `34.54.146.69`. |
+| Multi-region | `us-central1` (primary) + `asia-southeast1`. Global HTTPS LB at `api.tigerclaw.io` (IP: `34.54.146.69`) | ✅ Live |
 
 ---
 
-## 3. Core Intelligence (The "Brain")
+## 3. Customer Onboarding Flow (Current — Phase 1)
 
-- **26 active tools** in `api/src/tools/` — Gemini function-calling, not OpenClaw skills
-- Every tool strictly adheres to `ToolContext` typing (`api/src/tools/ToolContext.ts`)
-- `ai.ts` builds `ToolContext` statelessly on every incoming message
-- Tools missing from `toolsMap` in `ai.ts` cause infinite loops — always register new tools
-- **Scoring threshold: 80** — not configurable, not discussable
+```
+Customer pays on Stan Store
+  → Stan Store sends confirmation email
+  → Email contains link: wizard.tigerclaw.io/signup
+  → Customer enters purchase email
+  → POST /auth/verify-purchase
+      → if no DB record: creates one on-demand (stan_store_self_serve_...)
+      → if active record: creates second bot (multi-agent path)
+  → Session token issued
+  → Customer fills single-page form: agent name, niche, ICP, Telegram bot token, AI key
+  → POST /wizard/hatch
+  → BullMQ tenant-provisioning job
+  → Provisioner: registers Telegram webhook, sets bot name/description, status → onboarding
+  → First message: ICP fast-path intro (confident, no interview)
+```
+
+**The 5-step wizard is retired for new customers.** `/signup` is the entry point. The old wizard steps still exist in code but are not the primary flow.
+
+---
+
+## 4. Core Intelligence (The Brain — 26 Tools)
+
+- Tools live in `api/src/tools/`
+- Every tool uses `ToolContext` (`api/src/tools/ToolContext.ts`)
+- `ai.ts` builds `ToolContext` statelessly on every message
+- **Tools missing from `toolsMap` in `ai.ts` cause infinite loops — always register new tools**
+- Scoring threshold: **80** — not configurable
 
 ### Tool Loop
-1. Incoming message → `processTelegramMessage` or `processLINEMessage`
-2. **ICP Fast-Path Check (added 2026-03-30):** `checkWizardIcpFastPath(tenantId)` — if `onboard_state.json` has `customerProfile` AND onboarding is not yet complete, skip `tiger_onboard()` entirely and send confident ICP-aware intro
+1. Incoming message → `processTelegramMessage` (LINE deferred)
+2. ICP Fast-Path Check — if `onboard_state.json` has `customerProfile` and onboarding incomplete, skip `tiger_onboard()`, send confident intro
 3. `startFocus()` — writes `focus_state` Redis key
-4. `buildSystemPrompt(tenant)` (async) — injects memory context including ICP data
-5. `getChatHistory()` — loads history + prepends `chat_memory` summary if exists
-6. Gemini function-calling loop via `runToolLoop()` — **only `{ output }` is returned to Gemini** from tool results; raw data fields are stripped to prevent woody/technical responses
-7. `saveChatHistory()` — saves turns, triggers Sawtooth compression if threshold exceeded
-8. `completeFocus()` — triggers compression if tool call count >= 12
-9. Fire-and-forget: `factExtractionQueue.add()` for async fact extraction
+4. `buildSystemPrompt(tenant)` (async) — injects ICP, hive patterns, lead stats, market intel
+5. `getChatHistory()` — loads history + `chat_memory` summary
+6. Gemini function-calling loop via `runToolLoop()` — **only `{ output }` passed to Gemini**, raw data stripped
+7. `saveChatHistory()` — triggers Sawtooth compression if threshold exceeded
+8. `completeFocus()` — triggers compression if tool calls ≥ 12
+9. Fire-and-forget: `factExtractionQueue.add()`
 
 ---
 
-## 4. Memory Architecture (V4.1)
-
-All four phases are shipped and live.
+## 5. Memory Architecture
 
 ### Redis Keys
 | Key | Purpose | TTL |
@@ -59,116 +88,99 @@ All four phases are shipped and live.
 | `chat_history:{tenantId}:{chatId}` | Raw turn history | 7 days |
 | `chat_memory:{tenantId}:{chatId}` | Sawtooth compressed summaries | 30 days |
 | `focus_state:{tenantId}:{chatId}` | Session bookending | 24 hours |
+| `circuit_breaker:gemini:errors:{tenantId}` | Gemini error count | 1 hour |
+| `circuit_breaker:gemini:tripped:{tenantId}` | Circuit tripped flag | 1 hour |
+| `magic_short:{code}` | Short magic link → full URL | Same TTL as token |
 
 ### PostgreSQL (`tenant_states` table)
 | `state_key` | Purpose |
 |---|---|
-| `onboard_state` | Onboarding interview answers + wizard `customerProfile` (ICP data pre-loaded at hatch) |
-| `fact_anchors` | Extracted business facts from live conversations |
+| `scout_state.json` | Scout run timestamps, burst count, lead totals |
+| `onboard_state.json` | Onboarding answers + ICP pre-loaded at hatch |
+| `fact_anchors` | Extracted business facts from conversations |
 
 ### Dynamic System Prompt (`buildSystemPrompt`)
-Async. Injects **four live signals** loaded in `Promise.all()`. DB failure on any signal = graceful degradation, no crash.
-
-1. **ICP summary** — from `onboard_state.json` (`icpSingle`, falling back to `customerProfile`) + `fact_anchors`
-2. **Hive patterns** — top signals from `hive_signals` for tenant's flavor/region
-3. **Lead stats** — live counts from `tenant_leads`
-4. **Market intelligence** — up to 5 fresh facts from `market_intelligence` (confidence ≥ 70, within 7 days). Domain key is flavor **displayName** (e.g. `"Real Estate Agent"`), NOT the flavor key (`"real-estate"`). See `getMarketIntelligence()` in `market_intel.ts`.
-
-### Sawtooth Compression (Two Triggers)
-- **History threshold:** `history.length > MAX_HISTORY_TURNS * 2` → `compressChatHistory()`
-- **Focus threshold:** `toolCallsSinceStart >= 12` → `completeFocus()` → `compressChatHistory()`
-
-Compression uses `PLATFORM_ONBOARDING_KEY` (not tenant's key). Merges summary into `chat_memory` Redis key (30d TTL).
-
-### Mac Cluster (192.168.0.2) — OFFLINE ONLY
-Reads Cloud SQL via Auth Proxy. Runs Reflexion Loops offline. Proposes system prompt improvements for Brent to review.
-**NOT called by Cloud Run. Cannot break production.**
-
----
-
-## 5. Multi-Agent Architecture (Added 2026-03-30)
-
-- One email can own multiple bots. Each Stan Store purchase creates a fresh bot_id + tenant + subscription.
-- `auth.ts` `/verify-purchase` checks: if existing bot's subscription is NOT `pending_setup`, creates a NEW bot (multi-agent path).
-- Session token carries the correct bot_id through all 5 wizard steps.
-- Provisioner receives bot_id (UUID), not email — no cross-contamination between agents.
-- Critical for scale: Pebo wants 20+ agents, John's 21,000 distributors may want several each.
+Async. Loads 4 signals in `Promise.all()`. DB failure = graceful degradation.
+1. ICP summary (`icpSingle`, falling back to `customerProfile`) + `fact_anchors`
+2. Hive patterns — top signals for tenant's flavor/region
+3. Lead stats — live counts from `tenant_leads`
+4. Market intelligence — up to 5 facts (confidence ≥ 70, within 7 days). Domain key = flavor **displayName** (e.g. `"Real Estate Agent"`), NOT flavor key (`"real-estate"`)
 
 ---
 
 ## 6. Key Management (4-Layer Fallback)
 
-Tenants never go dark immediately if billing fails.
-
 | Layer | Source | Threshold |
 |---|---|---|
-| 1 | Platform Onboarding Key (Tiger Claw provided) | 50 msg/day |
+| 1 | Platform Onboarding Key | 50 msg/day |
 | 2 | Tenant Primary BYOK | Unlimited |
 | 3 | Tenant Fallback BYOK | Unlimited |
-| 4 | Platform Emergency Keep-Alive | 5 msg, pauses after 24h |
-
-Handled in `tiger_keys.ts` and `ai.ts`.
+| 4 | Platform Emergency Key | ❌ **EXPIRED** — must be renewed |
 
 ---
 
-## 7. Queue Architecture (BullMQ)
+## 7. Queue Architecture (BullMQ — 8 Queues)
 
-| Queue | Worker | Purpose |
-|---|---|---|
-| `tenant-provisioning` | `provisionWorker` | New tenant setup (name, webhook, status) |
-| `telegram-webhooks` | `telegramWorker` | Telegram message processing |
-| `line-webhooks` | `lineWorker` | LINE message processing |
-| `fact-extraction` | `factExtractionWorker` | Async fact anchor extraction |
-| `ai-routines` | `routineWorker` | Scout (+ morning report), nurture, value-gap check-ins, weekly check-ins, Strike/Postiz routines |
-| `global-cron` | `cronWorker` | Heartbeat scheduler (every minute) |
+| Queue | Purpose |
+|---|---|
+| `tenant-provisioning` | New tenant setup |
+| `telegram-webhooks` | Telegram message processing |
+| `line-webhooks` | LINE (deferred — queue exists, worker active) |
+| `fact-extraction` | Async fact anchor extraction |
+| `ai-routines` | Scout, nurture, value-gap, check-ins |
+| `global-cron` | Heartbeat scheduler (every minute) |
 
----
-
-## 8. Morning Hunt Report (Added 2026-04-01)
-
-`daily_scout` routine fires at 7 AM UTC for every active tenant. After `tiger_scout` runs, Tiger composes a morning message and sends it via Telegram or LINE. Language of Hope fires if pipeline is empty — no silent runs.
-
-Previously: `runToolLoop` result was discarded (`return ''`). Now: `accumulatedText` is captured and pushed to operator.
+`ENABLE_WORKERS=true` must be set in deploy. It is. Do not remove it.
 
 ---
 
-## 9. Provisioning Flow (Updated 2026-03-30)
+## 8. Scout Architecture
 
-1. `POST /wizard/hatch` validates botId, subscription, AI key
-2. Activates subscription (`pending_setup` → `active`)
-3. Writes `customerProfile` to `onboard_state.json` (ICP pre-load)
-4. Enqueues BullMQ `tenant-provisioning` job
-5. Provisioner: updates tenant record **including name** from wizard input
-6. Registers Telegram webhook (BYOB token → `setWebhook`)
-7. Rebrands Telegram profile: `setMyName` + `setMyDescription` using **tenant.name** (now correct)
-8. Registers LINE webhook (if credentials, non-fatal)
-9. Status → `onboarding`
-10. First inbound message → ICP fast-path check → confident intro (no interview)
+- **Burst mode**: user-triggered on-demand runs (default when mode not specified). Max 3/day, min 1h between.
+- **Scheduled mode**: nightly cron at 5 AM tenant time. Must be passed explicitly: `mode: 'scheduled'`.
+- Sources: Reddit (public JSON), Facebook Groups via Serper, LINE OpenChat via Serper
+- **All 3 Serper keys currently return 403 — scout finds zero prospects on every tenant**
+- Reddit public API accessible but returning 403 from Cloud Run egress — under investigation
 
 ---
 
-## 9. Security & Isolation
+## 9. Admin
 
-- SQL queries never built from LLM output
-- Tenant data siloed to tenant-specific schemas (`t_{uuid}`)
-- Bot tokens AES-256-GCM encrypted at rest via `services/pool.ts`
-- BYOK keys validated server-side before storage — never store plaintext
-- `ALLOWED_ORIGINS` enforced on all CORS — fails loudly if not set
-- All secrets in Cloud Secret Manager or environment variables
+- **Dashboard URL:** `wizard.tigerclaw.io/admin` (not /admin/dashboard)
+- **Token:** `gcloud secrets versions access latest --secret="tiger-claw-admin-token" --project="hybrid-matrix-472500-k5"`
+- **Mandatory post-deploy:** `POST /admin/fix-all-webhooks` after every API deploy
 
 ---
 
 ## 10. Deployment
 
 ### API (Cloud Run)
-Triggered automatically by GitHub Actions on merge to `main`.
+GitHub Actions deploys on merge to `main`. **No AI agent is to push directly to main.** All changes via `feat/` branch + PR.
 
 ### Wizard (Vercel)
-Vercel watches `tiger-claw-v4-core` repo. Merge to `main` → auto-deploy `web-onboarding/` to `wizard.tigerclaw.io`.
+**Auto-deploy is broken.** Deploy manually from Vercel dashboard until Root Directory setting is fixed.
 
-### Website (Vercel)
-Separate repo `tiger-bot-website`. Push to `main` → auto-deploy to `tigerclaw.io`.
+### Post-Deploy Protocol (mandatory, every time)
+```bash
+ADMIN_TOKEN=$(gcloud secrets versions access latest --secret="tiger-claw-admin-token" --project="hybrid-matrix-472500-k5")
+curl -X POST https://api.tigerclaw.io/admin/fix-all-webhooks \
+  -H "Authorization: Bearer $ADMIN_TOKEN"
+```
 
 ---
 
-> **Note to all AI agents:** This architecture is locked. If you see a type error, fix the TypeScript interface. Do NOT rewrite the architecture. Do NOT restore OpenClaw. Do NOT add per-tenant containers. Do NOT switch AI providers.
+## 11. Known Broken — Do Not Claim Otherwise
+
+| Service | Status | Fix Required |
+|---------|--------|-------------|
+| Serper keys (all 3) | 403 | New keys from serper.dev |
+| Platform emergency Gemini key | Expired | Renew in GCP secrets |
+| Resend email in production | Not in deploy script | Add `RESEND_API_KEY` to deploy-cloudrun.sh |
+| Stripe | Placeholder | Decision needed — not a current priority |
+| Zapier | Dead code | Can be removed when convenient |
+| nurture_check calling tiger_scout | Wrong behavior | Bug — not yet fixed |
+| Vercel auto-deploy | Broken | Fix Root Directory in Vercel settings |
+
+---
+
+> **Note to all agents:** Architecture is locked. No RAG. No containers. No OpenClaw. No switching AI providers. If you see a TypeScript error, fix the interface — do not rewrite the system.
