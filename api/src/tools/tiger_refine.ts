@@ -43,8 +43,9 @@ async function execute(
   const { logger } = context;
   const rawContent = params.rawContent as string;
   const sourceUrl = (params.sourceUrl as string) || "unknown";
-  const extractionGoal = (params.extractionGoal as string) || "intent_signals";
-  const domain = (params.domain as string) || "Generic Market Research";
+  // Sanitize caller-controlled fields before injecting into Gemini prompt
+  const extractionGoal = String((params.extractionGoal as string) || "intent_signals").replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '').slice(0, 200);
+  const domain = String((params.domain as string) || "Generic Market Research").replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '').slice(0, 200);
   const capturedBy = (params.capturedBy as string) || "unknown";
   const entityId = (params.entityId as string) || null;
   const miningCost = (params.miningCost as number) || 0.05;

@@ -691,6 +691,20 @@ function formatMarketIntelligence(facts: MarketFact[], fallbackFacts: string[] =
 
 // ─── System prompt ────────────────────────────────────────────────────────────
 // Async version — reads onboard_state.json so the bot has full operator context.
+/**
+ * Sanitize a value before injecting it into a Gemini system prompt.
+ * Strips control characters and truncates to maxLen.
+ * Operator data comes from user-controlled onboarding fields — a compromised
+ * account must not be able to override model behavior via prompt injection.
+ */
+function sanitizePromptField(value: unknown, maxLen: number): string {
+    if (value === null || value === undefined) return '—';
+    return String(value)
+        // eslint-disable-next-line no-control-regex
+        .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '') // strip control chars (keep \n \r \t)
+        .slice(0, maxLen);
+}
+
 export async function buildSystemPrompt(tenant: any): Promise<string> {
     const flavor = loadFlavorConfig(tenant.flavor);
 
@@ -707,8 +721,8 @@ export async function buildSystemPrompt(tenant: any): Promise<string> {
     const icpBuilder = onboardState?.icpBuilder ?? {};
     const icpCustomer = onboardState?.icpCustomer ?? {};
     const icpSingle = onboardState?.icpSingle ?? {};
-    const botName = onboardState?.botName ?? 'Tiger';
-    const operatorName = identity.name ?? tenant.name ?? 'your operator';
+    const botName = sanitizePromptField(onboardState?.botName ?? 'Tiger', 80);
+    const operatorName = sanitizePromptField(identity.name ?? tenant.name ?? 'your operator', 80);
     const hasOnboarding = onboardState?.phase === 'complete';
 
     // Load dynamic approved skills for this tenant
@@ -733,11 +747,11 @@ export async function buildSystemPrompt(tenant: any): Promise<string> {
         `━━━━ OPERATOR IDENTITY (LOCKED — do not contradict these facts) ━━━━`,
         `Your name: ${botName}`,
         `Operator name: ${operatorName}`,
-        `What they sell / represent: ${identity.productOrOpportunity ?? '—'}`,
-        `Years in profession: ${identity.yearsInProfession ?? '—'}`,
-        `Their biggest proven result: ${identity.biggestWin ?? '—'}`,
-        `What makes them different: ${identity.differentiator ?? '—'}`,
-        `Monthly income goal: ${identity.monthlyIncomeGoal ?? '—'}`,
+        `What they sell / represent: ${sanitizePromptField(identity.productOrOpportunity, 300)}`,
+        `Years in profession: ${sanitizePromptField(identity.yearsInProfession, 50)}`,
+        `Their biggest proven result: ${sanitizePromptField(identity.biggestWin, 300)}`,
+        `What makes them different: ${sanitizePromptField(identity.differentiator, 300)}`,
+        `Monthly income goal: ${sanitizePromptField(identity.monthlyIncomeGoal, 50)}`,
         ``,
         `Use these facts naturally when you build credibility, handle objections, and represent the operator.`,
         `Never invent results or credentials that weren't provided above.`,
@@ -768,16 +782,16 @@ export async function buildSystemPrompt(tenant: any): Promise<string> {
         if (primaryIcp?.idealPerson) {
             const label = onboardState?.flavor === 'real-estate' ? 'Ideal Client' : 'Ideal Customer / Recruit';
             icpLines.push(``, `━━━━ IDEAL CUSTOMER PROFILE ━━━━`);
-            icpLines.push(`${label}: ${primaryIcp.idealPerson}`);
-            if (primaryIcp.problemFaced) icpLines.push(`Problem they face: ${primaryIcp.problemFaced}`);
-            if (primaryIcp.currentApproachFailing) icpLines.push(`What's not working for them: ${primaryIcp.currentApproachFailing}`);
-            if (primaryIcp.onlinePlatforms) icpLines.push(`Where they hang out online: ${primaryIcp.onlinePlatforms}`);
-            if (primaryIcp.typesToAvoid) icpLines.push(`Types to avoid: ${primaryIcp.typesToAvoid}`);
+            icpLines.push(`${label}: ${sanitizePromptField(primaryIcp.idealPerson, 300)}`);
+            if (primaryIcp.problemFaced) icpLines.push(`Problem they face: ${sanitizePromptField(primaryIcp.problemFaced, 300)}`);
+            if (primaryIcp.currentApproachFailing) icpLines.push(`What's not working for them: ${sanitizePromptField(primaryIcp.currentApproachFailing, 300)}`);
+            if (primaryIcp.onlinePlatforms) icpLines.push(`Where they hang out online: ${sanitizePromptField(primaryIcp.onlinePlatforms, 300)}`);
+            if (primaryIcp.typesToAvoid) icpLines.push(`Types to avoid: ${sanitizePromptField(primaryIcp.typesToAvoid, 300)}`);
         }
         if (onboardState?.flavor === 'network-marketer' && icpCustomer?.idealPerson) {
-            icpLines.push(``, `Ideal Customer: ${icpCustomer.idealPerson}`);
-            if (icpCustomer.problemFaced) icpLines.push(`Problem they face: ${icpCustomer.problemFaced}`);
-            if (icpCustomer.onlinePlatforms) icpLines.push(`Where they hang out: ${icpCustomer.onlinePlatforms}`);
+            icpLines.push(``, `Ideal Customer: ${sanitizePromptField(icpCustomer.idealPerson, 300)}`);
+            if (icpCustomer.problemFaced) icpLines.push(`Problem they face: ${sanitizePromptField(icpCustomer.problemFaced, 300)}`);
+            if (icpCustomer.onlinePlatforms) icpLines.push(`Where they hang out: ${sanitizePromptField(icpCustomer.onlinePlatforms, 300)}`);
         }
     }
 
