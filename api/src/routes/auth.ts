@@ -9,7 +9,20 @@
 import { Router, type Request, type Response } from "express";
 import { createHmac, timingSafeEqual } from "crypto";
 import { z } from "zod";
+import { rateLimit } from "express-rate-limit";
 import { lookupPurchaseByEmail, createBYOKUser, createBYOKBot, createBYOKSubscription } from "../services/db.js";
+
+// Rate limiter: 10 attempts per IP per 15 minutes.
+// Prevents email enumeration and on-demand DB record spam.
+const verifyPurchaseLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  handler: (_req, res) => {
+    res.status(429).json({ error: "Too many requests. Please try again later." });
+  },
+});
 
 const router = Router();
 
@@ -49,7 +62,7 @@ export function verifySessionToken(token: string): { email: string; botId: strin
 }
 
 // ── POST /auth/verify-purchase ────────────────────────────────────────────────
-router.post("/verify-purchase", async (req: Request, res: Response) => {
+router.post("/verify-purchase", verifyPurchaseLimiter, async (req: Request, res: Response) => {
   const schema = z.object({ email: z.string().email() });
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) {
