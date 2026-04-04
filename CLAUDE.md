@@ -91,8 +91,10 @@
 
 ## Engineering Constraints (Non-Negotiable)
 
-- `main` is branch-protected. Always use `feat/` branches and `gh pr create`.
-- Never push directly to `main` or use `--no-verify` / `--force` without explicit user instruction.
+- **NO AI AGENT TOUCHES MAIN. EVER.** All changes go through a `feat/` or `fix/` branch, then `gh pr create`. This is not a suggestion.
+- After every PR: verify with `gh pr view <number>` that state is `MERGED` before telling the operator it's done.
+- After every deploy: verify `curl https://api.tigerclaw.io/health` returns 200 and run `POST /admin/fix-all-webhooks`. Do not claim a deploy succeeded without proof.
+- Never push directly to `main`. Never use `--no-verify` or `--force` on main under any circumstances.
 - OpenClaw, Mini-RAG, and per-tenant Docker containers are permanently eradicated. Do not reference or recreate them.
 - The Mac cluster at 192.168.0.2 is an **offline** Reflexion Loop tool. It is NOT a Cloud Run dependency. Never make Cloud Run call it.
 - `buildSystemPrompt()` is async. Always `await` it.
