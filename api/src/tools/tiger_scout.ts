@@ -1221,7 +1221,7 @@ async function handleHunt(
   region: string,
   flavor: string
 ): Promise<ToolResult> {
-  const mode = params.mode ?? "scheduled";
+  const mode = params.mode ?? "burst";
   const limit = params.limit ?? 50;
   const sourceOverride = params.sources;
 
@@ -1426,7 +1426,7 @@ export const tiger_scout = {
       mode: {
         type: "string",
         enum: ["scheduled", "burst"],
-        description: "'scheduled' (default) — standard scan. 'burst' — intensive scan, limited to 3 per day.",
+        description: "'burst' (default) — use for all user-triggered on-demand scans (max 3/day, min 1h between). 'scheduled' — reserved for the automatic nightly cron run only.",
       },
       sources: {
         type: "array",
