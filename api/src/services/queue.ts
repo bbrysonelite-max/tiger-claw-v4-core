@@ -85,7 +85,6 @@ export const provisionWorker = SHOULD_RUN_WORKERS ? new Worker(
         console.log(`[Worker] Started provisioning job ${job.id} for slug: ${job.data.slug}`);
 
         try {
-            // Logically decoupled provisioning flow
             const result = await provisionTenant({
                 slug: job.data.slug,
                 name: job.data.name,
@@ -106,9 +105,8 @@ export const provisionWorker = SHOULD_RUN_WORKERS ? new Worker(
 
             console.log(`[Worker] Succeeded provisioning job ${job.id}. Tenant live.`);
 
-            // Update the Bot ID State successfully
             const pool = getPool();
-            await pool.query("UPDATE bots SET status = 'live', deployed_at = NOW() WHERE id = $1", [job.data.botId]);
+            await pool.query("UPDATE tenants SET status = 'live', deployed_at = NOW() WHERE id = $1", [job.data.botId]);
 
             await sendAdminAlert(
                 `✅ New tenant provisioned via Queue (Blowout Protection)!\n` +
@@ -124,36 +122,28 @@ export const provisionWorker = SHOULD_RUN_WORKERS ? new Worker(
 
             return result;
         } catch (error) {
-            console.error(`[Worker] Fatal error provisioning job ${job.id}:`, error);
-
-            // Wait to alert admins until it hard-fails entirely or just alert now? Let bullmq retry, but mark it erroring
-            const pool = getPool();
-            await pool.query("UPDATE bots SET status = 'error' WHERE id = $1", [job.data.botId]);
-
-            await sendAdminAlert(
-                `❌ Provisioning Worker FAILED for ${job.data.name} (${job.data.slug})\n` +
-                `Error: ${error}`
-            );
-
-            throw error; // Let BullMQ handle exponential backoffs
+            console.error(`[Worker] Error on provisioning job ${job.id} (attempt ${job.attemptsMade}):`, error);
+            throw error; // Let BullMQ retry — status update happens only on terminal failure
         }
     },
     {
         connection: connection as any,
-        // Concurrency protection: Do not provision more than 10 pods simultaneously per worker
         concurrency: 10,
-        // Optional limits: max 50 jobs per minute per node
-        limiter: {
-            max: 50,
-            duration: 60000,
-        }
+        stalledInterval: 30000,
+        maxStalledCount: 3,
+        lockDuration: 60000,
+        limiter: { max: 50, duration: 60000 },
     }
 ) : null;
 
 if (provisionWorker) {
-    // 'failed' fires only after ALL retries are exhausted — this is the terminal failure alert
+    // 'failed' fires only after ALL retries are exhausted — terminal failure only
     provisionWorker.on('failed', (job, err) => {
         console.error(`[Worker] Provisioning Job ${job?.id} TERMINAL FAILURE (all retries exhausted). Error:`, err);
+        // Mark tenant as error only on terminal failure — not on transient retries
+        if (job?.data?.botId) {
+            getPool().query("UPDATE tenants SET status = 'error' WHERE id = $1", [job.data.botId]).catch(() => {});
+        }
         sendAdminAlert(
             `🚨 PROVISIONING TERMINAL FAILURE — all retries exhausted\n` +
             `Job: ${job?.id}\nSlug: ${job?.data?.slug ?? 'unknown'}\nCustomer: ${job?.data?.name ?? 'unknown'} (${job?.data?.email ?? 'unknown'})\nError: ${err?.message ?? String(err)}`
@@ -223,7 +213,10 @@ export const telegramWorker = SHOULD_RUN_WORKERS ? new Worker(
     },
     {
         connection: connection as any,
-        concurrency: 50, // Higher concurrency since these are chat payloads
+        concurrency: 50,
+        stalledInterval: 30000,
+        maxStalledCount: 3,
+        lockDuration: 30000,
     }
 ) : null;
 
@@ -273,6 +266,9 @@ export const lineWorker = SHOULD_RUN_WORKERS ? new Worker(
     {
         connection: connection as any,
         concurrency: 50,
+        stalledInterval: 30000,
+        maxStalledCount: 3,
+        lockDuration: 30000,
     }
 ) : null;
 
@@ -315,12 +311,18 @@ export const emailWorker = SHOULD_RUN_WORKERS ? new Worker(
     {
         connection: connection as any,
         concurrency: 10,
+        stalledInterval: 30000,
+        maxStalledCount: 3,
+        lockDuration: 60000,
     }
 ) : null;
 
 if (emailWorker) {
     emailWorker.on('failed', (job, err) => {
-        console.error(`[Worker] Email support job ${job?.id} failed (from: ${job?.data?.fromEmail ?? 'unknown'}). Error:`, err?.message ?? err);
+        console.error(`[Worker] Email support job ${job?.id} TERMINAL FAILURE (from: ${job?.data?.fromEmail ?? 'unknown'}). Error:`, err?.message ?? err);
+        sendAdminAlert(
+            `⚠️ Email support TERMINAL FAILURE\nFrom: ${job?.data?.fromEmail ?? 'unknown'}\nSubject: ${job?.data?.subject ?? 'unknown'}\nError: ${err?.message ?? String(err)}`
+        ).catch(() => {});
     });
 }
 
@@ -349,6 +351,9 @@ export const factExtractionWorker = SHOULD_RUN_WORKERS ? new Worker(
     {
         connection: connection as any,
         concurrency: 20,
+        stalledInterval: 30000,
+        maxStalledCount: 3,
+        lockDuration: 30000,
     }
 ) : null;
 
@@ -387,6 +392,9 @@ export const routineWorker = SHOULD_RUN_WORKERS ? new Worker(
     {
         connection: connection as any,
         concurrency: 20,
+        stalledInterval: 30000,
+        maxStalledCount: 3,
+        lockDuration: 60000,
     }
 ) : null;
 
@@ -436,14 +444,14 @@ export const cronWorker = SHOULD_RUN_WORKERS ? new Worker(
                     await routineQueue.add('nurture_check', {
                         tenantId: tenant.id,
                         routineType: 'nurture_check',
-                    }, { jobId: `nurture_${tenant.id}`, removeOnComplete: true, removeOnFail: true });
+                    }, { jobId: `nurture_${tenant.id}`, removeOnComplete: true, removeOnFail: { count: 100 } });
 
                     // daily_scout runs once per day at 7 AM UTC (date-stamped jobId prevents re-add)
                     if (nowHour === 7) {
                         await routineQueue.add('daily_scout', {
                             tenantId: tenant.id,
                             routineType: 'daily_scout',
-                        }, { jobId: `scout_${tenant.id}_${today}`, removeOnComplete: true, removeOnFail: true });
+                        }, { jobId: `scout_${tenant.id}_${today}`, removeOnComplete: true, removeOnFail: { count: 100 } });
                     }
 
                     // ── Key Health Monitor — runs every hour ─────────────────────────
@@ -485,7 +493,7 @@ export const cronWorker = SHOULD_RUN_WORKERS ? new Worker(
                                 await routineQueue.add('value_gap_checkin', {
                                     tenantId: tenant.id,
                                     routineType: 'value_gap_checkin',
-                                }, { jobId: `value_gap_${tenant.id}_${today}`, removeOnComplete: true, removeOnFail: true });
+                                }, { jobId: `value_gap_${tenant.id}_${today}`, removeOnComplete: true, removeOnFail: { count: 100 } });
                             }
                         } catch (gapErr) {
                             console.error(`[Cron] Value-gap check failed for tenant ${tenant.id}:`, gapErr);
@@ -537,7 +545,7 @@ export const cronWorker = SHOULD_RUN_WORKERS ? new Worker(
                 await miningQueue.add('global_market_mining', {}, {
                     jobId: `market_mining_${today}`,
                     removeOnComplete: true,
-                    removeOnFail: true,
+                    removeOnFail: { count: 100 },
                 });
                 console.log(`[Cron] Enqueued daily market intelligence mining run.`);
             }
@@ -579,9 +587,12 @@ export const cronWorker = SHOULD_RUN_WORKERS ? new Worker(
             throw err;
         }
     },
-    { 
-        connection: connection as any, 
+    {
+        connection: connection as any,
         concurrency: 1,
+        stalledInterval: 30000,
+        maxStalledCount: 3,
+        lockDuration: 120000,
     }
 ) : null;
 
@@ -608,7 +619,13 @@ export const miningWorker = SHOULD_RUN_WORKERS ? new Worker(
             throw err;
         }
     },
-    { connection: connection as any, concurrency: 1 }
+    {
+        connection: connection as any,
+        concurrency: 1,
+        stalledInterval: 30000,
+        maxStalledCount: 3,
+        lockDuration: 600000, // mining runs can take minutes
+    }
 ) : null;
 
 if (miningWorker) {
@@ -649,33 +666,41 @@ export const onboardingWorker = SHOULD_RUN_WORKERS ? new Worker(
         console.log(`[Onboarding] ✅ Stan Store setup complete for ${email} — botId: ${botId}`);
         return { botId };
         },
-        { connection: connection as any, concurrency: 5 }
-        ) : null;
+    {
+        connection: connection as any,
+        concurrency: 5,
+        stalledInterval: 30000,
+        maxStalledCount: 3,
+        lockDuration: 60000,
+    }
+) : null;
 
-        export const marketIntelligenceWorker = SHOULD_RUN_WORKERS ? new Worker(
-        'market-intelligence-batch',
-        async (job: Job) => {
+export const marketIntelligenceWorker = SHOULD_RUN_WORKERS ? new Worker(
+    'market-intelligence-batch',
+    async (job: Job) => {
         const fact = job.data;
         const { saveMarketFact } = await import('./market_intel.js');
-        // Async and decoupled from the main chat loop — processes one fact per job.
         await saveMarketFact(fact);
         return { success: true };
-        },
-        { 
-        connection: connection as any, 
+    },
+    {
+        connection: connection as any,
         concurrency: 10,
-        limiter: {
-            max: 100,
-            duration: 1000
-        }
-        }
-        ) : null;
+        stalledInterval: 30000,
+        maxStalledCount: 3,
+        lockDuration: 30000,
+        limiter: { max: 100, duration: 1000 },
+    }
+) : null;
 
-        if (marketIntelligenceWorker) {
-        marketIntelligenceWorker.on('failed', (job, err) => {
+if (marketIntelligenceWorker) {
+    marketIntelligenceWorker.on('failed', (job, err) => {
         console.error(`[Worker] Market Intelligence batch job ${job?.id} failed:`, err);
-        });
-        }
+        sendAdminAlert(
+            `⚠️ Market intelligence batch TERMINAL FAILURE\nJob: ${job?.id}\nError: ${err?.message ?? String(err)}`
+        ).catch(() => {});
+    });
+}
 
 if (onboardingWorker) {
     onboardingWorker.on('failed', (job, err) => {
