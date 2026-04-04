@@ -602,20 +602,24 @@ export const cronWorker = SHOULD_RUN_WORKERS ? new Worker(
 
 export const miningWorker = SHOULD_RUN_WORKERS ? new Worker(
     'market-mining',
-    async () => {
-        console.log('[Mining] Daily market intelligence run starting...');
+    async (job: Job) => {
+        const runId = job.id ?? `mine_${Date.now()}`;
+        console.log(`[Mining] Daily market intelligence run starting (runId: ${runId})...`);
+        const { logAdminEvent } = await import('./db.js');
+        await logAdminEvent('mine_started', undefined, { runId }).catch(() => {});
         try {
             const { runMarketMining } = await import('./market_miner.js');
             const result = await runMarketMining();
             console.log(`[Mining] Run complete — flavors: ${result.flavorsProcessed}, posts: ${result.postsFound}, facts: ${result.factsSaved}`);
-            const { logAdminEvent } = await import('./db.js');
             await logAdminEvent('mine_complete', undefined, {
+                runId,
                 flavorsProcessed: result.flavorsProcessed,
                 postsFound: result.postsFound,
                 factsSaved: result.factsSaved,
             }).catch(() => {});
         } catch (err) {
             console.error('[Mining] Run failed:', err);
+            await logAdminEvent('mine_failed', undefined, { runId, error: String(err) }).catch(() => {});
             throw err;
         }
     },

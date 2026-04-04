@@ -24,6 +24,7 @@ export function loadSecrets(): void {
     const entries = readdirSync(SECRETS_DIR);
     console.log(`[secrets] Found ${entries.length} mounted secrets in ${SECRETS_DIR}.`);
 
+    let loaded = 0;
     for (const name of entries) {
       if (name.startsWith(".")) continue;
 
@@ -36,7 +37,7 @@ export function loadSecrets(): void {
           // Cloud Run volume mounts: secret is a directory containing version file(s)
           const inner = readdirSync(fullPath).filter(f => !f.startsWith("."));
           if (inner.length === 0) {
-            console.warn(`[secrets] Secret directory "${name}" is empty — skipping.`);
+            console.warn(`[secrets] Secret directory is empty — skipping.`);
             continue;
           }
           content = readFileSync(join(fullPath, inner[0]), "utf8").trim();
@@ -45,12 +46,12 @@ export function loadSecrets(): void {
         }
 
         process.env[name] = content;
-        console.log(`[secrets] Loaded secret "${name}" into process.env.`);
+        loaded++;
       } catch (err) {
-        console.warn(`[secrets] Failed to read secret "${name}":`, (err as Error).message);
+        console.warn(`[secrets] Failed to read a secret:`, (err as Error).message);
       }
     }
-    console.log("[secrets] Volume mount secret injection complete.");
+    console.log(`[secrets] Loaded ${loaded} secrets from Secret Manager.`);
   } catch (err) {
     console.error("[secrets] Error reading /secrets directory:", err);
   }

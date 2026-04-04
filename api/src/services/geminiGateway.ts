@@ -141,6 +141,7 @@ export function sanitizeGeminiJSON(raw: string): string {
     return result;
 }
 
+// callGemini: 4 attempts (0–3). On attempt 3 (or any non-rate error), throws immediately.
 export async function callGemini<T>(fn: () => Promise<T>): Promise<T> {
     await geminiSemaphore.acquire();
     try {
@@ -154,7 +155,8 @@ export async function callGemini<T>(fn: () => Promise<T>): Promise<T> {
                 await new Promise(r => setTimeout(r, delay));
             }
         }
-        throw new Error('unreachable');
+        // TypeScript requires a return path — loop always throws on attempt 3, but TS can't infer that
+        throw new Error('[Gemini] callGemini: all 4 attempts exhausted');
     } finally {
         geminiSemaphore.release();
     }

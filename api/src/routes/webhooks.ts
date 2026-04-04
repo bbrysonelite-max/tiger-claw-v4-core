@@ -465,9 +465,11 @@ router.post("/stan-store", async (req: Request, res: Response) => {
     console.warn("[stan-store-webhook] ZAPIER_WEBHOOK_SECRET not set — endpoint is unprotected. Set this env var.");
   }
 
-  // Log the raw payload on every call so we can inspect Stan Store's field schema
+  // Log a redacted summary — full body contains PII (email, name) and payment data
   const body = req.body as Record<string, unknown>;
-  console.log("[stan-store-webhook] Raw Zapier payload:", JSON.stringify(body));
+  const emailRaw = String(body["email"] ?? body["Email"] ?? body["buyer_email"] ?? "");
+  const redactedEmail = emailRaw.length > 3 ? `${emailRaw.slice(0, 3)}***` : "***";
+  console.log(`[stan-store-webhook] Received — email: ${redactedEmail}, fields: ${Object.keys(body).join(", ")}`);
 
   // Extract email — try all common Zapier/Stan field name variants
   const email = (
