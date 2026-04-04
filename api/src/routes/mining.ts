@@ -1,11 +1,12 @@
 import { Router, type Request, type Response } from "express";
 import { tiger_refine } from "../tools/tiger_refine.js";
 import { isAlreadyMined } from "../services/market_intel.js";
+import { requireAdmin } from "../services/admin_shared.js";
 
 const router = Router();
 
 // v5 Data Refinery endpoint
-router.post("/refine", async (req: Request, res: Response) => {
+router.post("/refine", requireAdmin, async (req: Request, res: Response) => {
   const { rawContent, sourceUrl, extractionGoal, domain } = req.body;
 
   if (!rawContent) {

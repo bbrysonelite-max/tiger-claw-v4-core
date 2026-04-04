@@ -16,6 +16,7 @@ const mockDb = vi.hoisted(() => ({
   getTenantBySlug: vi.fn(),
   getPool: vi.fn(),
   getBotState: vi.fn(),
+  dropTenantSchema: vi.fn().mockResolvedValue(undefined),
 }))
 
 const mockProvisioner = vi.hoisted(() => ({
@@ -45,6 +46,7 @@ async function buildApp() {
 beforeEach(() => {
   vi.resetAllMocks()
   process.env['ADMIN_TOKEN'] = VALID_TOKEN
+  mockDb.dropTenantSchema.mockResolvedValue(undefined)
 })
 
 // ---------------------------------------------------------------------------

@@ -28,6 +28,7 @@ import {
   getRecentAdminEvents,
   getPoolStats,
   getPool,
+  dropTenantSchema,
   type Tenant,
 } from "../services/db.js";
 import {
@@ -459,6 +460,9 @@ router.delete("/fleet/:tenantId", async (req: Request, res: Response) => {
     const tenant = await resolveTenant(req.params["tenantId"]!);
     if (!tenant) return res.status(404).json({ error: "Tenant not found" });
     await terminateTenant(tenant);
+    await dropTenantSchema(tenant.id).catch((err) =>
+      console.error(`[admin] dropTenantSchema failed for ${tenant.id} (non-fatal):`, err.message)
+    );
     return res.json({ ok: true, tenantId: tenant.id, status: "terminated" });
   } catch (err) {
     return res.status(500).json({ error: err instanceof Error ? err.message : String(err) });

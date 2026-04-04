@@ -372,7 +372,8 @@ async function buildAndSaveLead(
   matchedKeywords: string[],
   negativeSignals: string[],
   oar: OarType,
-  icpBonus: number = 0
+  icpBonus: number = 0,
+  scoreThreshold: number = SCORE_THRESHOLD
 ): Promise<LeadRecord> {
   const leads = await loadLeads(tenantId);
 
@@ -398,7 +399,7 @@ async function buildAndSaveLead(
     existing.negativeSignals = negativeSignals;
     existing.lastSignalAt = new Date().toISOString();
     // Re-score
-    await recomputeAndSave(existing, leads, tenantId);
+    await recomputeAndSave(existing, leads, tenantId, scoreThreshold);
     return existing;
   }
 
@@ -433,8 +434,8 @@ async function buildAndSaveLead(
     isUnicorn = builderScore > 0 && customerScore > 0;
   }
 
-  const builderQualifies = oar !== "customer" && builderScore >= SCORE_THRESHOLD;
-  const customerQualifies = oar !== "builder" && customerScore >= SCORE_THRESHOLD;
+  const builderQualifies = oar !== "customer" && builderScore >= scoreThreshold;
+  const customerQualifies = oar !== "builder" && customerScore >= scoreThreshold;
   const qualified = builderQualifies || customerQualifies;
   const qualifyingOar: "builder" | "customer" = builderQualifies ? "builder" : "customer";
   const qualifyingScore = qualifyingOar === "builder" ? builderScore : customerScore;
@@ -478,7 +479,7 @@ async function buildAndSaveLead(
   return record;
 }
 
-async function recomputeAndSave(lead: LeadRecord, leads: LeadsStore, tenantId: string): Promise<void> {
+async function recomputeAndSave(lead: LeadRecord, leads: LeadsStore, tenantId: string, scoreThreshold: number = SCORE_THRESHOLD): Promise<void> {
   const intentScore = computeIntentScore(lead.intentSignalHistory);
   lead.intentScore = intentScore;
 
@@ -499,8 +500,8 @@ async function recomputeAndSave(lead: LeadRecord, leads: LeadsStore, tenantId: s
   }
 
   const qualified =
-    (lead.oar !== "customer" && lead.builderScore >= SCORE_THRESHOLD) ||
-    (lead.oar !== "builder" && lead.customerScore >= SCORE_THRESHOLD);
+    (lead.oar !== "customer" && lead.builderScore >= scoreThreshold) ||
+    (lead.oar !== "builder" && lead.customerScore >= scoreThreshold);
 
   if (qualified && !lead.qualified) {
     lead.qualifiedAt = new Date().toISOString();
@@ -1070,6 +1071,8 @@ async function runHunt(
   sources: string[];
 }> {
   const oar: OarType = flavor === "network-marketer" ? "both" : "customer";
+  const flavorConfig = loadFlavorConfig(flavor);
+  const scoreThreshold = flavorConfig.scoreThreshold ?? SCORE_THRESHOLD;
 
   // Pre-fetch ICP bias signal
   const icpSignal = await getHiveSignalWithFallback('ideal_customer_profile', flavor, region).catch(() => null);
@@ -1169,7 +1172,8 @@ async function runHunt(
       fitResult.matchedKeywords,
       fitResult.flaggedNegatives,
       oar,
-      icpBonus
+      icpBonus,
+      scoreThreshold
     );
 
     if (lead.optedOut) continue; // Skip opted-out leads
