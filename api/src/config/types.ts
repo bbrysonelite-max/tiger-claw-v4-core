@@ -198,6 +198,7 @@ export interface FlavorConfig {
   discovery: Partial<DiscoveryConfig>;
   nurtureTemplates: NurtureTemplates;
   fallbackIntelligence?: string[];    // High-value, vertical-specific facts when live mining is empty
+  scoreThreshold?: number;            // Override default score threshold (80) for this flavor
 }
 
 // ---------------------------------------------------------------------------

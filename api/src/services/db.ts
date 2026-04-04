@@ -242,6 +242,20 @@ export async function createTenantSchema(tenantId: string, client?: PoolClient):
   `);
   console.log(`[db] Schema generated for tenant: ${tenantId}`);
 }
+
+/**
+ * Drop the per-tenant PostgreSQL schema on tenant termination/deletion.
+ * Called after the tenant row is deleted — cleans up all contacts, messages,
+ * bot_states, and appointments permanently.
+ */
+export async function dropTenantSchema(tenantId: string): Promise<void> {
+  if (!/^[0-9a-f-]{36}$/.test(tenantId)) {
+    throw new Error(`[db] dropTenantSchema: invalid tenantId format: "${tenantId}"`);
+  }
+  const schemaName = `t_${tenantId.replace(/-/g, '_')}`;
+  await getPool().query(`DROP SCHEMA IF EXISTS "${schemaName}" CASCADE`);
+  console.log(`[db] Schema dropped for tenant: ${tenantId}`);
+}
 export async function createTenant(data: {
   slug: string;
   name: string;

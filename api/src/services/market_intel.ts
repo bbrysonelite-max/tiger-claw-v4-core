@@ -55,11 +55,27 @@ export async function initMarketIntelSchema(): Promise<void> {
  * Check if a source URL has already been purified.
  * Prevents double-mining costs.
  */
+/**
+ * Normalize a URL for dedup checks: strip query params, hash, and trailing slash.
+ * Prevents tracking parameters and redirect variants from creating duplicate facts.
+ */
+function normalizeUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    u.search = '';
+    u.hash = '';
+    return u.toString().replace(/\/$/, '');
+  } catch {
+    return url.replace(/[?#].*$/, '').replace(/\/$/, '');
+  }
+}
+
 export async function isAlreadyMined(sourceUrl: string): Promise<boolean> {
   if (!sourceUrl || sourceUrl === "unknown") return false;
+  const normalized = normalizeUrl(sourceUrl);
   const result = await getPool().query(
     "SELECT id FROM market_intelligence WHERE source_url = $1 LIMIT 1",
-    [sourceUrl]
+    [normalized]
   );
   return result.rows.length > 0;
 }
