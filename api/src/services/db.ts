@@ -26,6 +26,8 @@ export function getWritePool(): Pool {
       max: 10,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 5000,
+      statement_timeout: 30000,
+      query_timeout: 35000,
     });
 
     writePool.on("error", (err) => {
@@ -43,9 +45,11 @@ export function getReadPool(): Pool {
   if (!readPool) {
     readPool = new Pool({
       connectionString: readUrl,
-      max: 20, // Replicas can handle more concurrent read connections
+      max: 20,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 5000,
+      statement_timeout: 30000,
+      query_timeout: 35000,
     });
 
     readPool.on("error", (err) => {
@@ -184,11 +188,12 @@ function rowToTenant(row: Record<string, unknown>): Tenant {
 // Schema-per-Tenant Generation
 // ---------------------------------------------------------------------------
 
-export async function createTenantSchema(tenantId: string): Promise<void> {
+export async function createTenantSchema(tenantId: string, client?: PoolClient): Promise<void> {
   // Use double quotes for schema to handle UUIDs safely
   const schemaName = `t_${tenantId.replace(/-/g, '_')}`;
-  
-  await getPool().query(`
+  const executor: { query: (text: string) => Promise<unknown> } = client ?? getPool();
+
+  await executor.query(`
     CREATE SCHEMA IF NOT EXISTS "${schemaName}";
 
     CREATE TABLE IF NOT EXISTS "${schemaName}".contacts (
@@ -571,6 +576,24 @@ export async function listBotPool(status?: BotPoolStatus): Promise<BotPoolEntry[
 }
 
 /**
+ * Recover orphaned bot pool entries: assigned rows whose tenant was hard-deleted
+ * and whose tenant_id reference went NULL. These never return to the pool without
+ * this repair. Safe to call at startup and on-demand via admin endpoint.
+ */
+export async function fixBotPoolOrphans(): Promise<number> {
+  const result = await getPool().query(
+    `UPDATE bot_pool SET status = 'available', tenant_id = NULL, assigned_at = NULL
+     WHERE status = 'assigned' AND tenant_id IS NULL
+     RETURNING id`
+  );
+  const count = result.rowCount ?? 0;
+  if (count > 0) {
+    console.log(`[db] fixBotPoolOrphans: recovered ${count} orphaned bot pool entries.`);
+  }
+  return count;
+}
+
+/**
  * Atomically assign the oldest available bot token to a tenant.
  * Uses SELECT FOR UPDATE SKIP LOCKED to prevent race conditions
  * under concurrent provisioning.
@@ -745,15 +768,24 @@ export async function createBYOKBot(
   email?: string
 ): Promise<string> {
   const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 30) + '-' + Date.now().toString(36);
-  const result = await getPool().query(
-    `INSERT INTO tenants (user_id, name, slug, email, flavor, status, region, language, preferred_channel, container_name)
-     VALUES ($1, $2, $3, $4, $5, $6, 'us-en', 'en', 'telegram', $7)
-     RETURNING id`,
-    [userId, name, slug, email ?? null, niche, status, `tiger_claw_${slug}`]
-  );
-  const tenantId = result.rows[0]["id"] as string;
-  await createTenantSchema(tenantId);
-  return tenantId;
+  return withClient(async (client) => {
+    await client.query("BEGIN");
+    try {
+      const result = await client.query(
+        `INSERT INTO tenants (user_id, name, slug, email, flavor, status, region, language, preferred_channel, container_name)
+         VALUES ($1, $2, $3, $4, $5, $6, 'us-en', 'en', 'telegram', $7)
+         RETURNING id`,
+        [userId, name, slug, email ?? null, niche, status, `tiger_claw_${slug}`]
+      );
+      const tenantId = result.rows[0]["id"] as string;
+      await createTenantSchema(tenantId, client);
+      await client.query("COMMIT");
+      return tenantId;
+    } catch (err) {
+      await client.query("ROLLBACK");
+      throw err;
+    }
+  });
 }
 
 /**

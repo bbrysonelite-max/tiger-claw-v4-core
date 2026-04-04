@@ -29,7 +29,7 @@ loadSecrets(); // Inject volume-mounted secrets before anything else
 import express, { type Request, type Response, type NextFunction } from "express";
 import cors from "cors";
 import rateLimit from "express-rate-limit";
-import { initSchema, listTenants, updateTenantStatus, logAdminEvent } from "./services/db.js";
+import { initSchema, listTenants, updateTenantStatus, logAdminEvent, fixBotPoolOrphans } from "./services/db.js";
 import { initMarketIntelSchema } from "./services/market_intel.js";
 import { runMigrations } from "./services/migrate.js";
 import { getPoolStatus } from "./services/pool.js";
@@ -229,6 +229,9 @@ async function main(): Promise<void> {
 
   // Initialize Market Intelligence schema (v5 Data Moat)
   await initMarketIntelSchema();
+
+  // Recover orphaned bot pool entries (assigned rows with no tenant after hard-delete)
+  await fixBotPoolOrphans().catch((err) => console.warn("[startup] fixBotPoolOrphans failed (non-fatal):", err.message));
 
   // Validate all 11 flavor JSON files (GAP 1)
   validateAllFlavors();
