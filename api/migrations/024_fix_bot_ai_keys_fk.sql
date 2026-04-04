@@ -21,6 +21,12 @@ BEGIN
   END IF;
 END $$;
 
+-- Clean up orphaned rows before adding the FK. Rows with tenant_id values that no
+-- longer exist in tenants (legacy bots table data) would violate the constraint.
+DELETE FROM bot_ai_keys
+  WHERE tenant_id IS NOT NULL
+    AND tenant_id NOT IN (SELECT id FROM tenants);
+
 -- Add correct FK referencing tenants. Use ON DELETE SET NULL (not CASCADE) so a
 -- hard-deleted tenant doesn't silently wipe key records that may be needed for audit.
 ALTER TABLE bot_ai_keys
