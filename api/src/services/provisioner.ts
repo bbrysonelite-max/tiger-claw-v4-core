@@ -55,7 +55,7 @@ export interface ProvisionInput {
   timezone?: string;
   vertical?: string;
   hiveOptIn?: boolean;
-  botId: string;
+  botId?: string;  // Required for Stan Store wizard flow; absent for admin manual provisioning
 }
 
 export interface ProvisionResult {
@@ -75,11 +75,14 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
   // Step 0: Activate subscription atomically inside the job.
   // This guarantees activation only happens if the job is actually running — no
   // orphaned active subscriptions when Redis rejects the queue.add() call.
-  const activated = await activateSubscription(input.botId);
-  if (!activated) {
-    return { success: false, error: `Failed to activate subscription for botId=${input.botId}. No pending_setup record found.`, steps };
+  // botId is absent for admin manual provisioning (no subscription record exists).
+  if (input.botId) {
+    const activated = await activateSubscription(input.botId);
+    if (!activated) {
+      return { success: false, error: `Failed to activate subscription for botId=${input.botId}. No pending_setup record found.`, steps };
+    }
+    steps.push(`Subscription activated for botId=${input.botId}`);
   }
-  steps.push(`Subscription activated for botId=${input.botId}`);
 
   // Guard: reject unknown flavor keys before touching the DB
   if (!(VALID_FLAVOR_KEYS as readonly string[]).includes(input.flavor)) {
