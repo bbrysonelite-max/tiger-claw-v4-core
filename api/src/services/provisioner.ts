@@ -11,6 +11,7 @@ import {
   getBotState,
   setBotState,
   checkAndGrantFoundingMember,
+  activateSubscription,
   type Tenant,
 } from "./db.js";
 import { decryptToken } from "./pool.js";
@@ -54,6 +55,7 @@ export interface ProvisionInput {
   timezone?: string;
   vertical?: string;
   hiveOptIn?: boolean;
+  botId: string;
 }
 
 export interface ProvisionResult {
@@ -69,6 +71,15 @@ export interface ProvisionResult {
 
 export async function provisionTenant(input: ProvisionInput): Promise<ProvisionResult> {
   const steps: string[] = [];
+
+  // Step 0: Activate subscription atomically inside the job.
+  // This guarantees activation only happens if the job is actually running — no
+  // orphaned active subscriptions when Redis rejects the queue.add() call.
+  const activated = await activateSubscription(input.botId);
+  if (!activated) {
+    return { success: false, error: `Failed to activate subscription for botId=${input.botId}. No pending_setup record found.`, steps };
+  }
+  steps.push(`Subscription activated for botId=${input.botId}`);
 
   // Guard: reject unknown flavor keys before touching the DB
   if (!(VALID_FLAVOR_KEYS as readonly string[]).includes(input.flavor)) {

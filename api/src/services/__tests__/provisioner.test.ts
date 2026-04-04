@@ -16,6 +16,7 @@ const mockDecryptToken = vi.hoisted(() => vi.fn((s: string) => `plaintext-${s}`)
 const mockSendAdminAlert = vi.hoisted(() => vi.fn());
 const mockFetch = vi.hoisted(() => vi.fn());
 const mockGetBotState = vi.hoisted(() => vi.fn());
+const mockActivateSubscription = vi.hoisted(() => vi.fn().mockResolvedValue(true));
 
 // ─── Module mocks ─────────────────────────────────────────────────────────────
 
@@ -27,6 +28,7 @@ vi.mock('../db.js', () => ({
   getBotState: mockGetBotState,
   getPool: vi.fn(() => ({ query: mockGetPoolQuery })),
   checkAndGrantFoundingMember: vi.fn().mockResolvedValue(true),
+  activateSubscription: mockActivateSubscription,
 }));
 
 vi.mock('../pool.js', () => ({
@@ -57,6 +59,7 @@ const BASE_INPUT = {
   region: 'us-en',
   language: 'en',
   preferredChannel: 'telegram',
+  botId: 'bot-uuid-test',
 };
 
 const MOCK_TENANT = {
