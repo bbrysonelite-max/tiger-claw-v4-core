@@ -1152,6 +1152,20 @@ router.get("/magic-link", async (req: Request, res: Response) => {
   return res.json({ url, expires: new Date(expires).toISOString() });
 });
 
+// ── POST /admin/fleet/:tenantId/clear-circuit-breaker ────────────────────────
+router.post("/fleet/:tenantId/clear-circuit-breaker", async (req: Request, res: Response) => {
+  const { tenantId } = req.params;
+  try {
+    const errKey = `circuit_breaker:gemini:errors:${tenantId}`;
+    const tripKey = `circuit_breaker:gemini:tripped:${tenantId}`;
+    const deleted = await redisConnection.del(errKey, tripKey);
+    console.log(`[admin] Cleared circuit breaker for ${tenantId} (${deleted} keys deleted)`);
+    return res.json({ ok: true, tenantId, keysDeleted: deleted });
+  } catch (err) {
+    return res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
 // ── POST /admin/flush-redis ───────────────────────────────────────────────────
 // ONE-TIME USE: Wipe all Redis keys for a clean fire test.
 // Clears BullMQ queues, chat history, focus states, sessions, rate limits.
