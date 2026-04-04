@@ -20,11 +20,11 @@ export function requireAdmin(req: Request, res: Response, next: NextFunction): v
 // ─── Shared Admin Alerts ──────────────────────────────────────────────────────
 
 export async function sendAdminAlert(message: string): Promise<void> {
-  const adminToken = process.env["ADMIN_BOT_TOKEN"];
-  const adminChatId = process.env["ADMIN_CHAT_ID"];
+  const adminToken = process.env["ADMIN_TELEGRAM_BOT_TOKEN"];
+  const adminChatId = process.env["ADMIN_TELEGRAM_CHAT_ID"];
 
   if (!adminToken || !adminChatId) {
-    console.warn("[admin] ADMIN_BOT_TOKEN or ADMIN_CHAT_ID missing — alert suppressed:", message);
+    console.warn("[admin] ADMIN_TELEGRAM_BOT_TOKEN or ADMIN_TELEGRAM_CHAT_ID missing — alert suppressed:", message);
     return;
   }
 
