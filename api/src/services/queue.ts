@@ -450,17 +450,8 @@ export const cronWorker = SHOULD_RUN_WORKERS ? new Worker(
                             console.log(`[Cron] Key health change for ${tenant.id}: ${tenant.key_health} -> ${currentHealth} (${keyErr ?? 'OK'})`);
                             await updateTenantKeyHealth(tenant.id, currentHealth);
 
-                            if (currentHealth === 'dead' && tenant.bot_token) {
-                                try {
-                                    const bot = new TelegramBot(tenant.bot_token);
-                                    await bot.sendMessage(
-                                        tenant.id, // Assuming tenant.id is used as chatId for the operator's control channel
-                                        `🚨 *Tiger Claw Alert:* your AI key (${aiProvider.provider}) has stopped working. Your agent is now paused.\n\nError: ${keyErr ?? 'Unauthorized'}\n\nPlease update your key at your dashboard: ${process.env['FRONTEND_URL'] ?? 'https://wizard.tigerclaw.io'}/dashboard?slug=${tenant.slug}`,
-                                        { parse_mode: 'Markdown' }
-                                    ).catch(e => console.warn(`[Cron] Failed to notify dead key to tenant ${tenant.id}:`, e.message));
-                                } catch (notifyErr) {
-                                    console.warn(`[Cron] Failed to init bot for health notification:`, notifyErr);
-                                }
+                            if (currentHealth === 'dead') {
+                                await sendAdminAlert(`🔑 Dead key — tenant *${tenant.slug}* (${tenant.email})\nProvider: ${aiProvider.provider}\nError: ${keyErr ?? 'Unauthorized'}\nDashboard: ${process.env['FRONTEND_URL'] ?? 'https://wizard.tigerclaw.io'}/dashboard?slug=${tenant.slug}`);
                             }
                         }
                     }
