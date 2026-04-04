@@ -149,6 +149,8 @@ Short provisioning links (expire 2026-04-07):
 | Stan Store → Lemon Squeezy/Paddle (international VAT compliance) | DEFERRED |
 | LINE (Phase 2/3) — requires LINE Official Account, not personal account | DEFERRED |
 | Past customers owed bots: `chana.loh@gmail.com`, `nancylimsk@gmail.com`, `lily.vergara@gmail.com` | WHEN READY |
+| **GitHub branch hygiene** — 148 stale branches in `bbrysonelite-max/tiger-claw-v4-core`. Every merged PR left its branch behind. Needs a bulk delete pass. Rule going forward: delete branch on merge. | CLEANUP |
+| **Data mine — add Serper as second source** — Mine is 100% Reddit-only. Serper keys are live and confirmed working. Adding Serper would search all of Google's indexed web (blogs, forums, Quora, news) using the same `scoutQueries` already written per flavor. tiger_refine already filters garbage so breadth is safe. Do not build until platform has been stable for a few days. | NEXT |
 
 ---
 
