@@ -1,6 +1,6 @@
 # Tiger Claw — State of the Union
 
-**Last updated:** 2026-04-03 (Session 6 — audit performed end of session)
+**Last updated:** 2026-04-03 (Session 6 — scout confirmed live, 10 prospects found, 1 qualified)
 **Read this first. Read nothing else until you have finished this file.**
 
 ---
@@ -28,6 +28,7 @@ Results of a full live test of every external dependency. This is ground truth.
 | Cloud Run API | Healthy — postgres, redis, disk, workers all OK |
 | PostgreSQL | OK |
 | Redis + BullMQ | OK |
+| **Scout — end-to-end** | **CONFIRMED LIVE 2026-04-03 7:18 PM. 10 prospects found, 1 qualified (score 80), Facebook Groups via Serper. This is the core product function.** |
 | `GOOGLE_API_KEY` (platform) | 200 — active |
 | `PLATFORM_ONBOARDING_KEY` | 200 — active |
 | `STRIPE_SECRET_KEY` | 200 — account live |
