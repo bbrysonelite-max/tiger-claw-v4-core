@@ -63,7 +63,7 @@ const HatchSchema = z.object({
   timezone: z.string().optional(),
   preferredChannel: z.string().optional(),
   region: z.string().optional(),
-  botToken: z.string().optional(), // BYOB: Telegram tenants provide their own BotFather token
+  botToken: z.string().regex(/^\d+:[A-Za-z0-9_-]{35,}$/, "Invalid Telegram bot token format").optional(), // BYOB: Telegram tenants provide their own BotFather token
   lineToken: z.string().optional(), // LINE channel access token
   lineChannelSecret: z.string().optional(), // LINE channel secret (for webhook signature verification)
   hiveOptIn: z.boolean().optional(),

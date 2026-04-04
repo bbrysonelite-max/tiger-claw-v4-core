@@ -10,6 +10,7 @@ BEGIN
   EXCEPTION
     WHEN undefined_column THEN
       NULL;
+    WHEN OTHERS THEN RAISE;
   END;
 
   BEGIN
@@ -19,6 +20,7 @@ BEGIN
       NULL;
     WHEN undefined_column THEN
       NULL;
+    WHEN OTHERS THEN RAISE;
   END;
 
   BEGIN
@@ -26,5 +28,6 @@ BEGIN
   EXCEPTION
     WHEN undefined_column THEN
       NULL;
+    WHEN OTHERS THEN RAISE;
   END;
 END $$;

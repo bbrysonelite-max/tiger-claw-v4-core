@@ -189,6 +189,9 @@ function rowToTenant(row: Record<string, unknown>): Tenant {
 // ---------------------------------------------------------------------------
 
 export async function createTenantSchema(tenantId: string, client?: PoolClient): Promise<void> {
+  if (!/^[0-9a-f-]{36}$/.test(tenantId)) {
+    throw new Error(`[db] createTenantSchema: invalid tenantId format: "${tenantId}"`);
+  }
   // Use double quotes for schema to handle UUIDs safely
   const schemaName = `t_${tenantId.replace(/-/g, '_')}`;
   const executor: { query: (text: string) => Promise<unknown> } = client ?? getPool();
@@ -793,26 +796,6 @@ export async function createBYOKBot(
  * otherwise creates a new one. Prevents duplicate bot records when the
  * wizard's Step 2 is submitted more than once (e.g. user goes back).
  */
-export async function findOrCreateBYOKBot(
-  userId: string,
-  name: string,
-  niche: string
-): Promise<string> {
-  const existing = await getPool().query(
-    `SELECT id FROM bots WHERE user_id = $1 AND niche = $2 AND status = 'pending'
-     ORDER BY created_at DESC LIMIT 1`,
-    [userId, niche]
-  );
-  if (existing.rows[0]) return existing.rows[0]["id"] as string;
-
-  const result = await getPool().query(
-    `INSERT INTO bots (user_id, name, niche, status) VALUES ($1, $2, $3, 'pending') RETURNING id`,
-    [userId, name, niche]
-  );
-  const botId = result.rows[0]["id"] as string;
-  await createTenantSchema(botId);
-  return botId;
-}
 
 export async function createBYOKConfig(data: {
   botId: string;
