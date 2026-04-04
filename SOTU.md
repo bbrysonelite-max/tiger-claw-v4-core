@@ -1,6 +1,6 @@
 # Tiger Claw — State of the Union
 
-**Last updated:** 2026-04-04 (End of Session 8 — tool safety audit, mine dashboard, broken window cleanup)
+**Last updated:** 2026-04-04 (End of Session 9 — full reliability & security audit, no PRs merged, audit-april-4th.md written)
 **This is the single source of truth. Read nothing else until you finish this file.**
 
 ---
@@ -13,6 +13,21 @@
 - The operator is running a real business. False confidence causes real damage.
 - No AI agent pushes directly to `main`. All changes via `feat/` or `fix/` branch + PR.
 - "I merged it" means nothing until confirmed. After every PR, verify with `gh pr view <number>` that state is `MERGED`. After every deploy, verify health endpoint returns 200 and check the logs. Do not tell the operator something is done until you have proof it is done.
+
+---
+
+## ⚠️ AUDIT BACKLOG — Read Before Touching Any Code
+
+A full reliability & security audit was completed Session 9 (2026-04-04). **57 issues found (26 HIGH, 22 MED, 9 LOW).** The full document is at `audit-april-4th.md` in the repo root.
+
+**Three items are actively broken in production right now:**
+1. **`bot_ai_keys.bot_id` column wrong name** — `addAIKey()` fails on every call. Multi-key rotation is dead. Fix: migration 023, one SQL line. (`P1-1`)
+2. **`activateSubscription` fires before queue job is enqueued** — Redis blip = paying customer with active subscription and no bot, no recovery. (`P1-2`)
+3. **`stan-store-onboarding` worker has zero retries** — single DB hiccup permanently orphans a customer. (`P1-3`)
+
+**Do not onboard new customers before P1-1, P1-2, P1-3 are shipped.**
+
+Read `audit-april-4th.md` for the full phase-by-phase fix plan with exact file/line references and code-level instructions.
 
 ---
 
@@ -131,6 +146,23 @@ tiger_onboard, tiger_scout, tiger_contact, tiger_aftercare, tiger_briefing, tige
 
 ## Known Open Issues
 
+**IMPORTANT:** The full audit backlog (57 issues, phased fix plan) is in `audit-april-4th.md`. The items below are a summary of the highest-priority items plus the pre-existing backlog.
+
+### Audit Phase 1 — Fix Before Next Customer (all OPEN)
+| Item | ID |
+|------|----|
+| `bot_ai_keys.bot_id` column never renamed — `addAIKey()` broken, multi-key rotation dead | P1-1 |
+| `activateSubscription` fires before `provisionQueue.add()` — orphaned subscriptions on Redis blip | P1-2 |
+| `stan-store-onboarding` worker has zero retries despite claiming 5 | P1-3 |
+| No Serper key rotation — 429 = silent empty results, `SERPER_KEY_3` unused in miner | P1-4 |
+| `reddit_scout.mjs` has zero Serper fallback | P1-5 |
+| Empty AI reply sends user silence — no fallback message | P1-6 |
+| Telegram webhook validation skipped when env var unset (code check; env var IS wired in prod) | P1-7 |
+| `verify-purchase` issues session tokens for any email, no purchase proof, no rate limit | P1-8 |
+| `ADMIN_TOKEN` in session-signing fallback chain | P1-9 |
+| `fc.args` not validated before Gemini tool dispatch — malformed args cause silent retry loops | P1-10 |
+
+### Pre-Existing Backlog
 | Item | Priority |
 |------|----------|
 | Jeff Mack and John need to complete wizard fresh | IMMEDIATE |
@@ -138,16 +170,22 @@ tiger_onboard, tiger_scout, tiger_contact, tiger_aftercare, tiger_briefing, tige
 | Vercel auto-deploy broken — deploy wizard manually until Root Directory fixed | OPS |
 | Add per-tenant health indicators to admin dashboard fleet table | NEXT |
 | Add per-tenant drill-down in admin dashboard | NEXT |
-| source_url missing index on market_intelligence table | MEDIUM |
-| factExtractionWorker failures produce no admin alert | MEDIUM |
-| marketIntelligenceWorker failures produce no admin alert | MEDIUM |
-| WIZARD_SESSION_SECRET not in deploy script — accidentally safe via MAGIC_LINK_SECRET fallback | LOW |
 | Reddit 403 from Cloud Run egress — awaiting Reddit API approval | WAITING |
-| Remove Zapier dead code | LOW |
-| Remove Stripe dead code | LOW |
 | Past customers owed bots: `chana.loh@gmail.com`, `nancylimsk@gmail.com`, `lily.vergara@gmail.com` | WHEN READY |
-| GitHub branch hygiene — stale branches remain. Rule: delete branch on merge (now enforced). | CLEANUP |
 | Affiliate/referral tracking — Max Steingart deal (30% affiliate). Hold until he sells first 10. | DEFERRED |
+| Remove Stripe dead code | LOW |
+
+---
+
+## Session 9 — What Was Done (2026-04-04)
+
+Full reliability & security audit across 5 domains using 5 parallel sub-agents. No PRs merged this session. Output is `audit-april-4th.md` in the repo root.
+
+**Findings:** 26 HIGH, 22 MED, 9 LOW. Three issues are actively broken in production right now (P1-1 through P1-3 above). Platform is green and serving current tenants but is not safe for new customer onboarding until Phase 1 items are shipped.
+
+**Audit domains:** AI Agent Loop & Tool Registry · Provisioning Pipeline & BullMQ Queues · Database & Schema · Security/Auth/Secrets · Market Mining/Serper/Scout
+
+**Platform state at session end:** All services green. 455/455 tests passing. No code changed.
 
 ---
 
