@@ -23,7 +23,6 @@ import {
   getFoundingMemberDisplay,
   createBYOKUser,
   createBYOKBot,
-  activateSubscription,
   getPool,
   setBotState,
 } from "../services/db.js";
@@ -221,13 +220,6 @@ router.post("/hatch", async (req: Request, res: Response) => {
     }
     const finalRegion = region || (language === "th" ? "th-th" : "us-en");
     const channel = preferredChannel || (lineToken && !botToken ? "line" : null) || tenant.preferredChannel || "telegram";
-
-    // Activate the subscription before provisioning — if no pending subscription
-    // exists, there is nothing to hatch and we must not queue provisioning.
-    const activated = await activateSubscription(botId);
-    if (!activated) {
-      return res.status(500).json({ error: "Failed to activate subscription. Please try again." });
-    }
 
     // Save LINE credentials encrypted to the tenant record (if provided).
     // The provisioner reads these from the refreshed tenant to register the LINE webhook.

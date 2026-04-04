@@ -90,6 +90,7 @@ export const provisionWorker = SHOULD_RUN_WORKERS ? new Worker(
                 botToken: job.data.botToken,
                 botUsername: job.data.botUsername,
                 timezone: job.data.timezone,
+                botId: job.data.botId,
             });
 
             if (!result.success) {
