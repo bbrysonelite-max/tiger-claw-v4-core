@@ -6,6 +6,19 @@ const REDDIT_UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/5
 const REDDIT_HEADERS = { "User-Agent": REDDIT_UA, "Accept": "application/json" };
 const DELAY_MS = 1500; // polite delay between requests
 
+// ─── Serper key rotation ────────────────────────────────────────────────────
+// All three keys are used in round-robin. On a 429, rotate to the next key.
+// If all keys are exhausted, return empty and log an admin-level alert.
+const SERPER_KEYS: string[] = [
+    process.env["SERPER_KEY_1"],
+    process.env["SERPER_KEY_2"],
+    process.env["SERPER_KEY_3"],
+].filter(Boolean) as string[];
+
+let serperKeyIndex = 0;
+let serperCallsThisRun = 0;
+const SERPER_MAX_CALLS_PER_RUN = 50;
+
 const mockContext: any = {
     sessionKey: "market-miner",
     logger: console,
@@ -35,24 +48,42 @@ async function fetchReddit(query: string): Promise<MinerPost[] | null> {
 }
 
 async function fetchSerper(query: string): Promise<MinerPost[]> {
-    const serperKey = process.env.SERPER_KEY_2 ?? process.env.SERPER_KEY_1;
-    if (!serperKey) return [];
-    const res = await fetch("https://google.serper.dev/search", {
-        method: "POST",
-        headers: { "X-API-KEY": serperKey, "Content-Type": "application/json" },
-        body: JSON.stringify({ q: query, num: 5 }),
-    });
-    if (!res.ok) {
-        console.warn(`[Miner] Serper returned ${res.status} for "${query}" — skipping.`);
+    if (SERPER_KEYS.length === 0) return [];
+    if (serperCallsThisRun >= SERPER_MAX_CALLS_PER_RUN) {
+        console.warn(`[Miner] Serper call cap (${SERPER_MAX_CALLS_PER_RUN}) reached for this run — skipping remaining Serper queries.`);
         return [];
     }
-    const data = await res.json() as any;
-    const results: any[] = data?.organic ?? [];
-    return results.map((r: any) => ({
-        rawContent: `${r.title ?? ""}\n\n${r.snippet ?? ""}`.trim(),
-        sourceUrl: r.link ?? "",
-        entityId: undefined,
-    })).filter(p => p.rawContent.length >= 20 && p.sourceUrl);
+
+    const startIndex = serperKeyIndex;
+    for (let attempt = 0; attempt < SERPER_KEYS.length; attempt++) {
+        const key = SERPER_KEYS[serperKeyIndex % SERPER_KEYS.length];
+        serperCallsThisRun++;
+        const res = await fetch("https://google.serper.dev/search", {
+            method: "POST",
+            headers: { "X-API-KEY": key!, "Content-Type": "application/json" },
+            body: JSON.stringify({ q: query, num: 5 }),
+        });
+        if (res.status === 429) {
+            console.warn(`[Miner] Serper key ${serperKeyIndex % SERPER_KEYS.length} rate-limited — rotating to next key.`);
+            serperKeyIndex++;
+            continue;
+        }
+        if (!res.ok) {
+            console.warn(`[Miner] Serper returned ${res.status} for "${query}" — skipping.`);
+            return [];
+        }
+        const data = await res.json() as any;
+        const results: any[] = data?.organic ?? [];
+        return results.map((r: any) => ({
+            rawContent: `${r.title ?? ""}\n\n${r.snippet ?? ""}`.trim(),
+            sourceUrl: r.link ?? "",
+            entityId: undefined,
+        })).filter(p => p.rawContent.length >= 20 && p.sourceUrl);
+    }
+
+    // All keys exhausted
+    console.error(`[Miner] [ALERT] All ${SERPER_KEYS.length} Serper keys are rate-limited. Returning empty for "${query}".`);
+    return [];
 }
 
 /**
@@ -64,6 +95,7 @@ async function fetchSerper(query: string): Promise<MinerPost[]> {
  */
 export async function runMarketMining(): Promise<{ flavorsProcessed: number; postsFound: number; factsSaved: number; factsRejected: number }> {
     console.log("[Miner] Starting daily market intelligence run.");
+    serperCallsThisRun = 0; // reset per-run cap counter
 
     let flavorsProcessed = 0;
     let postsFound = 0;
