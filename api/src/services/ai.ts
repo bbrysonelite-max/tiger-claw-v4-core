@@ -962,6 +962,11 @@ async function runToolLoop(
                 // Unknown tool — Gemini hallucinated a tool name
                 console.error(`[${logPrefix}] [ALERT] Unknown tool called: "${fc.name}" — not in toolsMap`);
                 toolResult = { error: `Unknown tool "${fc.name}". Only registered tools may be called.` };
+            } else if (!fc.args || typeof fc.args !== 'object' || Array.isArray(fc.args)) {
+                // Malformed args — Gemini returned null/non-object for a known tool.
+                // Guard prevents silent crash in tool.execute() and stops retry loops.
+                console.error(`[${logPrefix}] [ALERT] Malformed args from Gemini for tool "${fc.name}":`, fc.args);
+                toolResult = { error: `Tool "${fc.name}" received malformed arguments. Please try again.` };
             } else {
                 try {
                     toolResult = await tool.execute(fc.args, toolContext);
@@ -1180,7 +1185,9 @@ export async function processTelegramMessage(
                 console.log(`[AI] Message sent to chat ${chatId}`);
                 await trackGeminiSuccess(tenantId);
             } else {
-                console.warn(`[AI] [ALERT] Gemini returned empty reply for tenant ${tenantId} chat ${chatId}`);
+                // Empty reply — send a fallback so the user never receives silence.
+                console.error(`[AI] [ALERT] Gemini returned empty reply for tenant ${tenantId} chat ${chatId} — sending fallback`);
+                await bot.sendMessage(chatId, "I ran into an issue with that one — please try again or rephrase.");
             }
         } catch (geminiErr: any) {
             console.error(`[AI] [ALERT] Gemini path failed for tenant ${tenantId}:`, geminiErr.message);
