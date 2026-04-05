@@ -75,6 +75,13 @@ router.post("/verify-purchase", verifyPurchaseLimiter, async (req: Request, res:
     const purchase = await lookupPurchaseByEmail(email);
 
     if (!purchase) {
+      // If Lemon Squeezy is configured, purchases must arrive via webhook first
+      if (process.env["LEMONSQUEEZY_SIGNING_SECRET"]) {
+        console.warn(`[auth] No purchase record for ${email} — Lemon Squeezy mode: rejecting`);
+        return res.status(404).json({ error: "No purchase found for this email. Please use the link from your purchase confirmation email." });
+      }
+
+      // Stan Store fallback: create on-demand (no payment verification)
       // No purchase record found — create on-demand
       console.log(`[auth] No purchase record for ${email} — creating on-demand (Stan Store self-serve)`);
 
