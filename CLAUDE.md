@@ -4,21 +4,26 @@
 
 ---
 
-## Current Session State (2026-04-05 — Session 12 COMPLETE)
+## Current Session State (2026-04-05 — Session 13 COMPLETE)
 
-### Platform is fully green. 447/447 tests passing. Revision 00336-hhb live.
+### Platform green. 447/447 tests passing. Revision 00345-525 live. PRs #221–#222 merged to main — NOT YET DEPLOYED.
 
-**Session 12 completed a full 8-module ground-truth assessment and shipped 4 fixes:**
-- PR #212: `fact_anchors` now read into `buildSystemPrompt()` — agents compound over time
-- PR #213: Customer dashboard auth fixed — session token stored at signup, sent on API calls
-- PR #214: Delta scan via `sinceTimestamp` — scout no longer rescans same content
-- PR #215: `nurture_check` skips LLM when tenant has zero leads — token burn eliminated
-- Vercel root directory misconfiguration fixed — manual deploys now work
+**Session 13 shipped 4 changes across two repos:**
+- PR #220 (docs): MODULE_ASSESSMENT + SOTU updated — C1/C2/H1/H3/M1/M3 marked resolved, stale open items removed
+- PR #221 (fix/C3): Hatch email now sends in Tiger's voice with agent name + flavor. Fires even when botUsername is null. Dead admin-only `triggerProactiveInitiation` block removed from provisioner.
+- PR #222 (fix/M2): `makeSerperFetcher()` factory in market_miner — per-invocation call counter eliminates cross-run interference. `getSerperKey()` round-robin rotator in tiger_scout — all 3 Serper keys used, not just KEY_1.
+- Website PR #1 (tiger-bot-website): Refund policy section added to tigerclaw.io for Paddle compliance.
+
+**⚠️ Deploy needed:** PRs #221–#222 are on main but Cloud Run still runs 00345-525. Run deploy before next customer onboards.
 
 **Full assessment in `MODULE_ASSESSMENT.md`. Read it before writing any code.**
 
+### ⚠️ FIRST PRIORITY NEXT SESSION: Agent Behavior Review
+- Agent behavior was flagged as a "broken window" — conversational quality, SOUL injection, and `runToolLoop()` behavior need a ground-truth review before any customer goes through the wizard.
+- Do not skip. Do not onboard John, Jeff, or Debbie until this is reviewed and confirmed working.
+
 ### Critical Open Issues (do not launch publicly until C4 is resolved)
-- **C4:** Payment gate is open — any email gets a free bot. Paddle application submitted 2026-04-05, awaiting approval. Lemon Squeezy was rejected. Stan Store in draft mode.
+- **C4:** Payment gate is open — any email gets a free bot. Paddle application submitted 2026-04-05. Domains approved. Business name had typos — cannot find how to correct in portal. Everything else approved; token likely available but deferred. Awaiting final approval.
 - **H2:** Reddit 403 on every scout run — Oxylabs account needed.
 - Read `MODULE_ASSESSMENT.md` for the complete prioritized fix list.
 
