@@ -124,12 +124,10 @@
 
 **What's missing / imperfect:**
 1. **No HEARTBEAT.md file** — logic is hardcoded in queue.ts. Acceptable for Cloud Run. BullMQ IS the heartbeat implementation.
-2. **No HEARTBEAT_OK suppression** — `nurture_check` fires the LLM even when there's nothing to nurture. Burns tokens every cycle for every active tenant.
+2. ~~**No HEARTBEAT_OK suppression**~~ — **Fixed (PR #215):** `nurture_check` now pre-checks `tenant_leads` count and skips the LLM entirely when zero leads exist. Token burn eliminated. ✅
 3. **`onboardComplete` guard** — skips tenants where `phase !== 'complete'`. But one-page signup bots have `phase` undefined (never set). So new bots get scheduled for routines immediately after hatch, before first conversation. May be intentional.
 
-**Fatal?** No. Daily scout fires. Morning reports send. Value gap check runs. The token burn on empty nurture checks is a cost issue.
-
-**Fix:** Pre-check `tenant_leads` count before spinning up LLM for `nurture_check`. Zero leads = skip entirely.
+**Fatal?** No. Daily scout fires. Morning reports send. Value gap check runs.
 
 ---
 
@@ -165,13 +163,8 @@
 - **Global Hive** — `hive_signals` + `market_intelligence` tables. `buildSystemPrompt()` calls `getHiveSignalWithFallback()` and `queryHivePatterns()`. Injected into every agent's context. ✅
 - **fact_anchors write pipeline** — `factExtractionQueue` fires after every conversation. `extractFactAnchors()` reads last 10 history entries, runs Gemini to extract structured facts (products, ICP updates, objections, hot leads, preferences), saves to `tenant_states` as `fact_anchors`. ✅
 
-**Critical gap:**
-- **`buildSystemPrompt()` never reads `fact_anchors` back.** The extraction runs. The facts are in the DB. But they are never injected into the system prompt. Agent accumulates intelligence it never uses.
-- Only place `fact_anchors` is read: `tiger_strike_draft.ts` (social media drafts only, not main conversation loop).
-
-**Fatal?** No for launch. Yes for the product's core value proposition over time. This is what makes an agent sharp in week 3 vs. week 1. Without it, every session starts fresh except for the initial ICP.
-
-**Fix:** ~10 lines in `buildSystemPrompt()`. Read `fact_anchors` from `tenant_states`, format as a prompt block, inject after the ICP block. The write pipeline is already running.
+**Fixed (PR #212):**
+- `buildSystemPrompt()` now reads `fact_anchors` back from `tenant_states` and injects them after the ICP block. Agents compound over time. ✅
 
 ---
 
@@ -261,28 +254,28 @@ SOUL.md is loaded via `loadSoul()` in `ai.ts` and injected into `buildSystemProm
 
 ### Critical — blocks correct operation
 
-| # | Fix | File(s) | Impact |
+| # | Fix | File(s) | Status |
 |---|---|---|---|
-| C1 | Customer dashboard sends no auth token — 401 for all customers | `web-onboarding/src/app/dashboard/page.tsx` | Customers cannot see their dashboard |
-| C2 | `fact_anchors` are extracted but never read back into system prompt | `api/src/services/ai.ts` (~10 lines in `buildSystemPrompt()`) | Agent never compounds — same ICP every session forever |
-| C3 | No proactive first message on hatch | `api/src/services/provisioner.ts` (~20 lines) | Bot hatches in silence — operator hears nothing |
-| C4 | Payment gate is open — any email gets a free bot | `api/src/routes/auth.ts` + new Lemon Squeezy webhook | Revenue integrity; required before any marketing |
+| C1 | Customer dashboard sends no auth token — 401 for all customers | `web-onboarding/src/app/dashboard/page.tsx` | ✅ Fixed PR #213 |
+| C2 | `fact_anchors` are extracted but never read back into system prompt | `api/src/services/ai.ts` | ✅ Fixed PR #212 |
+| C3 | No proactive first message on hatch | `api/src/services/provisioner.ts` | Open — UX workaround needed |
+| C4 | Payment gate is open — any email gets a free bot | `api/src/routes/auth.ts` + new Paddle webhook | Open — Paddle application submitted 2026-04-05 |
 
 ### High — degrades product quality
 
-| # | Fix | File(s) | Impact |
+| # | Fix | File(s) | Status |
 |---|---|---|---|
-| H1 | `nurture_check` fires LLM even with zero leads | `api/src/services/queue.ts` (~5 lines) | Token burn every minute for every tenant |
-| H2 | Reddit returns 403 on every scout run | `api/src/services/market_miner.ts` | Scout falls back to paid Serper for all Reddit queries |
-| H3 | No delta scan — rescans same content every run | `api/src/tools/tiger_scout.ts` | Duplicate leads, wasted API calls |
+| H1 | `nurture_check` fires LLM even with zero leads | `api/src/services/queue.ts` | ✅ Fixed PR #215 |
+| H2 | Reddit returns 403 on every scout run | `api/src/services/market_miner.ts` | Open — Oxylabs account needed |
+| H3 | No delta scan — rescans same content every run | `api/src/tools/tiger_scout.ts` | ✅ Fixed PR #214 |
 
 ### Medium — cost and efficiency
 
-| # | Fix | File(s) | Impact |
+| # | Fix | File(s) | Status |
 |---|---|---|---|
-| M1 | All 25 tools declared to Gemini on every request | `api/src/services/ai.ts` | Token overhead — context caching or tool subsets |
-| M2 | Serper quota is global, not per-tenant | `api/src/services/market_miner.ts` | One heavy tenant exhausts quota for all |
-| M3 | Vercel auto-deploy broken for `web-onboarding/` | CI config | Every UI change requires manual deploy |
+| M1 | All 25 tools declared to Gemini on every request | `api/src/services/ai.ts` | ✅ Fixed PR #219 (context caching) |
+| M2 | Serper quota is global, not per-tenant | `api/src/services/market_miner.ts` | Open |
+| M3 | Vercel auto-deploy broken for `web-onboarding/` | CI config | ✅ Fixed (root directory misconfiguration resolved) |
 
 ### Parallel execution plan
 
