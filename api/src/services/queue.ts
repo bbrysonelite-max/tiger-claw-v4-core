@@ -115,9 +115,7 @@ export const provisionWorker = SHOULD_RUN_WORKERS ? new Worker(
 
             if (job.data.email && result.tenant?.id) {
                 const botUsername = await getTenantBotUsername(result.tenant.id);
-                if (botUsername) {
-                    await sendProvisioningReceipt(job.data.email, botUsername, "BYOK Basic");
-                }
+                await sendProvisioningReceipt(job.data.email, job.data.name, botUsername, job.data.flavor);
             }
 
             return result;
