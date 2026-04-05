@@ -6,6 +6,29 @@ const REDDIT_UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/5
 const REDDIT_HEADERS = { "User-Agent": REDDIT_UA, "Accept": "application/json" };
 const DELAY_MS = 1500; // polite delay between requests
 
+// Returns fetch options with Oxylabs residential proxy if configured.
+// When OXYLABS_USERNAME + OXYLABS_PASSWORD are set, Reddit requests route
+// through residential IPs that bypass the 403 block on Cloud Run egress.
+// When not set, returns empty options (existing behavior).
+function getOxylabsOptions(): RequestInit {
+  const user = process.env["OXYLABS_USERNAME"];
+  const pass = process.env["OXYLABS_PASSWORD"];
+  if (!user || !pass) return {};
+
+  // Oxylabs residential proxy endpoint
+  const proxyAuth = Buffer.from(`${user}:${pass}`).toString("base64");
+  return {
+    headers: {
+      "Proxy-Authorization": `Basic ${proxyAuth}`,
+      "X-Oxylabs-Geo-Location": "United States",
+    },
+  };
+}
+
+if (process.env["OXYLABS_USERNAME"]) {
+  console.log("[market_miner] Oxylabs proxy active — routing Reddit through residential IP");
+}
+
 // ─── Serper key rotation ────────────────────────────────────────────────────
 // All three keys are used in round-robin. On a 429, rotate to the next key.
 // If all keys are exhausted, return empty and log an admin-level alert.
@@ -33,7 +56,14 @@ interface MinerPost {
 
 async function fetchReddit(query: string): Promise<MinerPost[] | null> {
     const url = `https://www.reddit.com/search.json?q=${encodeURIComponent(query)}&sort=new&limit=5`;
-    const res = await fetch(url, { headers: REDDIT_HEADERS });
+    const oxylabs = getOxylabsOptions();
+    const res = await fetch(url, {
+      ...oxylabs,
+      headers: {
+        ...(oxylabs.headers as Record<string, string> | undefined),
+        ...REDDIT_HEADERS,
+      },
+    });
     if (!res.ok) return null; // caller will fall back to Serper
     const data = await res.json() as any;
     const posts: any[] = data?.data?.children ?? [];

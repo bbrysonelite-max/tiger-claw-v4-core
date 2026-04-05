@@ -620,6 +620,31 @@ async function httpsPost(
 }
 
 // ---------------------------------------------------------------------------
+// Oxylabs proxy helper
+// ---------------------------------------------------------------------------
+
+// Returns extra headers for Oxylabs residential proxy if configured.
+// When OXYLABS_USERNAME + OXYLABS_PASSWORD are set, Reddit requests route
+// through residential IPs that bypass the 403 block on Cloud Run egress.
+// When not set, returns empty object (existing behavior).
+function getOxylabsHeaders(): Record<string, string> {
+  const user = process.env["OXYLABS_USERNAME"];
+  const pass = process.env["OXYLABS_PASSWORD"];
+  if (!user || !pass) return {};
+
+  // Oxylabs residential proxy endpoint
+  const proxyAuth = Buffer.from(`${user}:${pass}`).toString("base64");
+  return {
+    "Proxy-Authorization": `Basic ${proxyAuth}`,
+    "X-Oxylabs-Geo-Location": "United States",
+  };
+}
+
+if (process.env["OXYLABS_USERNAME"]) {
+  console.log("[tiger_scout] Oxylabs proxy active — routing Reddit through residential IP");
+}
+
+// ---------------------------------------------------------------------------
 // Source: Reddit
 // ---------------------------------------------------------------------------
 
@@ -696,6 +721,7 @@ async function fetchRedditPosts(
   logger.info("tiger_scout: searching Reddit", { query, authenticated: !!bearerToken });
 
   const headers: Record<string, string> = {
+    ...getOxylabsHeaders(),
     "User-Agent": "TigerClaw/1.0 by tigerclaw_io",
   };
   if (bearerToken) headers["Authorization"] = `Bearer ${bearerToken}`;
@@ -735,7 +761,7 @@ async function fetchRedditPosts(
     try {
       const userRes = await httpsGet(
         `https://www.reddit.com/user/${encodeURIComponent(author)}/about.json`,
-        { "User-Agent": "TigerClaw/1.0" }
+        { ...getOxylabsHeaders(), "User-Agent": "TigerClaw/1.0" }
       );
       if (userRes.statusCode === 200) {
         const userAbout: RedditUserAbout = JSON.parse(userRes.body);
