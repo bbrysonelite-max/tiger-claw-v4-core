@@ -156,7 +156,7 @@ Full details in `MODULE_ASSESSMENT.md`. Read that file for the complete picture.
 | 4. Hatchery | Working — BYOB/BYOK/ICP flow solid | No proactive first message |
 | 5. Orchestration | Working — daily scout, nurture, value gap, feedback loop | Nurture token burn fixed ✅ |
 | 6. Skills | 25 tools working. All loaded every turn (token waste). | No |
-| 7. Memory | Short-term ✅ Hive ✅ fact_anchors now wired ✅ | Fixed this session |
+| 7. Memory | Short-term ✅ Hive ✅ fact_anchors wired ✅ | No |
 | 8. Payment/Dashboard/SOUL | Dashboard auth fixed ✅ SOUL solid ✅ Payment gate open ❌ | C4 open |
 
 ---
@@ -182,7 +182,6 @@ tiger_onboard, tiger_scout, tiger_contact, tiger_aftercare, tiger_briefing, tige
 | H2: Reddit 403 — Oxylabs account needed | HIGH |
 | Paddle migration (replaces Stan Store) — awaiting approval | HIGH |
 | Proactive first message on hatch — Telegram limitation, needs UX workaround | MED |
-| M1: Context caching for Gemini tool declarations | MED (cost) |
 | M2: Per-tenant Serper quota tracking | MED |
 | R2-P1-6: Stan Store Zapier race condition on stripe_subscription_id UNIQUE | MED |
 | Past customers owed bots: `chana.loh@gmail.com`, `nancylimsk@gmail.com`, `lily.vergara@gmail.com` | WHEN READY |
