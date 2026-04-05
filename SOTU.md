@@ -100,7 +100,7 @@ Customer pays on Stan Store
 ```
 
 **⚠️ Payment gate is open.** Anyone who navigates directly to `/signup` can get a free bot.
-Fix path: migrate to Lemon Squeezy (better for international, real webhook support, Merchant of Record).
+Fix path: Paddle (application submitted 2026-04-05). When approved, build `/webhooks/paddle` using same pattern as existing Lemon Squeezy handler.
 
 ---
 
@@ -114,7 +114,7 @@ Fix path: migrate to Lemon Squeezy (better for international, real webhook suppo
 | AI | Gemini 2.0 Flash | `@google/generative-ai` SDK — **LOCKED. Do not switch to 2.5-flash** (GCP function-calling bug) |
 | Signup + Dashboard | Next.js, `web-onboarding/` | `wizard.tigerclaw.io` — Vercel. Auto-deploy now fixed. |
 | Website | Static HTML | `tigerclaw.io` — separate repo |
-| Payments | Stan Store | Direct. No Zapier. Migration to Lemon Squeezy planned. |
+| Payments | Stan Store (draft mode) | Paddle application pending. LS rejected. |
 | Search / Scout | Serper | `SERPER_KEY_1/2/3` — all confirmed working |
 | Mine fallback | Serper KEY_2 | Reddit primary, Serper fallback when Reddit 403s |
 | Email | Resend | Domain verified. `RESEND_API_KEY` in deploy script — emails live. |
@@ -180,7 +180,7 @@ tiger_onboard, tiger_scout, tiger_contact, tiger_aftercare, tiger_briefing, tige
 |------|----------|
 | C4: Payment gate open — any email gets free bot | CRITICAL before marketing |
 | H2: Reddit 403 — Oxylabs account needed | HIGH |
-| Lemon Squeezy migration (replaces Stan Store for international) | HIGH |
+| Paddle migration (replaces Stan Store) — awaiting approval | HIGH |
 | Proactive first message on hatch — Telegram limitation, needs UX workaround | MED |
 | M1: Context caching for Gemini tool declarations | MED (cost) |
 | M2: Per-tenant Serper quota tracking | MED |

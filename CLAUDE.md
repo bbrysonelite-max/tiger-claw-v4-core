@@ -18,7 +18,7 @@
 **Full assessment in `MODULE_ASSESSMENT.md`. Read it before writing any code.**
 
 ### Critical Open Issues (do not launch publicly until C4 is resolved)
-- **C4:** Payment gate is open — any email gets a free bot. Lemon Squeezy migration required.
+- **C4:** Payment gate is open — any email gets a free bot. Paddle application submitted 2026-04-05, awaiting approval. Lemon Squeezy was rejected. Stan Store in draft mode.
 - **H2:** Reddit 403 on every scout run — Oxylabs account needed.
 - Read `MODULE_ASSESSMENT.md` for the complete prioritized fix list.
 
