@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import {
-  CheckCircle2,
   Loader2,
   AlertCircle,
   ExternalLink,
@@ -275,36 +274,50 @@ interface SuccessStateProps {
 }
 
 function SuccessState({ agentName, botUsername }: SuccessStateProps) {
+  const [slug, setSlug] = useState<string | null>(null);
+
+  useEffect(() => {
+    setSlug(localStorage.getItem("tc_slug"));
+  }, []);
+
   return (
     <div className="min-h-screen flex items-center justify-center px-4 py-16">
       <div className="w-full max-w-lg text-center">
-        <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-green-500/10 border border-green-500/30 mb-6">
-          <CheckCircle2 className="w-10 h-10 text-green-400" />
-        </div>
-
-        <h1 className="text-4xl font-bold text-white mb-3">Your agent is live.</h1>
-        <p className="text-xl text-orange-400 font-semibold mb-8">
-          {agentName} is ready to hunt.
-        </p>
-
-        <p className="text-white/70 text-lg mb-8">
-          Open Telegram and message{" "}
-          <span className="text-white font-bold">@{botUsername}</span> to meet your agent.
+        <h1 className="text-4xl font-bold text-white mb-2">{agentName} is ready to hunt.</h1>
+        <p className="text-white/50 text-base mb-10">
+          Your agent already knows who you&apos;re hunting. One message starts it.
         </p>
 
         <a
           href={`https://t.me/${botUsername}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-2 bg-[#0088cc] hover:bg-[#0088cc]/80 text-white font-bold text-lg px-8 py-4 rounded-xl transition-all hover:scale-105 active:scale-95"
+          className="w-full flex items-center justify-center gap-3 bg-[#0088cc] hover:bg-[#0099dd] text-white font-bold text-xl px-6 py-5 rounded-2xl transition-all hover:scale-[1.02] active:scale-[0.98] mb-8"
         >
-          Open Your Agent in Telegram →
-          <ExternalLink className="w-5 h-5" />
+          Open Telegram → Meet {agentName}
+          <ExternalLink className="w-5 h-5 shrink-0" />
         </a>
 
-        <p className="text-white/40 text-sm mt-8">
-          Your agent will send you a morning report every day. Expect your first one tomorrow at 7 AM.
-        </p>
+        <ul className="flex flex-col gap-3 text-left mb-10">
+          <li className="text-white/70 text-base">
+            Say hello. Your agent already knows who you&apos;re hunting.
+          </li>
+          <li className="text-white/70 text-base">
+            Every morning at 7 AM, {agentName} sends you a hunt report.
+          </li>
+          <li className="text-white/70 text-base">
+            The Hive is watching. Every run makes the intelligence sharper.
+          </li>
+        </ul>
+
+        {slug && (
+          <a
+            href={`/dashboard?slug=${slug}`}
+            className="text-white/30 hover:text-white/60 text-sm transition-colors"
+          >
+            View your dashboard →
+          </a>
+        )}
       </div>
     </div>
   );
