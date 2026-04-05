@@ -105,6 +105,8 @@ interface VerifyResponse {
   ok?: boolean;
   valid?: boolean;
   botId?: string;
+  sessionToken?: string;
+  slug?: string;
   message?: string;
   error?: string;
 }
@@ -116,6 +118,7 @@ interface HatchResponse {
     slug: string;
     name: string;
   };
+  slug?: string;
   botUsername?: string;
   error?: string;
   field?: string;
@@ -148,7 +151,7 @@ interface FormErrors {
 
 interface EmailGateProps {
   prefillEmail: string;
-  onVerified: (email: string, botId: string) => void;
+  onVerified: (email: string, botId: string, sessionToken: string) => void;
 }
 
 function EmailGate({ prefillEmail, onVerified }: EmailGateProps) {
@@ -173,7 +176,9 @@ function EmailGate({ prefillEmail, onVerified }: EmailGateProps) {
         const data: VerifyResponse = await res.json();
 
         if ((data.ok || data.valid) && data.botId) {
-          onVerified(trimmed, data.botId);
+          localStorage.setItem("tc_session_token", data.sessionToken ?? "");
+          localStorage.setItem("tc_bot_id", data.botId);
+          onVerified(trimmed, data.botId, data.sessionToken ?? "");
         } else {
           setStatus("error");
           setErrorMsg(
@@ -288,10 +293,12 @@ function SuccessState({ agentName, botUsername }: SuccessStateProps) {
         </p>
 
         <a
-          href={`tg://resolve?domain=${botUsername}`}
+          href={`https://t.me/${botUsername}`}
+          target="_blank"
+          rel="noopener noreferrer"
           className="inline-flex items-center gap-2 bg-[#0088cc] hover:bg-[#0088cc]/80 text-white font-bold text-lg px-8 py-4 rounded-xl transition-all hover:scale-105 active:scale-95"
         >
-          Open Telegram
+          Open Your Agent in Telegram →
           <ExternalLink className="w-5 h-5" />
         </a>
 
@@ -428,6 +435,10 @@ function SignupForm({ email, botId }: SignupFormProps) {
       const data: HatchResponse = await res.json();
 
       if (res.ok && (data.success || data.ok)) {
+        const tenantSlug = data.slug ?? data.tenant?.slug ?? "";
+        if (tenantSlug) {
+          localStorage.setItem("tc_slug", tenantSlug);
+        }
         setSuccess({
           agentName: form.agentName.trim(),
           botUsername: data.botUsername || telegramUsername || form.agentName.trim(),
@@ -768,7 +779,7 @@ function SignupPageInner() {
   const [verifiedEmail, setVerifiedEmail] = useState("");
   const [botId, setBotId] = useState("");
 
-  const handleVerified = (email: string, id: string) => {
+  const handleVerified = (email: string, id: string, _sessionToken: string) => {
     setVerifiedEmail(email);
     setBotId(id);
     setVerified(true);
