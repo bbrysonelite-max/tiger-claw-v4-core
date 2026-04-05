@@ -26,7 +26,7 @@ A second full audit was run Session 11 (2026-04-04) by 5 parallel sub-agents. **
 - R2-P1-6 🔴 OPEN: Stan Store Zapier race — duplicate timestamp hits UNIQUE constraint on stripe_subscription_id
 - R2-P1-7 ✅ FIXED #210: URL normalization mismatch in saveMarketFact() — moat was accumulating duplicates on every mining run
 
-**PR #210 is open — merge and deploy before onboarding any new customers.**
+**PR #210 MERGED. Deployed to revision `tiger-claw-api-00330-6ml`. Health confirmed: postgres ✅ redis ✅ workers ✅. Webhooks re-registered.**
 
 **Phase 2 (16 issues, MED) and Phase 3 (9 issues, LOW) remain open.** See `audit-session10-round2.md`.
 

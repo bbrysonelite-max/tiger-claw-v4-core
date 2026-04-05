@@ -1,6 +1,6 @@
 # Tiger Claw V4 — Core Architecture
 
-**Last updated:** 2026-04-04 (Session 8)
+**Last updated:** 2026-04-05 (Session 11 — Round 2 audit + security fixes PR #210)
 **Status:** LIVE. Locked. Do not rewrite.
 
 ---
@@ -21,7 +21,7 @@ Tiger Claw V4 is **stateless**. No long-running Docker containers per tenant. No
 
 | Component | Technology | Actual Status |
 |---|---|---|
-| Compute | Google Cloud Run, Node.js/Express, port 4000 | ✅ Live. Revision 00310-pjx |
+| Compute | Google Cloud Run, Node.js/Express, port 4000 | ✅ Live. Revision 00330-6ml |
 | Database | Cloud SQL PostgreSQL HA — `tiger_claw_shared` | ✅ Live |
 | Cache & Queues | Cloud Redis HA + BullMQ (8 queues) | ✅ Live |
 | AI Provider | Gemini 2.0 Flash — `@google/generative-ai` SDK | ✅ Live. **LOCKED — do not switch to 2.5-flash** (GCP function-calling bug) |
@@ -169,7 +169,7 @@ Dead key detection fires admin Telegram alert via `sendAdminAlert()` → `ADMIN_
 - **Sources (in order):**
   1. Reddit public JSON (currently 403 from Cloud Run egress — fallback active)
   2. Serper fallback (`SERPER_KEY_2`) — confirmed working
-- Scoring threshold: **80**. Scoring uses profileFit + intentSignals only when engagement data absent (weights normalized — fixed Session 7 PR #180).
+- Scoring threshold: **80** (platform default). Configurable per flavor via `FlavorConfig.scoreThreshold` — threaded through `runHunt → buildAndSaveLead → recomputeAndSave` (PR #204). Scoring uses profileFit + intentSignals only when engagement data absent (weights normalized — fixed Session 7 PR #180).
 
 ---
 
@@ -221,7 +221,7 @@ curl -X POST https://api.tigerclaw.io/admin/fix-all-webhooks \
 
 ## 11. Test Coverage
 
-- **455 tests** across 42 test files. All passing as of Session 8.
+- **447 tests** across 41 test files. All passing as of Session 11 (PR #210).
 - Every tool in `toolsMap` has test coverage.
 - Run: `npm test` from `api/`
 - CI runs on every PR push.
@@ -237,7 +237,7 @@ curl -X POST https://api.tigerclaw.io/admin/fix-all-webhooks \
 | Stripe | ❌ Placeholder. Not used. |
 | Zapier | ❌ Dead code. |
 | LINE | ❌ Deferred. Requires LINE Official Account. |
-| Customer-facing dashboard | ❌ Not built. Phase 2. |
+| Customer-facing dashboard | ✅ Built. `GET/POST /dashboard/:slug` — session-token auth + ownership check (PR #210). |
 
 ---
 
