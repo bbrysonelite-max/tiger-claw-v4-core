@@ -13,9 +13,9 @@
 //   customer_details.email
 //   customer_details.preferred_locales[0] → language
 
-import { Router, type Request, type Response } from "express";
+import express, { Router, type Request, type Response } from "express";
 import Stripe from "stripe";
-import { createHmac } from "crypto";
+import { createHmac, timingSafeEqual } from "crypto";
 import Redis from "ioredis";
 import { rateLimit } from "express-rate-limit";
 import { telegramQueue, lineQueue, emailQueue } from "../services/queue.js";
@@ -538,6 +538,80 @@ router.post("/stan-store", async (req: Request, res: Response) => {
       await sendAdminAlert(
         `❌ Stan Store Zapier webhook provisioning FAILED\nCustomer: ${name} (${email})\nError: ${errMsg}`
       );
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// POST /webhooks/lemon-squeezy
+// Lemon Squeezy fires this when a purchase completes (order_created event).
+// Creates the user + bot + subscription record so verify-purchase finds it.
+// Auth: X-Signature header = HMAC-SHA256(rawBody, LEMONSQUEEZY_SIGNING_SECRET)
+// ---------------------------------------------------------------------------
+
+router.post("/lemon-squeezy", express.raw({ type: "application/json" }), async (req: Request, res: Response) => {
+  const secret = process.env["LEMONSQUEEZY_SIGNING_SECRET"];
+
+  // If secret not configured, log and reject — do not create records
+  if (!secret) {
+    console.warn("[lemon-squeezy] LEMONSQUEEZY_SIGNING_SECRET not set — endpoint disabled");
+    return res.status(503).json({ error: "Payment webhook not configured" });
+  }
+
+  // Verify HMAC signature
+  const signature = req.headers["x-signature"] as string | undefined;
+  if (!signature) {
+    return res.status(401).json({ error: "Missing signature" });
+  }
+
+  const hmac = createHmac("sha256", secret);
+  hmac.update(req.body as Buffer); // raw body buffer
+  const digest = hmac.digest("hex");
+
+  if (!timingSafeEqual(Buffer.from(digest), Buffer.from(signature))) {
+    console.warn("[lemon-squeezy] Signature mismatch — rejected");
+    return res.status(401).json({ error: "Invalid signature" });
+  }
+
+  // Parse the payload
+  const payload = JSON.parse((req.body as Buffer).toString());
+  const eventName = payload?.meta?.event_name;
+
+  // Only process order_created events
+  if (eventName !== "order_created") {
+    return res.json({ received: true, ignored: true });
+  }
+
+  const email = payload?.data?.attributes?.user_email as string | undefined;
+  const name = payload?.data?.attributes?.user_name as string | undefined;
+  const orderId = payload?.data?.id as string | undefined;
+
+  if (!email) {
+    console.error("[lemon-squeezy] No email in payload");
+    await sendAdminAlert(`🚨 Lemon Squeezy webhook: no email in payload\nOrder: ${orderId}`);
+    return res.status(400).json({ error: "No email in payload" });
+  }
+
+  // Respond immediately — process async
+  res.json({ received: true });
+
+  setImmediate(async () => {
+    try {
+      const displayName = name || email.split("@")[0]!;
+      const userId = await createBYOKUser(email, displayName);
+      const botId = await createBYOKBot(userId, displayName, "network-marketer", "pending", email);
+      await createBYOKSubscription({
+        userId,
+        botId,
+        stripeSubscriptionId: `lemonsqueezy_${orderId}`,
+        planTier: "pro",
+        status: "pending_setup",
+      });
+      await logAdminEvent("lemon_squeezy_purchase", botId, { email, orderId });
+      console.log(`[lemon-squeezy] Purchase processed: ${email} → botId: ${botId}`);
+    } catch (err: any) {
+      console.error("[lemon-squeezy] Failed to create records:", err.message);
+      await sendAdminAlert(`🚨 Lemon Squeezy purchase processing FAILED\nEmail: ${email}\nOrder: ${orderId}\nError: ${err.message}`).catch(() => {});
     }
   });
 });
