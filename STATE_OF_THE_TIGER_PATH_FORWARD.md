@@ -1,6 +1,6 @@
 # State of the Tiger — Path Forward
 
-**Last Updated:** 2026-04-04 (Session 8)
+**Last Updated:** 2026-04-05 (Session 11)
 
 **No lying. No assuming. No guessing.**
 
@@ -22,6 +22,8 @@
 | 10 | Phase 1 Self-Serve Signup | ✅ Built and deployed (Session 6) |
 | 11 | Silent Failure Audit + Full Platform Green | ✅ Done (Session 7) |
 | 12 | Tool Safety Audit + Admin Mine Controls | ✅ Done (Session 8) |
+| 13 | Full Reliability & Security Audit (57 issues) | ✅ Done (Sessions 9+10) — PRs #189–#209 |
+| 14 | Round 2 Audit (38 issues) + Phase 1 Security Fixes | ✅ Done (Session 11) — PR #210 |
 
 ---
 
@@ -30,6 +32,34 @@
 **Get first 10 customers running.** Operator + Jeff Mack + John (Thailand) have access to ~60,000 NuSkin distributors. Target: first 10 onboarded, running for one week, no fires. Then expand to next 40.
 
 Jeff, John, and Debbie all need to complete the wizard. Links go to `wizard.tigerclaw.io/signup`.
+
+---
+
+## Session 11 — What Was Done (2026-04-05)
+
+Round 2 audit by 5 parallel sub-agents found 38 new issues. Phase 1 (all HIGH severity security) fixed immediately.
+
+| PR | Fix |
+|----|-----|
+| #210 | R2-P1-1/2: GET + POST /dashboard/:slug — added requireSession + ownership check (any attacker could read all tenant data or hijack API key) |
+| #210 | R2-P1-3/4/5: PATCH/POST /tenants/:id/status|scout|keys/activate — added requireAdmin (attacker could terminate any bot) |
+| #210 | Updated tiger_onboard.ts internal self-calls to pass Authorization header |
+| #210 | R2-P1-7: saveMarketFact() now normalizes source URL before storage (moat was accumulating duplicates on every mining run) |
+| #210 | Added requireSession middleware export to auth.ts |
+
+**Deployed: revision `tiger-claw-api-00330-6ml`. Health confirmed. Webhooks re-registered.**
+
+**32 remaining issues (Phase 2 + Phase 3) open in `audit-session10-round2.md`.**
+
+---
+
+## Sessions 9+10 — What Was Done (2026-04-04)
+
+Full reliability & security audit by 6 parallel sub-agents found 57 issues. All resolved or deferred.
+
+| PRs | Fix |
+|-----|-----|
+| #189–#209 | 57 issues — schema fixes, auth hardening, scoreThreshold threading, provisioner botId optional, admin_events column names, bot_ai_keys FK, URL dedup, and more |
 
 ---
 
@@ -117,6 +147,7 @@ On April 2, a live Zoom onboarding call with John (Thailand) failed completely. 
 | Jeff / John / Debbie not onboarded | No paying customers running | Send them wizard link |
 | Vercel auto-deploy broken | Wizard must be deployed manually | Fix Root Directory in Vercel settings |
 | Reddit 403 from Cloud Run egress | Mine uses Serper fallback (working) | Awaiting Reddit API approval |
+| R2-P1-6: Stan Store Zapier race | Same-ms timestamp hits UNIQUE on stripe_subscription_id | Add Redis idempotency key on email+minute window (same pattern as Stripe dedup) |
 
 ---
 
@@ -126,10 +157,14 @@ On April 2, a live Zoom onboarding call with John (Thailand) failed completely. 
 |------|----------|
 | Remove Zapier dead code (`/webhooks/stan-store`, `ZAPIER_WEBHOOK_SECRET`) | LOW |
 | Remove Stripe dead code (`STRIPE_*` env vars, `/webhooks/stripe`) | LOW |
-| source_url missing index on market_intelligence table | MEDIUM |
+| source_url missing index on market_intelligence table | MEDIUM — R2-P2-2 in audit |
 | factExtractionWorker failures produce no admin alert | MEDIUM |
 | marketIntelligenceWorker failures produce no admin alert | MEDIUM |
-| WIZARD_SESSION_SECRET not in deploy script (safe via fallback) | LOW |
+| WIZARD_SESSION_SECRET not in deploy script (safe via fallback) | LOW — R2-P2-16 in audit |
+| serperKeyIndex + serperCallsThisRun are module-level globals — broken under concurrency | HIGH — R2-P2-1/3 in audit |
+| Postmark webhook has no auth when POSTMARK_WEBHOOK_TOKEN absent | MED — R2-P2-6 in audit |
+| Telegram message dedup missing — retries can double-send replies | MED — R2-P2-14 in audit |
+| 32 total open items in Round 2 audit | See `audit-session10-round2.md` |
 | Stan Store → Lemon Squeezy/Paddle (international VAT) | DEFERRED |
 | LINE Phase 2 (requires LINE Official Account) | DEFERRED |
 | Customer-facing dashboard | DEFERRED |

@@ -4,26 +4,18 @@
 
 ---
 
-## Current Session State (2026-04-04 — Sessions 7+8 COMPLETE)
+## Current Session State (2026-04-05 — Session 11 COMPLETE)
 
-### Platform is fully green. 455/455 tests passing. Revision 00310-pjx live.
+### Platform is fully green. 447/447 tests passing. Revision 00330-6ml live.
 
-**Sessions 7+8 fixed 14+ silent failures including things broken since launch:**
-- Serper fallback for market miner (Reddit 403'd from Cloud Run egress)
-- RESEND_API_KEY wired into deploy — first production email ever sent and confirmed
-- TELEGRAM_WEBHOOK_SECRET in deploy — webhooks no longer need manual fix after every deploy
-- Admin alert env var names corrected — alerts were silently dropped since launch
-- nurture_check now correctly calls tiger_nurture, not tiger_scout
-- 72-hour duplicate account window removed
-- Slug collision guard added to wizard hatch
-- Scoring ceiling fixed (engagement weight normalized)
-- tiger_refine registered in toolsMap
-- getTenant() wrapped in try/catch in webhook hot path
-- tiger_strike_draft FK validation — prevents hallucinated UUID crashes
-- System prompt rule: never report tool failures to operator, never ask "what's it gonna be?"
-- Mine dashboard controls — Run Now button, live status, last run stats
-- tiger_gmail_send + tiger_postiz removed from toolsMap (irreversible public actions — not Tiger's job)
-- /admin/metrics activeTenants fixed — was counting onboarding as active
+**Session 11 (Round 2 audit) closed 6 active security holes:**
+- GET /dashboard/:slug was fully unauthenticated — any attacker knowing a slug could read all tenant data
+- POST /dashboard/:slug/update-key was unauthenticated — attacker could hijack any tenant's Gemini key
+- PATCH /tenants/:id/status + POST /keys/activate + POST /scout were unauthenticated — attacker could terminate any bot
+- saveMarketFact() was storing raw URLs — moat was accumulating duplicate facts on every mining run
+- All fixed in PR #210. Deployed and health-verified.
+
+**32 remaining issues (Phase 2 MED + Phase 3 LOW) tracked in `audit-session10-round2.md`.**
 
 ### Immediate Priority
 Jeff Mack, John (Thailand), and Debbie need to complete wizard at `wizard.tigerclaw.io/signup`.
@@ -100,7 +92,7 @@ Target: first 10 customers from Brent/Jeff/John NuSkin network running for one w
 - New tools in `api/src/tools/` MUST be registered in `toolsMap` in `ai.ts`. Missing = infinite tool loop.
 - **`tiger_gmail_send` and `tiger_postiz` are intentionally NOT in toolsMap.** Do not re-add them. Gemini must not send personal Gmail or post to social media without explicit human approval.
 - **Gemini 2.0 Flash only.** Do not switch to 2.5-flash (GCP function-calling bug).
-- 455 tests must pass before any PR is opened. Run `npm test` from `api/`.
+- 447 tests must pass before any PR is opened. Run `npm test` from `api/`.
 
 ---
 
