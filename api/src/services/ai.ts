@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI, Content, Part, GenerateContentResult } from '@google/generative-ai';
+import { GoogleAICacheManager } from '@google/generative-ai/server';
 import OpenAI from 'openai';
 import { getTenant, getPool, getBotState, setBotState, getTenantBotToken, getHiveSignalWithFallback, queryHivePatterns, updateTenantKeyHealth } from './db.js';
 import { getTenantState } from './tenant_data.js';
@@ -200,6 +201,9 @@ function mapToGoogleSchema(param: any): any {
     return mapped;
 }
 
+// ─── Tool declarations — built once at module load (static, never change) ───────
+// geminiTools is a module-level singleton: mapToGoogleSchema runs once, the result
+// is reused on every request. No per-request rebuild.
 const geminiTools = [{
     functionDeclarations: Object.values(toolsMap).map((tool: any) => ({
         name: tool.name,
@@ -207,6 +211,78 @@ const geminiTools = [{
         parameters: mapToGoogleSchema(tool.parameters),
     })),
 }];
+
+// ─── Gemini Context Cache ─────────────────────────────────────────────────────
+// Gemini context caching avoids re-tokenizing static tool declarations on every
+// request. Each tenant API key gets its own cache (cached content is key-scoped).
+// TTL = 1 hour. Falls back to geminiTools singleton if caching is unsupported or
+// the token threshold (32 768 tokens) is not met.
+//
+// Cache entries are stored in a module-level Map keyed by API key so a second
+// request for the same tenant reuses the same cached-content name.
+const GEMINI_CACHE_TTL_SECONDS = 3600;
+interface GeminiCacheEntry { name: string; expiresAt: number; }
+const geminiCacheByKey = new Map<string, GeminiCacheEntry>();
+
+/**
+ * Returns a GenerativeModel that uses a Gemini context cache for the tool
+ * declarations when possible. Falls back to a regular model (singleton tools)
+ * when:
+ *   - gemini-2.0-flash does not support context caching for this key/quota
+ *   - The cached content doesn't meet the 32 768-token minimum
+ *   - The cache API returns an error for any other reason
+ *
+ * systemInstruction is NOT cached — it contains per-tenant dynamic content.
+ * Tools are static and safe to cache; they are built once at module load in
+ * the geminiTools singleton above.
+ */
+async function getGeminiModelWithCache(
+    genAI: GoogleGenerativeAI,
+    apiKey: string,
+    modelName: string,
+    systemInstruction: string,
+): Promise<ReturnType<GoogleGenerativeAI['getGenerativeModel']>> {
+    try {
+        const now = Date.now();
+        let cacheEntry = geminiCacheByKey.get(apiKey);
+
+        // Create a new cache if none exists or the existing one has expired
+        if (!cacheEntry || cacheEntry.expiresAt <= now) {
+            const cacheManager = new GoogleAICacheManager(apiKey);
+            const created = await cacheManager.create({
+                model: modelName,
+                // contents is required by the type but tools-only caches work with empty contents.
+                // The Gemini API enforces the 32 768-token minimum server-side.
+                contents: [],
+                tools: geminiTools as any,
+                ttlSeconds: GEMINI_CACHE_TTL_SECONDS,
+            });
+            if (!created.name) {
+                throw new Error('Gemini cache created but returned no name');
+            }
+            cacheEntry = {
+                name: created.name,
+                expiresAt: now + GEMINI_CACHE_TTL_SECONDS * 1000,
+            };
+            geminiCacheByKey.set(apiKey, cacheEntry);
+            console.log(`[AI] Gemini context cache created: ${created.name} (model=${modelName})`);
+        }
+
+        const cachedContent = await new GoogleAICacheManager(apiKey).get(cacheEntry.name);
+        return genAI.getGenerativeModelFromCachedContent(cachedContent, {
+            systemInstruction,
+        });
+    } catch (cacheErr: any) {
+        // Caching is optional — fall back silently to the standard model path
+        // which uses the module-level geminiTools singleton (zero per-request rebuild cost).
+        console.warn(`[AI] Gemini context cache unavailable (${(cacheErr.message ?? String(cacheErr)).slice(0, 120)}). Using non-cached model.`);
+        return genAI.getGenerativeModel({
+            model: modelName,
+            systemInstruction,
+            tools: geminiTools as any,
+        });
+    }
+}
 
 // ─── Redis ───────────────────────────────────────────────────────────────────
 const redisUrl = process.env.REDIS_URL;
@@ -1209,11 +1285,7 @@ export async function processTelegramMessage(
             console.log(`[AI] History loaded: ${history.length} entries`);
 
             const genAI = new GoogleGenerativeAI(aiProvider.key);
-            const model = genAI.getGenerativeModel({
-                model: aiProvider.model,
-                systemInstruction: await buildSystemPrompt(tenant),
-                tools: geminiTools as any,
-            });
+            const model = await getGeminiModelWithCache(genAI, aiProvider.key, aiProvider.model, await buildSystemPrompt(tenant));
 
             const chat = model.startChat({ history });
             console.log(`[AI] Sending message to Gemini: "${effectiveText.slice(0, 80)}"`);
@@ -1298,11 +1370,9 @@ export async function processSystemRoutine(tenantId: string, routineType: string
         // chat history causes the next run to start with a 'function' role message
         // (from the previous run's tool responses), which Gemini rejects.
         const genAI = new GoogleGenerativeAI(aiProvider.provider === 'google' ? aiProvider.key : '');
-        const model = aiProvider.provider === 'google' ? genAI.getGenerativeModel({
-            model: aiProvider.model,
-            systemInstruction: await buildSystemPrompt(tenant),
-            tools: geminiTools as any,
-        }) : null;
+        const model = aiProvider.provider === 'google'
+            ? await getGeminiModelWithCache(genAI, aiProvider.key, aiProvider.model, await buildSystemPrompt(tenant))
+            : null;
 
         const wizardUrl = process.env['FRONTEND_URL'] ?? 'https://wizard.tigerclaw.io';
         const systemPrompts: Record<string, string> = {
@@ -1632,11 +1702,9 @@ export async function processLINEMessage(
 
         const history = await getChatHistory(tenantId, chatId);
         const genAI = new GoogleGenerativeAI(aiProvider.provider === 'google' ? aiProvider.key : '');
-        const model = aiProvider.provider === 'google' ? genAI.getGenerativeModel({
-            model: aiProvider.model,
-            systemInstruction: await buildSystemPrompt(tenant),
-            tools: geminiTools as any,
-        }) : null;
+        const model = aiProvider.provider === 'google'
+            ? await getGeminiModelWithCache(genAI, aiProvider.key, aiProvider.model, await buildSystemPrompt(tenant))
+            : null;
 
         let replyText = '';
         if (aiProvider.provider === 'openai') {
