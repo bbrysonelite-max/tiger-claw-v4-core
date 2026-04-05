@@ -27,8 +27,11 @@ async function buildApp() {
   return app
 }
 
+const ADMIN_TOKEN = 'test-admin-token-32-chars-xxxxxxxx'
+
 beforeEach(() => {
   vi.resetAllMocks()
+  process.env['ADMIN_TOKEN'] = ADMIN_TOKEN
 })
 
 describe('PATCH /tenants/:id/status', () => {
@@ -37,7 +40,7 @@ describe('PATCH /tenants/:id/status', () => {
     mockDb.getTenant.mockResolvedValue({ id: 't1', status: 'pending' })
     mockDb.updateTenantStatus.mockResolvedValue(undefined)
 
-    const res = await request(app).patch('/tenants/t1/status').send({ status: 'active' })
+    const res = await request(app).patch('/tenants/t1/status').set('Authorization', `Bearer ${ADMIN_TOKEN}`).send({ status: 'active' })
     expect(res.status).toBe(200)
     expect(mockDb.updateTenantStatus).toHaveBeenCalledWith('t1', 'active')
   })
@@ -46,7 +49,7 @@ describe('PATCH /tenants/:id/status', () => {
     const app = await buildApp()
     mockDb.getTenant.mockResolvedValue({ id: 't1' })
 
-    const res = await request(app).patch('/tenants/t1/status').send({ status: 'unknown_status' })
+    const res = await request(app).patch('/tenants/t1/status').set('Authorization', `Bearer ${ADMIN_TOKEN}`).send({ status: 'unknown_status' })
     expect(res.status).toBe(400)
   })
 })
@@ -56,7 +59,7 @@ describe('POST /tenants/:id/scout', () => {
     const app = await buildApp()
     mockDb.getTenant.mockResolvedValue({ id: 't1', slug: 'tenant-1' })
 
-    const res = await request(app).post('/tenants/t1/scout').send({ trigger: 'manual' })
+    const res = await request(app).post('/tenants/t1/scout').set('Authorization', `Bearer ${ADMIN_TOKEN}`).send({ trigger: 'manual' })
     expect(res.status).toBe(200)
     expect(mockQueue.routineQueue.add).toHaveBeenCalled()
   })
@@ -67,7 +70,7 @@ describe('POST /tenants/:id/keys/activate', () => {
     const app = await buildApp()
     mockDb.getTenant.mockResolvedValue({ id: 't1' })
 
-    const res = await request(app).post('/tenants/t1/keys/activate').send({ action: 'deactivate_onboarding_key' })
+    const res = await request(app).post('/tenants/t1/keys/activate').set('Authorization', `Bearer ${ADMIN_TOKEN}`).send({ action: 'deactivate_onboarding_key' })
     expect(res.status).toBe(200)
   })
 })

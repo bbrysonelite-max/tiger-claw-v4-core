@@ -6,7 +6,7 @@
 // exists within the last 72 hours and return a signed session token.
 // The token is stored in sessionStorage and gates wizard access.
 
-import { Router, type Request, type Response } from "express";
+import { Router, type Request, type Response, type NextFunction } from "express";
 import { createHmac, timingSafeEqual } from "crypto";
 import { z } from "zod";
 import { rateLimit } from "express-rate-limit";
@@ -160,5 +160,24 @@ router.post("/verify-purchase", verifyPurchaseLimiter, async (req: Request, res:
     return res.status(500).json({ error: "Authentication failed. Please try again." });
   }
 });
+
+// ── requireSession middleware ─────────────────────────────────────────────────
+// Validates the session token from Authorization: Bearer <token>.
+// Attaches the decoded session payload to res.locals.session on success.
+export function requireSession(req: Request, res: Response, next: NextFunction): void {
+  const auth = req.headers["authorization"] ?? "";
+  const token = auth.startsWith("Bearer ") ? auth.slice(7) : auth;
+  if (!token) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  const session = verifySessionToken(token);
+  if (!session) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  res.locals["session"] = session;
+  next();
+}
 
 export default router;

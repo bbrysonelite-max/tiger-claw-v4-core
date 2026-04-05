@@ -583,6 +583,7 @@ function notifyKeyActivation(tenantId: string): void {
       headers: {
         "content-type": "application/json",
         "content-length": Buffer.byteLength(body),
+        "authorization": `Bearer ${process.env["ADMIN_TOKEN"] ?? ""}`,
       },
     },
     () => { /* fire and forget */ }
@@ -963,6 +964,7 @@ function setTenantActive(tenantId: string): Promise<void> {
         headers: {
           "content-type": "application/json",
           "content-length": Buffer.byteLength(body),
+          "authorization": `Bearer ${process.env["ADMIN_TOKEN"] ?? ""}`,
         },
       },
       () => resolve()
@@ -994,6 +996,7 @@ function triggerFirstScout(tenantId: string): Promise<void> {
         headers: {
           "content-type": "application/json",
           "content-length": Buffer.byteLength(body),
+          "authorization": `Bearer ${process.env["ADMIN_TOKEN"] ?? ""}`,
         },
       },
       () => resolve()

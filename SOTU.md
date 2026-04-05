@@ -1,6 +1,6 @@
 # Tiger Claw — State of the Union
 
-**Last updated:** 2026-04-04 (End of Sessions 9+10 — full audit sprint complete. All 57 issues resolved or deferred. PRs #189–#204 merged.)
+**Last updated:** 2026-04-04 (Session 11 — Round 2 audit. 38 new issues found. Phase 1 fixes in PR #210.)
 **This is the single source of truth. Read nothing else until you finish this file.**
 
 ---
@@ -16,16 +16,24 @@
 
 ---
 
-## ✅ AUDIT SPRINT COMPLETE
+## ⚠️ ROUND 2 AUDIT IN PROGRESS
 
-Full reliability & security audit was completed Session 9 (2026-04-04). **57 issues found. All resolved or explicitly deferred.** Details at `audit-april-4th.md`.
+A second full audit was run Session 11 (2026-04-04) by 5 parallel sub-agents. **38 new issues found.** Full details: `audit-session10-round2.md`.
 
-**Remaining open items from the audit:**
-- **P2-15** (MED): Telegram/LINE webhook workers have zero retries — transient 429 drops a user message. Low urgency.
-- **P3-3** (MED): Tenant delete does not cancel Stan Store subscription — needs Stan Store API research. Deferred.
+**Phase 1 (HIGH — fix before next customer):**
+- R2-P1-1/2 ✅ FIXED #210: GET/POST /dashboard/:slug were fully unauthenticated — any attacker could read tenant data or hijack API keys
+- R2-P1-3/4/5 ✅ FIXED #210: PATCH/POST /tenants/:id/status|scout|keys/activate were unauthenticated — attacker could terminate any bot
+- R2-P1-6 🔴 OPEN: Stan Store Zapier race — duplicate timestamp hits UNIQUE constraint on stripe_subscription_id
+- R2-P1-7 ✅ FIXED #210: URL normalization mismatch in saveMarketFact() — moat was accumulating duplicates on every mining run
+
+**PR #210 is open — merge and deploy before onboarding any new customers.**
+
+**Phase 2 (16 issues, MED) and Phase 3 (9 issues, LOW) remain open.** See `audit-session10-round2.md`.
+
+**Round 1 audit remaining deferred items:**
+- **P2-15** (MED): Telegram/LINE webhook workers have zero retries — transient 429 drops a user message.
+- **P3-3** (MED): Tenant delete does not cancel Stan Store subscription — needs Stan Store API research.
 - **P3-7** (MED): Burst counter TOCTOU race (multi-instance Cloud Run). Deferred until multi-instance is confirmed.
-
-**Platform is safe to onboard new customers as of PRs #189–#204.**
 
 ---
 

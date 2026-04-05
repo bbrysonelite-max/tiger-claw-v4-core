@@ -3,6 +3,7 @@
 // GET /dashboard/:slug — returns bot status, usage, channels, API key status, subscription
 
 import { Router, type Request, type Response } from "express";
+import { requireSession } from "./auth.js";
 import {
     getTenantBySlug,
     getTenantBotUsername,
@@ -19,13 +20,19 @@ import { encryptToken } from "../services/pool.js";
 const router = Router();
 
 // GET /dashboard/:slug
-router.get("/:slug", async (req: Request, res: Response) => {
+router.get("/:slug", requireSession, async (req: Request, res: Response) => {
   try {
     const slug = req.params["slug"]!;
     const tenant = await getTenantBySlug(slug);
 
     if (!tenant) {
         return res.status(404).json({ error: "Tenant not found" });
+    }
+
+    // Ownership check: session must belong to this tenant
+    const session = res.locals["session"] as { botId: string };
+    if (session.botId !== tenant.id) {
+        return res.status(403).json({ error: "Forbidden" });
     }
 
     const pool = getPool();
@@ -158,7 +165,7 @@ router.get("/:slug", async (req: Request, res: Response) => {
 });
 
 // POST /dashboard/:slug/update-key — inline key update, no wizard required
-router.post("/:slug/update-key", async (req: Request, res: Response) => {
+router.post("/:slug/update-key", requireSession, async (req: Request, res: Response) => {
     try {
         const slug = req.params["slug"]!;
         const { key, provider, model } = req.body as { key: string; provider: string; model?: string };
@@ -169,6 +176,12 @@ router.post("/:slug/update-key", async (req: Request, res: Response) => {
 
         const tenant = await getTenantBySlug(slug);
         if (!tenant) return res.status(404).json({ error: "Tenant not found" });
+
+        // Ownership check: session must belong to this tenant
+        const session = res.locals["session"] as { botId: string };
+        if (session.botId !== tenant.id) {
+            return res.status(403).json({ error: "Forbidden" });
+        }
 
         const { valid, error: validationError } = await validateAIKey(provider, key);
         if (!valid) {
