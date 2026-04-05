@@ -97,7 +97,7 @@ export async function saveMarketFact(fact: MarketFact): Promise<string> {
       fact.fact_summary,
       fact.confidence_score,
       fact.mining_cost ?? 0,
-      fact.source_url,
+      normalizeUrl(fact.source_url),
       fact.captured_by,
       fact.metadata,
       fact.valid_until ?? null

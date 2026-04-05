@@ -11,6 +11,7 @@
 
 import { Router, type Request, type Response } from "express";
 import * as http from "http";
+import { requireAdmin } from "../services/admin_shared.js";
 import {
   getTenant,
   getTenantBySlug,
@@ -34,7 +35,7 @@ const VALID_STATUSES: TenantStatus[] = [
 // Called by tiger_onboard Phase 5 to mark tenant as fully onboarded.
 // ---------------------------------------------------------------------------
 
-router.patch("/:tenantId/status", async (req: Request, res: Response) => {
+router.patch("/:tenantId/status", requireAdmin, async (req: Request, res: Response) => {
   try {
     const tenant = await getTenant(req.params.tenantId);
     if (!tenant) {
@@ -99,7 +100,7 @@ router.patch("/:tenantId/status", async (req: Request, res: Response) => {
 // used for this tenant.
 // ---------------------------------------------------------------------------
 
-router.post("/:tenantId/keys/activate", async (req: Request, res: Response) => {
+router.post("/:tenantId/keys/activate", requireAdmin, async (req: Request, res: Response) => {
   try {
     const tenant = await getTenant(req.params.tenantId);
     if (!tenant) {
@@ -135,7 +136,7 @@ import { routineQueue } from "../services/queue.js";
 // Forwards to the tenant's central event queue.
 // ---------------------------------------------------------------------------
 
-router.post("/:tenantId/scout", async (req: Request, res: Response) => {
+router.post("/:tenantId/scout", requireAdmin, async (req: Request, res: Response) => {
   try {
     const tenant = await getTenant(req.params.tenantId);
     if (!tenant) {

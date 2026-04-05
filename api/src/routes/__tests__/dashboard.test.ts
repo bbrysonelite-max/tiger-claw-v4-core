@@ -2,6 +2,15 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import request from 'supertest'
 import express from 'express'
 
+// Mock requireSession to inject a session matching the test tenant id 't1'
+vi.mock('../../routes/auth.js', () => ({
+  requireSession: (req: any, res: any, next: any) => {
+    res.locals.session = { botId: 't1', email: 'test@test.com', userId: 'u1', expires: Date.now() + 86400000 }
+    next()
+  },
+  verifySessionToken: vi.fn(),
+}))
+
 const mockDb = vi.hoisted(() => ({
   getTenantBySlug: vi.fn(),
   getTenant: vi.fn(),
