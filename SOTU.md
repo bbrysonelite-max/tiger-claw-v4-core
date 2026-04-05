@@ -1,6 +1,6 @@
 # Tiger Claw — State of the Union
 
-**Last updated:** 2026-04-04 (Session 11 — Round 2 audit. 38 new issues found. Phase 1 fixes in PR #210.)
+**Last updated:** 2026-04-05 (Session 12 — Full module assessment + 4 critical fixes deployed. Revision 00336-hhb live.)
 **This is the single source of truth. Read nothing else until you finish this file.**
 
 ---
@@ -16,24 +16,34 @@
 
 ---
 
-## ⚠️ ROUND 2 AUDIT IN PROGRESS
+## Current Platform State
 
-A second full audit was run Session 11 (2026-04-04) by 5 parallel sub-agents. **38 new issues found.** Full details: `audit-session10-round2.md`.
+**Revision:** `tiger-claw-api-00336-hhb` — deployed 2026-04-05
+**Health:** postgres ✅ redis ✅ workers ✅ disk ✅
+**Tests:** 447/447 passing
+**Wizard:** `wizard.tigerclaw.io/signup` — 200 OK
 
-**Phase 1 (HIGH — fix before next customer):**
-- R2-P1-1/2 ✅ FIXED #210: GET/POST /dashboard/:slug were fully unauthenticated — any attacker could read tenant data or hijack API keys
-- R2-P1-3/4/5 ✅ FIXED #210: PATCH/POST /tenants/:id/status|scout|keys/activate were unauthenticated — attacker could terminate any bot
-- R2-P1-6 🔴 OPEN: Stan Store Zapier race — duplicate timestamp hits UNIQUE constraint on stripe_subscription_id
-- R2-P1-7 ✅ FIXED #210: URL normalization mismatch in saveMarketFact() — moat was accumulating duplicates on every mining run
+**Session 12 fixes merged and live (PRs #212–#215):**
+- ✅ #212 — `fact_anchors` now read back into `buildSystemPrompt()`. Agents compound over time.
+- ✅ #213 — Customer dashboard auth fixed. Session token stored at signup, sent on dashboard requests.
+- ✅ #214 — Delta scan: `sinceTimestamp` filter prevents rescanning same content.
+- ✅ #215 — `nurture_check` skips LLM when tenant has zero leads. Token burn eliminated.
+- ✅ Vercel root directory misconfiguration fixed. Auto-deploy now works.
 
-**PR #210 MERGED. Deployed to revision `tiger-claw-api-00330-6ml`. Health confirmed: postgres ✅ redis ✅ workers ✅. Webhooks re-registered.**
+---
 
-**Phase 2 (16 issues, MED) and Phase 3 (9 issues, LOW) remain open.** See `audit-session10-round2.md`.
+## ⚠️ OPEN CRITICAL ISSUES
 
-**Round 1 audit remaining deferred items:**
-- **P2-15** (MED): Telegram/LINE webhook workers have zero retries — transient 429 drops a user message.
-- **P3-3** (MED): Tenant delete does not cancel Stan Store subscription — needs Stan Store API research.
-- **P3-7** (MED): Burst counter TOCTOU race (multi-instance Cloud Run). Deferred until multi-instance is confirmed.
+| # | Issue | Priority |
+|---|---|---|
+| C4 | Payment gate is open — any email gets a free bot. No verification against Stan Store. | CRITICAL before marketing |
+| H2 | Reddit returns 403 on every scout run — falls back to paid Serper | HIGH |
+| M1 | All 25 tools declared to Gemini every request — no context caching | MED (cost) |
+| M2 | Serper quota is global, not per-tenant | MED |
+| R2-P1-6 | Stan Store Zapier race — duplicate timestamp hits UNIQUE constraint | MED |
+
+Full assessment: `MODULE_ASSESSMENT.md` in repo root.
+Full audit backlog: `audit-session10-round2.md` and `audit-april-4th.md`.
 
 ---
 
@@ -41,7 +51,7 @@ A second full audit was run Session 11 (2026-04-04) by 5 parallel sub-agents. **
 
 1. Read this file top to bottom
 2. Run `curl https://api.tigerclaw.io/health` — confirm postgres, redis, workers all OK
-3. Check platform health: `GET /admin/platform-health` with admin token — all services should be green
+3. Read `MODULE_ASSESSMENT.md` — complete 8-module ground-truth assessment of what was built
 4. Pull current fleet: `GET /admin/fleet` with admin token
 5. Do not touch anything until you know what is broken and what is not
 
@@ -52,13 +62,15 @@ A second full audit was run Session 11 (2026-04-04) by 5 parallel sub-agents. **
 
 ## What This Product Is
 
-AI sales agent SaaS. Customer pays on Stan Store → gets email with link → `wizard.tigerclaw.io/signup` → single-page form → bot hatches in ~2 minutes → bot prospects for them on Telegram around the clock.
+Stateless agent hatchery for network marketing recruiting. Customer brings their own Telegram bot token (BYOB) and their own Gemini API key (BYOK). One-page signup. Agent hatches knowing its ICP. Agent prospects while operator sleeps. Hive gets smarter with every run.
 
 **The value proposition:** Your bot hunts while you sleep.
 
-**Confirmed working 2026-04-04:** Scout found prospects on Facebook Groups via Serper fallback. Bot responded intelligently, checked pipeline, surfaced leads with Hive intelligence applied. First production email ever delivered confirmed.
+**Two products (strict separation):**
+- **Tiger Strike** (Hunter) — finds leads, facilitates first public reply or DM, fires webhook to TigerClaw on positive reply
+- **TigerClaw** (Closer) — receives webhook payload, triggers SMS outreach and nurture sequence
 
-**Immediate go-to-market:** Operator (Brent) + Jeff Mack + John (Thailand) have access to ~60,000 NuSkin distributors. Target: get first 10 running, watch for one week, then expand to next 40.
+**Current focus:** TigerClaw only. Tiger Strike is the data layer feeding it.
 
 ---
 
@@ -68,15 +80,17 @@ Stan Store is the merchant. No Zapier. No Stripe (placeholder only).
 
 ```
 Customer pays on Stan Store
-→ Stan Store sends confirmation email with wizard.tigerclaw.io/signup
-→ Customer enters purchase email on /signup
-→ POST /auth/verify-purchase — creates DB record on-demand if none exists
+→ Stan Store sends confirmation email with link: wizard.tigerclaw.io/signup?email=customer@email.com
+→ Customer clicks link — email pre-populates in EmailGate
+→ POST /auth/verify-purchase — creates DB record on-demand (NO payment verification — known gap C4)
 → Customer fills form: agent name, niche, ICP, Telegram bot token, Gemini key
-→ POST /wizard/hatch
+→ POST /wizard/hatch — validates key inline, writes ICP to onboard_state.json
 → BullMQ tenant-provisioning job
-→ Bot registered, webhook set, ICP loaded → status: onboarding
-→ First message: confident intro, no interview
+→ Bot registered, webhook set, slash commands registered, ICP loaded → status: onboarding
 ```
+
+**⚠️ Payment gate is open.** Anyone who navigates directly to `/signup` can get a free bot.
+Fix path: migrate to Lemon Squeezy (better for international, real webhook support, Merchant of Record).
 
 ---
 
@@ -88,9 +102,9 @@ Customer pays on Stan Store
 | Database | Cloud SQL PostgreSQL | `tiger_claw_shared`, proxy port **5433** locally (NOT 5432) |
 | Cache / Queues | Cloud Redis + BullMQ | 8 queues. `ENABLE_WORKERS=true` required in deploy. |
 | AI | Gemini 2.0 Flash | `@google/generative-ai` SDK — **LOCKED. Do not switch to 2.5-flash** (GCP function-calling bug) |
-| Signup + Dashboard | Next.js, `web-onboarding/` | `wizard.tigerclaw.io` — Vercel. **Auto-deploy broken — deploy manually.** |
+| Signup + Dashboard | Next.js, `web-onboarding/` | `wizard.tigerclaw.io` — Vercel. Auto-deploy now fixed. |
 | Website | Static HTML | `tigerclaw.io` — separate repo |
-| Payments | Stan Store | Direct. No Zapier. No Stripe. |
+| Payments | Stan Store | Direct. No Zapier. Migration to Lemon Squeezy planned. |
 | Search / Scout | Serper | `SERPER_KEY_1/2/3` — all confirmed working |
 | Mine fallback | Serper KEY_2 | Reddit primary, Serper fallback when Reddit 403s |
 | Email | Resend | Domain verified. `RESEND_API_KEY` in deploy script — emails live. |
@@ -101,108 +115,100 @@ Customer pays on Stan Store
 
 ## Live Service Status
 
-Last verified 2026-04-04 (Session 8):
+Last verified 2026-04-05 (Session 12):
 
 | Service | Status | Notes |
 |---------|--------|-------|
-| Cloud Run, Postgres, Redis | ✅ | Healthy. Revision 00310-pjx |
+| Cloud Run | ✅ | Revision 00336-hhb |
+| Postgres | ✅ | Healthy |
+| Redis | ✅ | Healthy |
 | Workers | ✅ | ENABLE_WORKERS=true confirmed |
 | Serper keys (x3) | ✅ | All confirmed working |
 | Platform Gemini key | ✅ | Active |
-| Platform onboarding key | ✅ | Active |
-| Platform emergency key | ✅ | Renewed Session 7 |
 | Admin Telegram bot | ✅ | @AlienProbeadmin_bot — alerts firing correctly |
-| Resend | ✅ | RESEND_API_KEY in deploy script — first production email confirmed delivered |
-| TELEGRAM_WEBHOOK_SECRET | ✅ | In deploy script since #175 — secretWired: true confirmed post-deploy |
-| Reddit (market miner) | ❌ | 403 from Cloud Run egress. Serper fallback active. Reddit API key awaiting approval. |
-| Stripe | ❌ | Placeholder. Not used. |
-| Vercel auto-deploy | ❌ | Root Directory not set correctly — deploy wizard manually |
+| Resend | ✅ | First production email confirmed delivered |
+| TELEGRAM_WEBHOOK_SECRET | ✅ | In deploy script — secretWired: true confirmed |
+| Vercel (`wizard.tigerclaw.io`) | ✅ | Root directory fixed. 200 OK confirmed. |
+| Reddit (market miner) | ❌ | 403 from Cloud Run egress. Serper fallback active. Oxylabs pending. |
+| Stripe | ❌ | Placeholder only. Not used. |
 
 ---
 
-## Current Tenant Fleet
+## Module Assessment Summary
 
-Pull live data: `GET https://api.tigerclaw.io/admin/fleet` with admin token.
+Full details in `MODULE_ASSESSMENT.md`. Read that file for the complete picture.
 
-Last known state 2026-04-04:
-
-| Slug | Status | Bot | Notes |
-|------|--------|-----|-------|
-| `brent-bryson-mnjd321r` | onboarding | @Testtigerfour_bot "Teddy" | Brent's test bot. Scout confirmed live. |
-| `justagreatdirector-mne9xtna` | pending | — | Debbie — needs to complete wizard |
-
-Jeff Mack and John (Thailand) were wiped from DB end of Session 7 for clean re-onboarding via wizard. They have not re-onboarded yet.
-
-**Active agents (status = 'active' or 'live'):** 0 — Teddy is in `onboarding` status, not yet `active`.
+| Module | Status | Fatal gaps |
+|---|---|---|
+| 1. Scout | Degraded — Reddit 403, no pre-classification | No |
+| 2. Hive | Working — 313 facts on first run, dedup fixed | No |
+| 3. Cognitive Architecture | Backend (self-improvement.ts) works. File layer missing. | No |
+| 4. Hatchery | Working — BYOB/BYOK/ICP flow solid | No proactive first message |
+| 5. Orchestration | Working — daily scout, nurture, value gap, feedback loop | Nurture token burn fixed ✅ |
+| 6. Skills | 25 tools working. All loaded every turn (token waste). | No |
+| 7. Memory | Short-term ✅ Hive ✅ fact_anchors now wired ✅ | Fixed this session |
+| 8. Payment/Dashboard/SOUL | Dashboard auth fixed ✅ SOUL solid ✅ Payment gate open ❌ | C4 open |
 
 ---
 
-## Tool Registry (25 tools — as of Session 8)
+## Tool Registry (25 tools)
 
 All tools live in `api/src/tools/`. All must be registered in `toolsMap` in `ai.ts` or Gemini enters an infinite loop.
 
-**Registered in toolsMap:**
+**Registered:**
 tiger_onboard, tiger_scout, tiger_contact, tiger_aftercare, tiger_briefing, tiger_convert, tiger_export, tiger_email, tiger_hive, tiger_import, tiger_keys, tiger_lead, tiger_move, tiger_note, tiger_nurture, tiger_objection, tiger_score, tiger_score_1to10, tiger_search, tiger_settings, tiger_drive_list, tiger_strike_harvest, tiger_strike_draft, tiger_strike_engage, tiger_refine
 
-**Intentionally NOT registered (tool files exist but Gemini cannot call them):**
-- `tiger_gmail_send` — removed Session 8. Gemini must never send from operator's personal Gmail without human approval.
-- `tiger_postiz` — removed Session 8. Social media broadcasting is not Tiger's job.
+**Intentionally NOT registered:**
+- `tiger_gmail_send` — Gemini must never send from operator's personal Gmail without human approval.
+- `tiger_postiz` — Social broadcasting is not Tiger's job.
 
 ---
 
 ## Known Open Issues
 
-**IMPORTANT:** The full audit backlog (57 issues, phased fix plan) is in `audit-april-4th.md`. The items below are a summary of the highest-priority items plus the pre-existing backlog.
-
-### Audit Sprint — COMPLETE (PRs #189–#204)
-All Phase 1 and Phase 2 items shipped. All Phase 3 items shipped except P2-15, P3-3, P3-7 (see audit notes above). See `audit-april-4th.md` for full status.
-
-### Pre-Existing Backlog
 | Item | Priority |
 |------|----------|
-| Jeff Mack and John need to complete wizard fresh | IMMEDIATE |
-| Debbie (justagreatdirector) needs to complete wizard | IMMEDIATE |
-| Vercel auto-deploy broken — deploy wizard manually until Root Directory fixed | OPS |
-| Add per-tenant health indicators to admin dashboard fleet table | NEXT |
-| Add per-tenant drill-down in admin dashboard | NEXT |
-| Reddit 403 from Cloud Run egress — awaiting Reddit API approval | WAITING |
+| C4: Payment gate open — any email gets free bot | CRITICAL before marketing |
+| H2: Reddit 403 — Oxylabs account needed | HIGH |
+| Lemon Squeezy migration (replaces Stan Store for international) | HIGH |
+| Proactive first message on hatch — Telegram limitation, needs UX workaround | MED |
+| M1: Context caching for Gemini tool declarations | MED (cost) |
+| M2: Per-tenant Serper quota tracking | MED |
+| R2-P1-6: Stan Store Zapier race condition on stripe_subscription_id UNIQUE | MED |
 | Past customers owed bots: `chana.loh@gmail.com`, `nancylimsk@gmail.com`, `lily.vergara@gmail.com` | WHEN READY |
-| Affiliate/referral tracking — Max Steingart deal (30% affiliate). Hold until he sells first 10. | DEFERRED |
+| Affiliate/referral tracking — Max Steingart deal (30%). Hold until he sells first 10. | DEFERRED |
 | Remove Stripe dead code | LOW |
 
 ---
 
-## Session 9 — What Was Done (2026-04-04)
+## Session 12 — What Was Done (2026-04-05)
 
-Full reliability & security audit across 5 domains using 5 parallel sub-agents. No PRs merged this session. Output is `audit-april-4th.md` in the repo root.
+Full 8-module ground-truth assessment of the codebase against all foundation documents (Swarm Blueprint, Cognitive Architecture spec, Heartbeat spec, Essential Root Documentation). Results in `MODULE_ASSESSMENT.md`.
 
-**Findings:** 26 HIGH, 22 MED, 9 LOW. Three issues are actively broken in production right now (P1-1 through P1-3 above). Platform is green and serving current tenants but is not safe for new customer onboarding until Phase 1 items are shipped.
+**PRs merged:**
+- #212 — `fact_anchors` wired into `buildSystemPrompt()` — agents now compound over time
+- #213 — Dashboard auth: session token stored at signup, sent on all dashboard API calls
+- #214 — Delta scan: `sinceTimestamp` filter in `tiger_scout.ts` — no more rescanning same content
+- #215 — `nurture_check` pre-checks `tenant_leads` count — skips LLM when zero leads
 
-**Audit domains:** AI Agent Loop & Tool Registry · Provisioning Pipeline & BullMQ Queues · Database & Schema · Security/Auth/Secrets · Market Mining/Serper/Scout
+**Also fixed:** Vercel root directory misconfiguration — manual deploys now work from CLI.
 
-**Platform state at session end:** All services green. 455/455 tests passing. No code changed.
+**Deployed:** Revision `tiger-claw-api-00336-hhb`. Health confirmed. Wizard 200 OK.
+
+**Key finding:** The product works. Agents hatch, know their ICP, prospect, have personality. The Hive accumulates. The cron fires daily reports. Payment gate and dashboard auth were the two things breaking the customer experience — both now fixed or in flight.
 
 ---
 
-## Session 8 — What Was Done (2026-04-04)
+## Session 11 — What Was Done (2026-04-04)
 
-Continued from Session 7. Platform was fully green at session start.
+Round 2 audit Phase 1 fixes. 5 security holes closed. PR #210 merged and deployed.
 
-**PRs merged this session (#186–#187):**
-- #186 — Mine engine controls in admin dashboard: `GET /admin/mine/status`, `POST /admin/mine/run`, live running indicator + Run Now button, mine_complete admin event logging
-- #187 — Tool safety audit + broken window cleanup:
-  - Tests added for all 5 previously untested tools (tiger_email, tiger_gmail_send, tiger_drive_list, tiger_postiz, tiger_refine, tiger_score_1to10) — 43 new tests, 455 total
-  - `tiger_gmail_send` removed from toolsMap — Gemini must not send from operator's personal Gmail
-  - `tiger_postiz` removed from toolsMap — social broadcasting is not Tiger's job
-  - `/admin/metrics` activeTenants fixed — was counting 'onboarding' as active, now only counts 'active' and 'live'
-  - tiger_strike_draft test fixed — FK check mock was missing
+- GET/POST /dashboard/:slug were fully unauthenticated
+- PATCH/POST /tenants routes were unauthenticated
+- saveMarketFact() URL normalization mismatch causing moat duplicates
+- All 5 documentation files updated (SOTU, ARCHITECTURE, STATE_OF_THE_TIGER_PATH_FORWARD, CLAUDE.md, SOUL.md)
 
-**Also discussed this session:**
-- White label / affiliate deal with Max Steingart — holding at referral model until he sells first 10
-- Platform scaling ceiling is ~500 active bots before DB needs attention — plenty of runway
-- Immediate go-to-market focus: get first 10 from Brent/Jeff/John NuSkin network running for one week
-
-**Platform state at session end:** All services green. 455/455 tests passing. CI green. Revision 00310-pjx live.
+**Platform state at session end:** 447/447 tests. Revision 00330-6ml.
 
 ---
 
@@ -210,15 +216,22 @@ Continued from Session 7. Platform was fully green at session start.
 
 ```bash
 # 1. Deploy API
-GCP_PROJECT_ID=hybrid-matrix-472500-k5 bash ./ops/deploy-cloudrun.sh
+gcloud run deploy tiger-claw-api \
+  --source ./api \
+  --region us-central1 \
+  --project hybrid-matrix-472500-k5 \
+  --quiet
 
-# 2. Fix all webhooks (now idempotent — TELEGRAM_WEBHOOK_SECRET is in deploy script)
+# 2. Health check
+curl https://api.tigerclaw.io/health
+
+# 3. Fix all webhooks
 ADMIN_TOKEN=$(gcloud secrets versions access latest --secret="tiger-claw-admin-token" --project="hybrid-matrix-472500-k5")
 curl -X POST https://api.tigerclaw.io/admin/fix-all-webhooks \
   -H "Authorization: Bearer $ADMIN_TOKEN"
 
-# 3. Deploy wizard (manual — Vercel auto-deploy is broken)
-# Use Vercel dashboard or CLI from web-onboarding/
+# 4. Deploy wizard (from web-onboarding/ directory)
+npx vercel deploy --prod --yes
 ```
 
 ---
@@ -235,7 +248,8 @@ curl -X POST https://api.tigerclaw.io/admin/fix-all-webhooks \
 - Cloud SQL proxy runs on port **5433** locally, not 5432.
 - One PR per fix. Test before opening a PR. Delete branch after merge.
 - The Mac cluster at `192.168.0.2` is offline only. Cloud Run never calls it.
-- `tiger_gmail_send` and `tiger_postiz` are NOT in toolsMap by design. Do not re-add them without explicit operator approval.
+- `tiger_gmail_send` and `tiger_postiz` are NOT in toolsMap by design. Do not re-add them.
+- 447 tests must pass before any PR is opened. Run `npm test` from `api/`.
 
 ---
 
@@ -253,13 +267,12 @@ Do not mention any of these publicly until built.
 
 ## Session Protocol
 
-**Start of session:** Run cold start checklist above. Read this file. Do not code until you know what is broken.
+**Start of session:** Run cold start checklist above. Read this file. Read `MODULE_ASSESSMENT.md`. Do not code until you know what is broken.
 
 **End of session:** Update this file before closing. Specifically:
 1. Update "Last updated" line
 2. Update Live Service Status if anything changed
-3. Update Current Tenant Fleet from live data
-4. Update Known Open Issues (mark resolved, add new)
-5. Add a bullet to Session history above
+3. Update Known Open Issues (mark resolved, add new)
+4. Add a session summary above
 
 A session that ends without updating this file leaves the next agent blind.

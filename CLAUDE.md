@@ -4,22 +4,23 @@
 
 ---
 
-## Current Session State (2026-04-05 — Session 11 COMPLETE)
+## Current Session State (2026-04-05 — Session 12 COMPLETE)
 
-### Platform is fully green. 447/447 tests passing. Revision 00330-6ml live.
+### Platform is fully green. 447/447 tests passing. Revision 00336-hhb live.
 
-**Session 11 (Round 2 audit) closed 6 active security holes:**
-- GET /dashboard/:slug was fully unauthenticated — any attacker knowing a slug could read all tenant data
-- POST /dashboard/:slug/update-key was unauthenticated — attacker could hijack any tenant's Gemini key
-- PATCH /tenants/:id/status + POST /keys/activate + POST /scout were unauthenticated — attacker could terminate any bot
-- saveMarketFact() was storing raw URLs — moat was accumulating duplicate facts on every mining run
-- All fixed in PR #210. Deployed and health-verified.
+**Session 12 completed a full 8-module ground-truth assessment and shipped 4 fixes:**
+- PR #212: `fact_anchors` now read into `buildSystemPrompt()` — agents compound over time
+- PR #213: Customer dashboard auth fixed — session token stored at signup, sent on API calls
+- PR #214: Delta scan via `sinceTimestamp` — scout no longer rescans same content
+- PR #215: `nurture_check` skips LLM when tenant has zero leads — token burn eliminated
+- Vercel root directory misconfiguration fixed — manual deploys now work
 
-**32 remaining issues (Phase 2 MED + Phase 3 LOW) tracked in `audit-session10-round2.md`.**
+**Full assessment in `MODULE_ASSESSMENT.md`. Read it before writing any code.**
 
-### Immediate Priority
-Jeff Mack, John (Thailand), and Debbie need to complete wizard at `wizard.tigerclaw.io/signup`.
-Target: first 10 customers from Brent/Jeff/John NuSkin network running for one week.
+### Critical Open Issues (do not launch publicly until C4 is resolved)
+- **C4:** Payment gate is open — any email gets a free bot. Lemon Squeezy migration required.
+- **H2:** Reddit 403 on every scout run — Oxylabs account needed.
+- Read `MODULE_ASSESSMENT.md` for the complete prioritized fix list.
 
 ### Active Business Context
 - **Max Steingart:** White label / affiliate deal (30% affiliate via Stan Store). Holding at referral model — must sell 10 first. Do not build partner infrastructure until he proves he can sell.

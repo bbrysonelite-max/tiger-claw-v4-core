@@ -1,0 +1,302 @@
+# Tiger Claw — Module Assessment (April 2026)
+
+**Purpose:** Ground-truth assessment of what was built vs. what the foundation documents specify. Conducted against the Swarm Blueprint (architecture only — not the data intelligence business model), the Cognitive Architecture spec, the Heartbeat spec, and the Essential Root Documentation spec.
+
+**Product definition (confirmed):** Stateless agent hatchery for network marketing recruiting agents. BYOB (bring your own Telegram token from BotFather). BYOK (bring your own Gemini key). One-page signup. Agents that prospect and qualify leads. Hive gets smarter with every run.
+
+---
+
+## Module 1: Scout
+
+**What it should do:** Find high-intent prospects on Reddit, Facebook Groups, Telegram, and other platforms. Delta scan — only new content since last run. Pre-classify before scoring to avoid wasting tokens.
+
+**What was built:**
+- `api/src/tools/tiger_scout.ts` (1,455 lines) — full ICP keyword extraction, INTENT_PATTERNS array, lead scoring with decay, SCORE_THRESHOLD=80
+- Sources: Reddit, Telegram (stubbed), Facebook Groups (Serper fallback), LINE OpenChat (stubbed)
+- `ScoutState` tracks lastScheduledScan, burstCountToday, totalLeadsDiscovered
+- `api/src/services/market_miner.ts` (166 lines) — iterates FLAVOR_REGISTRY, fetches Reddit → falls back to Serper
+
+**What's broken:**
+1. **Reddit returns 403** on every run. No auth, no OAuth, no residential proxy. Falls back to Serper for all Reddit queries — burning paid API calls on what should be free scraping.
+2. **No delta scan.** No timestamp comparison against last run. Every scan re-processes the same content.
+3. **Serper globals** (`serperKeyIndex`, `serperCallsThisRun`) are module-level — shared across all tenants. One heavy tenant can exhaust the quota for all others.
+4. **Facebook Groups** — Serper only (surface-level). No deep group access.
+5. **No relevance pre-classification.** Every post goes through full scoring before being filtered.
+
+**Fatal?** No. Degrades gracefully to Serper. Agents can prospect today. Quality and cost are degraded.
+
+**Fix path:** Oxylabs residential proxies for Reddit auth. Delta scan via stored timestamp in `bot_states`. Per-tenant Serper quota tracking.
+
+---
+
+## Module 2: Hive (Market Intelligence)
+
+**What it should do:** Global shared intelligence layer. Every agent's activity feeds back into the Hive. Nightly mining run populates `market_intelligence` table. Agents query it for high-confidence facts before scouting. Moat grows over time.
+
+**What was built:**
+- `market_intelligence` table — `017_market_intelligence.sql`
+- `api/src/services/market_miner.ts` — autonomous nightly mining via BullMQ (`market-mining` queue), 2 AM UTC + Cheese Grater 3 AM backup
+- `api/src/tools/tiger_refine.ts` — Gemini 2.0 Flash fact extraction, RefinedFact types (objection, claim, sentiment, pricing, gap, intent_signal), 120-day fact expiry
+- `api/src/tools/tiger_hive.ts` — agent-facing tool for querying hive intelligence
+- `hive_signals` table + `hive_benchmarks` — injected into `buildSystemPrompt()` via `getHiveSignalWithFallback()` and `queryHivePatterns()`
+- `saveMarketFact()` now normalizes URLs before storage (PR #210 fix — dedup was broken before this)
+
+**What's missing:**
+- Reddit 403s mean mining falls back to Serper — same quality degradation as Module 1
+- No Oxylabs integration yet
+
+**Fatal?** No. Mining runs. Facts accumulate. 313 facts on first autonomous run. Dedup fixed.
+
+---
+
+## Module 3: Cognitive Architecture (Self-Improvement)
+
+**What it should do:** Identity Layer (SOUL.md, AGENTS.md, TOOLS.md, HEARTBEAT.md), Memory Layer (MEMORY.md, daily logs, heartbeat-state.json), Self-Improvement Layer (LEARNINGS.md, Ralph Wiggum Loop), Skills Layer (lazy SKILL.md files).
+
+**What was built:**
+- `api/src/services/self-improvement.ts` — substantial service:
+  - `draftSkillFromFailure()` — on tool failure, extracts the failure context and saves a prompt-based skill to the `skills` table
+  - `loadApprovedSkills(tenantId, flavor)` — loads approved skills into `buildSystemPrompt()` as MASTER STRATEGIC DIRECTIVES
+  - `analyzePatterns()` — finds tools with 2+ failures in 7 days
+  - `logLearning()` — legacy API, logs to admin_events
+  - FITFO Protocol: one failure = one draft, no threshold, no waiting
+- `api/migrations/013_skills.sql` + `014_skills_draft_dedup.sql` — skills table exists in DB
+- `api/.learnings/LEARNINGS.md` — exists but empty (just a heading)
+- `api/.learnings/ERRORS.md` — has Telegram webhook errors from March, no analysis written
+
+**What's missing:**
+- No `AGENTS.md` file (operational rules)
+- No `TOOLS.md` file (tool inventory / endpoints)
+- No `HEARTBEAT.md` file
+- No `activeContext.md` or `progress.md`
+- `LEARNINGS.md` is empty — self-improvement.ts writes to DB, not to the file
+- Ralph Wiggum Loop not wired into `runToolLoop()` in `ai.ts`
+
+**Fatal?** No. The backend engine exists and runs. File layer is cosmetic for Cloud Run. DB-backed skills are the real implementation.
+
+---
+
+## Module 4: Hatchery (Signup → Provision → Live)
+
+**What it should do:** One-page signup. BYOB + BYOK. 60 seconds from payment to bot live. Agent hatches with ICP pre-loaded — never re-asks what it already knows.
+
+**What was built:**
+- `web-onboarding/src/app/signup/page.tsx` — one-page signup live at `wizard.tigerclaw.io/signup` (200 OK)
+  - 5 sections: flavor picker, agent name, ICP (3 fields), Telegram token with live validation, Gemini key
+  - EmailGate component: verifies purchase email, auto-verifies from URL param
+  - SuccessState: "Your agent is live. [Name] is ready to hunt."
+- `api/src/routes/wizard.ts` — `POST /wizard/hatch`:
+  - Validates botId, checks pending subscription
+  - Validates and installs Gemini key inline if provided
+  - Writes `customerProfile` + `icpSingle` to `onboard_state.json` BEFORE provisioning
+  - Enqueues to `provisionQueue` with `jobId: provision-${botId}` (dedup guard)
+- `api/src/services/provisioner.ts`:
+  - Activates subscription atomically inside the job
+  - BYOB enforced — no botToken = no Telegram webhook = no hatch
+  - Sets webhook → rebrands bot name/description → registers slash commands → sets status `onboarding`
+  - Founding member eligibility check (fire-and-forget)
+- ICP data stored in `bot_states` table (DB-backed, not filesystem — correct for Cloud Run)
+- `buildSystemPrompt()` reads `icpSingle` from `onboard_state.json` on every message
+
+**What's missing:**
+1. **No proactive first message.** `triggerProactiveInitiation()` is commented out. Agent hatches in silence. Operator hears nothing until they message the bot first. Spec says "60 seconds from payment to bot sending first message."
+2. **Vercel auto-deploy broken.** `web-onboarding/` changes require manual Vercel deploy.
+
+**Fatal?** No. The flow works. The agent knows its ICP from message one. The silence on hatch is a UX gap, not a functional failure.
+
+**Fix:** Uncomment and generalize `triggerProactiveInitiation()` for all tenants — one message on hatch: "Hey [name], I'm live. I know who you're hunting. Let's go."
+
+---
+
+## Module 5: Orchestration / Heartbeat
+
+**What it should do:** Periodic background pulse. Checks what's overdue, runs exactly that, stays silent when nothing to report. Batches multiple checks into one agent turn to save tokens.
+
+**What was built:**
+- `global-cron` BullMQ queue, singleton `global_heartbeat_cron` job, fires every minute
+- `cronWorker` iterates all active tenants, dispatches to `routineQueue` with date-stamped jobIds (dedup = equivalent of heartbeat-state.json)
+- `routineWorker` calls `processSystemRoutine(tenantId, routineType)` with concurrency: 20
+- `processSystemRoutine()` in `ai.ts` has strong prompts:
+  - `daily_scout` at 7 AM UTC — waterfall (scout → search → data mine → draft cold outreach) + morning report in agent's voice
+  - `nurture_check` every cron cycle — surfaces leads due for follow-up
+  - `value_gap_checkin` at 9 AM if no lead in 3 days — genuine diagnostic, not retention push
+  - Feedback loop Mon/Wed/Fri 8 AM UTC
+
+**What's missing / imperfect:**
+1. **No HEARTBEAT.md file** — logic is hardcoded in queue.ts. Acceptable for Cloud Run. BullMQ IS the heartbeat implementation.
+2. **No HEARTBEAT_OK suppression** — `nurture_check` fires the LLM even when there's nothing to nurture. Burns tokens every cycle for every active tenant.
+3. **`onboardComplete` guard** — skips tenants where `phase !== 'complete'`. But one-page signup bots have `phase` undefined (never set). So new bots get scheduled for routines immediately after hatch, before first conversation. May be intentional.
+
+**Fatal?** No. Daily scout fires. Morning reports send. Value gap check runs. The token burn on empty nurture checks is a cost issue.
+
+**Fix:** Pre-check `tenant_leads` count before spinning up LLM for `nurture_check`. Zero leads = skip entirely.
+
+---
+
+## Module 6: Skills Layer
+
+**What it should do:** Self-contained skill directories loaded lazily. Agent declares only the tools it needs for the current task. System prompt stays lean.
+
+**What was built:**
+- 25 TypeScript tools registered in `toolsMap` in `ai.ts`
+- All 25 declared to Gemini via `geminiTools` on every single request
+- `loadApprovedSkills()` injects DB-backed dynamic skills into system prompt as MASTER STRATEGIC DIRECTIVES
+- Tool inventory covers full pipeline: scout → score → lead → nurture → convert → operator management
+
+**What's missing:**
+1. **No lazy loading.** All 25 tool declarations sent to Gemini every turn. Significant token overhead.
+2. **No `skills/` directory.** Spec called for file-based SKILL.md definitions. Everything is TypeScript.
+3. `tiger_gmail_send` and `tiger_postiz` intentionally excluded (CLAUDE.md mandate — correct).
+
+**Fatal?** No. All tools work and are tested. Token overhead is a cost issue, not correctness.
+
+**Optimization path (two options):**
+1. **Context caching (immediate)** — Gemini native feature. Cache static tool declarations + system prompt. Near-zero token cost after first request. One afternoon of work.
+2. **Routine-aware tool sets (Phase 2)** — Pass only relevant tools per routineType. `daily_scout` gets 5 tools. `nurture_check` gets 4 tools. Conversational turns get full set or intent-classified subset.
+
+---
+
+## Module 7: Memory Layer
+
+**What it should do:** Short-term (session history), long-term per-agent (learns operator's business over time), global Hive (platform-wide intelligence). Agent never re-asks what it already knows. Compounds every week.
+
+**What was built:**
+- **Short-term (Redis)** — `chat_history:tenantId:chatId`, capped at 20 turns (MAX_HISTORY_TURNS). Loaded on every message. ✅
+- **Global Hive** — `hive_signals` + `market_intelligence` tables. `buildSystemPrompt()` calls `getHiveSignalWithFallback()` and `queryHivePatterns()`. Injected into every agent's context. ✅
+- **fact_anchors write pipeline** — `factExtractionQueue` fires after every conversation. `extractFactAnchors()` reads last 10 history entries, runs Gemini to extract structured facts (products, ICP updates, objections, hot leads, preferences), saves to `tenant_states` as `fact_anchors`. ✅
+
+**Critical gap:**
+- **`buildSystemPrompt()` never reads `fact_anchors` back.** The extraction runs. The facts are in the DB. But they are never injected into the system prompt. Agent accumulates intelligence it never uses.
+- Only place `fact_anchors` is read: `tiger_strike_draft.ts` (social media drafts only, not main conversation loop).
+
+**Fatal?** No for launch. Yes for the product's core value proposition over time. This is what makes an agent sharp in week 3 vs. week 1. Without it, every session starts fresh except for the initial ICP.
+
+**Fix:** ~10 lines in `buildSystemPrompt()`. Read `fact_anchors` from `tenant_states`, format as a prompt block, inject after the ICP block. The write pipeline is already running.
+
+---
+
+## Module 8: Payment Pipeline, Dashboards, and SOUL
+
+### Payment Pipeline
+
+**Current flow:**
+1. Customer buys on Stan Store
+2. Stan Store sends a confirmation email containing a link: `wizard.tigerclaw.io/signup?email=customer@email.com`
+3. Customer clicks link → email auto-populates in the EmailGate field
+4. `POST /auth/verify-purchase` receives the email → finds no prior DB record → creates user + bot + subscription on-demand → issues session token
+5. Customer proceeds through one-page signup → hatch
+
+**The gap: no payment gate exists.** `verify-purchase` creates records for any email with no verification against Stan Store or any payment processor. The only barrier is that paying customers receive the confirmation email with the link — but anyone who navigates directly to `wizard.tigerclaw.io/signup` and types any email gets a free bot.
+
+The Zapier webhook at `POST /webhooks/stan-store` is legacy code — it was built for an earlier flow and is no longer part of the current path. The `stan_store_self_serve_*` subscription IDs being generated are not fake — they're real records — but they're created without proof of payment.
+
+**For Lemon Squeezy (the right move for international):**
+Lemon Squeezy supports HMAC-signed webhooks. When a purchase completes, Lemon Squeezy fires to `/webhooks/lemon-squeezy` with the customer email and a verifiable signature. That creates the DB record *before* the customer arrives. Then `verify-purchase` finds the record and the gate is real. The existing stan-store webhook handler is the template — swap it out.
+
+**Why Lemon Squeezy over Stan Store:**
+- International sales without the US tax liability Stan Store creates
+- Real webhook support (Stan Store has none — that's why Zapier was needed)
+- Merchant of Record model — Lemon Squeezy handles VAT, sales tax globally
+
+---
+
+### Customer-Facing Dashboard
+
+**What was built:** A full dashboard at `wizard.tigerclaw.io/dashboard?slug=your-slug`. Shows bot status with live indicator, Telegram link, API key health (with inline key replacement form), channels, subscription status, and a leads table with scores and profile links. Well-designed and functional UI.
+
+**The gap: auth mismatch.** PR #210 added `requireSession` middleware to `GET /dashboard/:slug` and `POST /dashboard/:slug/update-key` on the API. The frontend was never updated to send the session token. Both fetch calls in `dashboard/page.tsx` send no Authorization header. Every customer who tries to view their dashboard currently receives a 401 and sees the error screen.
+
+**Fix:** Read the session token from wherever the signup flow stores it (localStorage or the URL after hatch), and pass it as `Authorization: Bearer <token>` in both fetch calls.
+
+---
+
+### Admin Dashboard
+
+**What was built:** A full fleet management dashboard at `/admin/dashboard`. Properly authenticated via Bearer token. Shows:
+- Pool health (now empty/irrelevant since BYOB, but shows status)
+- All tenants with status, flavor, region, last activity
+- Conversation stats (messages last 24h, today, by tenant)
+- Alarms: suspended tenants, waitlisted tenants, stuck-in-onboarding >48h
+- Per-tenant actions: suspend, resume, fix webhook
+- Tenant expand/collapse for detail view
+
+This is functional. The alarms for stuck onboarding >48h are directly useful for the current three customers. The conversation stats show whether agents are actually having conversations.
+
+**One stale reference:** Admin dashboard still shows "pool health" which is meaningless now that BYOB removed the pool. Low priority cleanup.
+
+---
+
+### SOUL
+
+**Solid. No action needed.**
+
+SOUL.md is loaded via `loadSoul()` in `ai.ts` and injected into `buildSystemPrompt()` first — before ICP, before tools, before everything. Contains:
+- Tiger's full voice and personality ("Pebo in your pocket")
+- The Voice Test ("Does this feel like Pebo just smiled?")
+- The Dream Injection Principle
+- The Three Daily Magic Moments (Morning Hunt Report, Midday Pulse, Evening Win)
+- The Language of Hope table (what Tiger never says vs. always says)
+- The Craig Principle, The Fear Reframe, The Opening Sequence in 6 languages
+- Design Principles
+
+"Pebo" being the agent's voice benchmark is intentional and correct — it's the human warmth anchor. The books and voice work that went into this document shows. This is the strongest single artifact in the entire codebase.
+
+**Note:** The SOUL is the same for every tenant. Every operator's agent has the same voice — Tiger's voice. Operators provide the ICP and identity data, but the personality is Tiger. That is by design and correct.
+
+---
+
+## Module 8 Summary
+
+| Area | Status | Fatal? |
+|---|---|---|
+| Payment gate | Open — any email gets a free bot | Yes for revenue integrity |
+| Customer dashboard | Auth mismatch — 401 for all customers | Yes for customer experience |
+| Admin dashboard | Works, properly authenticated, useful alarms | No |
+| SOUL | Solid — loaded first, voice is strong, no changes needed | No |
+| Lemon Squeezy migration | Not started — required before international launch | Yes for international |
+
+---
+
+## Priority Fix List
+
+### Critical — blocks correct operation
+
+| # | Fix | File(s) | Impact |
+|---|---|---|---|
+| C1 | Customer dashboard sends no auth token — 401 for all customers | `web-onboarding/src/app/dashboard/page.tsx` | Customers cannot see their dashboard |
+| C2 | `fact_anchors` are extracted but never read back into system prompt | `api/src/services/ai.ts` (~10 lines in `buildSystemPrompt()`) | Agent never compounds — same ICP every session forever |
+| C3 | No proactive first message on hatch | `api/src/services/provisioner.ts` (~20 lines) | Bot hatches in silence — operator hears nothing |
+| C4 | Payment gate is open — any email gets a free bot | `api/src/routes/auth.ts` + new Lemon Squeezy webhook | Revenue integrity; required before any marketing |
+
+### High — degrades product quality
+
+| # | Fix | File(s) | Impact |
+|---|---|---|---|
+| H1 | `nurture_check` fires LLM even with zero leads | `api/src/services/queue.ts` (~5 lines) | Token burn every minute for every tenant |
+| H2 | Reddit returns 403 on every scout run | `api/src/services/market_miner.ts` | Scout falls back to paid Serper for all Reddit queries |
+| H3 | No delta scan — rescans same content every run | `api/src/tools/tiger_scout.ts` | Duplicate leads, wasted API calls |
+
+### Medium — cost and efficiency
+
+| # | Fix | File(s) | Impact |
+|---|---|---|---|
+| M1 | All 25 tools declared to Gemini on every request | `api/src/services/ai.ts` | Token overhead — context caching or tool subsets |
+| M2 | Serper quota is global, not per-tenant | `api/src/services/market_miner.ts` | One heavy tenant exhausts quota for all |
+| M3 | Vercel auto-deploy broken for `web-onboarding/` | CI config | Every UI change requires manual deploy |
+
+### Parallel execution plan
+
+These can run simultaneously in isolated worktrees:
+- **Agent A:** C1 (dashboard auth) — `web-onboarding/` only
+- **Agent B:** C2 (fact_anchors read) — `api/src/services/ai.ts` only
+- **Agent C:** C3 (proactive first message) — `api/src/services/provisioner.ts` only
+- **Agent D:** H1 (nurture_check LLM skip) — `api/src/services/queue.ts` only
+- **Agent E:** H3 (delta scan) — `api/src/tools/tiger_scout.ts` only
+
+C4 (payment gate / Lemon Squeezy) requires architecture decision first — sequential, not parallel.
+H2 (Oxylabs) requires account setup first — deferred until account exists.
+
+---
+
+*Assessment conducted: April 2026. All 8 modules assessed against foundation documents.*
+*Next action: dispatch sub-agents for C1–C3, H1, H3 in parallel.*
