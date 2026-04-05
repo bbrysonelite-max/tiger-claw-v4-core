@@ -98,13 +98,11 @@
 - ICP data stored in `bot_states` table (DB-backed, not filesystem — correct for Cloud Run)
 - `buildSystemPrompt()` reads `icpSingle` from `onboard_state.json` on every message
 
-**What's missing:**
-1. **No proactive first message.** `triggerProactiveInitiation()` is commented out. Agent hatches in silence. Operator hears nothing until they message the bot first. Spec says "60 seconds from payment to bot sending first message."
-2. **Vercel auto-deploy broken.** `web-onboarding/` changes require manual Vercel deploy.
+**Fixed (PR #221):**
+1. **Proactive first message** — `sendProvisioningReceipt` now sends a personalized hatch email immediately after provisioning. Subject: "[AgentName] is live. Let's hunt." Body references agent name, flavor, ICP. Sends even when botUsername is null. Dead `triggerProactiveInitiation` admin-only block removed. ✅
+2. **Vercel auto-deploy** — root directory misconfiguration fixed in Session 12. Auto-deploy now works. ✅
 
-**Fatal?** No. The flow works. The agent knows its ICP from message one. The silence on hatch is a UX gap, not a functional failure.
-
-**Fix:** Uncomment and generalize `triggerProactiveInitiation()` for all tenants — one message on hatch: "Hey [name], I'm live. I know who you're hunting. Let's go."
+**Fatal?** No. Flow is solid end-to-end.
 
 ---
 
@@ -258,8 +256,8 @@ SOUL.md is loaded via `loadSoul()` in `ai.ts` and injected into `buildSystemProm
 |---|---|---|---|
 | C1 | Customer dashboard sends no auth token — 401 for all customers | `web-onboarding/src/app/dashboard/page.tsx` | ✅ Fixed PR #213 |
 | C2 | `fact_anchors` are extracted but never read back into system prompt | `api/src/services/ai.ts` | ✅ Fixed PR #212 |
-| C3 | No proactive first message on hatch | `api/src/services/provisioner.ts` | Open — UX workaround needed |
-| C4 | Payment gate is open — any email gets a free bot | `api/src/routes/auth.ts` + new Paddle webhook | Open — Paddle application submitted 2026-04-05 |
+| C3 | No proactive first message on hatch | `api/src/services/email.ts`, `queue.ts` | ✅ Fixed PR #221 — personalized hatch email, Tiger's voice (needs deploy) |
+| C4 | Payment gate is open — any email gets a free bot | `api/src/routes/auth.ts` + new Paddle webhook | Open — Paddle application in progress; domains approved, business name typo pending |
 
 ### High — degrades product quality
 
@@ -274,20 +272,16 @@ SOUL.md is loaded via `loadSoul()` in `ai.ts` and injected into `buildSystemProm
 | # | Fix | File(s) | Status |
 |---|---|---|---|
 | M1 | All 25 tools declared to Gemini on every request | `api/src/services/ai.ts` | ✅ Fixed PR #219 (context caching) |
-| M2 | Serper quota is global, not per-tenant | `api/src/services/market_miner.ts` | Open |
+| M2 | Serper quota is global, not per-tenant | `api/src/services/market_miner.ts`, `tiger_scout.ts` | ✅ Fixed PR #222 — per-invocation counter + key rotation (needs deploy) |
 | M3 | Vercel auto-deploy broken for `web-onboarding/` | CI config | ✅ Fixed (root directory misconfiguration resolved) |
 
-### Parallel execution plan
+### Next session priorities
 
-These can run simultaneously in isolated worktrees:
-- **Agent A:** C1 (dashboard auth) — `web-onboarding/` only
-- **Agent B:** C2 (fact_anchors read) — `api/src/services/ai.ts` only
-- **Agent C:** C3 (proactive first message) — `api/src/services/provisioner.ts` only
-- **Agent D:** H1 (nurture_check LLM skip) — `api/src/services/queue.ts` only
-- **Agent E:** H3 (delta scan) — `api/src/tools/tiger_scout.ts` only
-
-C4 (payment gate / Lemon Squeezy) requires architecture decision first — sequential, not parallel.
-H2 (Oxylabs) requires account setup first — deferred until account exists.
+1. **Deploy** — run Cloud Run deploy to ship PRs #221/#222. Verify health endpoint 200 after.
+2. **Agent behavior review** — operator flagged conversational quality as a "broken window." Review `runToolLoop()` in `ai.ts`, SOUL injection order in `buildSystemPrompt()`, and test a live agent conversation before onboarding any customer.
+3. **C4** — Build `/webhooks/paddle` once Paddle approves. Use existing LS webhook handler as template (HMAC signature verification, same pattern).
+4. **H2** — Oxylabs proxy for Reddit. Deferred until account exists.
+5. **R2-P1-6** — Stan Store Zapier race condition on `stripe_subscription_id` UNIQUE constraint. Buildable now.
 
 ---
 

@@ -1,6 +1,6 @@
 # Tiger Claw — State of the Union
 
-**Last updated:** 2026-04-05 (Session 12 COMPLETE — Full module assessment + 8 fixes deployed. Revision 00345-525 live.)
+**Last updated:** 2026-04-05 (Session 13 COMPLETE — Doc sync, C3+M2 fixed, refund policy added. PRs #221–#222 on main, NOT YET DEPLOYED.)
 **This is the single source of truth. Read nothing else until you finish this file.**
 
 ---
@@ -23,6 +23,12 @@
 **Tests:** 447/447 passing
 **Wizard:** `wizard.tigerclaw.io/signup` — 200 OK
 
+**Session 13 changes (PRs #220–#222 + website PR #1) — #221/#222 on main, NOT YET DEPLOYED:**
+- ✅ #220 — Docs: MODULE_ASSESSMENT + SOTU updated to reflect Session 12 resolved items.
+- ✅ #221 — Hatch email personalized (agent name + flavor, Tiger's voice, null-safe botUsername). — **needs deploy**
+- ✅ #222 — Serper: per-invocation call counter in market_miner; key rotation in tiger_scout. — **needs deploy**
+- ✅ Website #1 — Refund policy section added to tigerclaw.io for Paddle compliance.
+
 **Session 12 fixes merged and live (PRs #212–#219):**
 - ✅ #212 — `fact_anchors` now read back into `buildSystemPrompt()`. Agents compound over time.
 - ✅ #213 — Customer dashboard auth fixed. Session token stored at signup, sent on dashboard requests.
@@ -40,17 +46,17 @@
 
 | # | Issue | Priority |
 |---|---|---|
-| C4 | Payment gate is open — any email gets a free bot. Waiting on Paddle approval. | CRITICAL before marketing |
+| DEPLOY | PRs #221/#222 on main but not deployed — run deploy before next customer onboards | IMMEDIATE |
+| REVIEW | Agent behavior flagged as broken window — review before onboarding any customer | IMMEDIATE |
+| C4 | Payment gate open — any email gets free bot. Paddle application in progress. | CRITICAL before marketing |
 | H2 | Reddit returns 403 on every scout run — Oxylabs account needed | HIGH |
-| M2 | Serper quota is global, not per-tenant | MED |
 | R2-P1-6 | Stan Store Zapier race — duplicate timestamp hits UNIQUE constraint | MED |
 
 **Payment processor status:**
-- Stan Store: active, no payment gate (on-demand creation)
-- Lemon Squeezy: REJECTED — "services fulfilled outside Lemon Squeezy"
-- Paddle: application submitted 2026-04-05 at https://tigerclaw.io — awaiting approval
-- Lemon Squeezy webhook code is in the repo and ready. When Paddle approves, build equivalent `/webhooks/paddle` handler using same pattern.
-- LEMONSQUEEZY_SIGNING_SECRET is stored in GCP Secret Manager but NOT active in Cloud Run. Do not add it until a processor is confirmed.
+- Stan Store: active, no payment gate (on-demand creation — gap C4 still open)
+- Lemon Squeezy: REJECTED — "services fulfilled outside Lemon Squeezy". Webhook code dormant in repo. LEMONSQUEEZY_SIGNING_SECRET in GCP Secret Manager but NOT active in Cloud Run.
+- Paddle: application submitted 2026-04-05. Domains approved. Business name had typos in application — operator cannot find how to correct in portal. Everything else approved; token likely available but deferred pending final approval. When approved: build `/webhooks/paddle` using existing LS handler as template.
+- Refund policy: live at tigerclaw.io/#refund-policy (deployed 2026-04-05, tiger-bot-website PR #1).
 
 Full assessment: `MODULE_ASSESSMENT.md` in repo root.
 Full audit backlog: `audit-session10-round2.md` and `audit-april-4th.md`.
@@ -178,15 +184,36 @@ tiger_onboard, tiger_scout, tiger_contact, tiger_aftercare, tiger_briefing, tige
 
 | Item | Priority |
 |------|----------|
+| Deploy PRs #221/#222 to Cloud Run | IMMEDIATE |
+| Agent behavior review — conversational quality, SOUL injection, runToolLoop() | IMMEDIATE |
 | C4: Payment gate open — any email gets free bot | CRITICAL before marketing |
 | H2: Reddit 403 — Oxylabs account needed | HIGH |
-| Paddle migration (replaces Stan Store) — awaiting approval | HIGH |
-| Proactive first message on hatch — Telegram limitation, needs UX workaround | MED |
-| M2: Per-tenant Serper quota tracking | MED |
+| Paddle final approval — business name typo in application, all else approved | HIGH |
 | R2-P1-6: Stan Store Zapier race condition on stripe_subscription_id UNIQUE | MED |
 | Past customers owed bots: `chana.loh@gmail.com`, `nancylimsk@gmail.com`, `lily.vergara@gmail.com` | WHEN READY |
 | Affiliate/referral tracking — Max Steingart deal (30%). Hold until he sells first 10. | DEFERRED |
 | Remove Stripe dead code | LOW |
+
+---
+
+## Session 13 — What Was Done (2026-04-05)
+
+Doc sync + targeted fixes. No deploy yet — PRs are on main.
+
+**PRs merged:**
+- #220 — Docs: MODULE_ASSESSMENT Priority Fix List and module narratives updated to reflect Session 12 resolved items (C1/C2/H1/H3/M1/M3 marked resolved with PR numbers). SOTU stale open items removed.
+- #221 — fix/C3: Hatch email (`sendProvisioningReceipt`) now personalized — agent name and flavor in subject and body, Tiger's voice, sends regardless of botUsername. Dead admin-only `triggerProactiveInitiation` block removed from provisioner.
+- #222 — fix/M2: `market_miner.ts` refactored `fetchSerper` into `makeSerperFetcher()` factory — per-invocation call counter, no cross-run interference. `tiger_scout.ts` — `getSerperKey()` round-robin rotator added, replaces hardcoded KEY_1 lookups.
+
+**Website:**
+- `tiger-bot-website` PR #1: Refund policy section added to tigerclaw.io for Paddle merchant application compliance. 4-card layout covering 7-day money-back, statutory withdrawal rights, subscription cancellation, processing time. Paddle MoR disclosure included.
+
+**Paddle status:**
+- Domains approved. Everything else approved. Business name had typos in the application — operator cannot find correction path in portal. Token likely available but deferred. Waiting on final approval.
+
+**Flagged for next session:**
+- Deploy PRs #221/#222 to Cloud Run before any customer onboards.
+- Agent behavior review — operator flagged conversational quality as a "broken window." Must review `runToolLoop()`, SOUL injection in `buildSystemPrompt()`, and overall agent response quality before John/Jeff/Debbie go through the wizard.
 
 ---
 
