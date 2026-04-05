@@ -1,6 +1,7 @@
 import { GoogleGenerativeAI, Content, Part, GenerateContentResult } from '@google/generative-ai';
 import OpenAI from 'openai';
 import { getTenant, getPool, getBotState, setBotState, getTenantBotToken, getHiveSignalWithFallback, queryHivePatterns, updateTenantKeyHealth } from './db.js';
+import { getTenantState } from './tenant_data.js';
 import { getMarketIntelligence, MarketFact } from './market_intel.js';
 import TelegramBot from 'node-telegram-bot-api';
 import IORedis from 'ioredis';
@@ -795,6 +796,40 @@ export async function buildSystemPrompt(tenant: any): Promise<string> {
         }
     }
 
+    // Load accumulated fact anchors — extracted from past conversations
+    const factAnchors = await getTenantState<any>(tenant.id, 'fact_anchors').catch(() => null);
+
+    const anchorLines: string[] = [];
+    if (factAnchors && factAnchors.lastExtractedAt) {
+        const hasContent = [
+            factAnchors.productMentioned,
+            factAnchors.icpUpdates,
+            factAnchors.objectionsRaised,
+            factAnchors.preferencesStated,
+            factAnchors.hotLeadsMentioned,
+        ].some(arr => Array.isArray(arr) && arr.length > 0);
+
+        if (hasContent) {
+            anchorLines.push(``, `━━━━ WHAT YOU'VE LEARNED ABOUT THIS OPERATOR ━━━━`);
+            anchorLines.push(`(Extracted from past conversations — use naturally, never quote directly)`);
+            if (factAnchors.productMentioned?.length) {
+                anchorLines.push(`Products/opportunities mentioned: ${factAnchors.productMentioned.map((e: any) => e.value).join('; ')}`);
+            }
+            if (factAnchors.icpUpdates?.length) {
+                anchorLines.push(`ICP refinements: ${factAnchors.icpUpdates.map((e: any) => e.value).join('; ')}`);
+            }
+            if (factAnchors.objectionsRaised?.length) {
+                anchorLines.push(`Objections their prospects raise: ${factAnchors.objectionsRaised.map((e: any) => e.value).join('; ')}`);
+            }
+            if (factAnchors.preferencesStated?.length) {
+                anchorLines.push(`Operator preferences: ${factAnchors.preferencesStated.map((e: any) => e.value).join('; ')}`);
+            }
+            if (factAnchors.hotLeadsMentioned?.length) {
+                anchorLines.push(`Hot leads mentioned: ${factAnchors.hotLeadsMentioned.map((e: any) => e.value).join('; ')}`);
+            }
+        }
+    }
+
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // SOUL VOICE BLOCK — injected FIRST, above everything else.
     // This is Tiger's identity. It cannot be diluted by what follows.
@@ -852,6 +887,7 @@ export async function buildSystemPrompt(tenant: any): Promise<string> {
         `Key prospect signals for this vertical: ${flavor.defaultKeywords.slice(0, 8).join(', ')}.`,
         operatorBlock,
         ...icpLines,
+        ...anchorLines,
         ``,
         `You are a strategic business consultant with deep expertise in ${flavor.professionLabel}. You think alongside your operator — you don't just run tools, you lead.`,
         ``,
