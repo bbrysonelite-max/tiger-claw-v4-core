@@ -32,6 +32,26 @@ import { emitHiveEvent } from "../services/hiveEmitter.js";
 import { sendFirstLeadNotification } from "../services/email.js";
 
 // ---------------------------------------------------------------------------
+// Serper key rotation — round-robin across up to 3 keys.
+// All scout Serper calls go through getSerperKey() so no single key takes
+// all the load when multiple tenants scout concurrently.
+// ---------------------------------------------------------------------------
+const SCOUT_SERPER_KEYS: string[] = [
+  process.env["SERPER_KEY_1"],
+  process.env["SERPER_KEY_2"],
+  process.env["SERPER_KEY_3"],
+].filter(Boolean) as string[];
+
+let scoutSerperKeyIndex = 0;
+
+function getSerperKey(): string | undefined {
+  if (SCOUT_SERPER_KEYS.length === 0) return undefined;
+  const key = SCOUT_SERPER_KEYS[scoutSerperKeyIndex % SCOUT_SERPER_KEYS.length];
+  scoutSerperKeyIndex++;
+  return key;
+}
+
+// ---------------------------------------------------------------------------
 // Scoring constants — LOCKED per spec. Must match tiger_score.ts exactly.
 // ---------------------------------------------------------------------------
 
@@ -903,7 +923,7 @@ async function fetchFacebookPosts(
 ): Promise<DiscoveredProfile[]> {
   if (keywords.length === 0) return [];
 
-  const serperKey = process.env.SERPER_KEY_1 ?? process.env.SERPER_KEY_2 ?? process.env.SERPER_KEY_3;
+  const serperKey = getSerperKey();
   if (!serperKey) {
     logger.warn("tiger_scout: No SERPER_KEY configured — skipping Facebook source");
     return [];
@@ -1030,7 +1050,7 @@ async function fetchLINEPosts(
   }
 
   // Strategy 2: Serper fallback — search for LINE OpenChat content on the web
-  const serperKey = process.env.SERPER_KEY_1 ?? process.env.SERPER_KEY_2 ?? process.env.SERPER_KEY_3;
+  const serperKey = getSerperKey();
   if (!serperKey) {
     logger.info("tiger_scout: LINE source — no local messages and no SERPER_KEY");
     return [];
