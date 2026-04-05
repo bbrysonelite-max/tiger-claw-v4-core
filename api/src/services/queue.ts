@@ -441,10 +441,17 @@ export const cronWorker = SHOULD_RUN_WORKERS ? new Worker(
                     if (!onboardComplete) continue;
 
                     // Nurture check — runs every cron cycle (jobId dedup prevents parallel runs)
-                    await routineQueue.add('nurture_check', {
-                        tenantId: tenant.id,
-                        routineType: 'nurture_check',
-                    }, { jobId: `nurture_${tenant.id}`, removeOnComplete: true, removeOnFail: { count: 100 } });
+                    // Skip if tenant has no leads — avoids burning LLM tokens on an empty pipeline
+                    const { rows: leadRows } = await pool.query(
+                        `SELECT 1 FROM tenant_leads WHERE tenant_id = $1 LIMIT 1`,
+                        [tenant.id]
+                    );
+                    if (leadRows.length > 0) {
+                        await routineQueue.add('nurture_check', {
+                            tenantId: tenant.id,
+                            routineType: 'nurture_check',
+                        }, { jobId: `nurture_${tenant.id}`, removeOnComplete: true, removeOnFail: { count: 100 } });
+                    }
 
                     // daily_scout runs once per day at 7 AM UTC (date-stamped jobId prevents re-add)
                     if (nowHour === 7) {

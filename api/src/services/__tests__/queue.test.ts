@@ -174,9 +174,10 @@ describe('queue.ts workers', () => {
         // ── Value-gap detection tests (CLAUDE.md mandate) ─────────────────────
 
         it('enqueues value_gap_checkin at 9 AM UTC for tenants with no leads in 7 days', async () => {
-            // First call: main tenant query. Second call: value-gap sub-query returns a row (tenant IS in gap).
+            // Call 1: main tenant query. Call 2: nurture leads pre-check (has leads). Call 3: value-gap sub-query returns a row (tenant IS in gap).
             mockQuery
                 .mockResolvedValueOnce({ rows: [{ id: 'tenant-gap', created_at: new Date().toISOString() }] })
+                .mockResolvedValueOnce({ rows: [{ id: 'tenant-gap' }] }) // leads pre-check — tenant has leads
                 .mockResolvedValueOnce({ rows: [{ 1: 1 }] }); // gap query returns a row
 
             const { getBotState } = await import('../db.js');
@@ -201,9 +202,10 @@ describe('queue.ts workers', () => {
         });
 
         it('does NOT enqueue value_gap_checkin when tenant has a recent lead', async () => {
-            // First call: main tenant query. Second call: value-gap query returns no rows (no gap).
+            // Call 1: main tenant query. Call 2: nurture leads pre-check (has leads). Call 3: value-gap query returns no rows (no gap).
             mockQuery
                 .mockResolvedValueOnce({ rows: [{ id: 'tenant-healthy', created_at: new Date().toISOString() }] })
+                .mockResolvedValueOnce({ rows: [{ id: 'tenant-healthy' }] }) // leads pre-check — tenant has leads
                 .mockResolvedValueOnce({ rows: [] }); // no gap
 
             const { getBotState } = await import('../db.js');
@@ -247,9 +249,10 @@ describe('queue.ts workers', () => {
         });
 
         it('continues cron cycle when value-gap DB query throws (error isolation)', async () => {
-            // First call: main tenant query. Second call: value-gap query throws.
+            // Call 1: main tenant query. Call 2: nurture leads pre-check (has leads). Call 3: value-gap query throws.
             mockQuery
                 .mockResolvedValueOnce({ rows: [{ id: 'tenant-gap', created_at: new Date().toISOString() }] })
+                .mockResolvedValueOnce({ rows: [{ id: 'tenant-gap' }] }) // leads pre-check — tenant has leads
                 .mockRejectedValueOnce(new Error('DB timeout'));
 
             const { getBotState } = await import('../db.js');
