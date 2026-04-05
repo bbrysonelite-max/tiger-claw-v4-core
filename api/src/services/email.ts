@@ -32,31 +32,52 @@ export function verifyMagicToken(email: string, token: string, expires: number):
   }
 }
 
-export async function sendProvisioningReceipt(email: string, botUsername: string, planName: string): Promise<void> {
+export async function sendProvisioningReceipt(
+  email: string,
+  agentName: string,
+  botUsername: string | null,
+  flavor: string,
+): Promise<void> {
   const isMock = process.env["RESEND_API_KEY"] === undefined;
-  
+
   if (isMock) {
-    console.log(`[Email] MOCK sendProvisioningReceipt to ${email} for @${botUsername}`);
+    console.log(`[Email] MOCK sendProvisioningReceipt to ${email} — agent: ${agentName} (@${botUsername ?? "unknown"})`);
     return;
   }
+
+  const dashboardUrl = process.env["FRONTEND_URL"] ?? "https://wizard.tigerclaw.io";
+  const telegramLine = botUsername
+    ? `<p style="text-align:center;margin:28px 0;">
+        <a href="https://t.me/${botUsername}" style="display:inline-block;background:#f59e0b;color:#0a0a0f;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:700;font-size:16px;">
+          Message ${agentName} on Telegram →
+        </a>
+       </p>`
+    : `<p style="color:#6b7280;">Open Telegram and search for your bot to start the hunt.</p>`;
+
+  const html = `
+<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:480px;margin:0 auto;padding:24px;background:#0a0a0f;color:#e8e8f0;border-radius:12px;">
+  <h2 style="color:#f59e0b;margin-top:0;">${agentName} is live.</h2>
+  <p style="color:#d1d5db;line-height:1.6;">
+    Your ${flavor} agent is awake, loaded with your ICP, and ready to hunt.<br>
+    Send it a message to begin — it already knows who you're after.
+  </p>
+  ${telegramLine}
+  <p style="color:#6b7280;font-size:13px;line-height:1.6;">
+    View your dashboard and leads at <a href="${dashboardUrl}" style="color:#f59e0b;">${dashboardUrl}</a><br>
+    Your agent runs a daily scan at 7 AM UTC and sends you a morning report.
+  </p>
+  <hr style="border:none;border-top:1px solid #1f2937;margin:20px 0;">
+  <p style="color:#4b5563;font-size:12px;">Tiger Claw · <a href="https://tigerclaw.io" style="color:#f59e0b;">tigerclaw.io</a></p>
+</div>`;
 
   try {
     await resend.emails.send({
       from: FROM_EMAIL,
       to: email,
-      subject: "Your Tiger Claw Agent is Live! 🚀",
-      html: `
-        <h2>Your AI Agent is ready!</h2>
-        <p>Your agent <strong>@${botUsername}</strong> has been successfully provisioned on the ${planName} plan.</p>
-        <p><strong>Next steps:</strong></p>
-        <ol>
-          <li><a href="https://t.me/${botUsername}">Click here to message your bot on Telegram</a></li>
-          <li>Log into your <a href="${process.env["FRONTEND_URL"] ?? "https://wizard.tigerclaw.io"}">Customer Dashboard</a> to configure LINE or WhatsApp.</li>
-        </ol>
-        <p>Happy hunting,<br>Tiger Claw Team</p>
-      `,
+      subject: `${agentName} is live. Let's hunt.`,
+      html,
     });
-    console.log(`[Email] sendProvisioningReceipt sent to ${email}`);
+    console.log(`[Email] sendProvisioningReceipt sent to ${email} (agent: ${agentName})`);
   } catch (error) {
     console.error(`[Email] sendProvisioningReceipt failed:`, error);
   }

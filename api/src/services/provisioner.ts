@@ -18,7 +18,6 @@ import { decryptToken } from "./pool.js";
 import { sendAdminAlert } from "../routes/admin.js";
 import { logLearning } from "./self-improvement.js";
 import { VALID_FLAVOR_KEYS } from "../tools/flavorConfig.js";
-// Proactive initiation disabled temporarily during CORS testing
 
 // ---------------------------------------------------------------------------
 // Telegram fetch with timeout
@@ -230,13 +229,6 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
         console.warn('[provisioner] setMyCommands failed (non-fatal):', cmdErr);
       }
 
-      if (input.email === "brentbryson@me.com") {
-        const ADMIN_CHAT_ID = parseInt(process.env["ADMIN_TELEGRAM_CHAT_ID"] || "0");
-        if (ADMIN_CHAT_ID) {
-          console.log(`[provisioner] Sending proactive intake to Admin Chat for ${tenant.slug}`);
-          // await triggerProactiveInitiation(tenant.id, resolvedBotToken, ADMIN_CHAT_ID);
-        }
-      }
     }
 
     // ── LINE webhook registration (non-fatal — LINE-only bots are valid) ──────
