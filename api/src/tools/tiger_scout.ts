@@ -682,7 +682,8 @@ async function getRedditBearerToken(): Promise<string | null> {
 async function fetchRedditPosts(
   keywords: string[],
   limit: number,
-  logger: ToolContext["logger"]
+  logger: ToolContext["logger"],
+  sinceTimestamp: number = 0
 ): Promise<DiscoveredProfile[]> {
   if (keywords.length === 0) return [];
 
@@ -718,6 +719,9 @@ async function fetchRedditPosts(
 
   for (const post of posts) {
     const { author, title, selftext, subreddit, permalink, created_utc } = post.data;
+
+    // Skip posts older than sinceTimestamp (delta scan filter)
+    if (sinceTimestamp > 0 && created_utc && created_utc * 1000 <= sinceTimestamp) continue;
 
     // Skip deleted/bot accounts
     if (!author || author === "[deleted]" || author === "AutoModerator") continue;
@@ -788,7 +792,8 @@ interface TelegramUpdate {
 async function fetchTelegramMessages(
   keywords: string[],
   limit: number,
-  logger: ToolContext["logger"]
+  logger: ToolContext["logger"],
+  sinceTimestamp: number = 0
 ): Promise<DiscoveredProfile[]> {
   const botToken = process.env.TELEGRAM_BOT_TOKEN;
   if (!botToken) {
@@ -827,6 +832,9 @@ async function fetchTelegramMessages(
 
     const { from, text, date } = update.message;
     if (!from.id || seenUsers.has(from.id)) continue;
+
+    // Skip messages older than sinceTimestamp (delta scan filter)
+    if (sinceTimestamp > 0 && date && date * 1000 <= sinceTimestamp) continue;
 
     // Only process messages that contain at least one ICP keyword
     const msgLower = text.toLowerCase();
@@ -947,7 +955,8 @@ async function fetchLINEPosts(
   keywords: string[],
   limit: number,
   logger: ToolContext["logger"],
-  tenantId: string
+  tenantId: string,
+  sinceTimestamp: number = 0
 ): Promise<DiscoveredProfile[]> {
   if (keywords.length === 0) return [];
 
@@ -969,6 +978,9 @@ async function fetchLINEPosts(
 
     for (const msg of lineMessages) {
       if (!msg.userId || !msg.text || seenUsers.has(msg.userId)) continue;
+
+      // Skip messages older than sinceTimestamp (delta scan filter)
+      if (sinceTimestamp > 0 && msg.timestamp && msg.timestamp <= sinceTimestamp) continue;
 
       const textLower = msg.text.toLowerCase();
       const hasKeyword = [...keywordSet].some((k) => textLower.includes(k));
@@ -1062,7 +1074,8 @@ async function runHunt(
   limit: number,
   logger: ToolContext["logger"],
   region: string,
-  flavor: string
+  flavor: string,
+  scoutState: ScoutState
 ): Promise<{
   discovered: number;
   qualified: number;
@@ -1104,6 +1117,13 @@ async function runHunt(
   const activeSources = sourceOverride ?? getActiveSources(region);
   const perSourceLimit = Math.ceil(limit / activeSources.length);
 
+  // Delta scan: only fetch content newer than the last scan.
+  // Default to last 24 hours on first run (no lastScheduledScan).
+  const FALLBACK_WINDOW_MS = 24 * 60 * 60 * 1000;
+  let sinceTimestamp = scoutState.lastScheduledScan
+    ? new Date(scoutState.lastScheduledScan).getTime()
+    : Date.now() - FALLBACK_WINDOW_MS;
+
   let allProfiles: DiscoveredProfile[] = [];
 
   // Fetch from each active source
@@ -1112,16 +1132,17 @@ async function runHunt(
     try {
       switch (source) {
         case "reddit":
-          profiles = await fetchRedditPosts(allPositive, perSourceLimit, logger);
+          profiles = await fetchRedditPosts(allPositive, perSourceLimit, logger, sinceTimestamp);
           break;
         case "telegram":
-          profiles = await fetchTelegramMessages(allPositive, perSourceLimit, logger);
+          profiles = await fetchTelegramMessages(allPositive, perSourceLimit, logger, sinceTimestamp);
           break;
         case "facebook_groups":
+          // Serper results have no reliable date field — pass all through
           profiles = await fetchFacebookPosts(allPositive, perSourceLimit, logger);
           break;
         case "line_openchat":
-          profiles = await fetchLINEPosts(allPositive, perSourceLimit, logger, tenantId);
+          profiles = await fetchLINEPosts(allPositive, perSourceLimit, logger, tenantId, sinceTimestamp);
           break;
       }
     } catch (err) {
@@ -1129,6 +1150,35 @@ async function runHunt(
     }
     allProfiles = allProfiles.concat(profiles);
     logger.info("tiger_scout: source fetched", { source, count: profiles.length });
+  }
+
+  // Fallback: if delta filtering produced zero candidates, retry with last 24h window.
+  // A scout that returns nothing because "already scanned" is worse than an occasional rescan.
+  if (allProfiles.length === 0 && sinceTimestamp > Date.now() - FALLBACK_WINDOW_MS) {
+    logger.info("tiger_scout: delta scan returned zero candidates — falling back to last 24h window");
+    sinceTimestamp = Date.now() - FALLBACK_WINDOW_MS;
+    for (const source of activeSources) {
+      let profiles: DiscoveredProfile[] = [];
+      try {
+        switch (source) {
+          case "reddit":
+            profiles = await fetchRedditPosts(allPositive, perSourceLimit, logger, sinceTimestamp);
+            break;
+          case "telegram":
+            profiles = await fetchTelegramMessages(allPositive, perSourceLimit, logger, sinceTimestamp);
+            break;
+          case "facebook_groups":
+            profiles = await fetchFacebookPosts(allPositive, perSourceLimit, logger);
+            break;
+          case "line_openchat":
+            profiles = await fetchLINEPosts(allPositive, perSourceLimit, logger, tenantId, sinceTimestamp);
+            break;
+        }
+      } catch (err) {
+        logger.error("tiger_scout: source fetch failed (fallback)", { source, err: String(err) });
+      }
+      allProfiles = allProfiles.concat(profiles);
+    }
   }
 
   // Score each profile and write to leads.json
@@ -1248,18 +1298,22 @@ async function handleHunt(
 
   logger.info("tiger_scout: starting hunt", { mode, limit });
 
-  const result = await runHunt(tenantId, mode, sourceOverride, limit, logger, region, flavor);
+  const result = await runHunt(tenantId, mode, sourceOverride, limit, logger, region, flavor, scoutState);
 
   // Update scout state
   const today = new Date().toISOString().slice(0, 10);
+  const nowIso = new Date().toISOString();
   if (mode === "scheduled") {
-    scoutState.lastScheduledScan = new Date().toISOString();
+    scoutState.lastScheduledScan = nowIso;
   } else {
-    scoutState.lastBurstScan = new Date().toISOString();
+    scoutState.lastBurstScan = nowIso;
     scoutState.burstCountToday = scoutState.burstCountDate === today
       ? scoutState.burstCountToday + 1
       : 1;
     scoutState.burstCountDate = today;
+    // Update lastScheduledScan high-water mark for burst scans too,
+    // so the next delta scan (any mode) knows what content was already seen.
+    scoutState.lastScheduledScan = nowIso;
   }
   const isFirstQualifiedLeads = scoutState.totalLeadsQualified === 0 && result.qualified > 0;
   scoutState.totalLeadsDiscovered += result.discovered;

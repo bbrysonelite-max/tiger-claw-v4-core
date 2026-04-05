@@ -82,7 +82,16 @@ export default function DashboardPage() {
             return;
         }
 
-        fetch(`${API_BASE}/dashboard/${slug}`)
+        const token = localStorage.getItem("tc_session_token");
+        if (!token) {
+            setError("Session expired. Please return to the signup page.");
+            setLoading(false);
+            return;
+        }
+
+        fetch(`${API_BASE}/dashboard/${slug}`, {
+            headers: { "Authorization": `Bearer ${token}` },
+        })
             .then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
             .then((d) => {
                 if (d.error) {
@@ -99,10 +108,14 @@ export default function DashboardPage() {
         if (!data || !keyInput.trim()) return;
         setKeySaving(true);
         setKeyError("");
+        const token = localStorage.getItem("tc_session_token") ?? "";
         try {
             const res = await fetch(`${API_BASE}/dashboard/${data.tenant.slug}/update-key`, {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`,
+                },
                 body: JSON.stringify({ key: keyInput.trim(), provider: keyProvider }),
             });
             const json = await res.json();
@@ -111,7 +124,9 @@ export default function DashboardPage() {
                 setKeyFormOpen(false);
                 setKeyInput("");
                 // Refresh dashboard data
-                fetch(`${API_BASE}/dashboard/${data.tenant.slug}`)
+                fetch(`${API_BASE}/dashboard/${data.tenant.slug}`, {
+                    headers: { "Authorization": `Bearer ${token}` },
+                })
                     .then(r => r.json())
                     .then(d => { if (!d.error) setData(d); });
             } else {
