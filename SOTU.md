@@ -1,6 +1,6 @@
 # Tiger Claw — State of the Union
 
-**Last updated:** 2026-04-05 (Session 12 — Full module assessment + 4 critical fixes deployed. Revision 00336-hhb live.)
+**Last updated:** 2026-04-05 (Session 12 COMPLETE — Full module assessment + 8 fixes deployed. Revision 00345-525 live.)
 **This is the single source of truth. Read nothing else until you finish this file.**
 
 ---
@@ -18,16 +18,20 @@
 
 ## Current Platform State
 
-**Revision:** `tiger-claw-api-00336-hhb` — deployed 2026-04-05
+**Revision:** `tiger-claw-api-00345-525` — deployed 2026-04-05
 **Health:** postgres ✅ redis ✅ workers ✅ disk ✅
 **Tests:** 447/447 passing
 **Wizard:** `wizard.tigerclaw.io/signup` — 200 OK
 
-**Session 12 fixes merged and live (PRs #212–#215):**
+**Session 12 fixes merged and live (PRs #212–#219):**
 - ✅ #212 — `fact_anchors` now read back into `buildSystemPrompt()`. Agents compound over time.
 - ✅ #213 — Customer dashboard auth fixed. Session token stored at signup, sent on dashboard requests.
 - ✅ #214 — Delta scan: `sinceTimestamp` filter prevents rescanning same content.
 - ✅ #215 — `nurture_check` skips LLM when tenant has zero leads. Token burn eliminated.
+- ✅ #216 — Oxylabs proxy scaffolded (dormant — activates when env vars set).
+- ✅ #217 — Lemon Squeezy webhook scaffolded (dormant — activates when env var set).
+- ✅ #218 — Success screen redesigned. "[AgentName] is ready to hunt." + Telegram CTA.
+- ✅ #219 — Gemini context caching for tool declarations.
 - ✅ Vercel root directory misconfiguration fixed. Auto-deploy now works.
 
 ---
@@ -36,11 +40,17 @@
 
 | # | Issue | Priority |
 |---|---|---|
-| C4 | Payment gate is open — any email gets a free bot. No verification against Stan Store. | CRITICAL before marketing |
-| H2 | Reddit returns 403 on every scout run — falls back to paid Serper | HIGH |
-| M1 | All 25 tools declared to Gemini every request — no context caching | MED (cost) |
+| C4 | Payment gate is open — any email gets a free bot. Waiting on Paddle approval. | CRITICAL before marketing |
+| H2 | Reddit returns 403 on every scout run — Oxylabs account needed | HIGH |
 | M2 | Serper quota is global, not per-tenant | MED |
 | R2-P1-6 | Stan Store Zapier race — duplicate timestamp hits UNIQUE constraint | MED |
+
+**Payment processor status:**
+- Stan Store: active, no payment gate (on-demand creation)
+- Lemon Squeezy: REJECTED — "services fulfilled outside Lemon Squeezy"
+- Paddle: application submitted 2026-04-05 at https://tigerclaw.io — awaiting approval
+- Lemon Squeezy webhook code is in the repo and ready. When Paddle approves, build equivalent `/webhooks/paddle` handler using same pattern.
+- LEMONSQUEEZY_SIGNING_SECRET is stored in GCP Secret Manager but NOT active in Cloud Run. Do not add it until a processor is confirmed.
 
 Full assessment: `MODULE_ASSESSMENT.md` in repo root.
 Full audit backlog: `audit-session10-round2.md` and `audit-april-4th.md`.
@@ -119,7 +129,7 @@ Last verified 2026-04-05 (Session 12):
 
 | Service | Status | Notes |
 |---------|--------|-------|
-| Cloud Run | ✅ | Revision 00336-hhb |
+| Cloud Run | ✅ | Revision 00345-525 |
 | Postgres | ✅ | Healthy |
 | Redis | ✅ | Healthy |
 | Workers | ✅ | ENABLE_WORKERS=true confirmed |
@@ -193,7 +203,7 @@ Full 8-module ground-truth assessment of the codebase against all foundation doc
 
 **Also fixed:** Vercel root directory misconfiguration — manual deploys now work from CLI.
 
-**Deployed:** Revision `tiger-claw-api-00336-hhb`. Health confirmed. Wizard 200 OK.
+**Deployed:** Revision `tiger-claw-api-00345-525`. Health confirmed. Wizard 200 OK.
 
 **Key finding:** The product works. Agents hatch, know their ICP, prospect, have personality. The Hive accumulates. The cron fires daily reports. Payment gate and dashboard auth were the two things breaking the customer experience — both now fixed or in flight.
 
