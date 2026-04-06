@@ -954,8 +954,9 @@ export async function buildSystemPrompt(tenant: any): Promise<string> {
             ? [`━━━━ MASTER STRATEGIC DIRECTIVES ━━━━`, ...approvedSkills, ``]
             : []
         ),
-        // BRAND SOUL (The "Brighter Future" Covenant) — full SOUL.md content
-        ...(soul ? [`━━━━ BRAND SOUL & VISION ━━━━`, soul, ``] : []),
+        // SOUL.md content intentionally omitted — SOUL_VOICE_BLOCK above captures Tiger's voice
+        // with concrete examples. Full SOUL.md is the brand vision doc, not a prompt aid.
+        // Re-injecting it here doubled the voice signal and bloated the prompt.
         `You are ${botName}, deployed as a Tiger Claw Agent for ${operatorName}.`,
         `Industry: ${flavor.displayName} (${flavor.professionLabel}).`,
         `Respond in: ${tenant.language ?? 'English'}.`,
@@ -975,7 +976,7 @@ export async function buildSystemPrompt(tenant: any): Promise<string> {
         `- Allow organic conversation at any time — the operator can ask questions, vent, or request anything. Don't hold them hostage to onboarding flow. But always return to completing it if it's unfinished.`,
         ``,
         `TOOL JUDGMENT — READ THIS CAREFULLY:`,
-        `You have 18 specialized tools. You are intelligent enough to know when to use them without being told.`,
+        `You have 25 specialized tools. You are intelligent enough to know when to use them without being told.`,
         `Use tools as instruments of your judgment — not because a user's words match a keyword.`,
         `When a tool would serve the operator better than a direct answer, use it silently and report results.`,
         `When you can reason, advise, coach, or respond directly with genuine insight, do that instead.`,
@@ -1169,18 +1170,6 @@ async function checkWizardIcpFastPath(
     if (isFirstMessage && hasWizardIcp) {
         const botName = (onboardState?.botName ?? tenant.name ?? 'Tiger') as string;
 
-        const language = tenant.language ?? 'en';
-        const openingLines: Record<string, string> = {
-            'en': `Let me take you by the hand and lead you to your brighter future.`,
-            'th': `ให้ฉันจับมือคุณและนำคุณไปสู่อนาคตที่สดใสกว่านี้`,
-            'id': `Izinkan saya menggandeng tangan Anda dan membawa Anda menuju masa depan yang lebih cerah.`,
-            'zh': `让我牵着你的手，带你走向更光明的未来。`,
-            'es': `Permíteme tomarte de la mano y llevarte hacia tu futuro más brillante.`,
-            'de': `Lass mich deine Hand nehmen und dich in deine hellere Zukunft führen.`,
-        };
-        const opening = openingLines[language] ?? openingLines['en'];
-        const intro = `${opening}\n\nI'm ${botName}. I'm awake and ready to hunt for you.`;
-        
         // Mark onboarding as complete and translate wizard customerProfile into the
         // icpSingle format that buildSystemPrompt reads. Without this, buildSystemPrompt
         // finds an empty icpSingle, injects no ICP block, and the LLM re-runs onboarding.
@@ -1197,13 +1186,11 @@ async function checkWizardIcpFastPath(
         };
         await setBotState(tenantId, 'onboard_state.json', updatedState);
 
-        await sendMessage(intro);
-
-        await saveChatHistory(tenantId, chatId, [
-            { role: 'user' as const, parts: [{ text }] },
-            { role: 'model' as const, parts: [{ text: intro }] },
-        ]);
-        return true;
+        // Pass the operator's actual first message through Gemini — no canned response.
+        // The system note tells Tiger this is the first exchange and ICP is already loaded,
+        // so it introduces itself naturally and responds to what they actually said.
+        // updatedState is passed so buildSystemPrompt sees phase='complete' + icpSingle.
+        return false;
     }
     return false;
 }
@@ -1254,7 +1241,13 @@ export async function processTelegramMessage(
         );
         if (fastPathHandled) return;
 
-        const effectiveText = buildFirstMessageText(text, onboardingComplete, isFirstMessage);
+        // checkWizardIcpFastPath may have written phase='complete' to the DB.
+        // Re-derive from the original onboardState — if customerProfile exists and is valid,
+        // the bot was wizard-hatched and onboarding is now complete even if phase was unset.
+        const hasWizardIcp = !!(onboardState?.customerProfile?.idealCustomer?.trim() && onboardState?.customerProfile?.problem?.trim());
+        const resolvedOnboardingComplete = onboardingComplete || hasWizardIcp;
+
+        const effectiveText = buildFirstMessageText(text, resolvedOnboardingComplete, isFirstMessage);
 
         // ── Check feedback loop: is this message a feedback response? ──────────
         await maybeLogFeedback(tenantId, chatId, text, bot, tenant, aiProvider, toolContext);
