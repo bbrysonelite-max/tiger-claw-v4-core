@@ -869,6 +869,30 @@ export async function lookupPurchaseByEmail(email: string): Promise<{ userId: st
     subscriptionStatus: result.rows[0]["subscription_status"] as string,
   };
 }
+// Finds the most recent active/onboarding bot for a returning customer.
+// Used by POST /auth/session — never creates records, only reads.
+export async function findActiveSessionByEmail(email: string): Promise<{ userId: string; botId: string; slug: string; name: string } | null> {
+  const result = await getReadPool().query(
+    `SELECT u.id AS user_id, t.id AS bot_id, t.slug, u.name
+      FROM subscriptions s
+      JOIN users u ON u.id = s.user_id
+      JOIN tenants t ON t.id = s.tenant_id
+      WHERE u.email = $1
+        AND s.status IN ('pending_setup', 'active', 'onboarding')
+        AND t.status NOT IN ('terminated')
+      ORDER BY s.created_at DESC
+      LIMIT 1`,
+    [email]
+  );
+  if (!result.rows[0]) return null;
+  return {
+    userId: result.rows[0]["user_id"] as string,
+    botId: result.rows[0]["bot_id"] as string,
+    slug: result.rows[0]["slug"] as string,
+    name: result.rows[0]["name"] as string,
+  };
+}
+
 // Mark a subscription active after wizard completion.
 export async function activateSubscription(botId: string): Promise<boolean> {
   const result = await getPool().query(
