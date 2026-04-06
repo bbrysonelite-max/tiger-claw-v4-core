@@ -68,7 +68,8 @@ TELEGRAM_WEBHOOK_SECRET=tiger-claw-telegram-webhook-secret:latest,\
 RESEND_API_KEY=tiger-claw-resend-api-key:latest,\
 OXYLABS_USERNAME=oxylabs-username:latest,\
 OXYLABS_PASSWORD=oxylabs-password:latest,\
-PADDLE_WEBHOOK_SECRET=paddle-webhook-secret:latest"
+PADDLE_WEBHOOK_SECRET=paddle-webhook-secret:latest,\
+PADDLE_API_KEY=paddle-api-key:latest"
 
 for i in "${!DEPLOY_REGIONS[@]}"; do
   REGION="${DEPLOY_REGIONS[$i]}"
