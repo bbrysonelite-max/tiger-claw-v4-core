@@ -13,8 +13,8 @@ import {
 // ─── VALID_FLAVOR_KEYS ────────────────────────────────────────────────────────
 
 describe('VALID_FLAVOR_KEYS', () => {
-  it('contains exactly 13 customer-facing flavors', () => {
-    expect(VALID_FLAVOR_KEYS).toHaveLength(13);
+  it('contains exactly 9 customer-facing flavors', () => {
+    expect(VALID_FLAVOR_KEYS).toHaveLength(9);
   });
 
   it('does not include admin (internal-only, never provisioned)', () => {
@@ -33,21 +33,17 @@ describe('VALID_FLAVOR_KEYS', () => {
     expect(VALID_FLAVOR_KEYS).not.toContain('doctor');
   });
 
-  it('includes all 13 expected valid flavor keys', () => {
+  it('includes all 9 expected valid flavor keys', () => {
     const expected = [
       'network-marketer',
       'real-estate',
       'health-wellness',
       'airbnb-host',
-      'baker',
-      'candle-maker',
-      'gig-economy',
       'lawyer',
       'plumber',
       'sales-tiger',
-      'dorm-design',
+      'interior-designer',
       'mortgage-broker',
-      'personal-trainer',
     ];
     for (const key of expected) {
       expect(VALID_FLAVOR_KEYS).toContain(key);
@@ -58,15 +54,15 @@ describe('VALID_FLAVOR_KEYS', () => {
 // ─── validateAllFlavors ───────────────────────────────────────────────────────
 
 describe('validateAllFlavors', () => {
-  it('returns valid:true — all 13 flavor files are present', () => {
+  it('returns valid:true — all 9 flavor files are present', () => {
     const result = validateAllFlavors();
     expect(result.valid).toBe(true);
     expect(result.missing).toHaveLength(0);
   });
 
-  it('reports 13 loaded flavors', () => {
+  it('reports 9 loaded flavors', () => {
     const result = validateAllFlavors();
-    expect(result.loaded).toHaveLength(13);
+    expect(result.loaded).toHaveLength(9);
   });
 
   it('loaded list contains every key in VALID_FLAVOR_KEYS', () => {
@@ -107,20 +103,19 @@ describe('loadFlavorConfig', () => {
 // ─── listFlavors ──────────────────────────────────────────────────────────────
 
 describe('listFlavors', () => {
-  it('returns at least 13 flavor IDs (registry includes internal flavors)', () => {
+  it('returns at least 9 flavor IDs (registry includes internal flavors)', () => {
     const flavors = listFlavors();
-    expect(flavors.length).toBeGreaterThanOrEqual(13);
+    expect(flavors.length).toBeGreaterThanOrEqual(9);
   });
 
   it('includes network-marketer', () => {
     expect(listFlavors()).toContain('network-marketer');
   });
 
-  it('includes the three new flavors', () => {
+  it('includes interior-designer and mortgage-broker', () => {
     const flavors = listFlavors();
-    expect(flavors).toContain('dorm-design');
+    expect(flavors).toContain('interior-designer');
     expect(flavors).toContain('mortgage-broker');
-    expect(flavors).toContain('personal-trainer');
   });
 });
 

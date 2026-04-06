@@ -59,21 +59,10 @@ vi.mock('../../services/email.js', () => ({
   sendFirstLeadNotification: vi.fn().mockResolvedValue(undefined),
 }))
 
-// ─── Mock: Node https — used by tiger_scout for all source fetches ──────────
-// tiger_scout uses httpsGet/httpsPost (Node https), not global fetch.
-// We intercept at the https module level so the scout's network layer is
-// fully controlled without changing any production code.
-
-import { EventEmitter } from 'events'
-
-function makeHttpsResponse(statusCode: number, body: string) {
-  const res = new EventEmitter() as any
-  res.statusCode = statusCode
-  const req = new EventEmitter() as any
-  req.end = vi.fn()
-  req.on = vi.fn()
-  return { res, req, body }
-}
+// ─── Mock: fetch — used by tiger_scout's httpsGet/httpsPost helpers ─────────
+// tiger_scout.httpsGet wraps global fetch (Node 18+), not Node's https module.
+// We intercept at the fetch level so the scout's network layer is fully
+// controlled without changing any production code.
 
 const REDDIT_SEARCH_RESPONSE = JSON.stringify({
   data: {
@@ -99,38 +88,30 @@ const REDDIT_USER_RESPONSE = JSON.stringify({
   }
 })
 
-// Map URL patterns → mock responses
-function mockHttpsGet(url: string, _options: any, callback: Function) {
-  let statusCode = 200
+const mockFetch = vi.fn()
+vi.stubGlobal('fetch', mockFetch)
+
+// Route fetch calls to appropriate mock responses based on URL
+function mockFetchImpl(url: string): Promise<Response> {
+  let status = 200
   let body = '{}'
 
-  if (url.includes('/search.json') || url.includes('reddit.com/search')) {
+  if (url.includes('/search.json') || (url.includes('reddit.com') && url.includes('search'))) {
     body = REDDIT_SEARCH_RESPONSE
   } else if (url.includes('/user/') && url.includes('/about.json')) {
     body = REDDIT_USER_RESPONSE
-  } else if (url.includes('oauth.reddit.com/api/v1/access_token')) {
-    statusCode = 401 // no Reddit OAuth creds in tests — falls back to public API
+  } else if (url.includes('api/v1/access_token')) {
+    status = 401  // no Reddit OAuth creds in tests — falls back to public API
     body = ''
   }
 
-  const { res, req } = makeHttpsResponse(statusCode, body)
-
-  setImmediate(() => {
-    callback(res)
-    res.emit('data', Buffer.from(body))
-    res.emit('end')
-  })
-
-  return req
+  return Promise.resolve({
+    ok: status >= 200 && status < 300,
+    status,
+    text: async () => body,
+    json: async () => JSON.parse(body || '{}'),
+  } as Response)
 }
-
-vi.mock('https', async () => {
-  return {
-    default: { get: vi.fn(mockHttpsGet), request: vi.fn() },
-    get:     vi.fn(mockHttpsGet),
-    request: vi.fn(),
-  }
-})
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -205,15 +186,8 @@ describe('Autonomous Loop — Phase Tests', () => {
       'scout_state.json':  FRESH_SCOUT_STATE,
     }
 
-    // Re-apply https.get implementation after clearAllMocks resets call state.
-    // The factory sets it once; re-applying ensures it works in every test.
-    const httpsModule = await import('https') as any
-    if (httpsModule.get?.mockImplementation) {
-      httpsModule.get.mockImplementation(mockHttpsGet)
-    }
-    if (httpsModule.default?.get?.mockImplementation) {
-      httpsModule.default.get.mockImplementation(mockHttpsGet)
-    }
+    // Re-apply fetch mock after clearAllMocks resets call state.
+    mockFetch.mockImplementation(mockFetchImpl)
   })
 
   // ── Phase 1: SCOUT ──────────────────────────────────────────────────────────
