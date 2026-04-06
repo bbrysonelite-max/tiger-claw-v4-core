@@ -18,15 +18,15 @@
 
 ## Current Platform State
 
-**Revision:** `tiger-claw-api-00345-525` — deployed 2026-04-05
+**Revision:** `tiger-claw-api-00353-947` — deployed 2026-04-06
 **Health:** postgres ✅ redis ✅ workers ✅ disk ✅
 **Tests:** 447/447 passing
 **Wizard:** `wizard.tigerclaw.io/signup` — 200 OK
 
-**Session 13 changes (PRs #220–#222 + website PR #1) — #221/#222 on main, NOT YET DEPLOYED:**
+**Session 13 changes (PRs #220–#222 + website PR #1) — ALL DEPLOYED:**
 - ✅ #220 — Docs: MODULE_ASSESSMENT + SOTU updated to reflect Session 12 resolved items.
-- ✅ #221 — Hatch email personalized (agent name + flavor, Tiger's voice, null-safe botUsername). — **needs deploy**
-- ✅ #222 — Serper: per-invocation call counter in market_miner; key rotation in tiger_scout. — **needs deploy**
+- ✅ #221 — Hatch email personalized (agent name + flavor, Tiger's voice, null-safe botUsername).
+- ✅ #222 — Serper: per-invocation call counter in market_miner; key rotation in tiger_scout.
 - ✅ Website #1 — Refund policy section added to tigerclaw.io for Paddle compliance.
 
 **Session 12 fixes merged and live (PRs #212–#219):**
@@ -46,7 +46,7 @@
 
 | # | Issue | Priority |
 |---|---|---|
-| DEPLOY | PRs #221/#222 on main but not deployed — run deploy before next customer onboards | IMMEDIATE |
+| DEPLOY | ✅ PRs #221/#222 deployed — revision 00353-947 live 2026-04-06 | DONE |
 | REVIEW | Agent behavior flagged as broken window — review before onboarding any customer | IMMEDIATE |
 | C4 | Payment gate open — any email gets free bot. Paddle application in progress. | CRITICAL before marketing |
 | H2 | Reddit returns 403 on every scout run — Oxylabs account needed | HIGH |
@@ -135,7 +135,7 @@ Last verified 2026-04-05 (Session 12):
 
 | Service | Status | Notes |
 |---------|--------|-------|
-| Cloud Run | ✅ | Revision 00345-525 |
+| Cloud Run | ✅ | Revision 00353-947 |
 | Postgres | ✅ | Healthy |
 | Redis | ✅ | Healthy |
 | Workers | ✅ | ENABLE_WORKERS=true confirmed |
@@ -184,7 +184,7 @@ tiger_onboard, tiger_scout, tiger_contact, tiger_aftercare, tiger_briefing, tige
 
 | Item | Priority |
 |------|----------|
-| Deploy PRs #221/#222 to Cloud Run | IMMEDIATE |
+| ~~Deploy PRs #221/#222 to Cloud Run~~ | ~~IMMEDIATE~~ — ✅ DONE 2026-04-06 |
 | Agent behavior review — conversational quality, SOUL injection, runToolLoop() | IMMEDIATE |
 | C4: Payment gate open — any email gets free bot | CRITICAL before marketing |
 | H2: Reddit 403 — Oxylabs account needed | HIGH |
