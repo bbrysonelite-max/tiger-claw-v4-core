@@ -36,6 +36,25 @@ interface Tenant {
     messages24h?: number;
 }
 
+interface AgentHealth {
+    tenantId: string;
+    slug: string;
+    scout: {
+        lastBurstScan?: string;
+        totalLeadsQualified?: number;
+        totalLeadsDiscovered?: number;
+        burstCountToday?: number;
+    } | null;
+    activeContext: {
+        currentFocus?: string;
+        activeLead?: string;
+        lastAction?: string;
+        lastActionAt?: string;
+        leadsInPipeline?: number;
+        updatedAt: string;
+    } | null;
+}
+
 interface AdminMetrics {
     activeTenants: number;
     foundingMembers: number;
@@ -80,6 +99,7 @@ export default function AdminDashboard() {
     const [platformHealth, setPlatformHealth] = useState<{ name: string; status: "ok" | "error"; message: string }[] | null>(null);
     const [mineStatus, setMineStatus] = useState<{ isRunning: boolean; queueDepth: number; lastRun: { flavorsProcessed: number; postsFound: number; factsSaved: number; completedAt: string } | null } | null>(null);
     const [mineTriggering, setMineTriggering] = useState(false);
+    const [agentHealth, setAgentHealth] = useState<Record<string, AgentHealth>>({});
 
     const fetchMineStatus = useCallback(async (authToken: string) => {
         const headers = { "Authorization": `Bearer ${authToken}` };
@@ -144,7 +164,19 @@ export default function AdminDashboard() {
 
             // Mine status — fire separately, never block main dashboard load
             fetchMineStatus(authToken);
-            
+
+            // Agent health — fire separately, never block main dashboard load
+            fetch(`${API_BASE}/admin/agent-health`, { headers })
+                .then(r => r.ok ? r.json() : null)
+                .then(data => {
+                    if (data?.tenants) {
+                        const map: Record<string, AgentHealth> = {};
+                        (data.tenants as AgentHealth[]).forEach(h => { map[h.tenantId] = h; });
+                        setAgentHealth(map);
+                    }
+                })
+                .catch(() => {});
+
             // Merge conversation stats into tenant data for the fleet table
             const tenantList = t.tenants.map((tenant: any) => ({
                 ...tenant,
@@ -353,6 +385,9 @@ export default function AdminDashboard() {
                                         <th className="px-8 py-5 text-[10px] font-black uppercase tracking-[0.2em] text-white/20">Status</th>
                                         <th className="px-8 py-5 text-[10px] font-black uppercase tracking-[0.2em] text-white/20 text-center">CH</th>
                                         <th className="px-8 py-5 text-[10px] font-black uppercase tracking-[0.2em] text-white/20">Vertical</th>
+                                        <th className="px-8 py-5 text-[10px] font-black uppercase tracking-[0.2em] text-white/20 text-center">Onboard</th>
+                                        <th className="px-8 py-5 text-[10px] font-black uppercase tracking-[0.2em] text-white/20">Scout</th>
+                                        <th className="px-8 py-5 text-[10px] font-black uppercase tracking-[0.2em] text-white/20">Focus</th>
                                         <th className="px-8 py-5 text-[10px] font-black uppercase tracking-[0.2em] text-white/20">Last Active</th>
                                         <th className="px-8 py-5 text-[10px] font-black uppercase tracking-[0.2em] text-white/20 text-right">Burn (24h)</th>
                                     </tr>
@@ -380,6 +415,39 @@ export default function AdminDashboard() {
                                                 <span className="text-[11px] font-bold text-white/50 uppercase tracking-wider bg-white/5 px-2 py-0.5 rounded-md border border-white/5">
                                                     {t.slug.split('-').slice(0, 2).join(' ')}
                                                 </span>
+                                            </td>
+                                            <td className="px-8 py-5 text-center">
+                                                {(t.status === 'active' || t.status === 'live' || t.onboardingPhase === 'complete') ? (
+                                                    <CheckCircle2 className="h-4 w-4 text-green-500/70 mx-auto" />
+                                                ) : (
+                                                    <span className="text-white/20 text-[10px] font-mono">{t.onboardingPhase || '—'}</span>
+                                                )}
+                                            </td>
+                                            <td className="px-8 py-5">
+                                                {(() => {
+                                                    const h = agentHealth[t.id];
+                                                    if (!h?.scout) return <span className="text-white/10 text-xs">—</span>;
+                                                    return (
+                                                        <div className="flex flex-col gap-0.5">
+                                                            <span className="text-[11px] font-bold text-white/60">{h.scout.totalLeadsQualified ?? 0} qualified</span>
+                                                            <span className="text-[9px] text-white/20 font-mono">{h.scout.lastBurstScan ? timeAgo(h.scout.lastBurstScan) : 'no scan'}</span>
+                                                        </div>
+                                                    );
+                                                })()}
+                                            </td>
+                                            <td className="px-8 py-5 max-w-[180px]">
+                                                {(() => {
+                                                    const h = agentHealth[t.id];
+                                                    if (!h?.activeContext) return <span className="text-white/10 text-xs">—</span>;
+                                                    return (
+                                                        <div className="flex flex-col gap-0.5">
+                                                            <span className="text-[10px] font-bold text-primary/70 truncate">{h.activeContext.currentFocus || '—'}</span>
+                                                            {h.activeContext.activeLead && (
+                                                                <span className="text-[9px] text-white/30 truncate">{h.activeContext.activeLead}</span>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })()}
                                             </td>
                                             <td className="px-8 py-5 whitespace-nowrap">
                                                 <div className="flex items-center gap-2 text-white/40 text-xs">
