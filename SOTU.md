@@ -48,14 +48,16 @@
 |---|---|---|
 | DEPLOY | ✅ PRs #221/#222 deployed — revision 00353-947 live 2026-04-06 | DONE |
 | REVIEW | Agent behavior flagged as broken window — review before onboarding any customer | IMMEDIATE |
-| C4 | Payment gate open — any email gets free bot. Paddle application in progress. | CRITICAL before marketing |
+| C4 | Payment gate open — fix path: re-wire Zapier → `/webhooks/stan-store` + harden `verify-purchase` to 403 on no pre-existing record | NEXT SESSION |
 | H2 | Reddit returns 403 on every scout run — Oxylabs account needed | HIGH |
-| R2-P1-6 | Stan Store Zapier race — duplicate timestamp hits UNIQUE constraint | MED |
+| R2-P1-6 | Stan Store Zapier race — duplicate webhook fires hit UNIQUE constraint — fix in same session as C4 | MED |
 
 **Payment processor status:**
-- Stan Store: active, no payment gate (on-demand creation — gap C4 still open)
-- Lemon Squeezy: REJECTED — "services fulfilled outside Lemon Squeezy". Webhook code dormant in repo. LEMONSQUEEZY_SIGNING_SECRET in GCP Secret Manager but NOT active in Cloud Run.
-- Paddle: application submitted 2026-04-05. Domains approved. Business name had typos in application — operator cannot find how to correct in portal. Everything else approved; token likely available but deferred pending final approval. When approved: build `/webhooks/paddle` using existing LS handler as template.
+- Stan Store: active front door. Confirmation email sends wizard link with `?email=` param. C4 gap closes when Zapier is re-wired (next session).
+- Zapier: `/webhooks/stan-store` handler exists in codebase (legacy, dormant). Re-wire Stan Store → Zapier → this endpoint to pre-create purchase records. Then harden `verify-purchase` to 403 if no pre-existing record. Fixes C4 without Paddle.
+- Lemon Squeezy: REJECTED — "services fulfilled outside Lemon Squeezy". Webhook code dormant in repo. Dead end.
+- Paddle: provisionally approved. Domains approved. Business info submitted 2026-04-05 — awaiting final approval. When approved: build `/webhooks/paddle` using existing LS handler as template. Replaces Zapier long-term.
+- Stripe: operator has account. Fallback if Paddle declines. Same webhook pattern — `checkout.session.completed`, HMAC verify, pre-create record. Dead code placeholder already in repo.
 - Refund policy: live at tigerclaw.io/#refund-policy (deployed 2026-04-05, tiger-bot-website PR #1).
 
 Full assessment: `MODULE_ASSESSMENT.md` in repo root.
@@ -185,14 +187,15 @@ tiger_onboard, tiger_scout, tiger_contact, tiger_aftercare, tiger_briefing, tige
 | Item | Priority |
 |------|----------|
 | ~~Deploy PRs #221/#222 to Cloud Run~~ | ~~IMMEDIATE~~ — ✅ DONE 2026-04-06 |
-| Agent behavior review — conversational quality, SOUL injection, runToolLoop() | IMMEDIATE |
-| C4: Payment gate open — any email gets free bot | CRITICAL before marketing |
+| Agent behavior review — conversational quality, SOUL injection, runToolLoop() | IMMEDIATE (before John/Jeff/Debbie) |
+| C4: Re-wire Zapier → `/webhooks/stan-store`; harden `verify-purchase` to 403 on no pre-existing record | NEXT SESSION |
+| R2-P1-6: Fix Zapier race condition (UNIQUE on duplicate webhook) — same session as C4 | NEXT SESSION |
 | H2: Reddit 403 — Oxylabs account needed | HIGH |
-| Paddle final approval — business name typo in application, all else approved | HIGH |
-| R2-P1-6: Stan Store Zapier race condition on stripe_subscription_id UNIQUE | MED |
+| Paddle final approval — business info submitted, awaiting response | HIGH |
+| UX overhaul — tigerclaw.io + wizard + dashboard: unify end-to-end after Paddle resolves | AFTER PADDLE |
 | Past customers owed bots: `chana.loh@gmail.com`, `nancylimsk@gmail.com`, `lily.vergara@gmail.com` | WHEN READY |
 | Affiliate/referral tracking — Max Steingart deal (30%). Hold until he sells first 10. | DEFERRED |
-| Remove Stripe dead code | LOW |
+| Remove Stripe dead code | LOW — hold until Stripe fallback decision is final |
 
 ---
 
