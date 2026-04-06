@@ -49,7 +49,7 @@
 | DEPLOY | ✅ PRs #221/#222 deployed — revision 00353-947 live 2026-04-06 | DONE |
 | REVIEW | Agent behavior flagged as broken window — review before onboarding any customer | IMMEDIATE |
 | C4 | Payment gate open — fix path: re-wire Zapier → `/webhooks/stan-store` + harden `verify-purchase` to 403 on no pre-existing record | NEXT SESSION |
-| H2 | Reddit returns 403 on every scout run — Oxylabs account needed | HIGH |
+| H2 | Reddit 403 — use Oxylabs **Realtime API** (POST to `realtime.oxylabs.io/v1/queries`). Current scaffold in `market_miner.ts` uses proxy headers which don't work with native fetch — rewrite `getOxylabsOptions()` to use Realtime API instead. Needs account + `OXYLABS_USERNAME`/`OXYLABS_PASSWORD` in GCP secrets. | HIGH |
 | R2-P1-6 | Stan Store Zapier race — duplicate webhook fires hit UNIQUE constraint — fix in same session as C4 | MED |
 
 **Payment processor status:**
