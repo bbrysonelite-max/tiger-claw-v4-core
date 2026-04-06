@@ -181,13 +181,12 @@
 
 The Zapier webhook at `POST /webhooks/stan-store` is legacy code — it was built for an earlier flow and is no longer part of the current path. The `stan_store_self_serve_*` subscription IDs being generated are not fake — they're real records — but they're created without proof of payment.
 
-**For Lemon Squeezy (the right move for international):**
-Lemon Squeezy supports HMAC-signed webhooks. When a purchase completes, Lemon Squeezy fires to `/webhooks/lemon-squeezy` with the customer email and a verifiable signature. That creates the DB record *before* the customer arrives. Then `verify-purchase` finds the record and the gate is real. The existing stan-store webhook handler is the template — swap it out.
+**Fix path — Paddle (application submitted 2026-04-05):**
+Lemon Squeezy was rejected ("services fulfilled outside Lemon Squeezy"). Webhook code is dormant in the repo. `LEMONSQUEEZY_SIGNING_SECRET` is in GCP Secret Manager but NOT active in Cloud Run.
 
-**Why Lemon Squeezy over Stan Store:**
-- International sales without the US tax liability Stan Store creates
-- Real webhook support (Stan Store has none — that's why Zapier was needed)
-- Merchant of Record model — Lemon Squeezy handles VAT, sales tax globally
+Paddle is the replacement. Application submitted 2026-04-05. Domains approved. Business name had typos — operator cannot locate the correction path in the portal. Everything else approved; token likely available but deferred pending final approval.
+
+When Paddle approves: build `/webhooks/paddle` using the existing Lemon Squeezy handler as the template (HMAC signature verification, same pattern). Paddle fires a signed webhook on purchase → creates the DB record → `verify-purchase` finds it → gate is real.
 
 ---
 
@@ -195,9 +194,7 @@ Lemon Squeezy supports HMAC-signed webhooks. When a purchase completes, Lemon Sq
 
 **What was built:** A full dashboard at `wizard.tigerclaw.io/dashboard?slug=your-slug`. Shows bot status with live indicator, Telegram link, API key health (with inline key replacement form), channels, subscription status, and a leads table with scores and profile links. Well-designed and functional UI.
 
-**The gap: auth mismatch.** PR #210 added `requireSession` middleware to `GET /dashboard/:slug` and `POST /dashboard/:slug/update-key` on the API. The frontend was never updated to send the session token. Both fetch calls in `dashboard/page.tsx` send no Authorization header. Every customer who tries to view their dashboard currently receives a 401 and sees the error screen.
-
-**Fix:** Read the session token from wherever the signup flow stores it (localStorage or the URL after hatch), and pass it as `Authorization: Bearer <token>` in both fetch calls.
+**Fixed (PR #213):** Session token is now stored in localStorage after signup and sent as `Authorization: Bearer <token>` on all dashboard fetch calls. Both `GET /dashboard/:slug` and `POST /dashboard/:slug/update-key` return proper responses. Dashboard is functional for authenticated customers.
 
 ---
 
@@ -241,10 +238,10 @@ SOUL.md is loaded via `loadSoul()` in `ai.ts` and injected into `buildSystemProm
 | Area | Status | Fatal? |
 |---|---|---|
 | Payment gate | Open — any email gets a free bot | Yes for revenue integrity |
-| Customer dashboard | Auth mismatch — 401 for all customers | Yes for customer experience |
+| Customer dashboard | Auth fixed ✅ PR #213 — works for authenticated customers | No |
 | Admin dashboard | Works, properly authenticated, useful alarms | No |
 | SOUL | Solid — loaded first, voice is strong, no changes needed | No |
-| Lemon Squeezy migration | Not started — required before international launch | Yes for international |
+| Payment gate (C4) | Open — any email gets a free bot. Paddle application pending. | Yes for revenue integrity |
 
 ---
 
