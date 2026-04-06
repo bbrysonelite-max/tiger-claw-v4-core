@@ -2,31 +2,51 @@ import { FLAVOR_REGISTRY } from "../config/flavors/index.js";
 import { tiger_refine } from "../tools/tiger_refine.js";
 import { isAlreadyMined } from "./market_intel.js";
 
-const REDDIT_UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.536";
-const REDDIT_HEADERS = { "User-Agent": REDDIT_UA, "Accept": "application/json" };
 const DELAY_MS = 1500; // polite delay between requests
 
-// Returns fetch options with Oxylabs residential proxy if configured.
-// When OXYLABS_USERNAME + OXYLABS_PASSWORD are set, Reddit requests route
-// through residential IPs that bypass the 403 block on Cloud Run egress.
-// When not set, returns empty options (existing behavior).
-function getOxylabsOptions(): RequestInit {
+// ─── Oxylabs Realtime API ───────────────────────────────────────────────────
+// Cloud Run's egress IPs are blocked by Reddit. Native fetch cannot use HTTP
+// proxies — Proxy-Authorization headers are ignored by the Node runtime.
+// Solution: POST the target URL to Oxylabs Realtime API, which fetches it
+// through a residential IP and returns the content in the response body.
+//
+// Docs: https://developers.oxylabs.io/scraper-apis/web-scraper-api/realtime
+async function fetchViaOxylabs(targetUrl: string): Promise<string | null> {
   const user = process.env["OXYLABS_USERNAME"];
   const pass = process.env["OXYLABS_PASSWORD"];
-  if (!user || !pass) return {};
+  if (!user || !pass) return null;
 
-  // Oxylabs residential proxy endpoint
-  const proxyAuth = Buffer.from(`${user}:${pass}`).toString("base64");
-  return {
-    headers: {
-      "Proxy-Authorization": `Basic ${proxyAuth}`,
-      "X-Oxylabs-Geo-Location": "United States",
-    },
-  };
+  const auth = Buffer.from(`${user}:${pass}`).toString("base64");
+
+  try {
+    const res = await fetch("https://realtime.oxylabs.io/v1/queries", {
+      method: "POST",
+      headers: {
+        "Authorization": `Basic ${auth}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        source: "universal",
+        url: targetUrl,
+        geo_location: "United States",
+      }),
+    });
+
+    if (!res.ok) {
+      console.warn(`[market_miner] Oxylabs returned ${res.status} for ${targetUrl}`);
+      return null;
+    }
+
+    const data = await res.json() as any;
+    return data?.results?.[0]?.content ?? null;
+  } catch (err: any) {
+    console.warn(`[market_miner] Oxylabs fetch error: ${err.message}`);
+    return null;
+  }
 }
 
 if (process.env["OXYLABS_USERNAME"]) {
-  console.log("[market_miner] Oxylabs proxy active — routing Reddit through residential IP");
+  console.log("[market_miner] Oxylabs Realtime API configured — Reddit routed through residential IP");
 }
 
 // ─── Serper key rotation ────────────────────────────────────────────────────
@@ -56,19 +76,8 @@ interface MinerPost {
     entityId?: string;
 }
 
-async function fetchReddit(query: string): Promise<MinerPost[] | null> {
-    const url = `https://www.reddit.com/search.json?q=${encodeURIComponent(query)}&sort=new&limit=5`;
-    const oxylabs = getOxylabsOptions();
-    const res = await fetch(url, {
-      ...oxylabs,
-      headers: {
-        ...(oxylabs.headers as Record<string, string> | undefined),
-        ...REDDIT_HEADERS,
-      },
-    });
-    if (!res.ok) return null; // caller will fall back to Serper
-    const data = await res.json() as any;
-    const posts: any[] = data?.data?.children ?? [];
+function parseRedditPosts(rawJson: any): MinerPost[] {
+    const posts: any[] = rawJson?.data?.children ?? [];
     return posts.map((post: any) => {
         const { title, selftext, permalink, author } = post.data ?? {};
         return {
@@ -77,6 +86,41 @@ async function fetchReddit(query: string): Promise<MinerPost[] | null> {
             entityId: author ? `u/${author}` : undefined,
         };
     }).filter(p => p.rawContent.length >= 20);
+}
+
+async function fetchReddit(query: string): Promise<MinerPost[] | null> {
+    const redditUrl = `https://www.reddit.com/search.json?q=${encodeURIComponent(query)}&sort=new&limit=5`;
+
+    // Primary path: Oxylabs Realtime API (bypasses Cloud Run 403 block)
+    const content = await fetchViaOxylabs(redditUrl);
+    if (content !== null) {
+        try {
+            const data = JSON.parse(content);
+            const posts = parseRedditPosts(data);
+            console.log(`[market_miner] Oxylabs: "${query}" → ${posts.length} posts`);
+            return posts;
+        } catch {
+            console.warn(`[market_miner] Oxylabs returned non-JSON for "${query}" — falling back to Serper`);
+            return null;
+        }
+    }
+
+    // Fallback: direct Reddit fetch (works locally, 403s on Cloud Run without Oxylabs)
+    try {
+        const res = await fetch(redditUrl, {
+            headers: { "User-Agent": "TigerClaw-Miner/1.0", "Accept": "application/json" },
+        });
+        if (!res.ok) {
+            console.warn(`[market_miner] Reddit direct fetch ${res.status} for "${query}" — falling back to Serper`);
+            return null;
+        }
+        const data = await res.json() as any;
+        const posts = parseRedditPosts(data);
+        console.log(`[market_miner] Reddit direct: "${query}" → ${posts.length} posts`);
+        return posts;
+    } catch {
+        return null;
+    }
 }
 
 // Returns a fetchSerper function with its own isolated call counter.
