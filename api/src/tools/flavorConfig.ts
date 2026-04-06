@@ -15,15 +15,11 @@ export const VALID_FLAVOR_KEYS = [
     "real-estate",
     "health-wellness",
     "airbnb-host",
-    "baker",
-    "candle-maker",
-    "gig-economy",
     "lawyer",
     "plumber",
     "sales-tiger",
-    "dorm-design",
+    "interior-designer",
     "mortgage-broker",
-    "personal-trainer",
 ] as const;
 
 export type ValidFlavorKey = typeof VALID_FLAVOR_KEYS[number];

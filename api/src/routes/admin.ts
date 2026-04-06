@@ -365,6 +365,38 @@ router.get("/dashboard/tenants", requireAdmin, async (_req: Request, res: Respon
 });
 
 // ---------------------------------------------------------------------------
+// GET /admin/agent-health — per-tenant scout state + activeContext
+// Fires in parallel across all tenants. Errors per-tenant are silenced (null).
+// ---------------------------------------------------------------------------
+
+router.get("/agent-health", requireAdmin, async (_req: Request, res: Response) => {
+  try {
+    const { getTenantState, getActiveContext } = await import("../services/tenant_data.js");
+    const tenants = await listTenants();
+
+    const results = await Promise.all(
+      tenants.map(async (t) => {
+        const [scoutSettled, ctxSettled] = await Promise.allSettled([
+          getTenantState<Record<string, unknown>>(t.id, 'scout_state.json'),
+          getActiveContext(t.id),
+        ]);
+        return {
+          tenantId: t.id,
+          slug: t.slug,
+          scout: scoutSettled.status === 'fulfilled' ? scoutSettled.value : null,
+          activeContext: ctxSettled.status === 'fulfilled' ? ctxSettled.value : null,
+        };
+      })
+    );
+
+    return res.json({ tenants: results });
+  } catch (err) {
+    console.error("[admin] GET /agent-health error:", err);
+    return res.status(500).json({ error: "Failed to fetch agent health" });
+  }
+});
+
+// ---------------------------------------------------------------------------
 // GET /admin/fleet — list all tenants
 // ---------------------------------------------------------------------------
 
