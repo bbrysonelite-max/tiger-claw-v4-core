@@ -19,6 +19,22 @@ export const REAL_ESTATE_FLAVOR: FlavorConfig = {
     "need to sell my house"
   ],
 
+  intentSignals: [
+    // Buyer signals
+    { pattern: "\\b(first\\s*time\\s*home\\s*buyer|first\\s*home|buying\\s*my\\s*first\\s*house)\\b", type: "buyer_intent", strength: 85 },
+    { pattern: "\\b(relocating|moving\\s*to|just\\s*moved\\s*to|transferred\\s*to)\\b", type: "buyer_intent", strength: 80 },
+    { pattern: "\\b(looking\\s*for\\s*a\\s*realtor|need\\s*a\\s*real\\s*estate\\s*agent|recommend\\s*(a\\s*)?realtor)\\b", type: "agent_search", strength: 92 },
+    { pattern: "\\b(mortgage\\s*(pre.?approval|rate|question)|how\\s*much\\s*(house|home)\\s*can\\s*i\\s*afford)\\b", type: "buyer_intent", strength: 78 },
+    { pattern: "\\b(looking\\s*(to\\s*)?(buy|purchase)\\s*(a\\s*)?(house|home|property|condo))\\b", type: "buyer_intent", strength: 82 },
+    { pattern: "\\b(down\\s*payment|fha\\s*loan|va\\s*loan|first\\s*time\\s*buyer\\s*program)\\b", type: "buyer_intent", strength: 75 },
+    // Seller signals
+    { pattern: "\\b(need\\s*to\\s*sell\\s*(my\\s*)?(house|home)|want\\s*to\\s*sell\\s*my\\s*(house|home))\\b", type: "seller_intent", strength: 90 },
+    { pattern: "\\b(how\\s*(long|fast)\\s*(does\\s*it\\s*take\\s*to\\s*sell|to\\s*sell\\s*(a\\s*)?house))\\b", type: "seller_intent", strength: 80 },
+    { pattern: "\\b(listing\\s*my\\s*(home|house)|put\\s*(my\\s*)?(house|home)\\s*on\\s*the\\s*market)\\b", type: "seller_intent", strength: 85 },
+    { pattern: "\\b(home\\s*value|what\\s*is\\s*my\\s*home\\s*worth|get\\s*an\\s*appraisal)\\b", type: "seller_intent", strength: 72 },
+    { pattern: "\\b(do\\s*i\\s*need\\s*an\\s*agent\\s*to\\s*sell|fsbo|for\\s*sale\\s*by\\s*owner)\\b", type: "seller_intent", strength: 78 },
+  ],
+
   scoutQueries: [
     "subreddit:FirstTimeHomeBuyer relocating to new city buying a home realtor advice",
     "subreddit:FirstTimeHomeBuyer tips first time home buyer mistakes avoid",

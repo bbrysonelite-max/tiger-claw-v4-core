@@ -10,6 +10,17 @@ export const DORM_DESIGN_FLAVOR: FlavorConfig = {
   description: "Single-oar prospecting engine for interior designers specializing in dorms, studio apartments, and small-space transformations. Finds students and young renters, nurtures to a paid design consultation or package purchase.",
   professionLabel: "Interior Designer",
   defaultKeywords: ["dorm room", "small space", "studio apartment", "dorm decor", "room makeover", "small apartment", "college room", "micro living"],
+  intentSignals: [
+    { pattern: "\\b((my\\s*)?(son|daughter|kid|child|i|me|we'?re?|i'?m)\\s*(is\\s*|am\\s*)?going\\s*to\\s*college)\\b", type: "college_milestone", strength: 90 },
+    { pattern: "\\b(freshman\\s*year|starting\\s*college|off\\s*to\\s*college|move\\s*in\\s*day|move.?in\\s*week)\\b", type: "college_milestone", strength: 85 },
+    { pattern: "\\b(dorm\\s*(room|decor|layout|essentials|makeover|setup|ideas))\\b", type: "design_intent", strength: 90 },
+    { pattern: "\\b(lofting\\s*my\\s*bed|dorm\\s*bedding|dorm\\s*storage|dorm\\s*roommate|matching\\s*dorm)\\b", type: "design_intent", strength: 80 },
+    { pattern: "\\b(studio\\s*apartment\\s*(design|decor|ideas|tips)|small\\s*(space|room)\\s*(design|makeover|ideas))\\b", type: "small_space_intent", strength: 78 },
+    { pattern: "\\b(interior\\s*design\\s*(help|consultation|ideas|tips)|hire\\s*(an\\s*)?interior\\s*designer)\\b", type: "designer_search", strength: 88 },
+    { pattern: "\\b(room\\s*makeover|redecorate|how\\s*to\\s*decorate\\s*(my|a)\\s*(room|dorm|apartment))\\b", type: "design_intent", strength: 75 },
+    { pattern: "\\b(college\\s*move.?in|packing\\s*for\\s*college|college\\s*shopping\\s*list)\\b", type: "college_prep", strength: 82 },
+  ],
+
   scoutQueries: [
     "subreddit:college OR subreddit:Dorms dorm room makeover small space ideas",
     "subreddit:femalelivingspace OR subreddit:malelivingspace how to decorate small dorm room",

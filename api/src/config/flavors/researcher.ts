@@ -12,6 +12,8 @@ export const RESEARCHER_FLAVOR: FlavorConfig = {
     "market analysis", "competitive landscape", "objection trends",
     "customer sentiment", "industry standards"
   ],
+  intentSignals: [],  // Researcher flavor is an internal data harvesting agent — no prospect detection needed
+
   scoutQueries: [],
 
   conversion: {

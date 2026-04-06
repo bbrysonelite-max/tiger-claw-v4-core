@@ -11,6 +11,16 @@ export const DOCTOR_FLAVOR: FlavorConfig = {
   description: "Single-oar prospecting engine for physicians and medical professionals. Finds prospective patients, nurtures to a consultation booking. Never provides medical advice — scheduling only.",
   professionLabel: "Medical Professional",
   defaultKeywords: ["doctor", "physician", "medical consultation", "specialist", "appointment", "clinic"],
+  intentSignals: [
+    { pattern: "\\b(looking\\s*for\\s*(a\\s*)?(doctor|physician|specialist|new\\s*doctor)|recommend\\s*(a\\s*)?(doctor|physician|specialist))\\b", type: "doctor_search", strength: 92 },
+    { pattern: "\\b(second\\s*opinion\\s*(doctor|specialist|medical)|get\\s*a\\s*second\\s*opinion)\\b", type: "second_opinion_intent", strength: 88 },
+    { pattern: "\\b(new\\s*patient\\s*(appointment|accepting)|accepting\\s*new\\s*patients|find\\s*(a\\s*)?new\\s*(doctor|primary\\s*care))\\b", type: "new_patient_search", strength: 90 },
+    { pattern: "\\b(concierge\\s*(medicine|doctor|practice)|direct\\s*primary\\s*care|membership\\s*(medicine|doctor))\\b", type: "concierge_intent", strength: 85 },
+    { pattern: "\\b(can'?t\\s*(get|find|see)\\s*(a\\s*)?doctor|doctor\\s*wait\\s*time\\s*(too\\s*long|months)|doctor\\s*shortage)\\b", type: "access_frustration", strength: 80 },
+    { pattern: "\\b(telehealth|virtual\\s*(doctor|visit|consultation|appointment)|online\\s*doctor)\\b", type: "telehealth_intent", strength: 78 },
+    { pattern: "\\b(functional\\s*medicine\\s*doctor|integrative\\s*medicine|holistic\\s*(doctor|physician))\\b", type: "functional_medicine_intent", strength: 82 },
+  ],
+
   scoutQueries: [],
 
   conversion: {

@@ -9,6 +9,16 @@ export const CANDLE_MAKER_FLAVOR: FlavorConfig = {
   description: "Single-oar prospecting engine for artisan candle makers and small-batch product creators. Finds retail customers and wholesale buyers, nurturing to a first order or sampling session.",
   professionLabel: "Candle Maker / Artisan",
   defaultKeywords: ["soy candles", "handmade candles", "artisan candles", "small batch candles", "custom scented candles", "wholesale candles"],
+  intentSignals: [
+    { pattern: "\\b(looking\\s*(to\\s*)?(buy|order|get)\\s*(handmade|artisan|soy|natural)\\s*candles?)\\b", type: "purchase_intent", strength: 85 },
+    { pattern: "\\b(best\\s*(soy|handmade|artisan|scented)\\s*candles?\\s*(brand|shop|recommend|buy))\\b", type: "recommendation_seeking", strength: 82 },
+    { pattern: "\\b(custom\\s*(scented|personalized|wedding|gift)\\s*candles?|candle\\s*gift\\s*(set|idea|basket))\\b", type: "gift_intent", strength: 88 },
+    { pattern: "\\b(wholesale\\s*candles?|bulk\\s*(candle|candles?)\\s*(order|buy|pricing)|candle\\s*wholesale)\\b", type: "wholesale_intent", strength: 85 },
+    { pattern: "\\b(small\\s*(batch|business)\\s*candles?|support\\s*(local|indie|small)\\s*(candle|maker))\\b", type: "indie_buyer_signal", strength: 72 },
+    { pattern: "\\b(clean\\s*(burning|scent)|non.?toxic\\s*candle|soy\\s*wax\\s*(vs|over|instead|better))\\b", type: "product_conscious_buyer", strength: 68 },
+    { pattern: "\\b(candle\\s*subscription|monthly\\s*candle\\s*(box|club|delivery))\\b", type: "subscription_intent", strength: 80 },
+  ],
+
   scoutQueries: [
     "subreddit:Etsy OR subreddit:GiftIdeas best handmade soy candles recommendations buy",
     "subreddit:GiftIdeas OR subreddit:Frugal artisan candle brands worth buying reviews",

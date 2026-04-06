@@ -9,6 +9,16 @@ export const BAKER_FLAVOR: FlavorConfig = {
   description: "Single-oar prospecting engine for custom bakers and pastry chefs. Finds customers for custom orders, wedding cakes, and wholesale accounts, nurturing them to a first order or tasting.",
   professionLabel: "Baker / Pastry Chef",
   defaultKeywords: ["custom cake", "custom cookies", "wedding cake", "cake order", "baked goods", "artisan bakery", "gluten free baked goods"],
+  intentSignals: [
+    { pattern: "\\b(custom\\s*(cake|cookies|cupcakes|pastry|baked\\s*goods)|order\\s*(a\\s*)?custom\\s*cake)\\b", type: "order_intent", strength: 90 },
+    { pattern: "\\b(wedding\\s*cake\\s*(recommendation|near\\s*me|bakery|order|custom)|looking\\s*for\\s*a\\s*wedding\\s*cake)\\b", type: "wedding_cake_intent", strength: 92 },
+    { pattern: "\\b(birthday\\s*cake\\s*(order|custom|near\\s*me|bakery)|custom\\s*birthday\\s*cake)\\b", type: "birthday_cake_intent", strength: 85 },
+    { pattern: "\\b(gluten.?free\\s*(cake|bakery|baked\\s*goods|options)|allergy.?friendly\\s*(cake|bakery))\\b", type: "dietary_need", strength: 80 },
+    { pattern: "\\b(local\\s*bakery\\s*(recommendation|near\\s*me|custom)|small\\s*(batch|business)\\s*bakery)\\b", type: "local_baker_search", strength: 82 },
+    { pattern: "\\b(wholesale\\s*(baked\\s*goods|cakes|cookies)|bakery\\s*wholesale\\s*account)\\b", type: "wholesale_intent", strength: 85 },
+    { pattern: "\\b(where\\s*to\\s*(order|buy|find)\\s*(a\\s*)?(custom\\s*)?(cake|cookies|pastries))\\b", type: "purchase_intent", strength: 88 },
+  ],
+
   scoutQueries: [
     "subreddit:weddingplanning custom wedding cake recommendations local bakery",
     "subreddit:weddingplanning OR subreddit:Baking where to find custom cakes near me",

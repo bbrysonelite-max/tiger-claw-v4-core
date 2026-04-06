@@ -10,6 +10,20 @@ export const MORTGAGE_BROKER_FLAVOR: FlavorConfig = {
   description: "Dual-oar prospecting engine for mortgage brokers. Finds first-time homebuyers ready to get pre-approved AND homeowners looking to refinance, nurtures to a discovery call and loan application.",
   professionLabel: "Mortgage Broker",
   defaultKeywords: ["first time home buyer", "mortgage pre-approval", "home loan", "refinance", "buying a house", "mortgage rates", "FHA loan", "down payment assistance"],
+  intentSignals: [
+    // Buyer oar
+    { pattern: "\\b(first\\s*time\\s*home\\s*buyer\\s*(mortgage|loan|question|advice|help)|how\\s*to\\s*get\\s*(a\\s*)?mortgage)\\b", type: "buyer_mortgage_intent", strength: 88, oar: "builder" },
+    { pattern: "\\b(mortgage\\s*pre.?approval|get\\s*pre.?approved|pre.?qualify\\s*(for\\s*(a\\s*)?mortgage)?)\\b", type: "preapproval_intent", strength: 90, oar: "builder" },
+    { pattern: "\\b(how\\s*much\\s*(house|home)\\s*can\\s*i\\s*afford|home\\s*buying\\s*budget|income\\s*to\\s*buy\\s*a\\s*house)\\b", type: "affordability_question", strength: 82, oar: "builder" },
+    { pattern: "\\b(down\\s*payment\\s*(assistance|help|grant|program)|fha\\s*loan|va\\s*loan|usda\\s*loan)\\b", type: "loan_program_research", strength: 78, oar: "builder" },
+    { pattern: "\\b(credit\\s*score\\s*(for\\s*(a\\s*)?mortgage|to\\s*buy\\s*a\\s*house)|improve\\s*credit\\s*(to\\s*buy|for\\s*mortgage))\\b", type: "credit_preparation", strength: 75, oar: "builder" },
+    // Refinance oar
+    { pattern: "\\b(should\\s*i\\s*refinance|refinance\\s*(my\\s*)?mortgage|is\\s*(it\\s*worth\\s*it\\s*to\\s*)?refinance)\\b", type: "refinance_intent", strength: 90, oar: "customer" },
+    { pattern: "\\b(lower\\s*(my\\s*)?(mortgage\\s*)?rate|get\\s*a\\s*better\\s*(mortgage\\s*)?rate|current\\s*mortgage\\s*rate)\\b", type: "rate_shopping", strength: 85, oar: "customer" },
+    { pattern: "\\b(cash.?out\\s*refinance|tap\\s*(into\\s*)?(my\\s*)?home\\s*equity|heloc)\\b", type: "equity_access_intent", strength: 82, oar: "customer" },
+    { pattern: "\\b(lower\\s*my\\s*monthly\\s*payment|reduce\\s*(my\\s*)?mortgage\\s*payment)\\b", type: "payment_reduction_intent", strength: 80, oar: "customer" },
+  ],
+
   scoutQueries: [
     "subreddit:FirstTimeHomeBuyer first time home buyer mortgage questions advice",
     "subreddit:Mortgages OR subreddit:FirstTimeHomeBuyer how to get pre-approved for mortgage",

@@ -12,6 +12,18 @@ export const LAWYER_FLAVOR: FlavorConfig = {
   description: "Single-oar prospecting engine for attorneys. Finds prospective clients in the attorney's practice area, nurtures to a free consultation booking. Never provides legal advice — consultation scheduling only.",
   professionLabel: "Lawyer / Attorney",
   defaultKeywords: ["need a lawyer", "legal consultation", "free legal advice", "attorney near me", "legal help", "law firm recommendation"],
+  intentSignals: [
+    { pattern: "\\b(need\\s*(a\\s*)?lawyer|looking\\s*for\\s*(a\\s*)?lawyer|find\\s*(a\\s*)?lawyer|recommend\\s*(a\\s*)?attorney)\\b", type: "lawyer_search", strength: 92 },
+    { pattern: "\\b(free\\s*legal\\s*(consultation|advice|help)|legal\\s*aid|pro\\s*bono)\\b", type: "consultation_intent", strength: 85 },
+    { pattern: "\\b(lawsuit|sue|being\\s*sued|legal\\s*dispute|taking\\s*(someone|them)\\s*to\\s*court)\\b", type: "litigation_signal", strength: 88 },
+    { pattern: "\\b(personal\\s*injury|car\\s*accident\\s*(lawyer|attorney)|slip\\s*and\\s*fall|wrongful\\s*death)\\b", type: "pi_signal", strength: 90 },
+    { pattern: "\\b(divorce\\s*(lawyer|attorney)|custody\\s*(battle|lawyer)|family\\s*law)\\b", type: "family_law_signal", strength: 88 },
+    { pattern: "\\b(wrongful\\s*termination|employment\\s*discrimination|wage\\s*theft|hostile\\s*workplace)\\b", type: "employment_signal", strength: 85 },
+    { pattern: "\\b(do\\s*i\\s*need\\s*(a\\s*)?lawyer|should\\s*i\\s*(hire|get)\\s*(a\\s*)?lawyer|worth\\s*it\\s*to\\s*get\\s*(a\\s*)?lawyer)\\b", type: "decision_point", strength: 80 },
+    { pattern: "\\b(landlord\\s*(dispute|issue|problem)|tenant\\s*rights|eviction\\s*(notice|lawyer))\\b", type: "landlord_tenant_signal", strength: 82 },
+    { pattern: "\\b(dui|dwi|criminal\\s*(charge|defense|lawyer)|arrested|charged\\s*with)\\b", type: "criminal_signal", strength: 88 },
+  ],
+
   scoutQueries: [
     "subreddit:legaladvice do I need a lawyer for this situation",
     "subreddit:legaladvice OR subreddit:AskLawyers how to find a good attorney recommendation",

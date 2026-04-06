@@ -10,6 +10,19 @@ export const SALES_TIGER_FLAVOR: FlavorConfig = {
   description: "Two-oar prospecting engine for high-performance sales professionals. Simultaneously builds a pipeline of qualified buyers and recruits top sales talent — two growth engines running in parallel.",
   professionLabel: "Sales Professional",
   defaultKeywords: ["sales job opportunity", "sales commission", "b2b sales", "remote sales job", "high ticket sales", "sales career growth"],
+  intentSignals: [
+    // Recruit oar — find high-performing sales talent
+    { pattern: "\\b(high\\s*(commission|ticket)\\s*sales|uncapped\\s*commission|sales\\s*career\\s*(path|change|growth))\\b", type: "sales_career_intent", strength: 80, oar: "builder" },
+    { pattern: "\\b(break\\s*into\\s*sales|get\\s*into\\s*sales|start\\s*(a\\s*)?sales\\s*career|new\\s*to\\s*sales)\\b", type: "sales_entry_intent", strength: 75, oar: "builder" },
+    { pattern: "\\b(remote\\s*sales\\s*(job|career|opportunity)|work\\s*from\\s*home\\s*sales)\\b", type: "remote_sales_intent", strength: 78, oar: "builder" },
+    { pattern: "\\b(sales\\s*(quota|target|performance)\\s*(advice|tips|help)|missing\\s*(my\\s*)?quota)\\b", type: "performance_signal", strength: 70, oar: "builder" },
+    { pattern: "\\b(commission\\s*only\\s*(worth\\s*it|sales|job)|straight\\s*commission)\\b", type: "commission_consideration", strength: 72, oar: "builder" },
+    // Prospect oar — find buyers
+    { pattern: "\\b(b2b\\s*(software|solution|tool|platform)|looking\\s*(for|to\\s*buy)\\s*(a\\s*)?(crm|sales\\s*tool))\\b", type: "b2b_buyer_intent", strength: 75, oar: "customer" },
+    { pattern: "\\b(switching\\s*(from|crm|vendor)|alternative\\s*to\\s*[a-z]+|replace\\s*(our\\s*)?[a-z]+)\\b", type: "vendor_switch_intent", strength: 80, oar: "customer" },
+    { pattern: "\\b(scale\\s*(my\\s*)?sales\\s*(team|process)|grow\\s*(my\\s*)?revenue|improve\\s*close\\s*rate)\\b", type: "revenue_growth_intent", strength: 72, oar: "customer" },
+  ],
+
   scoutQueries: [
     "subreddit:sales high paying sales career path advice no degree income",
     "subreddit:sales best industries for sales professionals break into commission",

@@ -10,6 +10,16 @@ export const GIG_ECONOMY_FLAVOR: FlavorConfig = {
   description: "Single-oar prospecting engine for gig economy earners who help others get started. Finds people looking for flexible income, nurtures them to their first platform sign-up or first earning shift.",
   professionLabel: "Gig Economy Guide",
   defaultKeywords: ["side hustle", "extra income", "flexible work", "gig work", "work from home", "earn extra money", "delivery driver tips"],
+  intentSignals: [
+    { pattern: "\\b(how\\s*to\\s*(start|get\\s*started\\s*(with|on))\\s*(doordash|uber\\s*eats|instacart|uber|lyft|grubhub|taskrabbit))\\b", type: "gig_start_intent", strength: 88 },
+    { pattern: "\\b(best\\s*gig\\s*(app|platform|job|work)|which\\s*gig\\s*(app|platform)\\s*(pays|is)\\s*(the\\s*)?(best|most))\\b", type: "gig_evaluation", strength: 82 },
+    { pattern: "\\b(extra\\s*income\\s*(flexible|part.?time)|flexible\\s*(hours|schedule)\\s*(earn|money|income))\\b", type: "flexible_income_intent", strength: 78 },
+    { pattern: "\\b(is\\s*(delivery|doordash|uber|gig\\s*work)\\s*worth\\s*it|delivery\\s*driver\\s*(tips|advice|experience))\\b", type: "gig_consideration", strength: 75 },
+    { pattern: "\\b(need\\s*money\\s*(fast|quickly|now|asap)|quick\\s*(cash|money|income)|make\\s*money\\s*this\\s*week)\\b", type: "urgency_signal", strength: 80 },
+    { pattern: "\\b(between\\s*jobs|laid\\s*off|lost\\s*my\\s*job|unemployed|job\\s*hunting)\\b", type: "life_event", strength: 75 },
+    { pattern: "\\b(gig\\s*(economy|worker|work)|freelance\\s*(work|income|tips)|independent\\s*contractor\\s*(tips|advice))\\b", type: "gig_awareness", strength: 65 },
+  ],
+
   scoutQueries: [
     "subreddit:sidehustle best gig economy side hustle start no money",
     "subreddit:gigworkers OR subreddit:sidehustle how to make extra money flexible hours",
