@@ -4,34 +4,42 @@
 
 ---
 
-## Current Session State (2026-04-05 — Session 13 COMPLETE)
+## Current Session State (2026-04-06 — Session 14 COMPLETE)
 
-### Platform green. 447/447 tests passing. Revision 00345-525 live. PRs #221–#222 merged to main — NOT YET DEPLOYED.
+### 449/449 tests passing. PR #233 merged. Cloud Run deploy pending — run before next session.
 
-**Session 13 shipped 4 changes across two repos:**
-- PR #220 (docs): MODULE_ASSESSMENT + SOTU updated — C1/C2/H1/H3/M1/M3 marked resolved, stale open items removed
-- PR #221 (fix/C3): Hatch email now sends in Tiger's voice with agent name + flavor. Fires even when botUsername is null. Dead admin-only `triggerProactiveInitiation` block removed from provisioner.
-- PR #222 (fix/M2): `makeSerperFetcher()` factory in market_miner — per-invocation call counter eliminates cross-run interference. `getSerperKey()` round-robin rotator in tiger_scout — all 3 Serper keys used, not just KEY_1.
-- Website PR #1 (tiger-bot-website): Refund policy section added to tigerclaw.io for Paddle compliance.
-
-**⚠️ Deploy needed:** PRs #221–#222 are on main but Cloud Run still runs 00345-525. Run deploy before next customer onboards.
+**Session 14 shipped (PR #233 — merged 2026-04-06):**
+- Admin agent visibility: `GET /admin/agent-health` endpoint returns per-tenant scout state + activeContext. Fleet table gains 3 columns: Onboard (complete/phase), Scout (leads qualified + last scan age), Focus (currentFocus + activeLead).
+- Flavor simplification: 13 -> 9. Cut: gig-economy, personal-trainer, baker, candle-maker. Replaced dorm-design with interior-designer (full-service business flavor). Remaining 9: network-marketer, real-estate, health-wellness, airbnb-host, lawyer, plumber, sales-tiger, interior-designer, mortgage-broker.
+- Test fix: Phase 1 autonomous loop test was mocking Node https instead of global fetch. Fixed. Phase 1 now reliable.
 
 **Full assessment in `MODULE_ASSESSMENT.md`. Read it before writing any code.**
 
-### ⚠️ FIRST PRIORITY NEXT SESSION: Agent Behavior Review
-- Agent behavior was flagged as a "broken window" — conversational quality, SOUL injection, and `runToolLoop()` behavior need a ground-truth review before any customer goes through the wizard.
-- Do not skip. Do not onboard John, Jeff, or Debbie until this is reviewed and confirmed working.
+### FIRST PRIORITY NEXT SESSION: Observe One Real Conversation
 
-### Critical Open Issues (do not launch publicly until C4 is resolved)
-- **C4:** Payment gate is open — any email gets a free bot. Paddle application submitted 2026-04-05. Domains approved. Business name had typos — cannot find how to correct in portal. Everything else approved; token likely available but deferred. Awaiting final approval.
-- **H2:** Reddit 403 on every scout run — Oxylabs account needed.
-- Read `MODULE_ASSESSMENT.md` for the complete prioritized fix list.
+This system has never run in production. Not once. No agent has ever had a real conversation with a real prospect. That is the ground truth as of 2026-04-06.
+
+Before anything else, the operator must watch this happen live:
+1. One operator provisioned — bot assigned, onboarding complete
+2. Agent scouts and finds a real prospect
+3. Agent sends a real first message
+4. Prospect replies
+5. Agent responds intelligently — without human intervention
+
+Do not add features. Do not simplify further. Prove the loop closes on a live person first.
+
+### Critical Open Issues
+
+- **DEPLOY:** PR #233 merged. Cloud Run still on revision 00353-947. Run deploy script before next session.
+- **C4:** Payment gate is open — any email gets a free bot. Fix: re-wire Zapier -> `/webhooks/stan-store`, harden `verify-purchase` to 403 on no pre-existing record. Paddle application pending final approval. Stripe available as fallback.
+- **H2:** Reddit 403 on Cloud Run egress. Oxylabs Realtime API needed. Current scaffold uses proxy headers which do not work with native fetch — needs rewrite to POST `realtime.oxylabs.io/v1/queries`.
+- **LINE:** Not provisioning LINE. Future only. Telegram is the only active channel.
 
 ### Active Business Context
-- **Max Steingart:** White label / affiliate deal (30% affiliate via Stan Store). Holding at referral model — must sell 10 first. Do not build partner infrastructure until he proves he can sell.
-- **John / Bryson International Group:** 21,000 LINE distributors in Thailand. `vijohn@hotmail.com` — wiped from DB, needs fresh wizard.
-- **Jeff Mack:** `jeffmackte@gmail.com` — wiped from DB, needs fresh wizard.
-- **Debbie:** `justagreatdirector@outlook.com` — pending, needs wizard.
+
+- Operator is building this for their own distribution network. Do not treat any individual names as launch gates. If any one person falls out, it does not matter. The platform must stand on its own merit.
+- **Max Steingart:** White label / affiliate deal (30% via Stan Store). Hold at referral model. Do not build partner infrastructure until he has sold his first 10.
+- Founding members: comped provisioning, manual if needed. Payment gate fix comes after first live conversation is confirmed.
 
 ---
 
@@ -77,8 +85,7 @@
 
 - **One email can have multiple bots.** The old one-bot-per-email lock is dead.
 - `auth.ts` creates a NEW bot when an existing bot's subscription is not `pending_setup`.
-- Each Stan Store purchase creates a fresh bot_id, fresh subscription, fresh tenant.
-- This is critical: John's 21,000 distributors will want several each.
+- Each purchase creates a fresh bot_id, fresh subscription, fresh tenant.
 
 ---
 
@@ -96,9 +103,9 @@
 - Market intelligence domain key = flavor **displayName** (e.g. `"Real Estate Agent"`), NOT the flavor key.
 - `node-fetch` is NOT in `package.json`. Use native `fetch` (Node 18+).
 - New tools in `api/src/tools/` MUST be registered in `toolsMap` in `ai.ts`. Missing = infinite tool loop.
-- **`tiger_gmail_send` and `tiger_postiz` are intentionally NOT in toolsMap.** Do not re-add them. Gemini must not send personal Gmail or post to social media without explicit human approval.
+- **`tiger_gmail_send` and `tiger_postiz` are intentionally NOT in toolsMap.** Do not re-add them.
 - **Gemini 2.0 Flash only.** Do not switch to 2.5-flash (GCP function-calling bug).
-- 447 tests must pass before any PR is opened. Run `npm test` from `api/`.
+- 449 tests must pass before any PR is opened. Run `npm test` from `api/`.
 
 ---
 
