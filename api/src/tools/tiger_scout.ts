@@ -25,7 +25,7 @@ import { ToolContext, ToolResult } from "./ToolContext.js";
 
 import * as https from "https";
 import * as crypto from "crypto";
-import { getLeads, saveLeads as dbsaveLeads, getTenantState, saveTenantState } from "../services/tenant_data.js";
+import { getLeads, saveLeads as dbsaveLeads, getTenantState, saveTenantState, updateActiveContext } from "../services/tenant_data.js";
 import { loadFlavorConfig } from "./flavorConfig.js";
 import { getHiveSignalWithFallback, getTenant } from "../services/db.js";
 import { emitHiveEvent } from "../services/hiveEmitter.js";
@@ -1343,6 +1343,18 @@ async function handleHunt(
   scoutState.totalLeadsQualified += result.qualified;
   scoutState.lastScanSummary = `${result.qualified} qualified / ${result.discovered} discovered`;
   await saveScoutState(tenantId, scoutState);
+
+  // Update active context — record what the scout just found
+  if (result.qualified > 0) {
+    const topLead = result.qualifiedLeads?.[0]?.displayName;
+    updateActiveContext(tenantId, {
+      currentFocus: 'lead prospecting',
+      lastAction: `Scout found ${result.qualified} qualified lead${result.qualified !== 1 ? 's' : ''}`,
+      lastActionAt: new Date().toISOString(),
+      ...(topLead ? { activeLead: topLead } : {}),
+      leadsInPipeline: scoutState.totalLeadsQualified,
+    }).catch(() => {});
+  }
 
   // First-lead notification — email the operator when their agent finds leads for the first time
   if (isFirstQualifiedLeads) {

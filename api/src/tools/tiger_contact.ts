@@ -25,7 +25,7 @@ import { ToolContext, ToolResult } from "./ToolContext.js";
 // Manual approval opt-in: set `manualApproval: true` in settings.json.
 // Approved messages move from `pending_approval` to `scheduled`.
 
-import { getLeads, saveLeads as dbsaveLeads, getContacts, saveContacts as dbsaveContacts, getTenantState } from "../services/tenant_data.js";
+import { getLeads, saveLeads as dbsaveLeads, getContacts, saveContacts as dbsaveContacts, getTenantState, updateActiveContext } from "../services/tenant_data.js";
 import * as crypto from "crypto";
 
 // ---------------------------------------------------------------------------
@@ -471,6 +471,14 @@ async function handleQueue(
 
   contacts[record.id] = record;
   await saveContacts(context, contacts);
+
+  // Update active context — record the lead now being contacted
+  updateActiveContext(context.sessionKey, {
+    currentFocus: 'contacting leads',
+    activeLead: lead.displayName,
+    lastAction: `Queued ${strategy} contact for ${lead.displayName}`,
+    lastActionAt: new Date().toISOString(),
+  }).catch(() => {});
 
   logger.info("tiger_contact: queued", {
     contactId: record.id,

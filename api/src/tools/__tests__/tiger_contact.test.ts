@@ -14,6 +14,7 @@ vi.mock('../../services/tenant_data.js', () => ({
   saveContacts: vi.fn(async (_tid: string, data: Record<string, any>) => { mockContacts = data }),
   getTenantState: vi.fn(async (_tid: string, file: string) => mockTenantState[file] ?? null),
   saveTenantState: vi.fn(),
+  updateActiveContext: vi.fn().mockResolvedValue(undefined),
   importContacts: vi.fn(),
 }))
 

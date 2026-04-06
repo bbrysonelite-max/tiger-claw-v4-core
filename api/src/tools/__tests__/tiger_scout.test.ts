@@ -14,6 +14,7 @@ vi.mock('../../services/tenant_data.js', () => ({
   saveLeads: vi.fn(async (_tid: string, leads: Record<string, any>) => { mockLeads = leads }),
   getTenantState: vi.fn(async (_tid: string, file: string) => mockTenantState[file] ?? null),
   saveTenantState: vi.fn(),
+  updateActiveContext: vi.fn().mockResolvedValue(undefined),
 }))
 
 const TODAY = new Date().toISOString().slice(0, 10)
