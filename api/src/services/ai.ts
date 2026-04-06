@@ -1237,7 +1237,7 @@ export async function processTelegramMessage(
             isFirstMessage,
             text,
             chatId,
-            async (introText) => { await bot.sendMessage(chatId, introText); }
+            async (introText) => { await bot.sendMessage(chatId, stripMarkdown(introText)); }
         );
         if (fastPathHandled) return;
 
@@ -1263,7 +1263,7 @@ export async function processTelegramMessage(
             await trackAICalls(tenantId, aiProvider.baseURL ? 'openrouter' : 'openai', apiCalls);
             
             if (reply.trim()) {
-                await bot.sendMessage(chatId, reply);
+                await bot.sendMessage(chatId, stripMarkdown(reply));
                 // Success resets the Gemini error counter (circuit state has its own TTL)
                 await trackGeminiSuccess(tenantId);
             } else {
@@ -1297,7 +1297,7 @@ export async function processTelegramMessage(
 
             console.log(`[AI] Reply text length: ${replyText.trim().length}. Sending to Telegram.`);
             if (replyText.trim().length > 0) {
-                await bot.sendMessage(chatId, replyText);
+                await bot.sendMessage(chatId, stripMarkdown(replyText));
                 console.log(`[AI] Message sent to chat ${chatId}`);
                 await trackGeminiSuccess(tenantId);
             } else {
@@ -1329,6 +1329,26 @@ export async function processTelegramMessage(
             : '❌ Something went wrong. The operator has been notified. Please try again in a moment.';
         await bot.sendMessage(chatId, userMsg);
     }
+}
+
+// ─── Telegram text sanitizer ─────────────────────────────────────────────────
+// Telegram's plain-text sendMessage rejects unescaped Markdown characters.
+// Gemini responses frequently contain **, *, _, `, and bracket pairs.
+// Strip them so the content is delivered as readable plain text.
+function stripMarkdown(text: string): string {
+    return text
+        .replace(/\*\*([^*]+)\*\*/g, '$1')   // **bold** → bold
+        .replace(/\*([^*]+)\*/g, '$1')         // *italic* → italic
+        .replace(/\_\_([^_]+)\_\_/g, '$1')     // __underline__ → underline
+        .replace(/\_([^_]+)\_/g, '$1')         // _italic_ → italic
+        .replace(/~~([^~]+)~~/g, '$1')         // ~~strike~~ → strike
+        .replace(/`{3}[\s\S]*?`{3}/g, (m) =>  // ```code blocks``` → indented
+            m.replace(/`{3}[^\n]*\n?/g, '').replace(/`{3}/g, '').split('\n').map(l => '  ' + l).join('\n'))
+        .replace(/`([^`]+)`/g, '$1')           // `inline code` → inline code
+        .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // [text](url) → text
+        .replace(/^#{1,6}\s+/gm, '')           // # headings → plain
+        .replace(/^\s*[-*+]\s+/gm, '• ')       // - list items → bullet
+        .trim();
 }
 
 // ─── Error classification ─────────────────────────────────────────────────────
@@ -1425,7 +1445,7 @@ export async function processSystemRoutine(tenantId: string, routineType: string
                     const chatIds = await getTenantChatIds(tenantId);
                     const bot = new TelegramBot(botToken);
                     for (const cid of chatIds) {
-                        await bot.sendMessage(cid, message).catch(err =>
+                        await bot.sendMessage(cid, stripMarkdown(message)).catch(err =>
                             console.error(`[AI Routine] Failed to send value_gap_checkin to ${cid}:`, err.message)
                         );
                     }
@@ -1464,7 +1484,7 @@ export async function processSystemRoutine(tenantId: string, routineType: string
                         }
                         const bot = new TelegramBot(botToken);
                         for (const cid of chatIds) {
-                            await bot.sendMessage(cid, message).catch(err =>
+                            await bot.sendMessage(cid, stripMarkdown(message)).catch(err =>
                                 console.error(`[AI Routine] Failed to send ${routineType} to ${cid}:`, err.message)
                             );
                         }
@@ -1507,7 +1527,7 @@ export async function processSystemRoutine(tenantId: string, routineType: string
                     const chatIds = await getTenantChatIds(tenantId);
                     const bot = new TelegramBot(botToken);
                     for (const cid of chatIds) {
-                        await bot.sendMessage(cid, message).catch(err =>
+                        await bot.sendMessage(cid, stripMarkdown(message)).catch(err =>
                             console.error(`[AI Routine] Morning report failed to send to ${cid}:`, err.message)
                         );
                     }
@@ -1622,7 +1642,7 @@ Use your exact personality. Be specific to what they said, not generic. Do NOT e
 
     // Send coaching reply if we got one (separate from the normal AI response)
     if (coachingReply.trim()) {
-        await bot.sendMessage(chatId, `💬 ${coachingReply}`).catch(err =>
+        await bot.sendMessage(chatId, `💬 ${stripMarkdown(coachingReply)}`).catch(err =>
             console.error(`[Feedback] Failed to send coaching reply to ${chatId}:`, err.message)
         );
     }
