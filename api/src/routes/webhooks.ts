@@ -617,6 +617,121 @@ router.post("/lemon-squeezy", express.raw({ type: "application/json" }), async (
 });
 
 // ---------------------------------------------------------------------------
+// POST /webhooks/paddle
+// Paddle Billing webhook — fires on transaction.completed (new purchase).
+// Creates the user + bot + subscription record so verify-purchase finds it.
+//
+// Signature: Paddle-Signature header = "ts=<timestamp>;h1=<hmac-sha256-hex>"
+// Signed string: "<timestamp>:<rawBody>"
+// Secret: PADDLE_WEBHOOK_SECRET env var
+// ---------------------------------------------------------------------------
+
+router.post("/paddle", async (req: Request, res: Response) => {
+  const secret = process.env["PADDLE_WEBHOOK_SECRET"];
+  if (!secret) {
+    console.warn("[paddle-webhook] PADDLE_WEBHOOK_SECRET not set — endpoint disabled");
+    return res.status(503).json({ error: "Payment webhook not configured" });
+  }
+
+  // Verify Paddle signature: "ts=<timestamp>;h1=<hex>"
+  const sigHeader = req.headers["paddle-signature"] as string | undefined;
+  if (!sigHeader) {
+    return res.status(401).json({ error: "Missing Paddle-Signature" });
+  }
+
+  const tsPart = sigHeader.split(";").find(p => p.startsWith("ts="));
+  const h1Part = sigHeader.split(";").find(p => p.startsWith("h1="));
+  if (!tsPart || !h1Part) {
+    return res.status(401).json({ error: "Malformed Paddle-Signature" });
+  }
+  const ts = tsPart.slice(3);
+  const h1 = h1Part.slice(3);
+
+  const signedPayload = `${ts}:${(req.body as Buffer).toString()}`;
+  const expectedBuf = createHmac("sha256", secret).update(signedPayload).digest();
+  const incomingBuf = Buffer.from(h1, "hex");
+
+  // timingSafeEqual requires equal-length buffers — reject if lengths differ
+  if (incomingBuf.length !== expectedBuf.length || !timingSafeEqual(expectedBuf, incomingBuf)) {
+    console.warn("[paddle-webhook] Signature mismatch — rejected");
+    return res.status(401).json({ error: "Invalid signature" });
+  }
+
+  const payload = JSON.parse((req.body as Buffer).toString());
+  const eventType = payload?.event_type as string | undefined;
+
+  // Only process completed transactions (new purchases)
+  if (eventType !== "transaction.completed") {
+    return res.status(200).json({ received: true, ignored: true });
+  }
+
+  const data = payload?.data ?? {};
+  const transactionId = data.id as string | undefined;
+
+  if (!transactionId) {
+    console.error("[paddle-webhook] No transaction ID in payload");
+    return res.status(400).json({ error: "No transaction ID in payload" });
+  }
+
+  // Idempotency — Paddle retries on non-200. Prevent duplicate provisioning.
+  const idempotencyKey = `paddle:processed:${transactionId}`;
+  let alreadyProcessed: string | null;
+  try {
+    alreadyProcessed = await redis.get(idempotencyKey);
+  } catch (redisErr) {
+    console.error(`[paddle-webhook] [ALERT] Redis unavailable for idempotency check (txn: ${transactionId}):`, redisErr);
+    sendAdminAlert(`🚨 Paddle webhook Redis failure — txn ${transactionId} held for retry\nRedis error: ${redisErr instanceof Error ? redisErr.message : String(redisErr)}`).catch(() => {});
+    return res.status(503).json({ error: "Service temporarily unavailable — please retry" });
+  }
+  if (alreadyProcessed) {
+    console.log(`[paddle-webhook] Duplicate delivery for txn ${transactionId} — skipping.`);
+    return res.status(200).json({ received: true, duplicate: true });
+  }
+  await redis.set(idempotencyKey, "1", "EX", IDEMPOTENCY_TTL).catch(() => null);
+
+  // Extract customer email — try all known Paddle payload paths
+  const email = (
+    data.customer?.email ??
+    data.billing_details?.contacts?.[0]?.email
+  ) as string | undefined;
+
+  if (!email) {
+    console.error(`[paddle-webhook] No customer email in payload for txn ${transactionId}`);
+    await sendAdminAlert(`🚨 Paddle webhook: no email in payload\nTransaction: ${transactionId}`);
+    return res.status(400).json({ error: "No customer email in payload" });
+  }
+
+  const name = (data.customer?.name as string | undefined) ?? email.split("@")[0]!;
+
+  console.log(`[paddle-webhook] transaction.completed for ${name} (${email}) — txn: ${transactionId}`);
+
+  // Respond immediately — Paddle expects 200 within a few seconds
+  res.status(200).json({ received: true });
+
+  // Provision async
+  setImmediate(async () => {
+    try {
+      const userId = await createBYOKUser(email, name, undefined);
+      const botId = await createBYOKBot(userId, name, "network-marketer", "pending", email);
+      await createBYOKSubscription({
+        userId,
+        botId,
+        stripeSubscriptionId: `paddle_${transactionId}`,
+        planTier: "byok_basic",
+        status: "pending_setup",
+      });
+      await logAdminEvent("paddle_purchase", botId, { email, transactionId });
+      console.log(`[paddle-webhook] ✅ Provisioned Paddle customer: ${email} (botId: ${botId})`);
+      await sendAdminAlert(`✅ Paddle purchase provisioned\nCustomer: ${name} (${email})\nTransaction: ${transactionId}`);
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      console.error(`[paddle-webhook] 🚨 PROVISIONING FAILED for ${email}:`, errMsg);
+      await sendAdminAlert(`❌ Paddle webhook provisioning FAILED\nCustomer: ${name} (${email})\nTransaction: ${transactionId}\nError: ${errMsg}`);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
