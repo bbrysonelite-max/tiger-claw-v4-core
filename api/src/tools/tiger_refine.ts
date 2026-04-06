@@ -10,7 +10,7 @@ import { callGemini, sanitizeGeminiJSON } from "../services/geminiGateway.js";
 export interface RefinedFact {
   type: "objection" | "claim" | "sentiment" | "pricing" | "gap" | "intent_signal";
   sourceUrl?: string;
-  rawText: string;
+  verbatim: string;
   purifiedFact: string;
   confidenceScore: number; // 0-100
   metadata: {
@@ -90,7 +90,7 @@ ${rawContent.slice(0, 8000)}
 Return a JSON array of facts. Each fact must have exactly these fields:
 {
   "type": "objection" | "claim" | "sentiment" | "pricing" | "gap" | "intent_signal",
-  "rawText": "the verbatim or near-verbatim quote from the content (max 200 chars)",
+  "verbatim": "EXACT word-for-word text copied from the content above — must be characters that appear literally in the source, no paraphrasing, no summarizing, max 300 chars",
   "purifiedFact": "concise actionable insight in 1-2 sentences",
   "confidenceScore": number between 0 and 100,
   "metadata": {
@@ -101,6 +101,7 @@ Return a JSON array of facts. Each fact must have exactly these fields:
   }
 }
 
+CRITICAL RULE: The "verbatim" field is REQUIRED. If you cannot find an exact quote from the content that proves the fact, do NOT include that fact. Return an empty array [] if no facts have supporting direct quotes.
 Return an empty array [] if no meaningful facts are present. Do not invent facts not present in the content. Aim for 1-5 high-quality facts per piece of content.`;
 
     const result = await callGemini(() => model.generateContent(prompt));
@@ -113,7 +114,9 @@ Return an empty array [] if no meaningful facts are present. Do not invent facts
           (f: any) =>
             f &&
             typeof f.purifiedFact === "string" &&
-            typeof f.confidenceScore === "number"
+            typeof f.confidenceScore === "number" &&
+            typeof f.verbatim === "string" &&
+            f.verbatim.trim().length >= 15
         );
       }
     } catch (parseErr) {
@@ -192,7 +195,7 @@ Example: {"0": true, "1": false}`;
         mining_cost: miningCost,
         source_url: fact.sourceUrl || sourceUrl,
         captured_by: capturedBy,
-        metadata: { ...fact.metadata, rawText: fact.rawText },
+        metadata: { ...fact.metadata, verbatim: fact.verbatim },
         verified_at: new Date(),
         valid_until: validUntil,
       });

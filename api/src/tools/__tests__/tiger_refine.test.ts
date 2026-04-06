@@ -25,7 +25,7 @@ vi.mock('@google/generative-ai', () => ({
 const VALID_FACTS = JSON.stringify([
   {
     type: 'intent_signal',
-    rawText: 'I need more income fast',
+    verbatim: 'I need more income fast',
     purifiedFact: 'Prospect is actively seeking additional income streams.',
     confidenceScore: 88,
     metadata: { category: 'income', intensity: 'high', demographic: 'parent' },
@@ -112,6 +112,33 @@ describe('tiger_refine', () => {
     expect(mockSaveMarketFact).not.toHaveBeenCalled()
   })
 
+  it('rejects facts with missing or empty verbatim quote', async () => {
+    const noVerbatimFacts = JSON.stringify([
+      {
+        type: 'intent_signal',
+        verbatim: '',
+        purifiedFact: 'Prospect wants more income.',
+        confidenceScore: 85,
+        metadata: { category: 'income', intensity: 'high' },
+      },
+      {
+        type: 'intent_signal',
+        purifiedFact: 'Another fact with no verbatim field at all.',
+        confidenceScore: 80,
+        metadata: { category: 'income', intensity: 'medium' },
+      },
+    ])
+    mockGenerateContent
+      .mockResolvedValueOnce({ response: { text: () => noVerbatimFacts } })
+    const ctx = makeContext()
+    const result = await tiger_refine.execute(
+      { rawContent: 'This is long enough content to pass the length check and has useful info.' },
+      ctx
+    )
+    expect(result.ok).toBe(true)
+    expect(mockSaveMarketFact).not.toHaveBeenCalled()
+  })
+
   it('falls back to all facts when relevance gate call fails', async () => {
     mockGenerateContent
       .mockResolvedValueOnce({ response: { text: () => VALID_FACTS } })
@@ -128,8 +155,8 @@ describe('tiger_refine', () => {
 
   it('continues saving remaining facts if one DB write fails', async () => {
     const twoFacts = JSON.stringify([
-      { type: 'intent_signal', rawText: 'Fact 1', purifiedFact: 'Insight 1.', confidenceScore: 80, metadata: {} },
-      { type: 'intent_signal', rawText: 'Fact 2', purifiedFact: 'Insight 2.', confidenceScore: 75, metadata: {} },
+      { type: 'intent_signal', verbatim: 'Fact 1 exact quote here', purifiedFact: 'Insight 1.', confidenceScore: 80, metadata: {} },
+      { type: 'intent_signal', verbatim: 'Fact 2 exact quote here', purifiedFact: 'Insight 2.', confidenceScore: 75, metadata: {} },
     ])
     const gatePassBoth = JSON.stringify({ '0': true, '1': true })
     mockGenerateContent
