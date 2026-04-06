@@ -72,36 +72,75 @@ export default function DashboardPage() {
     const [keySaved, setKeySaved] = useState(false);
     const [keyError, setKeyError] = useState("");
 
-    useEffect(() => {
-        const params = new URLSearchParams(window.location.search);
-        const slug = params.get("slug") ?? params.get("s");
+    // Returning customer email login
+    const [needsEmail, setNeedsEmail] = useState(false);
+    const [emailInput, setEmailInput] = useState("");
+    const [emailLoading, setEmailLoading] = useState(false);
+    const [emailError, setEmailError] = useState("");
 
-        if (!slug) {
-            setError("Missing slug parameter. Access your dashboard via /dashboard?slug=your-slug");
-            setLoading(false);
-            return;
-        }
-
-        const token = localStorage.getItem("tc_session_token");
-        if (!token) {
-            setError("Session expired. Please return to the signup page.");
-            setLoading(false);
-            return;
-        }
-
+    const loadDashboard = (slug: string, token: string) => {
         fetch(`${API_BASE}/dashboard/${slug}`, {
             headers: { "Authorization": `Bearer ${token}` },
         })
             .then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
             .then((d) => {
-                if (d.error) {
-                    setError(d.error);
-                } else {
-                    setData(d);
-                }
+                if (d.error) setError(d.error);
+                else setData(d);
             })
             .catch((e) => setError(`Could not reach server: ${e.message}`))
             .finally(() => setLoading(false));
+    };
+
+    const handleEmailSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!emailInput.trim()) return;
+        setEmailLoading(true);
+        setEmailError("");
+        try {
+            const res = await fetch(`${API_BASE}/auth/session`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email: emailInput.trim().toLowerCase() }),
+            });
+            const d = await res.json() as { ok?: boolean; sessionToken?: string; slug?: string; error?: string };
+            if (!res.ok || !d.sessionToken || !d.slug) {
+                setEmailError(d.error ?? "No account found for this email.");
+                return;
+            }
+            localStorage.setItem("tc_session_token", d.sessionToken);
+            localStorage.setItem("tc_slug", d.slug);
+            setNeedsEmail(false);
+            setLoading(true);
+            // Update URL slug and load dashboard
+            const url = new URL(window.location.href);
+            url.searchParams.set("slug", d.slug);
+            window.history.replaceState({}, "", url.toString());
+            loadDashboard(d.slug, d.sessionToken);
+        } catch {
+            setEmailError("Connection error. Please try again.");
+        } finally {
+            setEmailLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const slug = params.get("slug") ?? params.get("s") ?? localStorage.getItem("tc_slug");
+
+        const token = localStorage.getItem("tc_session_token");
+        if (!token) {
+            setNeedsEmail(true);
+            setLoading(false);
+            return;
+        }
+
+        if (!slug) {
+            setNeedsEmail(true);
+            setLoading(false);
+            return;
+        }
+
+        loadDashboard(slug, token);
     }, []);
 
     const saveKey = async () => {
@@ -143,6 +182,43 @@ export default function DashboardPage() {
         return (
             <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+        );
+    }
+
+    if (needsEmail) {
+        return (
+            <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-4">
+                <div className="w-full max-w-sm">
+                    <div className="flex items-center gap-2 mb-8 justify-center">
+                        <Bot className="w-6 h-6 text-orange-500" />
+                        <span className="text-white font-bold text-lg">Tiger Claw</span>
+                    </div>
+                    <form onSubmit={handleEmailSubmit} className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 space-y-4">
+                        <div>
+                            <h2 className="text-white font-semibold mb-1">Access your dashboard</h2>
+                            <p className="text-zinc-400 text-sm">Enter the email you used to sign up.</p>
+                        </div>
+                        <div>
+                            <input
+                                type="email"
+                                value={emailInput}
+                                onChange={(e) => setEmailInput(e.target.value)}
+                                placeholder="you@example.com"
+                                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-orange-500"
+                                required
+                            />
+                        </div>
+                        {emailError && <p className="text-red-400 text-xs">{emailError}</p>}
+                        <button
+                            type="submit"
+                            disabled={emailLoading}
+                            className="w-full bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white rounded-lg py-2 text-sm font-semibold transition-colors"
+                        >
+                            {emailLoading ? "Looking up your account…" : "Access Dashboard →"}
+                        </button>
+                    </form>
+                </div>
             </div>
         );
     }

@@ -10,7 +10,7 @@ import { Router, type Request, type Response, type NextFunction } from "express"
 import { createHmac, timingSafeEqual } from "crypto";
 import { z } from "zod";
 import { rateLimit } from "express-rate-limit";
-import { lookupPurchaseByEmail, createBYOKUser, createBYOKBot, createBYOKSubscription } from "../services/db.js";
+import { lookupPurchaseByEmail, createBYOKUser, createBYOKBot, createBYOKSubscription, findActiveSessionByEmail } from "../services/db.js";
 
 // Rate limiter: 10 attempts per IP per 15 minutes.
 // Prevents email enumeration and on-demand DB record spam.
@@ -165,6 +165,42 @@ router.post("/verify-purchase", verifyPurchaseLimiter, async (req: Request, res:
   } catch (err) {
     console.error("[auth] verify-purchase error:", err);
     return res.status(500).json({ error: "Authentication failed. Please try again." });
+  }
+});
+
+// ── POST /auth/session — returning customer dashboard access ──────────────────
+// Takes an email, finds their most recent non-terminated bot, issues a fresh
+// session token. Never creates records — read-only. Used by the dashboard
+// "Access your dashboard" email form for customers whose token expired.
+router.post("/session", verifyPurchaseLimiter, async (req: Request, res: Response) => {
+  const schema = z.object({ email: z.string().email() });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: "Valid email is required." });
+  }
+
+  const { email } = parsed.data;
+
+  try {
+    const session = await findActiveSessionByEmail(email);
+    if (!session) {
+      return res.status(404).json({ error: "No account found for this email." });
+    }
+
+    const { sessionToken, expires } = generateSessionToken(email, session.botId, session.userId);
+    console.log(`[auth] Session re-issued for ${email} — slug: ${session.slug}`);
+
+    return res.json({
+      ok: true,
+      sessionToken,
+      expires,
+      slug: session.slug,
+      botId: session.botId,
+      name: session.name,
+    });
+  } catch (err) {
+    console.error("[auth] session error:", err);
+    return res.status(500).json({ error: "Could not retrieve session. Please try again." });
   }
 });
 
