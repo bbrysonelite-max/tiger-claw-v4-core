@@ -14,6 +14,7 @@ export const ADMIN_FLAVOR: FlavorConfig = {
     "founding members",
     "system anomalies",
   ],
+  intentSignals: [],  // Admin flavor — no prospect detection
   scoutQueries: [],
   conversion: {
     oars: ["single"],

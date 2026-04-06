@@ -14,6 +14,16 @@ export const INTERIOR_DESIGNER_FLAVOR: FlavorConfig = {
     "dorm essentials", "lofting my bed", "college roommate"
   ],
 
+  intentSignals: [
+    { pattern: "\\b((my\\s*)?(son|daughter|kid|i|we'?re?)\\s*(is\\s*|am\\s*)?going\\s*to\\s*college|freshman\\s*year|off\\s*to\\s*college)\\b", type: "college_milestone", strength: 90 },
+    { pattern: "\\b(dorm\\s*(room|decor|layout|setup|makeover|essentials))\\b", type: "dorm_design_intent", strength: 92 },
+    { pattern: "\\b(lofting\\s*my\\s*bed|dorm\\s*storage|college\\s*room\\s*ideas|move.?in\\s*day)\\b", type: "dorm_design_intent", strength: 85 },
+    { pattern: "\\b(hire\\s*(an\\s*)?interior\\s*designer|interior\\s*design\\s*consultation|interior\\s*designer\\s*(near\\s*me|recommendation))\\b", type: "designer_search", strength: 90 },
+    { pattern: "\\b(home\\s*(makeover|renovation|redesign)|redecorate\\s*(my\\s*)?(home|room|apartment|living\\s*room))\\b", type: "redesign_intent", strength: 80 },
+    { pattern: "\\b(small\\s*(space|apartment|room)\\s*(design|decor|ideas|tips)|studio\\s*apartment\\s*design)\\b", type: "small_space_intent", strength: 78 },
+    { pattern: "\\b(how\\s*to\\s*decorate\\s*(my|a)\\s*(room|dorm|apartment)|room\\s*transformation\\s*(ideas|tips))\\b", type: "design_intent", strength: 75 },
+  ],
+
   scoutQueries: [
     "subreddit:college OR subreddit:Dorms dorm room interior design tips setup move in",
     "subreddit:college OR subreddit:femalelivingspace freshman dorm room decor ideas",

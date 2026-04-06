@@ -10,6 +10,18 @@ export const PLUMBER_FLAVOR: FlavorConfig = {
   description: "Single-oar prospecting engine for plumbers and trades professionals. Finds homeowners and property managers who need service, nurtures to a booked appointment.",
   professionLabel: "Plumber / Trades Professional",
   defaultKeywords: ["plumber recommendation", "plumbing repair", "burst pipe", "water heater replacement", "drain clog", "plumbing estimate"],
+  intentSignals: [
+    { pattern: "\\b(burst\\s*pipe|pipe\\s*burst|pipe\\s*broke|pipe\\s*leak|water\\s*everywhere)\\b", type: "plumbing_emergency", strength: 95 },
+    { pattern: "\\b(water\\s*heater\\s*(broken|not\\s*working|leaking|replace|repair|died))\\b", type: "water_heater", strength: 90 },
+    { pattern: "\\b(clogged\\s*(drain|toilet|sink|shower)|drain\\s*(clog|blocked|slow))\\b", type: "drain_issue", strength: 85 },
+    { pattern: "\\b(need\\s*(a\\s*)?plumber|looking\\s*for\\s*(a\\s*)?plumber|recommend\\s*(a\\s*)?plumber|find\\s*(a\\s*)?plumber)\\b", type: "plumber_search", strength: 92 },
+    { pattern: "\\b(water\\s*(damage|leak|dripping|flooding|puddle|stain))\\b", type: "water_issue", strength: 80 },
+    { pattern: "\\b(low\\s*water\\s*pressure|no\\s*hot\\s*water|running\\s*toilet|toilet\\s*won'?t\\s*flush)\\b", type: "plumbing_issue", strength: 82 },
+    { pattern: "\\b(sewer\\s*(smell|backup|line)|septic\\s*(issue|problem|full))\\b", type: "sewer_issue", strength: 88 },
+    { pattern: "\\b(plumbing\\s*(estimate|quote|cost|repair|emergency)|how\\s*much\\s*(does|to fix)\\s*(a\\s*)?(plumber|plumbing))\\b", type: "quote_seeking", strength: 78 },
+    { pattern: "\\b(diy\\s*(plumbing|fix)|should\\s*i\\s*(call|hire)\\s*(a\\s*)?plumber|plumber\\s*vs\\s*diy)\\b", type: "decision_point", strength: 72 },
+  ],
+
   scoutQueries: [
     "subreddit:HomeImprovement OR subreddit:Plumbing licensed plumber recommendation water heater",
     "subreddit:HomeImprovement plumbing emergency drain clog who to call",

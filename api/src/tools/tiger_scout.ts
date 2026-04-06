@@ -25,7 +25,7 @@ import { ToolContext, ToolResult } from "./ToolContext.js";
 
 import * as https from "https";
 import * as crypto from "crypto";
-import { getLeads, saveLeads as dbsaveLeads, getTenantState, saveTenantState } from "../services/tenant_data.js";
+import { getLeads, saveLeads as dbsaveLeads, getTenantState, saveTenantState, updateActiveContext } from "../services/tenant_data.js";
 import { loadFlavorConfig } from "./flavorConfig.js";
 import { getHiveSignalWithFallback, getTenant } from "../services/db.js";
 import { emitHiveEvent } from "../services/hiveEmitter.js";
@@ -238,64 +238,40 @@ function extractICPKeywords(icp: ICP): { positive: string[]; negative: string[] 
 // Intent signal detection patterns (Network Marketer flavor focused)
 // ---------------------------------------------------------------------------
 
-interface IntentPattern {
-  pattern: RegExp;
-  type: string;
-  strength: number;
-}
-
-const INTENT_PATTERNS: IntentPattern[] = [
-  // Income / financial frustration — very strong signals
-  { pattern: /\b(side\s*hustle|extra\s*income|passive\s*income|financial\s*freedom)\b/i, type: "side_hustle_interest", strength: 75 },
-  { pattern: /\b(work\s*from\s*home|work\s*at\s*home|remote\s*work|wfh)\b/i, type: "side_hustle_interest", strength: 65 },
-  { pattern: /\b(be\s*my\s*own\s*boss|own\s*business|start\s*a\s*business|entrepreneur)\b/i, type: "side_hustle_interest", strength: 70 },
-  { pattern: /\b(tired\s*of\s*(my\s*)?(9\s*[-–]\s*5|job|boss)|quit\s*my\s*job|leave\s*my\s*job)\b/i, type: "income_complaint", strength: 72 },
-  { pattern: /\b(can'?t\s*afford|struggling\s*(financially|with\s*money|with\s*bills)|need\s*more\s*money|broke|debt)\b/i, type: "income_complaint", strength: 68 },
-  { pattern: /\b(lay\s*off|laid\s*off|lost\s*(my\s*)?job|job\s*loss|unemployed|looking\s*for\s*work)\b/i, type: "life_event", strength: 78 },
-  { pattern: /\b(new\s*(baby|parent|mom|dad)|just\s*had\s*a\s*(baby|kid)|maternity|paternity)\b/i, type: "life_event", strength: 60 },
-  { pattern: /\b(how\s*(do\s*i|can\s*i|to)\s*(make|earn|generate)\s*(money|income|cash))\b/i, type: "forum_question", strength: 70 },
-  { pattern: /\b(any\s*(good\s*)?(way|ways)\s*to\s*(make|earn)\s*(money|income))\b/i, type: "forum_question", strength: 65 },
-  { pattern: /\b(looking\s*(for\s*)?(opportunity|opportunities|business\s*opportunity|income\s*opportunity))\b/i, type: "side_hustle_interest", strength: 72 },
-  { pattern: /\b(inflation|cost\s*of\s*living|bills\s*(are\s*)?(too\s*high|killing\s*me))\b/i, type: "pain_point_post", strength: 58 },
-  { pattern: /\b(network\s*marketing|mlm|direct\s*sales|affiliate)\b/i, type: "side_hustle_interest", strength: 55 },
-  { pattern: /\b(health\s*(and\s*)?wellness|lose\s*weight|get\s*fit|feel\s*better|natural\s*(health|remedy|supplement))\b/i, type: "pain_point_post", strength: 55 },
-  { pattern: /\b(real\s*estate|investment\s*property|rental\s*income|landlord|flip\s*(houses|homes))\b/i, type: "side_hustle_interest", strength: 60 },
-  { pattern: /\b(competitor|alternative\s*to|instead\s*of|switched\s*from|left\s*[a-z]+\s*for)\b/i, type: "competitor_engagement", strength: 50 },
-
-  // College Dorm / Interior Design signals (v5 Mining Niche)
-  { pattern: /\b(son|daughter|kid|child|i|me)\s*(is\s*)?going\s*to\s*college\b/i, type: "college_milestone", strength: 85 },
-  { pattern: /\b(freshman\s*year|starting\s*college|off\s*to\s*college|move\s*in\s*day)\b/i, type: "college_milestone", strength: 80 },
-  { pattern: /\b(dorm\s*decor|dorm\s*room|dorm\s*layout|dorm\s*essentials|lofting\s*my\s*bed)\b/i, type: "design_intent", strength: 90 },
-  { pattern: /\b(college\s*roommate|matching\s*dorm|dorm\s*bedding|dorm\s*storage)\b/i, type: "design_intent", strength: 75 },
-];
-
 /**
- * Detect intent signals from post/bio text.
- * Returns array of detected signals.
+ * Detect intent signals from post/bio text using flavor-specific patterns.
+ * Compiles pattern strings to RegExp at call time (cached per flavor load).
+ * Returns array of detected signals sorted by strength descending.
  */
 function detectIntentSignals(
   text: string,
   source: string,
-  excerpt: string
+  excerpt: string,
+  flavorSignals: Array<{ pattern: string; type: string; strength: number }>
 ): IntentSignalRecord[] {
   const signals: IntentSignalRecord[] = [];
   const now = new Date().toISOString();
   const seen = new Set<string>();
 
-  for (const { pattern, type, strength } of INTENT_PATTERNS) {
-    if (pattern.test(text) && !seen.has(type)) {
-      seen.add(type);
-      signals.push({
-        type,
-        strength,
-        detectedAt: now,
-        source,
-        excerpt: excerpt.slice(0, 200),
-      });
+  for (const { pattern, type, strength } of flavorSignals) {
+    try {
+      const regex = new RegExp(pattern, "i");
+      if (regex.test(text) && !seen.has(type)) {
+        seen.add(type);
+        signals.push({
+          type,
+          strength,
+          detectedAt: now,
+          source,
+          excerpt: excerpt.slice(0, 200),
+        });
+      }
+    } catch {
+      // Bad regex in flavor config — skip silently, don't crash the scout
     }
   }
 
-  return signals;
+  return signals.sort((a, b) => b.strength - a.strength);
 }
 
 // ---------------------------------------------------------------------------
@@ -1237,11 +1213,12 @@ async function runHunt(
     // Score profileFit against the relevant ICP
     const fitResult = scoreProfileFit(profile, allPositive, allNegative);
 
-    // Detect intent signals from post content
+    // Detect intent signals from post content using flavor-specific patterns
     const signals = detectIntentSignals(
       `${profile.bio ?? ""} ${profile.recentPostText}`,
       `${profile.platform}/${profile.sourceUrl ?? ""}`,
-      profile.postExcerpt ?? profile.recentPostText.slice(0, 200)
+      profile.postExcerpt ?? profile.recentPostText.slice(0, 200),
+      flavorConfig.intentSignals ?? []
     );
 
     // Inject ICP Bias
@@ -1366,6 +1343,18 @@ async function handleHunt(
   scoutState.totalLeadsQualified += result.qualified;
   scoutState.lastScanSummary = `${result.qualified} qualified / ${result.discovered} discovered`;
   await saveScoutState(tenantId, scoutState);
+
+  // Update active context — record what the scout just found
+  if (result.qualified > 0) {
+    const topLead = result.qualifiedLeads?.[0]?.displayName;
+    updateActiveContext(tenantId, {
+      currentFocus: 'lead prospecting',
+      lastAction: `Scout found ${result.qualified} qualified lead${result.qualified !== 1 ? 's' : ''}`,
+      lastActionAt: new Date().toISOString(),
+      ...(topLead ? { activeLead: topLead } : {}),
+      leadsInPipeline: scoutState.totalLeadsQualified,
+    }).catch(() => {});
+  }
 
   // First-lead notification — email the operator when their agent finds leads for the first time
   if (isFirstQualifiedLeads) {

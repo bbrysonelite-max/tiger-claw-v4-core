@@ -225,3 +225,34 @@ export async function saveTenantState<T>(tenantId: string, stateKey: string, dat
         [tenantId, stateKey, data]
     );
 }
+
+// ---------------------------------------------------------------------------
+// Active Context — per-tenant working state
+// What the agent is currently focused on, injected into every system prompt.
+// ---------------------------------------------------------------------------
+
+export interface ActiveContext {
+    currentFocus?: string;
+    activeLead?: string;
+    lastAction?: string;
+    lastActionAt?: string;
+    pendingFollowUps?: Array<{ name: string; dueDate: string; note?: string }>;
+    leadsInPipeline?: number;
+    updatedAt: string;
+}
+
+export async function getActiveContext(tenantId: string): Promise<ActiveContext | null> {
+    return getTenantState<ActiveContext>(tenantId, 'active_context');
+}
+
+export async function updateActiveContext(
+    tenantId: string,
+    patch: Partial<Omit<ActiveContext, 'updatedAt'>>
+): Promise<void> {
+    const current = await getActiveContext(tenantId) ?? {} as Partial<ActiveContext>;
+    await saveTenantState<ActiveContext>(tenantId, 'active_context', {
+        ...current,
+        ...patch,
+        updatedAt: new Date().toISOString(),
+    } as ActiveContext);
+}

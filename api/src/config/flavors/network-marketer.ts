@@ -18,6 +18,27 @@ export const NETWORK_MARKETER_FLAVOR: FlavorConfig = {
     "passive income", "be my own boss", "tired of my job", "need more money"
   ],
 
+  intentSignals: [
+    // Builder oar — income pain and opportunity seeking
+    { pattern: "\\b(side\\s*hustle|extra\\s*income|passive\\s*income|financial\\s*freedom)\\b", type: "side_hustle_interest", strength: 75, oar: "builder" },
+    { pattern: "\\b(work\\s*from\\s*home|work\\s*at\\s*home|remote\\s*work|wfh)\\b", type: "side_hustle_interest", strength: 65, oar: "builder" },
+    { pattern: "\\b(be\\s*my\\s*own\\s*boss|own\\s*business|start\\s*a\\s*business|entrepreneur)\\b", type: "side_hustle_interest", strength: 70, oar: "builder" },
+    { pattern: "\\b(tired\\s*of\\s*(my\\s*)?(9\\s*[-–]\\s*5|job|boss)|quit\\s*my\\s*job|leave\\s*my\\s*job)\\b", type: "income_complaint", strength: 72, oar: "builder" },
+    { pattern: "\\b(can'?t\\s*afford|struggling\\s*(financially|with\\s*money|with\\s*bills)|need\\s*more\\s*money|broke|in\\s*debt)\\b", type: "income_complaint", strength: 68, oar: "builder" },
+    { pattern: "\\b(lay\\s*off|laid\\s*off|lost\\s*(my\\s*)?job|job\\s*loss|unemployed|looking\\s*for\\s*work)\\b", type: "life_event", strength: 78, oar: "builder" },
+    { pattern: "\\b(new\\s*(baby|parent|mom|dad)|just\\s*had\\s*a\\s*(baby|kid)|maternity|paternity)\\b", type: "life_event", strength: 60, oar: "builder" },
+    { pattern: "\\b(how\\s*(do\\s*i|can\\s*i|to)\\s*(make|earn|generate)\\s*(money|income|cash))\\b", type: "forum_question", strength: 70, oar: "builder" },
+    { pattern: "\\b(any\\s*(good\\s*)?(way|ways)\\s*to\\s*(make|earn)\\s*(money|income))\\b", type: "forum_question", strength: 65, oar: "builder" },
+    { pattern: "\\b(looking\\s*(for\\s*)?(opportunity|opportunities|business\\s*opportunity|income\\s*opportunity))\\b", type: "opportunity_seeking", strength: 72, oar: "builder" },
+    { pattern: "\\b(inflation|cost\\s*of\\s*living|bills\\s*(are\\s*)?(too\\s*high|killing\\s*me))\\b", type: "pain_point_post", strength: 58, oar: "builder" },
+    { pattern: "\\b(network\\s*marketing|mlm|direct\\s*sales|affiliate\\s*marketing)\\b", type: "industry_awareness", strength: 55, oar: "builder" },
+    // Customer oar — product interest signals (health/wellness products common in NM)
+    { pattern: "\\b(lose\\s*weight|weight\\s*loss|drop\\s*pounds|get\\s*lean)\\b", type: "health_intent", strength: 60, oar: "customer" },
+    { pattern: "\\b(more\\s*energy|feel\\s*tired|fatigue|low\\s*energy|exhausted\\s*all\\s*the\\s*time)\\b", type: "health_intent", strength: 58, oar: "customer" },
+    { pattern: "\\b(natural\\s*(health|remedy|supplement)|holistic|clean\\s*eating|wellness\\s*journey)\\b", type: "health_intent", strength: 55, oar: "customer" },
+    { pattern: "\\b(tried\\s*everything|nothing\\s*works|can'?t\\s*lose\\s*weight)\\b", type: "health_pain", strength: 65, oar: "customer" },
+  ],
+
   scoutQueries: [
     "subreddit:Entrepreneur OR subreddit:sidehustle best side hustle 2026 extra income business",
     "subreddit:WorkFromHome OR subreddit:sidehustle passive income from home legitimate ideas",

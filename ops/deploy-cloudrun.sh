@@ -65,7 +65,9 @@ SERPER_KEY_2=tiger-claw-serper-key-2:latest,\
 SERPER_KEY_3=tiger-claw-serper-key-3:latest,\
 MAGIC_LINK_SECRET=tiger-claw-magic-link-secret:latest,\
 TELEGRAM_WEBHOOK_SECRET=tiger-claw-telegram-webhook-secret:latest,\
-RESEND_API_KEY=tiger-claw-resend-api-key:latest"
+RESEND_API_KEY=tiger-claw-resend-api-key:latest,\
+OXYLABS_USERNAME=oxylabs-username:latest,\
+OXYLABS_PASSWORD=oxylabs-password:latest"
 
 for i in "${!DEPLOY_REGIONS[@]}"; do
   REGION="${DEPLOY_REGIONS[$i]}"

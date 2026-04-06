@@ -181,7 +181,7 @@ export async function getMarketIntelligence(
      FROM market_intelligence
      WHERE domain = $1
        AND confidence_score >= $2
-       AND created_at >= NOW() - INTERVAL '7 days'
+       AND created_at >= NOW() - INTERVAL '30 days'
        AND (valid_until IS NULL OR valid_until > NOW())
      ORDER BY created_at DESC, confidence_score DESC
      LIMIT $3`,

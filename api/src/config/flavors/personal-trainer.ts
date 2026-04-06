@@ -10,6 +10,17 @@ export const PERSONAL_TRAINER_FLAVOR: FlavorConfig = {
   description: "Single-oar prospecting engine for personal trainers and fitness coaches. Finds people who are ready to commit to a transformation, nurtures to a paid discovery call or training program enrollment.",
   professionLabel: "Personal Trainer",
   defaultKeywords: ["personal trainer", "weight loss coach", "fitness transformation", "gym coach", "online training", "workout plan", "fat loss", "strength training"],
+  intentSignals: [
+    { pattern: "\\b(looking\\s*for\\s*(a\\s*)?(personal\\s*trainer|fitness\\s*coach)|recommend\\s*(a\\s*)?(personal\\s*trainer|gym\\s*coach))\\b", type: "trainer_search", strength: 92 },
+    { pattern: "\\b(online\\s*(personal\\s*trainer|fitness\\s*coach|training\\s*program)\\s*(worth\\s*it|results|review))\\b", type: "online_training_intent", strength: 85 },
+    { pattern: "\\b(can'?t\\s*lose\\s*weight|tried\\s*everything\\s*(to\\s*lose|and\\s*can'?t)|weight\\s*loss\\s*(plateau|stuck))\\b", type: "weight_loss_frustration", strength: 82 },
+    { pattern: "\\b(transformation|body\\s*transformation|get\\s*(in\\s*shape|fit|toned|lean)\\s*(for|before|by))\\b", type: "transformation_intent", strength: 78 },
+    { pattern: "\\b(accountability\\s*(partner|coach)|need\\s*accountability|hold\\s*me\\s*accountable)\\b", type: "accountability_seeking", strength: 80 },
+    { pattern: "\\b(fitness\\s*goals|workout\\s*plan\\s*(help|advice|tips)|how\\s*to\\s*(start|begin)\\s*(working\\s*out|at\\s*the\\s*gym))\\b", type: "fitness_guidance_seeking", strength: 72 },
+    { pattern: "\\b(post.?partum\\s*(fitness|workout)|lose\\s*(baby|pregnancy)\\s*weight|get\\s*back\\s*in\\s*shape\\s*after)\\b", type: "life_event_fitness", strength: 80 },
+    { pattern: "\\b(strength\\s*training\\s*(for\\s*beginners|program|tips)|how\\s*to\\s*(build\\s*muscle|get\\s*stronger))\\b", type: "strength_intent", strength: 68 },
+  ],
+
   scoutQueries: [
     "subreddit:fitness OR subreddit:xxfitness how do I find a good personal trainer hire",
     "subreddit:loseit OR subreddit:fitness online personal trainer worth it results experience",

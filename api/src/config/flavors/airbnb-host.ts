@@ -17,6 +17,17 @@ export const AIRBNB_HOST_FLAVOR: FlavorConfig = {
     "managing airbnbs",
     "airbnb host tips"
   ],
+  intentSignals: [
+    { pattern: "\\b(want\\s*to\\s*start\\s*(an\\s*)?airbnb|thinking\\s*(about|of)\\s*starting\\s*(an\\s*)?airbnb|should\\s*i\\s*start\\s*(an\\s*)?airbnb)\\b", type: "str_start_intent", strength: 88 },
+    { pattern: "\\b(buying\\s*(an\\s*)?airbnb|buying\\s*(a\\s*)?short\\s*term\\s*rental|str\\s*investing)\\b", type: "str_investment", strength: 85 },
+    { pattern: "\\b(co.?host(ing)?|looking\\s*for\\s*a\\s*co.?host|co.?host\\s*agreement|revenue\\s*split)\\b", type: "cohost_intent", strength: 82 },
+    { pattern: "\\b(airbnb\\s*(vs|or)\\s*long\\s*term\\s*rental|short\\s*term\\s*vs\\s*long\\s*term)\\b", type: "str_consideration", strength: 78 },
+    { pattern: "\\b(more\\s*bookings|increase\\s*(airbnb\\s*)?bookings|airbnb\\s*occupancy|how\\s*to\\s*get\\s*more\\s*guests)\\b", type: "optimization_intent", strength: 75 },
+    { pattern: "\\b(str\\s*regulations|airbnb\\s*rules|short\\s*term\\s*rental\\s*(laws|permit|license))\\b", type: "compliance_question", strength: 68 },
+    { pattern: "\\b(rent\\s*arbitrage|airbnb\\s*arbitrage|subletting\\s*on\\s*airbnb)\\b", type: "arbitrage_intent", strength: 80 },
+    { pattern: "\\b(airbnb\\s*(income|revenue|earnings|profit|how\\s*much\\s*(can|do)\\s*i\\s*make))\\b", type: "income_research", strength: 72 },
+  ],
+
   scoutQueries: [
     "subreddit:airbnb should I start an airbnb short term rental worth it",
     "subreddit:airbnb OR subreddit:realestateinvesting airbnb vs long term rental income",

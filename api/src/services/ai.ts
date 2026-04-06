@@ -2,7 +2,7 @@ import { GoogleGenerativeAI, Content, Part, GenerateContentResult } from '@googl
 import { GoogleAICacheManager } from '@google/generative-ai/server';
 import OpenAI from 'openai';
 import { getTenant, getPool, getBotState, setBotState, getTenantBotToken, getHiveSignalWithFallback, queryHivePatterns, updateTenantKeyHealth } from './db.js';
-import { getTenantState } from './tenant_data.js';
+import { getTenantState, getActiveContext } from './tenant_data.js';
 import { getMarketIntelligence, MarketFact } from './market_intel.js';
 import TelegramBot from 'node-telegram-bot-api';
 import IORedis from 'ioredis';
@@ -873,7 +873,10 @@ export async function buildSystemPrompt(tenant: any): Promise<string> {
     }
 
     // Load accumulated fact anchors — extracted from past conversations
-    const factAnchors = await getTenantState<any>(tenant.id, 'fact_anchors').catch(() => null);
+    const [factAnchors, activeCtx] = await Promise.all([
+        getTenantState<any>(tenant.id, 'fact_anchors').catch(() => null),
+        getActiveContext(tenant.id).catch(() => null),
+    ]);
 
     const anchorLines: string[] = [];
     if (factAnchors && factAnchors.lastExtractedAt) {
@@ -904,6 +907,27 @@ export async function buildSystemPrompt(tenant: any): Promise<string> {
                 anchorLines.push(`Hot leads mentioned: ${factAnchors.hotLeadsMentioned.map((e: any) => e.value).join('; ')}`);
             }
         }
+    }
+
+    // Build active context block — what the agent is currently working on
+    const activeCtxLines: string[] = [];
+    if (activeCtx && activeCtx.updatedAt) {
+        activeCtxLines.push(``, `━━━━ WHAT YOU'RE CURRENTLY WORKING ON ━━━━`);
+        if (activeCtx.currentFocus) activeCtxLines.push(`Current focus: ${activeCtx.currentFocus}`);
+        if (activeCtx.activeLead) activeCtxLines.push(`Active lead: ${activeCtx.activeLead}`);
+        if (activeCtx.lastAction) {
+            const when = activeCtx.lastActionAt
+                ? ` (${new Date(activeCtx.lastActionAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})`
+                : '';
+            activeCtxLines.push(`Last action: ${activeCtx.lastAction}${when}`);
+        }
+        if (activeCtx.leadsInPipeline !== undefined) {
+            activeCtxLines.push(`Leads in pipeline: ${activeCtx.leadsInPipeline}`);
+        }
+        if (activeCtx.pendingFollowUps?.length) {
+            activeCtxLines.push(`Pending follow-ups: ${activeCtx.pendingFollowUps.map(f => `${f.name} (${f.dueDate})`).join(', ')}`);
+        }
+        activeCtxLines.push(`(Use this context to pick up exactly where you left off. Never announce it — just act on it.)`);
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -965,6 +989,7 @@ export async function buildSystemPrompt(tenant: any): Promise<string> {
         operatorBlock,
         ...icpLines,
         ...anchorLines,
+        ...activeCtxLines,
         ``,
         `You are a strategic business consultant with deep expertise in ${flavor.professionLabel}. You think alongside your operator — you don't just run tools, you lead.`,
         ``,

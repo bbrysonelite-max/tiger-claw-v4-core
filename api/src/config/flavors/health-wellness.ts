@@ -20,6 +20,19 @@ export const HEALTH_WELLNESS_FLAVOR: FlavorConfig = {
     "pain relief",
     "mental health"
   ],
+  intentSignals: [
+    { pattern: "\\b(looking\\s*for\\s*a\\s*(health|wellness)\\s*coach|recommend\\s*(a\\s*)?(health|wellness)\\s*coach)\\b", type: "coach_search", strength: 92 },
+    { pattern: "\\b(chronic\\s*(pain|illness|fatigue)|fibromyalgia|autoimmune|inflammation)\\b", type: "health_pain", strength: 80 },
+    { pattern: "\\b(tried\\s*everything|nothing\\s*(has\\s*)?worked|doctors\\s*can'?t\\s*figure\\s*it\\s*out)\\b", type: "frustration_signal", strength: 78 },
+    { pattern: "\\b(holistic\\s*(health|medicine|approach)|functional\\s*medicine|integrative\\s*health)\\b", type: "holistic_intent", strength: 72 },
+    { pattern: "\\b(lose\\s*weight|weight\\s*loss\\s*(journey|help|coach)|can'?t\\s*lose\\s*weight)\\b", type: "weight_intent", strength: 75 },
+    { pattern: "\\b(feel\\s*(exhausted|tired\\s*all\\s*the\\s*time|terrible|awful)|low\\s*energy|no\\s*energy)\\b", type: "health_pain", strength: 70 },
+    { pattern: "\\b(mental\\s*health|anxiety|stress\\s*management|burnout|overwhelmed)\\b", type: "mental_wellness", strength: 65 },
+    { pattern: "\\b(gut\\s*health|digestive\\s*issues|bloating|food\\s*sensitivities)\\b", type: "health_pain", strength: 68 },
+    { pattern: "\\b(wellness\\s*journey|self.?care|transformation|feel\\s*like\\s*myself\\s*again)\\b", type: "transformation_intent", strength: 62 },
+    { pattern: "\\b(natural\\s*(remedy|alternative|approach)|ditch\\s*(medication|meds)|alternative\\s*medicine)\\b", type: "holistic_intent", strength: 65 },
+  ],
+
   scoutQueries: [
     "subreddit:HealthyLiving OR subreddit:wellness looking for health coach recommendation hire",
     "subreddit:wellness OR subreddit:ChronicPain how to find a good wellness coach",

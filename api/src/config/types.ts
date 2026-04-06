@@ -180,6 +180,25 @@ export interface NurtureTemplates {
 }
 
 // ---------------------------------------------------------------------------
+// Intent Signals — per-flavor prospect detection patterns
+// ---------------------------------------------------------------------------
+
+// Each flavor defines its own intent signals. The scout compiles the pattern
+// string into a RegExp at runtime. Storing as string keeps flavors JSON-safe
+// and avoids regex serialization issues across module boundaries.
+//
+// oar: which conversion track this signal feeds (omit for single-oar flavors)
+// strength: 0–100. 90+ = explicit purchase/hire intent. 70–89 = strong signal.
+//           50–69 = moderate. Below 50 = weak / background noise.
+
+export interface IntentSignal {
+  pattern: string;                          // Regex string — compiled at runtime
+  type: string;                             // e.g. "buyer_intent", "income_pain"
+  strength: number;                         // 0–100
+  oar?: "builder" | "customer" | "single"; // Which oar this feeds (optional)
+}
+
+// ---------------------------------------------------------------------------
 // Flavor
 // ---------------------------------------------------------------------------
 
@@ -190,6 +209,7 @@ export interface FlavorConfig {
   professionLabel: string;
   defaultKeywords: string[];
   scoutQueries: string[];             // High-intent search strings for v5 Data Refinery
+  intentSignals: IntentSignal[];      // Flavor-specific prospect detection patterns for tiger_scout
   conversion: ConversionConfig;
   objectionBuckets: ObjectionBucket[];
   patternInterrupts: PatternInterruptStory[];

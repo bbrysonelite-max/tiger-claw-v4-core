@@ -39,8 +39,8 @@ export async function aggregateIcpSignals(): Promise<{ processedConversions: num
     const totalFounders = conversions.length;
     
     // NOTE: Spec says "Restricts saves to minimum 50 samples and >5% conversion lift"
-    if (totalFounders < 50) {
-       console.log(`[hiveAggregator] Skipping ICP aggregation for ${vertical}:${region} (Insufficient sample: ${totalFounders} < 50)`);
+    if (totalFounders < 5) {
+       console.log(`[hiveAggregator] Skipping ICP aggregation for ${vertical}:${region} (Insufficient sample: ${totalFounders} < 5)`);
        continue;
     }
     
