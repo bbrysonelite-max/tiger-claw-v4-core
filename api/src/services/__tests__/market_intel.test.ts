@@ -60,7 +60,7 @@ describe('getMarketIntelligence', () => {
     const [sql, params] = mockQuery.mock.calls[0]
     expect(sql).toContain('domain = $1')
     expect(sql).toContain('confidence_score >= $2')
-    expect(sql).toContain("INTERVAL '7 days'")
+    expect(sql).toContain("INTERVAL '30 days'")
     expect(sql).toContain('valid_until IS NULL OR valid_until > NOW()')
     expect(params[0]).toBe('network-marketer')
     expect(params[2]).toBe(3) // limit
@@ -81,14 +81,14 @@ describe('getMarketIntelligence', () => {
     expect(result).toEqual([])
   })
 
-  it('does not return stale facts — query enforces 7-day window in SQL', async () => {
+  it('does not return stale facts — query enforces 30-day window in SQL', async () => {
     // Stale filtering happens in SQL; verify the clause is present
     mockQuery.mockResolvedValueOnce({ rows: [] })
 
     await getMarketIntelligence('real-estate')
 
     const [sql] = mockQuery.mock.calls[0]
-    expect(sql).toContain("NOW() - INTERVAL '7 days'")
+    expect(sql).toContain("NOW() - INTERVAL '30 days'")
   })
 
   it('propagates DB errors so callers can catch them', async () => {
