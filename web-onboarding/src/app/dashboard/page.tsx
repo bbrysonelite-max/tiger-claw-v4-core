@@ -317,7 +317,7 @@ export default function DashboardPage() {
                         icon={<Shield className="h-5 w-5 text-[#22c55e]" />}
                         title="AI Engine"
                         value={engineLabel(data.apiKey.provider, data.apiKey.model)}
-                        subtitle={data.apiKey.model ?? "gemini-2.5-flash"}
+                        subtitle={data.apiKey.model ?? "gemini-2.0-flash"}
                     />
                     <StatCard
                         icon={<Zap className="h-5 w-5 text-amber-400" />}
