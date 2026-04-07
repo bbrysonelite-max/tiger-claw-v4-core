@@ -855,7 +855,11 @@ export async function buildSystemPrompt(tenant: any): Promise<string> {
 
     const icpLines: string[] = [];
     if (hasOnboarding) {
-        const primaryIcp = onboardState?.flavor === 'network-marketer' ? icpBuilder : icpSingleResolved;
+        let primaryIcp = onboardState?.flavor === 'network-marketer' ? icpBuilder : icpSingleResolved;
+        // Fall back to baked-in flavor default when operator hasn't completed ICP onboarding
+        if (!primaryIcp?.idealPerson && flavor?.defaultBuilderICP) {
+            primaryIcp = flavor.defaultBuilderICP as typeof primaryIcp;
+        }
         if (primaryIcp?.idealPerson) {
             const label = onboardState?.flavor === 'real-estate' ? 'Ideal Client' : 'Ideal Customer / Recruit';
             icpLines.push(``, `━━━━ IDEAL CUSTOMER PROFILE ━━━━`);

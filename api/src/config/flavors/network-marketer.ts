@@ -347,4 +347,15 @@ export const NETWORK_MARKETER_FLAVOR: FlavorConfig = {
     slow_drip_value: "Hey {{name}},\n\nChecking in — it's been a bit. Just wanted to share something I thought was worth passing along.\n\n{{tenantName}} has been focused on {{differentiator}}. Things are moving. No pitch — just wanted to stay in touch.\n\nIf anything's changed on your end, I'm always here.\n\n— {{botName}}",
     default_fallback: "Hey {{name}}, just checking in. — {{botName}}"
   },
+
+  // -------------------------------------------------------------------------
+  // Default Builder ICP — baked from 39 years of NM field experience
+  // Used when operator has not yet completed ICP onboarding questions.
+  // -------------------------------------------------------------------------
+  defaultBuilderICP: {
+    idealPerson: "Employed adult aged 30–55 who is financially stable but not financially secure — they have a job, they pay their bills, but they are one layoff, one medical bill, or one bad quarter away from real trouble. They have a network (family, coworkers, community) and they are coachable. They are NOT risk-takers — they are risk-REDUCERS looking for a second income stream that does not require them to quit their job or bet the house.",
+    problemFaced: "They are watching AI, automation, and inflation compress their financial safety margin. Their job feels less certain than it did five years ago. Cost of living is up. Their paycheck is flat. They want income security but they are afraid of anything that looks like a gamble. They have probably dismissed network marketing before because it felt risky — they need to see it framed as a hedge, not a bet.",
+    currentApproachFailing: "They are doing nothing — waiting for a raise that is not coming, hoping their job survives the next round of layoffs, or picking up gig work that trades time for dollars with no leverage. They have no residual income. Their financial plan is entirely dependent on one employer who does not owe them loyalty.",
+    onlinePlatforms: "Facebook groups (income, side hustle, work from home), Reddit (r/sidehustle, r/personalfinance, r/Entrepreneur), LinkedIn (middle management, sales professionals, educators, healthcare workers), Telegram and LINE communities in markets with high employment anxiety.",
+  },
 };
