@@ -106,7 +106,7 @@ export const provisionWorker = SHOULD_RUN_WORKERS ? new Worker(
             console.log(`[Worker] Succeeded provisioning job ${job.id}. Tenant live.`);
 
             const pool = getPool();
-            await pool.query("UPDATE tenants SET status = 'live', deployed_at = NOW() WHERE id = $1", [job.data.botId]);
+            await pool.query("UPDATE tenants SET status = 'live' WHERE id = $1", [job.data.botId]);
 
             await sendAdminAlert(
                 `✅ New tenant provisioned via Queue (Blowout Protection)!\n` +
