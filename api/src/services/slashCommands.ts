@@ -6,6 +6,10 @@ import { getTenant, getBYOKStatus, getPool } from './db.js';
 
 const FRONTEND_URL = process.env['FRONTEND_URL'] ?? 'https://wizard.tigerclaw.io';
 
+// Identity questions that Gemini's training overrides the system prompt on.
+// Intercept these before Gemini sees them and answer as the bot persona.
+const IDENTITY_PATTERNS = /^(who|what)\s+are\s+you|are\s+you\s+(an?\s+)?(ai|bot|robot|gemini|google|language\s+model|llm)|tell\s+me\s+about\s+yourself|what\s+is\s+your\s+name|introduce\s+yourself/i;
+
 export async function handleSlashCommand(
     tenantId: string,
     botToken: string,
@@ -13,6 +17,15 @@ export async function handleSlashCommand(
     text: string,
 ): Promise<boolean> {
     const cmd = text.split(/\s+/)[0]!.toLowerCase().split('@')[0]; // strip @botname suffix
+
+    // Intercept identity questions — Gemini ignores system prompt instructions on these
+    if (!cmd.startsWith('/') && IDENTITY_PATTERNS.test(text.trim())) {
+        const tenant = await getTenant(tenantId);
+        const name = tenant?.name ?? 'Tiger';
+        await tgSend(botToken, chatId, `I'm ${name} — your AI-powered sales agent. I hunt leads, qualify prospects, and help you close. What can I do for you today?`);
+        return true;
+    }
+
     if (!cmd.startsWith('/')) return false;
 
     switch (cmd) {
