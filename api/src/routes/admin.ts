@@ -1195,16 +1195,17 @@ router.get("/pipeline/health", async (_req: Request, res: Response) => {
 });
 
 // ── GET /admin/mine/status ───────────────────────────────────────────────────
-// Returns current mine queue state + last completed run stats.
+// Returns orchestration pipeline state + last completed run stats.
 router.get("/mine/status", async (_req: Request, res: Response) => {
   try {
-    const [active, waiting] = await Promise.all([
-      miningQueue.getActive(),
-      miningQueue.getWaiting(),
+    const { researchAgentQueue, reportingAgentQueue } = await import('../services/orchestrator.js');
+    const [researchActive, researchWaiting, reportingActive] = await Promise.all([
+      researchAgentQueue.getActive(),
+      researchAgentQueue.getWaiting(),
+      reportingAgentQueue.getActive(),
     ]);
-    const isRunning = active.length > 0;
+    const isRunning = researchActive.length > 0 || reportingActive.length > 0;
 
-    // Pull last mine_complete event from admin_events
     const pool = getPool();
     const evtRes = await pool.query(
       `SELECT details, created_at FROM admin_events
@@ -1215,7 +1216,12 @@ router.get("/mine/status", async (_req: Request, res: Response) => {
       ? { ...evtRes.rows[0].details, completedAt: evtRes.rows[0].created_at }
       : null;
 
-    return res.json({ isRunning, queueDepth: waiting.length, lastRun });
+    return res.json({
+      isRunning,
+      researchJobsActive: researchActive.length,
+      researchJobsWaiting: researchWaiting.length,
+      lastRun,
+    });
   } catch (err) {
     console.error("[admin] GET /mine/status error:", err);
     return res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
@@ -1223,17 +1229,14 @@ router.get("/mine/status", async (_req: Request, res: Response) => {
 });
 
 // ── POST /admin/mine/run ─────────────────────────────────────────────────────
-// Enqueue an immediate mine run (bypasses 2 AM cron schedule).
+// Trigger an immediate orchestrated run (bypasses 2 AM cron schedule).
 router.post("/mine/run", async (_req: Request, res: Response) => {
   try {
-    const jobId = `market_mining_manual_${Date.now()}`;
-    const job = await miningQueue.add('global_market_mining', {}, {
-      jobId,
-      removeOnComplete: true,
-      removeOnFail: true,
-    });
-    console.log(`[admin] Manual mine run enqueued — jobId: ${job.id}`);
-    return res.json({ ok: true, jobId: job.id });
+    const { startOrchestratedRun } = await import('../services/orchestrator.js');
+    const runId = `run_manual_${Date.now()}`;
+    await startOrchestratedRun(runId);
+    console.log(`[admin] Manual orchestrated run started — runId: ${runId}`);
+    return res.json({ ok: true, runId });
   } catch (err) {
     console.error("[admin] POST /mine/run error:", err);
     return res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
