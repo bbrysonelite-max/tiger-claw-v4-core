@@ -75,37 +75,8 @@ router.post("/verify-purchase", verifyPurchaseLimiter, async (req: Request, res:
     const purchase = await lookupPurchaseByEmail(email);
 
     if (!purchase) {
-      // If Lemon Squeezy is configured, purchases must arrive via webhook first
-      if (process.env["LEMONSQUEEZY_SIGNING_SECRET"]) {
-        console.warn(`[auth] No purchase record for ${email} — Lemon Squeezy mode: rejecting`);
-        return res.status(404).json({ error: "No purchase found for this email. Please use the link from your purchase confirmation email." });
-      }
-
-      // Stan Store fallback: create on-demand (no payment verification)
-      // No purchase record found — create on-demand
-      console.log(`[auth] No purchase record for ${email} — creating on-demand (Stan Store self-serve)`);
-
-      const name = email.split("@")[0] ?? email;
-      const userId = await createBYOKUser(email, name);
-      const botId = await createBYOKBot(userId, name, "network-marketer", "pending", email);
-      await createBYOKSubscription({
-        userId,
-        botId,
-        stripeSubscriptionId: `stan_store_self_serve_${Date.now()}`,
-        planTier: "pro",
-        status: "pending_setup",
-      });
-
-      console.log(`[auth] On-demand records created for ${email} — botId: ${botId}`);
-
-      const { sessionToken, expires } = generateSessionToken(email, botId, userId);
-      return res.json({
-        ok: true,
-        sessionToken,
-        expires,
-        botId,
-        name,
-      });
+      console.warn(`[auth] No purchase record for ${email} — rejecting`);
+      return res.status(404).json({ error: "No purchase found for this email. Please use the link from your receipt email." });
     }
 
     // Existing purchase found — check if we can resume or if we need a new one
