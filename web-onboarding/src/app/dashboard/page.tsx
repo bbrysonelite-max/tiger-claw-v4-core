@@ -322,7 +322,7 @@ export default function DashboardPage() {
                     <StatCard
                         icon={<Zap className="h-5 w-5 text-amber-400" />}
                         title="Subscription"
-                        value="Stan Store · Paid"
+                        value="Active Subscription"
                         subtitle="Lifetime Access · BYOK"
                     />
                 </div>

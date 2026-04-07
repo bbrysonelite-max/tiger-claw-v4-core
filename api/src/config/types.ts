@@ -219,6 +219,12 @@ export interface FlavorConfig {
   nurtureTemplates: NurtureTemplates;
   fallbackIntelligence?: string[];    // High-value, vertical-specific facts when live mining is empty
   scoreThreshold?: number;            // Override default score threshold (80) for this flavor
+  defaultBuilderICP?: {               // Baked-in ICP used when operator has not customized it
+    idealPerson: string;
+    problemFaced: string;
+    currentApproachFailing: string;
+    onlinePlatforms: string;
+  };
 }
 
 // ---------------------------------------------------------------------------
