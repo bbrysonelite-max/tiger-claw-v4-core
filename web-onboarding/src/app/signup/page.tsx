@@ -14,7 +14,7 @@ import TelegramTokenInput from "@/components/signup/TelegramTokenInput";
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://api.tigerclaw.io";
 
 // ---------------------------------------------------------------------------
-// Flavor data (14 customer-facing flavors — hardcoded to avoid API import)
+// Flavor data (9 customer-facing flavors)
 // ---------------------------------------------------------------------------
 
 interface Flavor {
@@ -40,11 +40,6 @@ const FLAVORS: Flavor[] = [
     description: "Finds people ready to invest in their health transformation",
   },
   {
-    key: "personal-trainer",
-    displayName: "Personal Trainer",
-    description: "Finds people ready to commit to a fitness transformation",
-  },
-  {
     key: "mortgage-broker",
     displayName: "Mortgage Broker",
     description: "Finds homebuyers and homeowners ready to talk loans",
@@ -63,26 +58,6 @@ const FLAVORS: Flavor[] = [
     key: "interior-designer",
     displayName: "Interior Designer",
     description: "Finds homeowners and businesses ready to redesign their space",
-  },
-  {
-    key: "dorm-design",
-    displayName: "Dorm & Small Space Designer",
-    description: "Finds students and renters ready to transform their space",
-  },
-  {
-    key: "baker",
-    displayName: "Baker / Pastry Chef",
-    description: "Finds customers hungry for custom baked goods and events",
-  },
-  {
-    key: "candle-maker",
-    displayName: "Candle Maker / Artisan",
-    description: "Finds buyers who love handmade artisan products",
-  },
-  {
-    key: "gig-economy",
-    displayName: "Gig Economy Guide",
-    description: "Finds people ready to start or grow a gig income",
   },
   {
     key: "plumber",
