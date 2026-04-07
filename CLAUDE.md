@@ -4,35 +4,34 @@
 
 ---
 
-## Current Session State (2026-04-06 — Session 14 COMPLETE)
+## Current Session State (2026-04-06 — Session 15 COMPLETE)
 
-### 449/449 tests passing. PR #233 merged. Cloud Run deploy pending — run before next session.
+### 458/458 tests passing. PRs #235, #236, #237 merged. Cloud Run revision 00372-mg2 live.
 
-**Session 14 shipped (PR #233 — merged 2026-04-06):**
-- Admin agent visibility: `GET /admin/agent-health` endpoint returns per-tenant scout state + activeContext. Fleet table gains 3 columns: Onboard (complete/phase), Scout (leads qualified + last scan age), Focus (currentFocus + activeLead).
-- Flavor simplification: 13 -> 9. Cut: gig-economy, personal-trainer, baker, candle-maker. Replaced dorm-design with interior-designer (full-service business flavor). Remaining 9: network-marketer, real-estate, health-wellness, airbnb-host, lawyer, plumber, sales-tiger, interior-designer, mortgage-broker.
-- Test fix: Phase 1 autonomous loop test was mocking Node https instead of global fetch. Fixed. Phase 1 now reliable.
+**Session 15 shipped:**
+- **PR #235 — Verbatim fix (tiger_refine):** Every saved market intelligence fact now requires an exact word-for-word quote from the source. Field renamed `rawText` → `verbatim`. Prompt enforces no-quote-no-fact rule. Filter rejects facts with verbatim < 15 chars.
+- **PR #236 — Paddle webhook integration:** `POST /webhooks/paddle` live. HMAC-SHA256 signature verification. Redis idempotency (24h TTL, fail closed on Redis down). Provisions BYOK user+bot+subscription on `transaction.completed`. GCP secrets created: `paddle-webhook-secret`, `paddle-api-key`. Webhook configured in Paddle dashboard.
+- **PR #237 — Wizard flavor fix:** Removed 5 cut flavors (personal-trainer, dorm-design, baker, candle-maker, gig-economy) from wizard signup. Now shows canonical 9.
+- **Oxylabs confirmed working:** Mine ran with Oxylabs producing 209 posts vs 14 from Serper. Env vars confirmed in deployed revision.
+- **Deployed:** Cloud Run revision `tiger-claw-api-00372-mg2`. Health green. fix-all-webhooks run (2 tenants fixed).
 
 **Full assessment in `MODULE_ASSESSMENT.md`. Read it before writing any code.**
 
-### FIRST PRIORITY NEXT SESSION: Observe One Real Conversation
+### FIRST PRIORITY NEXT SESSION: Close the Paddle Payment Loop
 
-This system has never run in production. Not once. No agent has ever had a real conversation with a real prospect. That is the ground truth as of 2026-04-06.
+Paddle webhook is live and provisioning works. What's missing: a Paddle product + price so a real checkout can trigger the full chain. Tomorrow:
+1. Create a Paddle product + price in Paddle dashboard
+2. Get a checkout link
+3. Buy it as a customer
+4. Watch the webhook fire → bot provisioned → go through wizard → bot scouts → bot talks
 
-Before anything else, the operator must watch this happen live:
-1. One operator provisioned — bot assigned, onboarding complete
-2. Agent scouts and finds a real prospect
-3. Agent sends a real first message
-4. Prospect replies
-5. Agent responds intelligently — without human intervention
-
-Do not add features. Do not simplify further. Prove the loop closes on a live person first.
+Do not add features. Prove the loop closes end-to-end first.
 
 ### Critical Open Issues
 
-- **DEPLOY:** PR #233 merged. Cloud Run still on revision 00353-947. Run deploy script before next session.
-- **C4:** Payment gate is open — any email gets a free bot. Fix: re-wire Zapier -> `/webhooks/stan-store`, harden `verify-purchase` to 403 on no pre-existing record. Paddle application pending final approval. Stripe available as fallback.
-- **H2:** Reddit 403 on Cloud Run egress. Oxylabs Realtime API needed. Current scaffold uses proxy headers which do not work with native fetch — needs rewrite to POST `realtime.oxylabs.io/v1/queries`.
+- **PADDLE PRODUCT:** Webhook is live but no Paddle product/price exists yet. No checkout URL. Create tomorrow before testing.
+- **C4:** Payment gate still open for direct wizard access. Fix after Paddle loop is proven.
+- **Admin alert markdown bug:** Underscores in error messages (e.g. `pending_setup`) break Telegram Markdown parser. Admin alerts with error text fail to deliver. Fix before launch.
 - **LINE:** Not provisioning LINE. Future only. Telegram is the only active channel.
 
 ### Active Business Context
