@@ -13,8 +13,8 @@ import {
 // ─── VALID_FLAVOR_KEYS ────────────────────────────────────────────────────────
 
 describe('VALID_FLAVOR_KEYS', () => {
-  it('contains exactly 9 customer-facing flavors', () => {
-    expect(VALID_FLAVOR_KEYS).toHaveLength(9);
+  it('contains exactly 8 customer-facing flavors', () => {
+    expect(VALID_FLAVOR_KEYS).toHaveLength(8);
   });
 
   it('does not include admin (internal-only, never provisioned)', () => {
@@ -42,7 +42,6 @@ describe('VALID_FLAVOR_KEYS', () => {
       'lawyer',
       'plumber',
       'sales-tiger',
-      'interior-designer',
       'mortgage-broker',
     ];
     for (const key of expected) {
@@ -54,15 +53,15 @@ describe('VALID_FLAVOR_KEYS', () => {
 // ─── validateAllFlavors ───────────────────────────────────────────────────────
 
 describe('validateAllFlavors', () => {
-  it('returns valid:true — all 9 flavor files are present', () => {
+  it('returns valid:true — all flavor files are present', () => {
     const result = validateAllFlavors();
     expect(result.valid).toBe(true);
     expect(result.missing).toHaveLength(0);
   });
 
-  it('reports 9 loaded flavors', () => {
+  it('reports 8 loaded flavors', () => {
     const result = validateAllFlavors();
-    expect(result.loaded).toHaveLength(9);
+    expect(result.loaded).toHaveLength(8);
   });
 
   it('loaded list contains every key in VALID_FLAVOR_KEYS', () => {
@@ -112,9 +111,8 @@ describe('listFlavors', () => {
     expect(listFlavors()).toContain('network-marketer');
   });
 
-  it('includes interior-designer and mortgage-broker', () => {
+  it('includes mortgage-broker', () => {
     const flavors = listFlavors();
-    expect(flavors).toContain('interior-designer');
     expect(flavors).toContain('mortgage-broker');
   });
 });

@@ -18,7 +18,6 @@ export const VALID_FLAVOR_KEYS = [
     "lawyer",
     "plumber",
     "sales-tiger",
-    "interior-designer",
     "mortgage-broker",
 ] as const;
 

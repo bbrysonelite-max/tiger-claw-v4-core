@@ -146,22 +146,22 @@ Your job is to filter out any facts that are not directly relevant to a REAL-WOR
 
 CRITICAL RULE: If the fact is about a VIDEO GAME, BOARD GAME, MOVIE, BOOK, or FICTIONAL UNIVERSE, you MUST return FALSE. Even if terms like "health", "stats", "plumbing", or "design" are used, if they refer to game mechanics or lore, they are 100% IRRELEVANT.
 
-REJECT (false):
-- Fictional lore, sci-fi, fantasy, or gaming content (e.g., Warhammer, Animal Crossing, RPG mechanics, game balance, video game updates, "builds", "variators").
-- Personal relationship stories or general social chitchat.
-- Any content that does not provide actionable business insight for a real "${domain}".
+REJECT (false) — only clear non-commercial content:
+- Video games, board games, movies, books, fictional universes, RPG/game mechanics, lore.
+- Pure social chitchat with zero business signal.
 
-ACCEPT (true):
-- Real-world purchase intent or research behavior from real people.
-- Business-related pain points or unmet needs.
-- Competitor mentions or pricing sensitivity.
-- Industry-specific professional challenges.
+ACCEPT (true) — any of the following:
+- Real-world purchase intent, research behavior, or product interest from real people.
+- Business pain points, income concerns, career or financial anxiety.
+- Competitor mentions, pricing sensitivity, or cost objections.
+- Industry-specific professional challenges or unmet needs.
+- General frustration or aspiration that a professional in "${domain}" could act on.
 
 Facts to classify:
 ${facts.map((f, i) => `${i}. ${f.purifiedFact}`).join("\n")}
 
-Return a JSON object mapping each index to a boolean representing its relevance. 
-Strictness: 10/10. If in doubt, return false.
+Return a JSON object mapping each index to a boolean representing its relevance.
+Strictness: 6/10. Accept any fact with a plausible commercial signal. Only reject obvious non-business content.
 Example: {"0": true, "1": false}`;
 
       const gateResult = await callGemini(() => gateModel.generateContent(gatePrompt));

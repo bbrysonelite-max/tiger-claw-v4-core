@@ -8,7 +8,6 @@ import { LAWYER_FLAVOR } from "./lawyer.js";
 import { PLUMBER_FLAVOR } from "./plumber.js";
 import { SALES_TIGER_FLAVOR } from "./sales-tiger.js";
 import { RESEARCHER_FLAVOR } from "./researcher.js";
-import { INTERIOR_DESIGNER_FLAVOR } from "./interior-designer.js";
 import { MORTGAGE_BROKER_FLAVOR } from "./mortgage-broker.js";
 
 export const FLAVOR_REGISTRY: Record<string, FlavorConfig> = {
@@ -21,7 +20,6 @@ export const FLAVOR_REGISTRY: Record<string, FlavorConfig> = {
   "plumber": PLUMBER_FLAVOR,
   "sales-tiger": SALES_TIGER_FLAVOR,
   "researcher": RESEARCHER_FLAVOR,
-  "interior-designer": INTERIOR_DESIGNER_FLAVOR,
   "mortgage-broker": MORTGAGE_BROKER_FLAVOR,
 };
 
