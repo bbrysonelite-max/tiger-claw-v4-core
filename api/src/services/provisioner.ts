@@ -78,9 +78,20 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
   if (input.botId) {
     const activated = await activateSubscription(input.botId);
     if (!activated) {
-      return { success: false, error: `Failed to activate subscription for botId=${input.botId}. No pending_setup record found.`, steps };
+      // Not pending_setup — check if already active from a prior attempt (idempotent retry)
+      const existing = await getPool().query(
+        `SELECT status FROM subscriptions WHERE tenant_id = $1 LIMIT 1`,
+        [input.botId]
+      );
+      const currentStatus = existing.rows[0]?.status as string | undefined;
+      if (currentStatus === 'active' || currentStatus === 'onboarding') {
+        steps.push(`Subscription already ${currentStatus} for botId=${input.botId} — continuing retry`);
+      } else {
+        return { success: false, error: `No subscription in activatable state for botId=${input.botId} (status: ${currentStatus ?? 'not found'})`, steps };
+      }
+    } else {
+      steps.push(`Subscription activated for botId=${input.botId}`);
     }
-    steps.push(`Subscription activated for botId=${input.botId}`);
   }
 
   // Guard: reject unknown flavor keys before touching the DB

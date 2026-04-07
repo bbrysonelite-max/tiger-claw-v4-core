@@ -47,7 +47,7 @@ export async function sendAdminAlert(message: string): Promise<void> {
 
   try {
     const bot = new TelegramBot(adminToken);
-    await bot.sendMessage(adminChatId, `🛡️ *ADMIN ALERT*\n\n${message}`, { parse_mode: "Markdown" });
+    await bot.sendMessage(adminChatId, `🛡️ ADMIN ALERT\n\n${message}`);
   } catch (err) {
     console.error("[admin] Failed to send admin alert:", err);
   }
