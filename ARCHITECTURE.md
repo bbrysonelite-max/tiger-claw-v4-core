@@ -1,6 +1,6 @@
 # Tiger Claw V4 — Core Architecture
 
-**Last updated:** 2026-04-05 (Session 11 — Round 2 audit + security fixes PR #210)
+**Last updated:** 2026-04-06 (Session 15 — Paddle integration + Oxylabs confirmed live)
 **Status:** LIVE. Locked. Do not rewrite.
 
 ---
@@ -21,41 +21,42 @@ Tiger Claw V4 is **stateless**. No long-running Docker containers per tenant. No
 
 | Component | Technology | Actual Status |
 |---|---|---|
-| Compute | Google Cloud Run, Node.js/Express, port 4000 | ✅ Live. Revision 00330-6ml |
+| Compute | Google Cloud Run, Node.js/Express, port 4000 | ✅ Live. Revision 00372-mg2 |
 | Database | Cloud SQL PostgreSQL HA — `tiger_claw_shared` | ✅ Live |
 | Cache & Queues | Cloud Redis HA + BullMQ (8 queues) | ✅ Live |
 | AI Provider | Gemini 2.0 Flash — `@google/generative-ai` SDK | ✅ Live. **LOCKED — do not switch to 2.5-flash** (GCP function-calling bug) |
-| Frontend (signup + dashboard) | Next.js on Vercel — `wizard.tigerclaw.io` | ✅ Live. **Vercel auto-deploy is BROKEN — deploy manually** |
+| Frontend (signup + dashboard) | Next.js on Vercel — `wizard.tigerclaw.io` | ✅ Live. Auto-deploy confirmed working. |
 | Frontend (website) | Static HTML — `tigerclaw.io` | ✅ Live |
-| Payments | **Stan Store only** | ✅ Active. No Zapier. No Stripe. |
-| Email (Resend) | Resend — `tigerclaw.io` domain verified | ✅ Live. `RESEND_API_KEY` in deploy script since Session 7. First production email confirmed delivered. |
-| Serper (search) | 3 keys: `SERPER_KEY_1/2/3` | ✅ All confirmed working |
-| Reddit (mine source) | Public JSON API | ❌ 403 from Cloud Run egress. Serper fallback active and working. |
+| Payments | **Paddle** (primary) + Stan Store (legacy) | ✅ Paddle webhook live. Product/price not yet created. |
+| Email (Resend) | Resend — `tigerclaw.io` domain verified | ✅ Live. `RESEND_API_KEY` in deploy script. |
+| Serper (search) | 3 keys: `SERPER_KEY_1/2/3` | ✅ All confirmed working. Round-robin active. |
+| Oxylabs | Realtime API — `OXYLABS_USERNAME` / `OXYLABS_PASSWORD` | ✅ Live. Mine produced 209 posts on last run. |
+| Reddit (mine source) | Public JSON API | ❌ 403 from Cloud Run egress. Oxylabs + Serper fallback active. |
 | Stripe | Placeholder | ❌ Not used. Do not wire up. |
-| Zapier | Dead code | ❌ Not used. `/webhooks/stan-store` dead code. |
+| Zapier | Dead code | ❌ Not used. `/webhooks/stan-store` dormant. |
 | LINE | Deferred | ❌ Phase 2/3. Code preserved. LINE Official Account required. |
 | GCP Project | `hybrid-matrix-472500-k5` | |
 | Multi-region | `us-central1` (primary) + `asia-southeast1`. Global HTTPS LB at `api.tigerclaw.io` (IP: `34.54.146.69`) | ✅ Live |
 
 ---
 
-## 3. Customer Onboarding Flow (Current — Phase 1)
+## 3. Customer Onboarding Flow (Current — Paddle, as of Session 15)
 
 ```
-Customer pays on Stan Store
-  → Stan Store sends confirmation email with wizard.tigerclaw.io/signup link
-  → Customer enters purchase email on /signup
-  → POST /auth/verify-purchase
-      → if no DB record: creates one on-demand
-      → if active record exists: creates new bot (multi-agent path)
-  → Session token issued
-  → Customer fills single-page form: agent name, niche, ICP, Telegram bot token, AI key
+Customer pays via Paddle checkout
+  → Paddle fires POST /webhooks/paddle (transaction.completed)
+  → Webhook: createBYOKUser + createBYOKBot + createBYOKSubscription(pending_setup)
+  → Customer navigates to wizard.tigerclaw.io
+  → Wizard starts at flavor selection (no email step)
+  → Customer fills form: agent name, ICP, Telegram bot token, Gemini key
   → POST /wizard/hatch
   → BullMQ tenant-provisioning job
   → Provisioner: registers Telegram webhook (with TELEGRAM_WEBHOOK_SECRET), sets bot name/description
   → status → onboarding
   → First message: confident ICP-based intro, no interview
 ```
+
+**NOTE:** Paddle product + price not yet created. No checkout URL exists. This must be done before testing the full flow.
 
 **BYOB (Bring Your Own Bot):** Customer provides their own Telegram bot token. No pool. No bottleneck.
 **BYOK (Bring Your Own Key):** Customer provides their own Gemini API key. Platform key is fallback only.
@@ -221,7 +222,7 @@ curl -X POST https://api.tigerclaw.io/admin/fix-all-webhooks \
 
 ## 11. Test Coverage
 
-- **447 tests** across 41 test files. All passing as of Session 11 (PR #210).
+- **458 tests** across 43 test files. All passing as of Session 15 (PR #236).
 - Every tool in `toolsMap` has test coverage.
 - Run: `npm test` from `api/`
 - CI runs on every PR push.
@@ -232,8 +233,10 @@ curl -X POST https://api.tigerclaw.io/admin/fix-all-webhooks \
 
 | Item | Status |
 |------|--------|
-| Reddit mine source | ❌ 403 from Cloud Run egress. Serper fallback working. |
-| Vercel auto-deploy | ❌ Broken. Deploy wizard manually. |
+| Reddit mine source | ❌ 403 from Cloud Run egress. Oxylabs + Serper fallback working. |
+| Vercel auto-deploy | ✅ Confirmed working as of Session 15. |
+| Paddle product/price | ❌ Not yet created. Webhook live, but no checkout URL exists. |
+| Admin alert markdown | ⚠️ Partial — fails when error text contains underscores. Telegram Markdown v1 bug. |
 | Stripe | ❌ Placeholder. Not used. |
 | Zapier | ❌ Dead code. |
 | LINE | ❌ Deferred. Requires LINE Official Account. |

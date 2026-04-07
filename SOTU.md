@@ -1,6 +1,6 @@
 # Tiger Claw — State of the Union
 
-**Last updated:** 2026-04-06 (Session 14 COMPLETE)
+**Last updated:** 2026-04-06 (Session 15 COMPLETE)
 **This is the single source of truth. Read nothing else until you finish this file.**
 
 ---
@@ -20,9 +20,9 @@
 
 **This system has never run in production. Not once.**
 
-No agent has ever had a real conversation with a real prospect. No operator has ever completed onboarding and watched their bot scout and contact someone. Every assessment of what "works" is based on code review and unit tests — not live observation. Do not assume otherwise.
+No agent has ever had a real conversation with a real prospect. No operator has ever completed onboarding end-to-end via a real payment and watched their bot scout and contact someone. Every assessment of what "works" is based on code review and unit tests — not live observation. Do not assume otherwise.
 
-The test suite passes. The infrastructure is healthy. The architecture is sound. But the loop has never closed on a real person.
+The test suite passes. The infrastructure is healthy. The Paddle webhook is live. But the full loop — pay → provision → hatch → scout → contact → reply — has never closed on a real person.
 
 **That is the first milestone. Everything else is secondary.**
 
@@ -30,11 +30,38 @@ The test suite passes. The infrastructure is healthy. The architecture is sound.
 
 ## Current Platform State
 
-**Last deployed revision:** `tiger-claw-api-00353-947` (deployed 2026-04-06)
-**PR #233 merged but NOT YET DEPLOYED** — run deploy before next session
+**Last deployed revision:** `tiger-claw-api-00372-mg2` (deployed 2026-04-06, Session 15)
 **Health (last verified 2026-04-06):** postgres OK, redis OK, workers OK
-**Tests:** 449/449 passing
-**Wizard:** `wizard.tigerclaw.io` — Vercel, auto-deploy working
+**Tests:** 458/458 passing
+**Wizard:** `wizard.tigerclaw.io` — Vercel, auto-deploy confirmed working
+
+---
+
+## What Was Done This Session (Session 15 — 2026-04-06)
+
+**PRs #235, #236, #237 merged:**
+
+1. **Verbatim fix — PR #235**
+   - `tiger_refine.ts`: field renamed `rawText` → `verbatim`. Prompt now requires exact word-for-word quotes from source text. Added CRITICAL RULE: if no exact quote exists, do not save the fact. Filter enforces minimum 15 chars.
+   - Tests updated: `verbatim` field validated, new test rejects facts with empty/missing verbatim.
+   - Mine confirmed producing 209 posts with Oxylabs (vs 14 from Serper fallback).
+
+2. **Paddle webhook integration — PR #236**
+   - `POST /webhooks/paddle` endpoint: HMAC-SHA256 signature verification, Redis idempotency (24h TTL), fail closed on Redis unavailability (503).
+   - Provisions BYOK user + bot + subscription on `transaction.completed`.
+   - 8 tests in isolated file (`paddle-webhook.test.ts`) — avoids `vi.resetModules()` contamination.
+   - GCP secrets created: `paddle-webhook-secret`, `paddle-api-key`.
+   - Paddle dashboard configured: webhook URL `https://api.tigerclaw.io/webhooks/paddle`, event `transaction.completed`.
+   - Deploy script updated with both Paddle secrets.
+   - **What's still missing:** A Paddle product + price. No checkout URL exists yet. Create before testing end-to-end.
+
+3. **Wizard flavor fix — PR #237**
+   - Removed 5 cut flavors from wizard signup: personal-trainer, dorm-design, baker, candle-maker, gig-economy.
+   - Wizard now shows the canonical 9 flavors matching the API registry.
+
+4. **Deployed:** Cloud Run revision `00372-mg2`. Health verified. `fix-all-webhooks` run (2 tenants fixed).
+
+5. **Discovered — Admin alert markdown bug:** Underscores in error messages (e.g. `pending_setup`, `botId=`) break Telegram's Markdown v1 parser. Admin alerts containing error text fail to deliver. Fix needed before launch.
 
 ---
 
@@ -80,12 +107,11 @@ The test suite passes. The infrastructure is healthy. The architecture is sound.
 
 | # | Issue | Priority |
 |---|---|---|
-| DEPLOY | PR #233 merged, not yet deployed. Run deploy before next session. | IMMEDIATE |
-| DAY ZERO | System has never run in production. First priority: observe one real conversation close. | IMMEDIATE |
-| C4 | Payment gate open. Fix: re-wire Zapier -> /webhooks/stan-store, harden verify-purchase. Paddle pending. Stripe fallback available. | NEXT SESSION |
-| H2 | Reddit 403 from Cloud Run egress. Oxylabs Realtime API needed — current scaffold uses proxy headers (broken). Needs account + env vars. | HIGH |
-| R2-P1-6 | Zapier race: duplicate webhook hits UNIQUE constraint. Fix same session as C4. | NEXT SESSION |
-| TOOL AUDIT | tiger_drive_list confirmed safe to remove from toolsMap. One confirmed cut not yet made. | LOW |
+| DAY ZERO | System has never run in production. First priority: prove full loop — Paddle purchase → provision → hatch → scout → contact → reply. | IMMEDIATE |
+| PADDLE PRODUCT | Webhook live but no Paddle product/price created. No checkout URL. Create before testing end-to-end payment flow. | IMMEDIATE |
+| ADMIN ALERT BUG | Underscores in error messages break Telegram Markdown parser. Admin alerts with error text silently fail. Fix before launch. | HIGH |
+| C4 | Payment gate still open for direct wizard access (no Paddle purchase required). Fix after Paddle loop proven. | NEXT SESSION |
+| TOOL AUDIT | tiger_drive_list confirmed safe to remove from toolsMap. Not yet done. | LOW |
 
 **Past customers owed bots (3 people paid, never received service):**
 `chana.loh@gmail.com`, `nancylimsk@gmail.com`, `lily.vergara@gmail.com` — offer complimentary re-activation when platform is proven live.
@@ -117,20 +143,24 @@ Stateless agent hatchery. Operator brings their own Telegram bot token (BYOB) an
 
 ## Current Onboarding Path
 
-No single clean path exists as of 2026-04-06. Three pieces:
+**Paddle is the active payment path as of Session 15.**
 
-1. **Payment front door:** Stan Store (confirmation email sends `wizard.tigerclaw.io/signup?email=` link)
-2. **Trigger:** Zapier webhook -> `/webhooks/stan-store` should be re-wired. Currently dormant. Fix path for C4.
-3. **Provisioning:** `POST /wizard/hatch` -> BullMQ job -> bot registered, webhook set, ICP loaded
+```
+Operator pays via Paddle checkout (checkout URL not yet created — build tomorrow)
+  → Paddle fires POST /webhooks/paddle (transaction.completed)
+  → Webhook provisions: createBYOKUser + createBYOKBot + createBYOKSubscription(pending_setup)
+  → Operator navigates to wizard.tigerclaw.io
+  → Wizard starts at "What kind of agent do you want?" (no email step — Paddle already provisioned)
+  → POST /wizard/hatch → BullMQ job → bot registered, webhook set, ICP loaded
+```
 
-**Payment gate is open.** Anyone who navigates directly to `/signup` can get a free bot. This is known gap C4.
+**Payment gate is still open** for direct wizard access (no Paddle purchase required). This is C4. Fix after Paddle loop is proven.
 
 Payment processor status:
-- **Stan Store:** Active front door. Confirmation email working.
-- **Zapier:** `/webhooks/stan-store` handler exists in codebase (dormant). Re-wire to fix C4.
-- **Paddle:** Application submitted 2026-04-05. Domains approved. Awaiting final token. When approved: build `/webhooks/paddle`.
-- **Stripe:** Operator has account. Fallback if Paddle declines. Dead code placeholder in repo.
-- **Lemon Squeezy:** Rejected. Dead end. Webhook code dormant.
+- **Paddle:** ✅ LIVE. Webhook at `https://api.tigerclaw.io/webhooks/paddle`. Secrets in GCP. Product/price not yet created — do this tomorrow.
+- **Stan Store:** Active front door for existing customers. Not the primary new-customer path.
+- **Stripe:** Placeholder. Not used.
+- **Lemon Squeezy:** Rejected. Dead end.
 
 ---
 
@@ -159,17 +189,19 @@ Last verified 2026-04-06:
 
 | Service | Status | Notes |
 |---------|--------|-------|
-| Cloud Run | OK | Revision 00353-947 |
+| Cloud Run | OK | Revision 00372-mg2 |
 | Postgres | OK | Healthy |
 | Redis | OK | Healthy |
 | Workers | OK | ENABLE_WORKERS=true confirmed |
 | Serper keys (x3) | OK | Round-robin active |
+| Oxylabs | OK | Username/password in GCP. Mine produced 209 posts on last run. |
 | Platform Gemini key | OK | Active |
-| Admin Telegram bot | OK | Alerts firing |
+| Admin Telegram bot | PARTIAL | Alerts fire but fail when message contains underscores (Markdown bug) |
 | Resend | OK | Test email confirmed delivered |
 | TELEGRAM_WEBHOOK_SECRET | OK | secretWired: true confirmed |
-| Vercel (wizard.tigerclaw.io) | OK | Auto-deploy working |
-| Reddit (scout) | BLOCKED | 403 from Cloud Run. Serper fallback active. Oxylabs fix pending. |
+| Vercel (wizard.tigerclaw.io) | OK | Auto-deploy confirmed working |
+| Paddle webhook | OK | Live at /webhooks/paddle. Secrets in GCP. Product/price not yet created. |
+| Reddit (scout) | BLOCKED | 403 from Cloud Run. Oxylabs + Serper fallback active. |
 | LINE | NOT ACTIVE | Future only |
 
 ---
