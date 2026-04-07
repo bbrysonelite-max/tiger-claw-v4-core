@@ -543,16 +543,13 @@ export const cronWorker = SHOULD_RUN_WORKERS ? new Worker(
 
             console.log(`[Cron] Enqueued routine checks for ${tenants.length} active tenants (hour: ${nowHour} UTC).`);
 
-            // ── Market Intelligence Mining — 2 AM UTC daily ───────────────────
-            // One full Reddit harvest pass across all 15 active flavors.
-            // Date-stamped jobId prevents duplicate runs within the same UTC day.
+            // ── Orchestrated Agent Pipeline — 2 AM UTC daily ─────────────────
+            // Spawns Research Agent fleet (parallel, one per flavor) then
+            // Reporting Agent. Replaces the legacy sequential market_miner.
             if (nowHour === 2) {
-                await miningQueue.add('global_market_mining', {}, {
-                    jobId: `market_mining_${today}`,
-                    removeOnComplete: true,
-                    removeOnFail: { count: 100 },
-                });
-                console.log(`[Cron] Enqueued daily market intelligence mining run.`);
+                const { startOrchestratedRun } = await import('./orchestrator.js');
+                await startOrchestratedRun(`run_${today}`);
+                console.log(`[Cron] Daily orchestrated run started (runId: run_${today})`);
             }
 
             // ── Platform key health check — 8 AM UTC daily ────────────────────
@@ -641,6 +638,92 @@ if (miningWorker) {
     miningWorker.on('failed', (job, err) => {
         console.error(`[Mining] Job ${job?.id} failed:`, err?.message ?? err);
         sendAdminAlert(`⚠️ Market mining job failed\nJob: ${job?.id}\nError: ${err?.message ?? String(err)}`).catch(() => {});
+    });
+}
+
+// ---------------------------------------------------------------------------
+// Orchestrator Worker — coordinates the daily agent pipeline
+// ---------------------------------------------------------------------------
+
+export const orchestratorWorker = SHOULD_RUN_WORKERS ? new Worker(
+    'tiger-orchestrator',
+    async (job: Job) => {
+        const { runId, triggeredAt } = job.data;
+        console.log(`[Orchestrator] Job received — runId: ${runId}, triggered: ${triggeredAt}`);
+        const { startOrchestratedRun } = await import('./orchestrator.js');
+        await startOrchestratedRun(runId);
+    },
+    {
+        connection: connection as any,
+        concurrency: 1,
+        stalledInterval: 30000,
+        maxStalledCount: 3,
+        lockDuration: 60000,
+    }
+) : null;
+
+if (orchestratorWorker) {
+    orchestratorWorker.on('failed', (job, err) => {
+        console.error(`[Orchestrator] Job ${job?.id} failed:`, err?.message ?? err);
+        sendAdminAlert(`🚨 Orchestrator job failed\nJob: ${job?.id}\nError: ${err?.message ?? String(err)}`).catch(() => {});
+    });
+}
+
+// ---------------------------------------------------------------------------
+// Research Agent Worker — per-flavor parallel market intelligence mining
+// ---------------------------------------------------------------------------
+
+export const researchAgentWorker = SHOULD_RUN_WORKERS ? new Worker(
+    'research-agent',
+    async (job: Job) => {
+        const { runId, flavorId, displayName, queries } = job.data;
+        console.log(`[ResearchAgent] Job received — flavor: ${displayName}, run: ${runId}`);
+        const { runResearchAgent } = await import('./research_agent.js');
+        const result = await runResearchAgent(runId, flavorId, displayName, queries);
+        return result;
+    },
+    {
+        connection: connection as any,
+        concurrency: 8,          // 8 flavors run in parallel
+        stalledInterval: 30000,
+        maxStalledCount: 3,
+        lockDuration: 600000,    // mining can take minutes
+    }
+) : null;
+
+if (researchAgentWorker) {
+    researchAgentWorker.on('failed', (job, err) => {
+        const flavor = job?.data?.displayName ?? 'unknown';
+        console.error(`[ResearchAgent] Job failed for flavor ${flavor}:`, err?.message ?? err);
+        // Non-fatal — one flavor failure never stops the run. Orchestrator still triggers reporting.
+    });
+}
+
+// ---------------------------------------------------------------------------
+// Reporting Agent Worker — daily intelligence brief
+// ---------------------------------------------------------------------------
+
+export const reportingAgentWorker = SHOULD_RUN_WORKERS ? new Worker(
+    'reporting-agent',
+    async (job: Job) => {
+        const { runId, startedAt, flavorsProcessed } = job.data;
+        console.log(`[ReportingAgent] Job received — run: ${runId}`);
+        const { runReportingAgent } = await import('./reporting_agent.js');
+        await runReportingAgent(runId, startedAt, flavorsProcessed);
+    },
+    {
+        connection: connection as any,
+        concurrency: 1,
+        stalledInterval: 30000,
+        maxStalledCount: 3,
+        lockDuration: 120000,
+    }
+) : null;
+
+if (reportingAgentWorker) {
+    reportingAgentWorker.on('failed', (job, err) => {
+        console.error(`[ReportingAgent] Job ${job?.id} failed:`, err?.message ?? err);
+        sendAdminAlert(`⚠️ Reporting Agent failed\nJob: ${job?.id}\nError: ${err?.message ?? String(err)}`).catch(() => {});
     });
 }
 

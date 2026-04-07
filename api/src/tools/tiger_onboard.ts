@@ -142,10 +142,6 @@ const FLAVOR_DEFAULT_ICP: Record<string, { idealPerson: string; problemFaced: st
     idealPerson: "A homeowner aged 30–65 with an urgent or planned plumbing need — from a dripping faucet to a full water heater replacement. They prioritize reliability and fair pricing over the cheapest option.",
     problemFaced: "They've been burned by unreliable contractors before. They need someone licensed, trustworthy, and responsive — and they don't know where to find them.",
   },
-  "interior-designer": {
-    idealPerson: "A homeowner or renter aged 28–55 planning a renovation or redesign. They have a vision but lack the expertise to execute it — and a budget they don't want to waste.",
-    problemFaced: "They're overwhelmed by choices, afraid of making expensive mistakes, and don't know how to translate their Pinterest board into a real room.",
-  },
   "personal-trainer": {
     idealPerson: "An adult aged 25–55 who wants to lose weight, build strength, or feel better but struggles with consistency. They've tried gyms before and quit.",
     problemFaced: "Generic programs don't stick. They need accountability, a plan built for their life, and someone who will adapt when things don't go perfectly.",
