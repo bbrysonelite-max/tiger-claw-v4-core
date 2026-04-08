@@ -782,9 +782,10 @@ export async function createBYOKBot(
   name: string,
   niche: string,
   status: string = "pending",
-  email?: string
+  email?: string,
+  precomputedSlug?: string
 ): Promise<string> {
-  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 30) + '-' + Date.now().toString(36);
+  const slug = precomputedSlug ?? (name.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 30) + '-' + Date.now().toString(36));
   return withClient(async (client) => {
     await client.query("BEGIN");
     try {
