@@ -79,7 +79,7 @@ The Telegram channel is just the tunnel — the intelligence behind it is a full
 | Skill | What It Does |
 |-------|-------------|
 | **Hunt** | Scans public signals daily for people expressing intent matching the ICP. Finds them before they find you. |
-| **Reach** | Engages publicly on forums and communities where prospects are already talking. Drives inbound without cold messaging. |
+| **Reach** | Finds prospects on public forums. Drafts a contextual reply and generates a one-click Web Intent URL. Operator clicks once — it posts from their real account. No auto-posting, no bot risk. |
 | **Qualify** | Holds natural conversation. Scores intent in real time. Knows when someone is ready and when they're not. |
 | **Handle objections** | Trained on the specific objections for each flavor. Doesn't fold. Doesn't push. Moves the conversation forward. |
 | **Remember** | Carries context across every conversation. Knows what was said, what was agreed, what the next step is. |
@@ -132,7 +132,7 @@ flowchart TD
 | Data Mine | Runs at 2 AM UTC daily. 8 Research Agents in parallel. 1,500+ facts per run. Identifies intent signals by region and flavor. Suggests top-of-funnel sources per region. |
 | Scout | Per-tenant. Finds prospects on the platforms most active in the operator's region. |
 | Agent | Starts conversations, handles objections, qualifies. Runs 24/7. ✅ Live |
-| Tiger Strike | Engages publicly on forums where prospects are talking. Drives inbound. ⚠️ Not yet wired to mine |
+| Tiger Strike | Drafts replies to public posts where prospects are talking. Generates one-click Web Intent URLs. Operator clicks → posts from their account. ⚠️ Not yet wired to mine cycle |
 | Reporting | Daily brief: facts mined, top sources by region. ✅ Live (admin only) |
 | Calendar / Booking | Operator sets 1–2 daily Zoom slots. Agent fills them. ⚠️ Not yet built |
 

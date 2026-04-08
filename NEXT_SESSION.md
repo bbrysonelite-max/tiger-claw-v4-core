@@ -49,10 +49,14 @@ After the first message: respond in the prospect's language only.
 After the 2 AM orchestrated run completes:
 1. Tiger Strike Harvest pulls top 20 unengaged facts (confidence ≥ 70)
 2. Tiger Strike Draft generates contextual replies
-3. Tiger Strike Engage posts replies publicly (via Oxylabs proxy for Reddit)
-4. `engagement_status` updated to `queued`
+3. Tiger Strike Engage generates Web Intent URLs — one per reply, per platform (X, Reddit, LinkedIn)
+4. Operator receives a daily batch of pre-filled one-click links
+5. Operator clicks → their browser opens with the reply pre-filled → they post it as themselves
+6. `engagement_status` updated to `queued` → `engaged` after confirmation
 
-This is the missing link between the mine and revenue. Facts must flow into public engagement or they're worthless.
+**Important:** Tiger Strike does NOT auto-post. It generates the reply and a deep link that opens the operator's browser with the text pre-filled. The operator clicks once. It posts from their real account. This is intentional — no write API, no bot detection risk, no OAuth token management. The system does the thinking; the operator does the clicking.
+
+This is the missing link between the mine and revenue.
 
 ---
 
