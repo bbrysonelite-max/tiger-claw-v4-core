@@ -28,15 +28,13 @@ This is the correct architecture. The mine feeds Tiger Strike. Tiger Strike driv
 
 **Failure:** Nobody knows the bot exists.
 
-**The fix:** Brent's YouTube channel IS the top of funnel.
+**The fix:** The mine IS the top of funnel. That's what it was built for.
 
-The mine runs at 2 AM and identifies what's trending in each flavor. The YouTube content brief is already built. Those are the same topics. Every video ends with one CTA: "Message my bot — link in bio."
+The mine runs at 2 AM listening for intent signals — people publicly expressing the pain the bot solves. Tiger Strike drafts replies to those public posts. Those replies drive people inbound to the bot. The prospect opts in by messaging first.
 
-Warm audience watches the video. They already trust Brent. They message the bot. The bot has a warm, pre-qualified prospect.
+The mine finds the signal. Tiger Strike creates the touch. The bot closes the loop.
 
-**The compounding effect:** More videos → more inbound → more booked calls → Brent documents the results → more videos. The Karpathy Ratchet applied to content.
-
-**Priority:** Post one video this week with the bot link in bio. Watch who messages. That's the data.
+**The gap today:** Tiger Strike Engage is not yet wired to run after the mine cycle. 1,679 facts are sitting unengaged. Wiring that connection IS the top of funnel going live.
 
 ---
 
@@ -140,7 +138,7 @@ Alternative: Serper already indexes Reddit and works. Tiger Strike can pull targ
 | 4 | Build `tiger_book_zoom` — Cal.com | This session |
 | 5 | Reduce wizard to 3 questions | This session |
 | 6 | Wire Tiger Strike Engage after mine | This session |
-| 7 | Post first YouTube video with bot link | This week |
+| 7 | Confirm Tiger Strike Engage is posting and driving inbound | After #6 |
 | 8 | Charge first founding member manually | When ready |
 | 9 | Paddle product + price live | When approved |
 | 10 | Karpathy Ratchet | After #6 proven |

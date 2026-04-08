@@ -65,7 +65,7 @@ This is the missing link between the mine and revenue. Facts must flow into publ
 ## Before Next Session Ends
 
 ### 6. Send Bot Link to 5 Warm Contacts
-Not a build task — an operator task. Brent sends `t.me/Brentstiger01_bot` to five people in the network with a personal note. Watch the first cold conversation. Document it. That data drives everything built after this.
+Not a build task — an operator task. Brent sends `t.me/Brentstiger01_bot` to five people in the network with a personal note. This is manual seeding while Tiger Strike Engage (#5) is being wired. Once the mine → Tiger Strike → inbound loop is live, this becomes automatic. Watch the first cold conversation. Document it.
 
 ### 7. Check 2 AM Mine Results
 Pull from `market_intelligence`:
@@ -81,9 +81,12 @@ Confirm Tiger Strike Engage fired and `engagement_status` rows moved from `uneng
 ## Parking Lot — Do Not Touch This Session
 
 - Karpathy Ratchet (mine self-improvement) — after pipeline proven at volume
-- YouTube content pipeline agent — after first live conversation documented
+- Additional signal sources (LINE OpenChat, Facebook Groups, Pantip, LinkedIn, Bright Data, Oxylabs Amplify) — after Tiger Strike Engage proven on current sources
 - Paddle product + price — waiting on merchant of record approval
 - Orphan tenant cleanup (`brents-tiger-01-mnpcril3`) — low priority, do when convenient
+- Oxylabs Amplify — planned data source, never built. Currently only Oxylabs Realtime proxy (for Reddit 403) exists.
+- Bright Data — planned data source, never built. Zero code in codebase.
+- LINE OpenChat, Facebook Groups, Pantip, LinkedIn — planned signal sources, all stubbed or absent
 - Admin alert markdown bug (underscore in Telegram) — fix before public launch
 
 ---
