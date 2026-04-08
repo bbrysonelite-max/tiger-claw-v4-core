@@ -305,7 +305,7 @@ router.get("/bot-status", async (req: Request, res: Response) => {
     return res.status(404).json({ error: "Tenant not found" });
   }
 
-  const isLive = tenant.status === "active" || tenant.status === "onboarding";
+  const isLive = tenant.status === "active" || tenant.status === "onboarding" || tenant.status === "live";
   if (!isLive) {
     return res.json({ status: "pending", botUsername: null, telegramLink: null });
   }
@@ -354,7 +354,7 @@ router.get("/status", async (req: Request, res: Response) => {
   }
 
   const botUsername = await getTenantBotUsername(tenant.id);
-  const isLive = tenant.status === "active" || tenant.status === "onboarding";
+  const isLive = tenant.status === "active" || tenant.status === "onboarding" || tenant.status === "live";
 
   return res.json({
     status: isLive ? "live" : "pending",
