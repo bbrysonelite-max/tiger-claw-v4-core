@@ -1,6 +1,6 @@
 # START HERE — Tiger Claw Session Brief
 
-**Last Updated:** 2026-04-06 (Session 15)
+**Last Updated:** 2026-04-08 (Session 16)
 
 **Read SOTU.md first. That is the single source of truth. This file is a fast orientation — SOTU has the details.**
 
@@ -10,15 +10,15 @@
 
 ## The Most Important Thing to Know
 
-**This system has never run in production. Not once.**
+**Brents Tiger 01 is live and responding on Telegram (@Brentstiger01_bot). First production bot confirmed.**
 
-No agent has ever had a real conversation with a real prospect. The Paddle webhook is live and provisioning works end-to-end — but the full loop (pay → provision → hatch → scout → contact → reply) has never closed on a real person. That is day zero. Act accordingly.
+The full Paddle loop (pay → provision → hatch → scout → contact → reply) has not yet closed on a paying customer. That remains day zero for the Paddle path. Admin hatch is proven. Paddle checkout URL does not yet exist.
 
 ---
 
 ## What Is Tiger Claw?
 
-AI sales agent SaaS. Operator brings their own Telegram bot token and Gemini API key. They go through a one-page signup wizard. Their agent hatches knowing their ICP. The agent prospects while the operator sleeps.
+AI sales agent SaaS. Operator brings their own Telegram bot token (BYOB) and Gemini API key (BYOK). One-page signup. Agent hatches knowing its ICP — **no interview, no questions asked**. The agent prospects while the operator sleeps.
 
 **The value proposition: Your bot hunts while you sleep.**
 
@@ -31,16 +31,17 @@ AI sales agent SaaS. Operator brings their own Telegram bot token and Gemini API
 
 ---
 
-## Current Onboarding Path (Paddle — as of Session 15)
+## Current Onboarding Path (Paddle — as of Session 16)
 
 ```
 Operator pays via Paddle checkout (product/price not yet created — do this first)
--> Paddle fires POST /webhooks/paddle (transaction.completed)
--> Webhook provisions user + bot + subscription (pending_setup)
--> Operator navigates to wizard.tigerclaw.io
--> Wizard starts at flavor selection (no email step — Paddle already provisioned)
--> Operator fills form: agent name, ICP, Telegram bot token, Gemini key
--> POST /wizard/hatch -> BullMQ job -> bot registered, webhook set, ICP loaded
+→ Paddle fires POST /webhooks/paddle (transaction.completed)
+→ Webhook provisions user + bot + subscription (pending_setup)
+→ Operator navigates to wizard.tigerclaw.io
+→ Wizard starts at flavor selection (no email step — Paddle already provisioned)
+→ Operator provides: agent name, Telegram bot token, Gemini key
+→ POST /wizard/hatch → BullMQ job → bot registered, webhook set, onboard state pre-seeded
+→ Bot is immediately operational — no interview required
 ```
 
 **Payment gate still open (C4):** Direct wizard access bypasses payment. Fix after Paddle loop is proven.
@@ -49,43 +50,67 @@ Operator pays via Paddle checkout (product/price not yet created — do this fir
 
 ---
 
+## Admin Hatch (Operator's Own Fleet)
+
+```bash
+ADMIN_TOKEN=$(gcloud secrets versions access latest --secret="tiger-claw-admin-token" --project="hybrid-matrix-472500-k5")
+curl -X POST https://api.tigerclaw.io/admin/hatch \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "botToken": "<BotFather token>",
+    "name": "Brents Tiger 02",
+    "flavor": "network-marketer",
+    "email": "bbryson@me.com",
+    "aiKey": "<Gemini key>",
+    "product": "Nuskin"
+  }'
+```
+
+**BotFather rate limit:** ~1 new bot per 8 minutes.
+
+---
+
 ## What Is and Is Not Working Right Now
 
 ### Infrastructure — OK
-- Cloud Run API healthy (revision 00372-mg2)
-- Postgres, Redis, Workers all OK
+- Cloud Run API healthy (revision 00403-xtj)
+- Postgres, Redis, Workers (11) all OK
 - Telegram webhook delivery + TELEGRAM_WEBHOOK_SECRET wired
 - Serper keys (x3) round-robin rotation active
-- Oxylabs working — 209 posts on last mine run
+- Oxylabs working — 1,684 facts in last 24h, 6,545 total
 - Resend email confirmed working
 - Admin dashboard operational (`wizard.tigerclaw.io/admin`)
 - Vercel auto-deploy confirmed working
 - Paddle webhook live (`POST /webhooks/paddle`)
-- 458/458 tests passing
+- 457/457 tests passing
+- Daily mine: Orchestrator → 8 Research Agents (parallel) → Reporting Agent — running at 2 AM UTC
 
 ### Not Working / Not Yet Proven
 | What | Status |
 |------|--------|
 | Reddit scout | Blocked — 403 from Cloud Run egress. Oxylabs + Serper fallback active. |
-| Real conversation | Never happened. Day zero. |
 | Paddle checkout | Webhook live but no product/price yet. No checkout URL. |
+| Real prospect conversation | Brents Tiger 01 live but no prospect has contacted it yet. |
 | Payment gate | Open — C4. Fix after Paddle loop proven. |
 | Admin alerts | Partial — fail when error message contains underscores (Markdown bug). |
 | LINE provisioning | Not active. Future only. |
 
 ---
 
-## Current Flavor Registry (9 customer-facing)
+## Current Flavor Registry (8 customer-facing)
 
-network-marketer, real-estate, health-wellness, airbnb-host, lawyer, plumber, sales-tiger, interior-designer, mortgage-broker
+network-marketer, real-estate, health-wellness, airbnb-host, lawyer, plumber, sales-tiger, mortgage-broker
 
-Simplified from 13 this session. Files for cut flavors remain on disk (dormant).
+Interior-designer removed (was a one-off, not a platform flavor). Files remain on disk dormant.
 
 ---
 
 ## First Priority This Session
 
-Close the Paddle payment loop end-to-end. Create a Paddle product + price. Buy it. Watch the webhook provision a bot. Go through the wizard. Watch the bot scout and send a first message. That is the only proof that matters right now.
+1. Hatch next bots (NM fleet) — 1 every 8 minutes via BotFather
+2. Create Paddle product + price → get checkout URL
+3. Prove full Paddle loop: pay → provision → hatch → first message
 
 ---
 
@@ -94,9 +119,10 @@ Close the Paddle payment loop end-to-end. Create a Paddle product + price. Buy i
 | Item | Priority |
 |------|----------|
 | Create Paddle product + price → get checkout URL | IMMEDIATE |
-| Prove full loop: pay → provision → hatch → scout → contact | IMMEDIATE |
+| Prove full loop: Paddle pay → provision → hatch → first message | IMMEDIATE |
 | Fix admin alert markdown bug (underscores break Telegram Markdown) | HIGH |
-| C4: Harden payment gate — wizard should require Paddle pre-provisioning | NEXT |
+| Terminate orphan tenant `brents-tiger-01-mnpcril3` (1ed77b8f) | LOW |
+| C4: Harden payment gate | NEXT |
 | tiger_drive_list: confirmed safe to remove from toolsMap | LOW |
 | Past customers owed service: chana.loh@gmail.com, nancylimsk@gmail.com, lily.vergara@gmail.com | WHEN READY |
 
@@ -107,8 +133,8 @@ Close the Paddle payment loop end-to-end. Create a Paddle product + price. Buy i
 1. One PR per fix. No chaining unrelated changes.
 2. Never push to main directly. Always `feat/` or `fix/` + PR.
 3. Architecture is LOCKED. No RAG. No containers. No OpenClaw. No switching from Gemini 2.0 Flash.
-4. Do not add features until the loop closes on a real person.
+4. Do not add features without a customer asking.
 5. No agent marks anything complete if known broken items remain.
 6. `tiger_gmail_send` and `tiger_postiz` are intentionally NOT in toolsMap. Do not re-add.
 7. Post-deploy: run `POST /admin/fix-all-webhooks` (idempotent).
-8. 449 tests must pass before any PR is opened.
+8. 457 tests must pass before any PR is opened.

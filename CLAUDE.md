@@ -4,41 +4,40 @@
 
 ---
 
-## Current Session State (2026-04-06 — Session 15 COMPLETE)
+## Current Session State (2026-04-08 — Session 16 COMPLETE)
 
-### 458/458 tests passing. PRs #235, #236, #237 merged. Cloud Run revision 00372-mg2 live.
+### 457/457 tests passing. PRs #251–#255 merged. Cloud Run revision 00403-xtj live.
 
-**Session 15 shipped:**
-- **PR #235 — Verbatim fix (tiger_refine):** Every saved market intelligence fact now requires an exact word-for-word quote from the source. Field renamed `rawText` → `verbatim`. Prompt enforces no-quote-no-fact rule. Filter rejects facts with verbatim < 15 chars.
-- **PR #236 — Paddle webhook integration:** `POST /webhooks/paddle` live. HMAC-SHA256 signature verification. Redis idempotency (24h TTL, fail closed on Redis down). Provisions BYOK user+bot+subscription on `transaction.completed`. GCP secrets created: `paddle-webhook-secret`, `paddle-api-key`. Webhook configured in Paddle dashboard.
-- **PR #237 — Wizard flavor fix:** Removed 5 cut flavors (personal-trainer, dorm-design, baker, candle-maker, gig-economy) from wizard signup. Now shows canonical 9.
-- **Oxylabs confirmed working:** Mine ran with Oxylabs producing 209 posts vs 14 from Serper. Env vars confirmed in deployed revision.
-- **Deployed:** Cloud Run revision `tiger-claw-api-00372-mg2`. Health green. fix-all-webhooks run (2 tenants fixed).
+**Session 16 shipped:**
+- **PR #251 — bot-status fix:** `GET /wizard/bot-status` returned `pending` for admin-hatched bots. Provisioner sets `status = 'live'`; endpoint only checked `active`/`onboarding`. Added `'live'` to both isLive checks in `wizard.ts`.
+- **PR #252 — duplicate tenant fix (critical):** Hatch was creating two tenant records. Slug generated twice with different `Date.now()` — once in `createBYOKBot()`, again in hatch handler. Fixed: generate slug once, pass as `precomputedSlug`.
+- **PR #253 — dashboard isLive + Stan Store cleanup:** `dashboard.ts` isLive missing `'live'` status. Removed two user-facing "Stan Store" references from `StepReviewPayment.tsx`.
+- **PR #254 — SOTU docs:** Recorded ICP hard-wire decision.
+- **PR #255 — ICP hard-wire:** Provisioner pre-seeds `onboard_state.json` at hatch time. `phase: complete`, ICP from flavor config. Bot wakes up calibrated — **no interview, no questions asked**. Optional `product` field on `/admin/hatch`.
+- **Brents Tiger 01 (@Brentstiger01_bot) confirmed live and responding on Telegram.**
+- **Parallel sub-agent audit:** Mine healthy (2 AM orchestrated run), NM defaultBuilderICP solid, webhook query correct.
 
 **Full assessment in `MODULE_ASSESSMENT.md`. Read it before writing any code.**
 
-### FIRST PRIORITY NEXT SESSION: Close the Paddle Payment Loop
+### FIRST PRIORITY NEXT SESSION
 
-Paddle webhook is live and provisioning works. What's missing: a Paddle product + price so a real checkout can trigger the full chain. Tomorrow:
-1. Create a Paddle product + price in Paddle dashboard
-2. Get a checkout link
-3. Buy it as a customer
-4. Watch the webhook fire → bot provisioned → go through wizard → bot scouts → bot talks
-
-Do not add features. Prove the loop closes end-to-end first.
+1. **Hatch next NM bots** — 1 per 8 min via BotFather. Fleet target: 2–3 NM bots running.
+2. **Create Paddle product + price** — No checkout URL exists. Build before testing payment loop.
+3. **Prove Paddle loop** — Pay → provision → hatch → first intelligent message.
 
 ### Critical Open Issues
 
-- **PADDLE PRODUCT:** Webhook is live but no Paddle product/price exists yet. No checkout URL. Create tomorrow before testing.
-- **C4:** Payment gate still open for direct wizard access. Fix after Paddle loop is proven.
-- **Admin alert markdown bug:** Underscores in error messages (e.g. `pending_setup`) break Telegram Markdown parser. Admin alerts with error text fail to deliver. Fix before launch.
-- **LINE:** Not provisioning LINE. Future only. Telegram is the only active channel.
+- **PADDLE PRODUCT:** Webhook live, no product/price yet. No checkout URL. Create before testing.
+- **C4:** Payment gate still open for direct wizard access. Fix after Paddle loop proven.
+- **Admin alert markdown bug:** Underscores in error messages break Telegram Markdown parser. Fix before launch.
+- **Orphan tenant:** `brents-tiger-01-mnpcril3` (1ed77b8f) — duplicate from bug. No bot token. Terminate when convenient.
+- **LINE:** Future only. Telegram is the only active channel.
 
 ### Active Business Context
 
-- Operator is building this for their own distribution network. Do not treat any individual names as launch gates. If any one person falls out, it does not matter. The platform must stand on its own merit.
-- **Max Steingart:** White label / affiliate deal (30% via Stan Store). Hold at referral model. Do not build partner infrastructure until he has sold his first 10.
-- Founding members: comped provisioning, manual if needed. Payment gate fix comes after first live conversation is confirmed.
+- Operator is building this for their own distribution network. Do not treat any individual names as launch gates. The platform must stand on its own merit.
+- Founding members: comped provisioning via admin hatch. Payment gate fix comes after first live prospect conversation is confirmed.
+- Window to prove agent intelligence is short. Do not waste it on interviews, forms, or friction.
 
 ---
 
@@ -104,7 +103,7 @@ Do not add features. Prove the loop closes end-to-end first.
 - New tools in `api/src/tools/` MUST be registered in `toolsMap` in `ai.ts`. Missing = infinite tool loop.
 - **`tiger_gmail_send` and `tiger_postiz` are intentionally NOT in toolsMap.** Do not re-add them.
 - **Gemini 2.0 Flash only.** Do not switch to 2.5-flash (GCP function-calling bug).
-- 449 tests must pass before any PR is opened. Run `npm test` from `api/`.
+- 457 tests must pass before any PR is opened. Run `npm test` from `api/`.
 
 ---
 
