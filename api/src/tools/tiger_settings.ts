@@ -56,6 +56,9 @@ interface TenantSettings {
   // Overrides (optional — fall back to onboard_state if absent)
   botName?: string;
 
+  // Booking (optional — required for tiger_book_zoom)
+  calcomBookingUrl?: string;    // Full Cal.com event URL e.g. "https://cal.com/brent/zoom-call"
+
   // Metadata
   lastUpdatedAt: string;
   updatedFields: string[];      // Which fields have been manually changed
@@ -606,7 +609,7 @@ async function execute(
 export const tiger_settings = {
   name: "tiger_settings",
   description:
-    "Tenant settings and channel management. Actions: get/set/reset for settings.json, channels for managing messaging channels (Telegram, WhatsApp, LINE). Settings: manualApproval, hiveOptIn, preferredChannel, timezone, language, dailyBriefingEnabled, scoutEnabled, maxDailyContacts, contactWindowStart/End, slowDripEnabled, aftercareEnabled, notifyOnConversion, notifyOnNewQualified, botName. Channel commands: channels list (show status), channels add whatsapp/line, channels remove whatsapp/line.",
+    "Tenant settings and channel management. Actions: get/set/reset for settings.json, channels for managing messaging channels (Telegram, WhatsApp, LINE). Settings: manualApproval, hiveOptIn, preferredChannel, timezone, language, dailyBriefingEnabled, scoutEnabled, maxDailyContacts, contactWindowStart/End, slowDripEnabled, aftercareEnabled, notifyOnConversion, notifyOnNewQualified, botName, calcomBookingUrl (full Cal.com event URL for tiger_book_zoom). Channel commands: channels list (show status), channels add whatsapp/line, channels remove whatsapp/line.",
 
   parameters: {
     type: "object",

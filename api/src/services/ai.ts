@@ -40,6 +40,7 @@ import { tiger_strike_harvest } from "../tools/tiger_strike_harvest.js";
 import { tiger_strike_draft } from "../tools/tiger_strike_draft.js";
 import { tiger_strike_engage } from "../tools/tiger_strike_engage.js";
 import { tiger_refine } from "../tools/tiger_refine.js";
+import { tiger_book_zoom } from "../tools/tiger_book_zoom.js";
 
 // ─── Safety constants ────────────────────────────────────────────────────────
 // BUG 1 FIX: circuit breaker — prevents infinite tool loop if Gemini misbehaves
@@ -169,6 +170,7 @@ const toolsMap = {
     tiger_strike_draft,
     tiger_strike_engage,
     tiger_refine,
+    tiger_book_zoom,
 };
 // Fix: Use STRICT @google/generative-ai Type enums to prevent silent JSON stripping
 // standard OpenClaw JSON schema uses lowercase 'object', 'string'. We recursively map it here.
