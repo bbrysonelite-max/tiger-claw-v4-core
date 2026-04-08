@@ -2,7 +2,7 @@
 // Intercepts /start /dashboard /status /help before Gemini sees them.
 // Returns true if handled (caller should skip AI), false to pass through.
 
-import { getTenant, getBYOKStatus, getPool } from './db.js';
+import { getTenant, getBYOKStatus, getPool, getBotState, setBotState } from './db.js';
 
 const FRONTEND_URL = process.env['FRONTEND_URL'] ?? 'https://wizard.tigerclaw.io';
 
@@ -30,6 +30,8 @@ export async function handleSlashCommand(
 
     switch (cmd) {
         case '/start':
+            await handleStart(tenantId, botToken, chatId);
+            return true;
         case '/dashboard':
             await sendDashboardMessage(tenantId, botToken, chatId);
             return true;
@@ -42,6 +44,39 @@ export async function handleSlashCommand(
         default:
             return false;
     }
+}
+
+// First /start per chatId: 4-language greeting to demonstrate intelligence.
+// Subsequent /start: send dashboard link.
+async function handleStart(tenantId: string, botToken: string, chatId: number) {
+    const stateKey = 'first_impression_shown.json';
+    let shownTo: number[] = [];
+    try {
+        const stored = await getBotState<number[]>(tenantId, stateKey);
+        if (Array.isArray(stored)) shownTo = stored;
+    } catch { /* fresh state */ }
+
+    if (shownTo.includes(chatId)) {
+        // Already greeted — send dashboard link
+        return sendDashboardMessage(tenantId, botToken, chatId);
+    }
+
+    // First time — 4-language greeting
+    const tenant = await getTenant(tenantId);
+    const agentName = tenant?.name ?? 'Tiger';
+
+    const greeting =
+        `Hi, I'm ${agentName}. I'm here to take you by the hand and lead you to a brighter future.\n\n` +
+        `สวัสดี ฉัน${agentName} ฉันพร้อมที่จะพาคุณไปสู่อนาคตที่สดใสกว่า\n\n` +
+        `Hola, soy ${agentName}. Estoy aquí para guiarte hacia un futuro más brillante.\n\n` +
+        `Hallo, ich bin ${agentName}. Ich bin hier, um dich in eine bessere Zukunft zu führen.\n\n` +
+        `Let's get to work! I'm having my nails done later!`;
+
+    await tgSend(botToken, chatId, greeting);
+
+    // Mark this chatId as greeted
+    shownTo.push(chatId);
+    await setBotState(tenantId, stateKey, shownTo).catch(() => {});
 }
 
 async function sendDashboardMessage(tenantId: string, botToken: string, chatId: number) {

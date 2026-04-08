@@ -55,11 +55,6 @@ const FLAVORS: Flavor[] = [
     description: "Finds travelers and helps maximize bookings",
   },
   {
-    key: "interior-designer",
-    displayName: "Interior Designer",
-    description: "Finds homeowners and businesses ready to redesign their space",
-  },
-  {
     key: "plumber",
     displayName: "Plumber / Trades Professional",
     description: "Finds homeowners and businesses that need trades work",

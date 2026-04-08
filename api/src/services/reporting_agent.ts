@@ -4,6 +4,7 @@
 
 import { getPool, logAdminEvent } from './db.js';
 import { sendAdminAlert } from '../routes/admin.js';
+import { runStrikeAutoPipeline } from './strike_auto_pipeline.js';
 
 export async function runReportingAgent(
     runId: string,
@@ -55,4 +56,9 @@ export async function runReportingAgent(
     }).catch(() => {});
 
     console.log(`[ReportingAgent] Brief sent — ${totalFacts} facts across ${flavorsProcessed} flavors`);
+
+    // Trigger Strike auto-pipeline: harvest → draft → Web Intent URLs → admin alert
+    runStrikeAutoPipeline().catch(err =>
+        console.warn('[ReportingAgent] Strike pipeline failed (non-fatal):', err)
+    );
 }
