@@ -10,12 +10,20 @@ Tiger Claw is an AI agent that hunts for qualified prospects 24/7 and books them
 
 This is what the platform is being built to do. Items marked ⚠️ are not yet live.
 
-### Signup — 3 Questions Only ⚠️ Not yet built
-1. **Agent name** — what to call the agent
-2. **Product or opportunity** — e.g. "Nuskin"
-3. **Your name** — the operator
+### Signup — 3 Steps Only ⚠️ Not yet built
 
-Everything else hardwired from the flavor. Current wizard still has more questions — 3-question simplification is on the build list.
+**Current wizard (live today):**
+1. Choose your flavor
+2. Give your agent a name
+3. Who are you trying to reach? ← 3 ICP sub-questions (ideal customer, problem, where they spend time online)
+4. Connect your Telegram bot token
+
+**Target wizard (to build):**
+1. Choose your flavor
+2. Give your agent a name
+3. Connect your Telegram bot token
+
+Step 3 (ICP questions) must be removed entirely. The flavor already knows the ICP. PR #255 pre-seeds the backend state correctly — the wizard UI just hasn't been updated yet to match. The operator should never be asked to define their ICP.
 
 ### After Signup
 The agent hatches immediately — calibrated, hunting-ready, no interview. ✅ Live (PR #255)
