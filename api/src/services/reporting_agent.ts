@@ -2,7 +2,7 @@
 // Triggered by the Orchestrator after all Research Agents complete.
 // Generates the daily intelligence brief and sends to admin.
 
-import { getPool } from './db.js';
+import { getPool, logAdminEvent } from './db.js';
 import { sendAdminAlert } from '../routes/admin.js';
 
 export async function runReportingAgent(
@@ -46,6 +46,13 @@ export async function runReportingAgent(
         `Flavors: ${flavorsProcessed} | Facts saved: ${totalFacts} | Duration: ~${durationMin} min\n\n` +
         `By flavor:\n${domainLines}`
     ).catch(() => {});
+
+    await logAdminEvent('mine_complete', undefined, {
+        runId,
+        flavorsProcessed,
+        factsSaved: totalFacts,
+        durationMin,
+    }).catch(() => {});
 
     console.log(`[ReportingAgent] Brief sent — ${totalFacts} facts across ${flavorsProcessed} flavors`);
 }
