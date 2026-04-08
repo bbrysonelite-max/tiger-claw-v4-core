@@ -99,7 +99,7 @@ export default function StepReviewPayment({ state, isDeploying, setIsDeploying, 
                             <div className="flex justify-between items-end border-b-2 border-primary/20 pb-4">
                                 <span className="text-white text-base font-bold uppercase tracking-widest">Your Plan</span>
                                 <div className="text-right">
-                                    <div className="text-sm text-green-400 font-bold">✓ Paid via Stan Store</div>
+                                    <div className="text-sm text-green-400 font-bold">✓ Payment Confirmed</div>
                                     <div className="text-2xl font-black text-white tracking-tighter">{state.planName} — {state.price}</div>
                                 </div>
                             </div>
@@ -110,7 +110,7 @@ export default function StepReviewPayment({ state, isDeploying, setIsDeploying, 
                                 <Lock className="w-4 h-4 text-white/90" />
                             </div>
                             <p className="text-sm text-white/90 font-medium leading-relaxed">
-                                ✅ 7-Day Money-Back Guarantee. Payments processed by <span className="text-white font-bold">Stan Store</span>.
+                                ✅ 7-Day Money-Back Guarantee.
                             </p>
                         </div>
                     </div>

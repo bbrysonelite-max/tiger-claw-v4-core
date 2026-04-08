@@ -71,7 +71,7 @@ router.get("/:slug", requireSession, async (req: Request, res: Response) => {
         bot: {
             username: botUsername ? `@${botUsername}` : null,
             telegramLink: botUsername ? `https://t.me/${botUsername}` : null,
-            isLive: tenant.status === "active" || tenant.status === "onboarding",
+            isLive: tenant.status === "active" || tenant.status === "onboarding" || tenant.status === "live",
         },
         apiKey: {
             configured: keyStatus?.configured ?? false,
