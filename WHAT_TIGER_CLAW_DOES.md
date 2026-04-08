@@ -6,33 +6,46 @@ Tiger Claw is an AI agent that hunts for qualified prospects 24/7 and books them
 
 ---
 
-## The Operator Experience
+## The Designed Experience (Vision — Not All Live Yet)
 
-### Signup — 3 Questions Only
+This is what the platform is being built to do. Items marked ⚠️ are not yet live.
 
+### Signup — 3 Questions Only ⚠️ Not yet built
 1. **Agent name** — what to call the agent
 2. **Product or opportunity** — e.g. "Nuskin"
 3. **Your name** — the operator
 
-That's it. Everything else is hardwired from the flavor. The platform already knows the ICP, the buyer profile, the objections, the scout queries. The operator doesn't configure any of it. They just show up.
+Everything else hardwired from the flavor. Current wizard still has more questions — 3-question simplification is on the build list.
 
 ### After Signup
+The agent hatches immediately — calibrated, hunting-ready, no interview. ✅ Live (PR #255)
 
-The agent hatches immediately — calibrated, hunting-ready, no interview.
-
-The operator sets their availability: one or two Zoom slots per day. That's the only other input required.
+The operator sets their availability: one or two Zoom slots per day. ⚠️ Calendar UI not yet built.
 
 ### Every Day After That
-
-- Agent hunts for qualified prospects using the Data Mine (1,500+ fresh facts daily across 8 flavors)
-- Agent reaches out, starts conversations, qualifies interest
-- When a prospect is ready: agent offers an available Zoom slot
-- Prospect books → confirmed on operator's calendar
+- Agent hunts for qualified prospects using the Data Mine ✅ Mine running
+- Agent engages publicly, drives inbound ⚠️ Tiger Strike Engage not yet wired
+- Agent qualifies in conversation ✅ Built
+- When a prospect is ready: agent offers a Zoom slot and books it ⚠️ Cal.com booking not yet built
 - Operator shows up to the Zoom and closes the deal
 
 ### The Deliverable
-
 **Booked calls.** Not leads. Not conversations. Not CRM entries. A human being on a Zoom at a specific time, already warmed up, already interested.
+
+---
+
+## Current Reality (2026-04-08)
+
+| Item | State |
+|------|-------|
+| Agent hatches calibrated, no interview | ✅ Live — PR #255 |
+| Wizard questions | ⚠️ Still more than 3 — simplification not built |
+| First impression in 4 languages | ⚠️ Not built |
+| Cal.com Zoom booking | ⚠️ Not built — `tiger_book_zoom` tool does not exist |
+| Tiger Strike Engage wired to mine | ⚠️ Not built — 1,679 facts unengaged |
+| Scout run for any real tenant | ⚠️ Never triggered in production |
+| Real prospect conversation | ⚠️ Zero — messages table empty |
+| Paddle checkout URL | ⚠️ No product/price created yet |
 
 ---
 
@@ -94,8 +107,8 @@ flowchart TD
     G --> H[POST /wizard/hatch\nBullMQ job enqueued]
     H --> I[Agent registered · webhook set\nonboard_state.json pre-seeded from flavor ICP]
     I --> J[Customer messages agent: 'Start']
-    J --> K[Agent first impression\n4 languages · Let's get to work!]
-    K --> L[Agent hunting-ready\nCalendar slots open · Scout active]
+    J --> K[Agent first impression\n⚠️ 4 languages not yet built]
+    K --> L[Agent hunting-ready\n⚠️ Calendar slots not yet built]
 ```
 
 **Why Paddle:** Direct webhook, no middleware, HMAC-verified, handles global VAT as merchant of record.
@@ -110,10 +123,10 @@ flowchart TD
 |-------|-------------|
 | Data Mine | Runs at 2 AM UTC daily. 8 Research Agents in parallel. 1,500+ facts per run. Identifies intent signals by region and flavor. Suggests top-of-funnel sources per region. |
 | Scout | Per-tenant. Finds prospects on the platforms most active in the operator's region. |
-| Agent | Starts conversations, handles objections, qualifies, books. Runs 24/7. |
-| Tiger Strike | Engages publicly on forums where prospects are talking. Drives inbound. |
-| Reporting | Daily brief: calls booked, conversations active, facts mined, top sources by region. |
-| Calendar | Operator sets 1–2 daily Zoom slots. Agent fills them. |
+| Agent | Starts conversations, handles objections, qualifies. Runs 24/7. ✅ Live |
+| Tiger Strike | Engages publicly on forums where prospects are talking. Drives inbound. ⚠️ Not yet wired to mine |
+| Reporting | Daily brief: facts mined, top sources by region. ✅ Live (admin only) |
+| Calendar / Booking | Operator sets 1–2 daily Zoom slots. Agent fills them. ⚠️ Not yet built |
 
 ---
 
