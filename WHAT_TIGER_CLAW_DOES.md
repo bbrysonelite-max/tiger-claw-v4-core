@@ -95,7 +95,7 @@ The agent runs 24/7. It does not sleep, forget, or have a bad day.
 
 - Not a CRM. Operators don't manage contacts.
 - Not a chatbot that waits for inbound. It hunts.
-- Not a complex setup. 3 questions, done.
+- Not a complex setup. One page, LAUNCH MY AGENT.
 - Not configurable ICP — the flavor already knows the customer better than the operator does.
 
 ---

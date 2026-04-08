@@ -108,3 +108,9 @@ Any new tool added to `api/src/tools/` must be registered in `toolsMap` in `api/
 ## 12. Dangerous Tools Require Explicit Approval
 
 Tools that take irreversible public actions (sending emails, posting to social media, calling external APIs on the operator's behalf) must not be registered in `toolsMap` without explicit operator approval. When in doubt, leave it out.
+
+---
+
+## 13. Never Reference Individual People by Name
+
+Do not reference specific individuals (distributors, contacts, partners, or anyone in the operator's network) by name in code, documentation, comments, prompts, or conversation. The platform must stand on its own merit independent of any specific person. Refer to roles only (e.g. "operator," "distributor," "contact") — never names.

@@ -170,7 +170,7 @@ Note: `mnpcril3` is the orphan from the duplicate-tenant bug. It has a subscript
 
 Stateless agent hatchery. Operator brings their own Telegram bot token (BYOB) and Gemini API key (BYOK). One-page signup. Agent hatches knowing its ICP — no interview, no questions. Agent prospects while operator sleeps. Hive gets smarter with every run.
 
-**The value proposition: Your bot hunts while you sleep.**
+**The value proposition: Your agent hunts while you sleep.**
 
 **Active channel:** Telegram only. LINE is future.
 
