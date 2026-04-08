@@ -1411,10 +1411,10 @@ router.post("/hatch", async (req: Request, res: Response) => {
   try {
     const {
       createBYOKUser, createBYOKBot, createBYOKSubscription, logAdminEvent: logEvent,
+      addAIKey, upsertBYOKConfig,
     } = await import('../services/db.js');
     const { encryptToken } = await import('../services/pool.js');
-    const { addAIKey, validateAIKey } = await import('../services/ai.js');
-    const { upsertBYOKConfig } = await import('../services/db.js');
+    const { validateAIKey } = await import('../services/ai.js');
     const { provisionQueue } = await import('../services/queue.js');
 
     // 1. Create / find user
