@@ -5,6 +5,16 @@
 
 ---
 
+## The Three Documents — Read In Order
+
+| # | File | Purpose |
+|---|------|---------|
+| 1 | `SOTU.md` ← you are here | What is true right now. Platform state, what's broken, what's working. No opinion, just facts. |
+| 2 | `HOW_TIGER_WINS.md` | Why things fail and the expert fix for each. The strategy. Read this before forming any plan. |
+| 3 | `NEXT_SESSION.md` | Marching orders. Exactly what to build this session, in order. Do not skip ahead. |
+
+---
+
 ## Standing Orders
 
 **No lying. No assuming. No guessing.**
@@ -204,9 +214,8 @@ Operator pays via Paddle checkout (checkout URL not yet created — build tomorr
 **Payment gate is still open** for direct wizard access (no Paddle purchase required). This is C4. Fix after Paddle loop is proven.
 
 Payment processor status:
-- **Paddle:** ✅ LIVE. Webhook at `https://api.tigerclaw.io/webhooks/paddle`. Secrets in GCP. Product/price not yet created.
-- **Stan Store:** Active front door for existing customers. Not the primary new-customer path.
-- **Stripe:** Placeholder. Not used.
+- **Paddle:** ✅ LIVE. Webhook at `https://api.tigerclaw.io/webhooks/paddle`. Secrets in GCP. Product/price not yet created. Merchant of record approval pending — this is the payment path.
+- **Stan Store / Zapier / Stripe:** Dead. The Zapier webhook never worked. Payment gate is open and intentionally held until Paddle approval comes through. Do not attempt to wire Zapier again.
 
 ---
 
@@ -220,7 +229,7 @@ Payment processor status:
 | AI | Gemini 2.0 Flash | LOCKED. Do not switch to 2.5-flash (GCP function-calling bug). |
 | Signup + Dashboard | Next.js, `web-onboarding/` | `wizard.tigerclaw.io` — Vercel. Auto-deploy working. |
 | Website | Static HTML | `tigerclaw.io` — separate repo |
-| Payments | Paddle (active) | Stan Store legacy. Stripe placeholder. |
+| Payments | Paddle (active) | Stan Store / Zapier / Stripe dead. Paddle is the only payment path. |
 | Scout search | Serper | `SERPER_KEY_1/2/3` — round-robin rotation active |
 | Reddit | Blocked | 403 from Cloud Run egress. Oxylabs fix pending. |
 | Email | Resend | Domain verified. `RESEND_API_KEY` in deploy. Needed for autonomous operation. |
