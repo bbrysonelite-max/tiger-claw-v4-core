@@ -111,7 +111,7 @@ flowchart TD
     C --> D[Provision: user + agent + subscription\nstatus: pending_setup]
     D --> E[Hatch email sent to customer]
     E --> F[Customer goes to wizard.tigerclaw.io]
-    F --> G[3-Question Signup\nagent name · product · operator name]
+    F --> G[Single page signup\nflavor · agent name · ICP · Telegram token · Gemini key]
     G --> H[POST /wizard/hatch\nBullMQ job enqueued]
     H --> I[Agent registered · webhook set\nonboard_state.json pre-seeded from flavor ICP]
     I --> J[Customer messages agent: 'Start']
