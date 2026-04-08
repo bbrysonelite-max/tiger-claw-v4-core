@@ -10,88 +10,71 @@ These are the marching orders. Do them in order. Do not skip ahead. Do not add f
 
 ### 1. ✅ Fix Brentstiger01 — DONE
 
-### 2. Wizard Fixes — IN PROGRESS
+### 2. ✅ Interior Designer removed from wizard — DONE
 
-**Interior Designer removal** — in progress. Cut from API registry (PR #233) but still in `web-onboarding/src/app/signup/page.tsx`. Broken signup path. One-line delete.
+### 3. ✅ Cal.com Zoom Booking — `tiger_book_zoom` — DONE (needs activation)
 
-**Contrast fix — HIGH** — The instructional/helper text under each step heading is gray on a black background. It is illegible. Nobody can read it. The step headings are white and work perfectly. The gray supporting text does not. Every line of instructional text on the wizard must be white or near-white. This is not a style preference — it is a usability failure that will cause drop-off on every signup.
+Tool is live and registered. Reads `calcomBookingUrl` from tenant settings.json. Generates pre-filled booking link when prospect qualifies. Admin alert fires on booking confirmation.
 
-Fix: in `web-onboarding/`, find all `text-gray-*` or `text-slate-*` classes on instructional/helper text and replace with `text-white` or `text-slate-200` minimum. Apply this rule to every web property going forward — gray text on dark backgrounds is banned for any text a user needs to read to complete an action.
+**Operator action required:** Write `calcomBookingUrl` to Brents Tiger 01 settings.json before testing. Set up Cal.com availability (1–2 slots/day).
+
+### 4. ✅ Agent First Impression — DONE
+
+4-language greeting on first `/start` per chatId. State stored in `first_impression_shown.json`. Language-matching in system prompt — agent mirrors prospect's language for the full conversation.
+
+### 5. ✅ Wire Tiger Strike Engage After Mine Cycle — DONE (unverified)
+
+`runStrikeAutoPipeline()` wired to fire after every 2 AM mine cycle via Reporting Agent. Has not yet fired at 2 AM.
 
 ---
 
-## This Session — Build In Order
+## This Session — Do In Order
 
-### 3. Cal.com Zoom Booking — `tiger_book_zoom`
-The agent's conversion event is a booked Zoom call. This tool must exist before the agent can close.
+### 6. Verify Tiger Strike Engage at 2 AM
 
-- Operator sets availability during wizard (1–2 daily slots)
-- New tool `tiger_book_zoom` added to `toolsMap` in `ai.ts`
-- Cal.com API key added to GCP secrets
-- Agent sends booking link when `qualifying_score` crosses threshold
-- Booking confirmed → notification to operator
+After next mine cycle, check:
+- `engagement_status` rows moved from `unengaged` to `queued` in `market_intelligence`
+- Admin Telegram alert arrived with one-click links
+- Alert is readable (no Markdown parse failure from underscores)
 
-### 4. Agent First Impression
-On the very first `Start` message, agent greets in 4 languages to demonstrate intelligence, then locks to the prospect's language for the remainder of the conversation.
+If the alert failed due to the Markdown bug, fix it now: escape underscores in the strike report message (`_` → `\_`).
 
-Greeting (English):
-> "Hi, I'm [Agent Name]. I'm here to take you by the hand and lead you to a brighter future."
+### 7. Send Bot Link to 5 Warm Contacts
 
-Then immediately in Thai, Spanish, and German.
+Not a build task — an operator task. Brent sends `t.me/Brentstiger01_bot` to five people in the network with a personal note. Watch the first cold conversation. Document it.
 
-Then: **"Let's get to work! I'm having my nails done later!"**
+### 8. Set calcomBookingUrl in Brents Tiger 01
 
-After the first message: respond in the prospect's language only.
-
-### 5. Wire Tiger Strike Engage After Mine Cycle
-After the 2 AM orchestrated run completes:
-1. Tiger Strike Harvest pulls top 20 unengaged facts (confidence ≥ 70)
-2. Tiger Strike Draft generates contextual replies
-3. Tiger Strike Engage generates Web Intent URLs — one per reply, per platform (X, Reddit, LinkedIn)
-4. Operator receives a daily batch of pre-filled one-click links
-5. Operator clicks → their browser opens with the reply pre-filled → they post it as themselves
-6. `engagement_status` updated to `queued` → `engaged` after confirmation
-
-**Important:** Tiger Strike does NOT auto-post. It generates the reply and a deep link that opens the operator's browser with the text pre-filled. The operator clicks once. It posts from their real account. This is intentional — no write API, no bot detection risk, no OAuth token management. The system does the thinking; the operator does the clicking.
-
-This is the missing link between the mine and revenue.
+Write the Cal.com booking URL to settings.json for tenant `56d45bfd-08f9-46e7-9767-bf1bb60f8f07`. Test by triggering `tiger_book_zoom` manually.
 
 ---
 
 ## Before Next Session Ends
 
-### 6. Send Bot Link to 5 Warm Contacts
-Not a build task — an operator task. Brent sends `t.me/Brentstiger01_bot` to five people in the network with a personal note. This is manual seeding while Tiger Strike Engage (#5) is being wired. Once the mine → Tiger Strike → inbound loop is live, this becomes automatic. Watch the first cold conversation. Document it.
+### 9. Wizard Contrast Fix — HIGH
 
-### 7. Check 2 AM Mine Results
-Pull from `market_intelligence`:
-- Total facts today
-- Facts by flavor
-- 10 sample facts with verbatim quotes
-- Rejection count from relevance gate
+The instructional/helper text under each step heading is gray on a black background. It is illegible. The step headings are white and work. The gray supporting text does not.
 
-Confirm Tiger Strike Engage fired and `engagement_status` rows moved from `unengaged` to `queued`.
+Fix: in `web-onboarding/`, replace all `text-gray-*` and `text-slate-*` classes on instructional/helper text with `text-white` or `text-slate-200` minimum. Apply this rule to every web property going forward — gray text on dark backgrounds is banned for any text a user needs to read to complete an action.
 
 ---
 
 ## Parking Lot — Do Not Touch This Session
 
 - Karpathy Ratchet (mine self-improvement) — after pipeline proven at volume
-- Regional top-of-funnel intelligence — mine should identify and recommend best signal sources per region as part of daily brief. SE Asia: LINE OpenChat, Pantip, Facebook Groups. North America: Reddit, LinkedIn, Facebook Groups. Europe: LinkedIn, local forums. Different markets, different surfaces. Mine already knows the region from the signals — it should surface where to find more.
-- Additional signal sources (LINE OpenChat, Facebook Groups, Pantip, LinkedIn, Bright Data, Oxylabs Amplify) — after Tiger Strike Engage proven on current sources
 - Paddle product + price — waiting on merchant of record approval
-- Orphan tenant cleanup (`brents-tiger-01-mnpcril3`) — low priority, do when convenient
-- Oxylabs Amplify — planned data source, never built. Currently only Oxylabs Realtime proxy (for Reddit 403) exists.
-- Bright Data — planned data source, never built. Zero code in codebase.
-- LINE OpenChat, Facebook Groups, Pantip, LinkedIn — planned signal sources, all stubbed or absent
-- Admin alert markdown bug (underscore in Telegram) — fix before public launch
+- Admin alert Markdown bug (underscore breaks Telegram) — fix only if Strike alert fails
+- Orphan tenant cleanup (`brents-tiger-01-mnpcril3`) — low priority
+- Oxylabs Amplify — planned, never built
+- Bright Data — planned, never built
+- LINE OpenChat, Facebook Groups, Pantip, LinkedIn — planned signal sources, not this session
+- Regional top-of-funnel intelligence (mine recommends best signal sources per region) — after volume
 
 ---
 
 ## Definition of Done for This Session
 
-- [ ] Brentstiger01 responding as a hunter, not an interviewer
-- [ ] `tiger_book_zoom` tool live and tested
-- [ ] Agent first impression ships in 4 languages
-- [ ] Tiger Strike Engage wired to mine cycle
-- [ ] At least 1 real cold conversation documented
+- [ ] Tiger Strike Engage verified firing at 2 AM and generating admin alert
+- [ ] `calcomBookingUrl` set — `tiger_book_zoom` testable
+- [ ] Brent has sent link to 5 contacts
+- [ ] First cold conversation documented (even if brief)

@@ -14,7 +14,7 @@ This is what the platform is being built to do. Items marked ⚠️ are not yet 
 
 The wizard is a single scrolling page at `wizard.tigerclaw.io`. All sections visible at once. No modal steps.
 
-1. **What kind of agent do you want?** — 9 flavor cards (Network Marketer, Real Estate Agent, Health & Wellness, Mortgage Broker, Lawyer/Attorney, Airbnb Host, Interior Designer*, Plumber/Trades, Sales Tiger)
+1. **What kind of agent do you want?** — 8 flavor cards (Network Marketer, Real Estate Agent, Health & Wellness, Mortgage Broker, Lawyer/Attorney, Airbnb Host, Plumber/Trades, Sales Tiger)
 2. **Give your agent a name** — display name, 30 char limit
 3. **Who are you trying to reach?** — ideal customer description, problem, where they spend time online
 4. **Connect your Telegram bot** — BotFather instructions + token input (AES-256-GCM encrypted)
@@ -23,12 +23,14 @@ The wizard is a single scrolling page at `wizard.tigerclaw.io`. All sections vis
 
 The ICP questions in section 3 give the operator a sense of ownership — they feel like they're programming their agent. This is intentional. Do not remove or simplify the wizard.
 
-*⚠️ Interior Designer shows in the wizard but was cut from the API flavor registry (PR #233). Bug — anyone selecting it gets an agent with no valid flavor on the backend. Needs to be removed from `web-onboarding/src/app/signup/page.tsx`.
+Interior Designer was cut from the API flavor registry (PR #233) and removed from the wizard frontend (PR #261). 8 valid flavors remain.
 
 ### After Signup
 The agent hatches immediately — calibrated, hunting-ready, no interview. ✅ Live (PR #255)
 
-The operator sets their availability: one or two Zoom slots per day. ⚠️ Calendar UI not yet built.
+First message from a prospect: 4-language greeting. After that, agent mirrors the prospect's language. ✅ Live (PR #261)
+
+The operator sets their availability: one or two Zoom slots per day. ⚠️ Calendar UI not yet built. Cal.com URL must be set manually in settings.json for now.
 
 ### Every Day After That
 - Agent hunts for qualified prospects using the Data Mine ✅ Mine running
@@ -42,17 +44,17 @@ The operator sets their availability: one or two Zoom slots per day. ⚠️ Cale
 
 ---
 
-## Current Reality (2026-04-08)
+## Current Reality (2026-04-07)
 
 | Item | State |
 |------|-------|
 | Agent hatches calibrated, no interview | ✅ Live — PR #255 |
-| Wizard | ✅ Live — 5 steps, working, do not change |
-| First impression in 4 languages | ⚠️ Not built |
-| Cal.com Zoom booking | ⚠️ Not built — `tiger_book_zoom` tool does not exist |
-| Tiger Strike Engage wired to mine | ⚠️ Not built — 1,679 facts unengaged |
+| Wizard | ✅ Live — 8 flavors, working, do not change |
+| First impression in 4 languages | ✅ Live — PR #261. Fires on first `/start` per chatId, language-matched after. |
+| Cal.com Zoom booking | ✅ Built — `tiger_book_zoom` registered. Needs `calcomBookingUrl` set to activate. |
+| Tiger Strike Engage wired to mine | ✅ Wired — PR #261. Fires after 2 AM mine cycle. Unverified — check after next run. |
 | Scout run for any real tenant | ⚠️ Never triggered in production |
-| Real prospect conversation | ⚠️ Zero — messages table empty |
+| Real prospect conversation | ⚠️ Zero — only operator has messaged |
 | Paddle checkout URL | ⚠️ No product/price created yet |
 
 ---
@@ -115,8 +117,8 @@ flowchart TD
     G --> H[POST /wizard/hatch\nBullMQ job enqueued]
     H --> I[Agent registered · webhook set\nonboard_state.json pre-seeded from flavor ICP]
     I --> J[Customer messages agent: 'Start']
-    J --> K[Agent first impression\n⚠️ 4 languages not yet built]
-    K --> L[Agent hunting-ready\n⚠️ Calendar slots not yet built]
+    J --> K[Agent first impression\n✅ 4 languages live — first /start only]
+    K --> L[Agent hunting-ready\n⚠️ calcomBookingUrl must be set for booking]
 ```
 
 **Why Paddle:** Direct webhook, no middleware, HMAC-verified, handles global VAT as merchant of record.
@@ -132,7 +134,7 @@ flowchart TD
 | Data Mine | Runs at 2 AM UTC daily. 8 Research Agents in parallel. 1,500+ facts per run. Identifies intent signals by region and flavor. Suggests top-of-funnel sources per region. |
 | Scout | Per-tenant. Finds prospects on the platforms most active in the operator's region. |
 | Agent | Starts conversations, handles objections, qualifies. Runs 24/7. ✅ Live |
-| Tiger Strike | Drafts replies to public posts where prospects are talking. Generates one-click Web Intent URLs. Operator clicks → posts from their account. ⚠️ Not yet wired to mine cycle |
+| Tiger Strike | Drafts replies to public posts where prospects are talking. Generates one-click Web Intent URLs. Operator clicks → posts from their account. ✅ Wired to mine cycle (PR #261). Verify after next 2 AM run. |
 | Reporting | Daily brief: facts mined, top sources by region. ✅ Live (admin only) |
 | Calendar / Booking | Operator sets 1–2 daily Zoom slots. Agent fills them. ⚠️ Not yet built |
 

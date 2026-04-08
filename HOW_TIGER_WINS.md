@@ -34,7 +34,7 @@ The mine runs at 2 AM listening for intent signals — people publicly expressin
 
 The mine finds the signal. Tiger Strike creates the touch. The agent closes the loop.
 
-**The gap today:** Tiger Strike Engage is not yet wired to run after the mine cycle. 1,679 facts are sitting unengaged. Wiring that connection IS the top of funnel going live.
+**Status:** Tiger Strike Engage pipeline is wired. After every 2 AM mine cycle: harvest top 20 unengaged facts → draft replies via Gemini → generate Web Intent URLs → admin Telegram alert with one-click links. Operator clicks, posts from their account. Has not fired yet at 2 AM — verify after next mine cycle.
 
 ---
 
@@ -50,11 +50,9 @@ When Paddle approves, the checkout URL goes live and the manual process stops. N
 
 ---
 
-## 4. Brentstiger01 Is Stuck Mid-Interview
+## 4. Brentstiger01 Is Stuck Mid-Interview — FIXED
 
-**Failure:** Phase is `icp_customer`. Next message triggers the interview, not hunting.
-
-**The fix:** Two-minute DB write. Write complete `onboard_state.json` to bot_states. Agent wakes up calibrated. No rebuild. No PR.
+`onboard_state.json` written directly to bot_states. Phase is `complete`. Identity: Brent / Nuskin. Full NM defaultBuilderICP loaded. Bot is hunting-ready. No interview.
 
 ---
 
@@ -70,35 +68,25 @@ Tiger Strike posts replies publicly. Those replies drive inbound. The scout find
 
 ---
 
-## 6. Zoom Booking Doesn't Exist
+## 6. Zoom Booking — BUILT, NOT YET ACTIVE
 
-**Failure:** Prospect says yes to a call. Agent has nowhere to send them.
+`tiger_book_zoom` tool is live and registered in `toolsMap`. Reads `calcomBookingUrl` from tenant settings.json.
 
-**The fix:** Cal.com. One API call. One new tool in toolsMap.
-
-Operator sets 1–2 daily Zoom slots once. Agent generates a Cal.com booking link when a prospect qualifies. Prospect books. Zoom lands on operator's calendar.
-
-**This is the most important feature on the roadmap.** Without it, every qualified prospect goes nowhere.
+**Activation required:** Write `calcomBookingUrl` to Brents Tiger 01 settings before testing. Operator must configure Cal.com availability separately (1–2 daily slots). Once set, agent generates a pre-filled booking link when a prospect qualifies and fires an admin Telegram alert on confirmation.
 
 ---
 
-## 7. Mine Is Not Feeding Anything
+## 7. Mine Is Not Feeding Anything — FIXED
 
-**Failure:** 1,679 facts. All unengaged. Nothing connected to them.
+Tiger Strike pipeline is wired. After every 2 AM mine cycle: `runStrikeAutoPipeline()` fires automatically from the Reporting Agent. Harvests top 20 unengaged facts (confidence ≥ 70), drafts replies via platform Gemini key, generates Web Intent URLs, sends admin alert with one-click links, marks facts `queued`.
 
-**The fix:** Wire Tiger Strike Engage to run after every mine cycle.
-
-After 2 AM run → Harvest top facts → Draft replies → Post publicly → Inbound starts.
-
-This is the missing link between the mine and revenue.
+Has not yet fired at 2 AM — verify after next mine cycle that facts move from `unengaged` to `queued` and admin alert arrives.
 
 ---
 
-## 8. First Impression — 4 Languages Every Time Is a Gimmick
+## 8. First Impression — FIXED
 
-**Failure:** Saying all 4 languages to every prospect regardless of who they are.
-
-**The fix:** Show it once, then match the human. 4 languages on first `Start` message only. After that, respond in their language.
+4-language greeting fires on the first `/start` per chatId only (state stored in `first_impression_shown.json`). Subsequent `/start` goes straight to dashboard link. Agent detects prospect's language in every conversation and mirrors it for all subsequent replies — never switches back to English unless the prospect does.
 
 ---
 
@@ -128,14 +116,14 @@ Alternative: Serper already indexes Reddit and works. Tiger Strike can pull targ
 
 ## The Winning Sequence
 
-| Step | Action | When |
-|------|--------|------|
-| 1 | Fix Brentstiger01 — DB write | Now |
-| 2 | Send link to 5 warm contacts | Today |
-| 3 | Watch first cold conversation | Today |
-| 4 | Build `tiger_book_zoom` — Cal.com | This session |
-| 5 | Wire Tiger Strike Engage after mine | This session |
-| 6 | Confirm Tiger Strike Engage is posting and driving inbound | After #5 |
+| Step | Action | Status |
+|------|--------|--------|
+| 1 | Fix Brentstiger01 — DB write | ✅ Done |
+| 2 | Send link to 5 warm contacts | Operator action — not yet done |
+| 3 | Watch first cold conversation | Pending — no prospects yet |
+| 4 | Build `tiger_book_zoom` — Cal.com | ✅ Done — needs calcomBookingUrl set |
+| 5 | Wire Tiger Strike Engage after mine | ✅ Done — verify after next 2 AM run |
+| 6 | Confirm Tiger Strike Engage is driving inbound | After 2 AM verification |
 | 7 | Charge first founding member manually | When ready |
 | 8 | Paddle product + price live | When approved |
 | 9 | Karpathy Ratchet | After #5 proven |
