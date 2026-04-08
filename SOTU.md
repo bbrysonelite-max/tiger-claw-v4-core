@@ -10,8 +10,9 @@
 | # | File | Purpose |
 |---|------|---------|
 | 1 | `SOTU.md` ← you are here | What is true right now. Platform state, what's broken, what's working. No opinion, just facts. |
-| 2 | `HOW_TIGER_WINS.md` | Why things fail and the expert fix for each. The strategy. Read this before forming any plan. |
-| 3 | `NEXT_SESSION.md` | Marching orders. Exactly what to build this session, in order. Do not skip ahead. |
+| 2 | `WHAT_TIGER_CLAW_DOES.md` | What the platform is, what the agent can do, the payment flow, the sale. Product vision. |
+| 3 | `HOW_TIGER_WINS.md` | Why things fail and the expert fix for each. The strategy. Read this before forming any plan. |
+| 4 | `NEXT_SESSION.md` | Marching orders. Exactly what to build this session, in order. Do not skip ahead. |
 
 ---
 
