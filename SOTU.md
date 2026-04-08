@@ -112,6 +112,7 @@ The test suite passes. The infrastructure is healthy. The Paddle webhook is live
 | ADMIN ALERT BUG | Underscores in error messages break Telegram Markdown parser. Admin alerts with error text silently fail. Fix before launch. | HIGH |
 | C4 | Payment gate still open for direct wizard access (no Paddle purchase required). Fix after Paddle loop proven. | NEXT SESSION |
 | TOOL AUDIT | tiger_drive_list confirmed safe to remove from toolsMap. Not yet done. | LOW |
+| ICP HARD-WIRE | **Decided 2026-04-07:** Remove operator-supplied `customerProfile` from wizard hatch. Load `icpSingle` automatically from the flavor config at hatch time. Operator no longer specifies their own ICP — the flavor IS the ICP. Applies to all 9 flavors. Do not ask the operator for ICP data during signup. | HIGH |
 
 **Past customers owed bots (3 people paid, never received service):**
 `chana.loh@gmail.com`, `nancylimsk@gmail.com`, `lily.vergara@gmail.com` — offer complimentary re-activation when platform is proven live.
