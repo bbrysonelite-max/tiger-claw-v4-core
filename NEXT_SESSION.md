@@ -8,33 +8,31 @@ These are the marching orders. Do them in order. Do not skip ahead. Do not add f
 
 ## Immediate — Do Before Anything Else
 
-### 1. Fix Brentstiger01 — 10 minutes
-Bot is stuck mid-interview (`phase: icp_customer`). Write complete `onboard_state.json` directly to bot_states:
-- `phase: complete`
-- `icpBuilder` from NM flavor `defaultBuilderICP`
-- `icpSingle` from NM flavor config
-- `identity.operatorName: Brent`
-- `identity.product: Nuskin`
+### 1. ✅ Fix Brentstiger01 — DONE
 
-No PR needed. Direct DB write. Confirm by messaging the bot and verifying it responds as a hunter, not an interviewer.
+### 2. Wizard Fixes — IN PROGRESS
+
+**Interior Designer removal** — in progress. Cut from API registry (PR #233) but still in `web-onboarding/src/app/signup/page.tsx`. Broken signup path. One-line delete.
+
+**Contrast fix — HIGH** — The instructional/helper text under each step heading is gray on a black background. It is illegible. Nobody can read it. The step headings are white and work perfectly. The gray supporting text does not. Every line of instructional text on the wizard must be white or near-white. This is not a style preference — it is a usability failure that will cause drop-off on every signup.
+
+Fix: in `web-onboarding/`, find all `text-gray-*` or `text-slate-*` classes on instructional/helper text and replace with `text-white` or `text-slate-200` minimum. Apply this rule to every web property going forward — gray text on dark backgrounds is banned for any text a user needs to read to complete an action.
 
 ---
 
 ## This Session — Build In Order
 
-### 2. Cal.com Zoom Booking — `tiger_book_zoom`
-The bot's conversion event is a booked Zoom call. This tool must exist before the bot can close.
+### 3. Cal.com Zoom Booking — `tiger_book_zoom`
+The agent's conversion event is a booked Zoom call. This tool must exist before the agent can close.
 
 - Operator sets availability during wizard (1–2 daily slots)
 - New tool `tiger_book_zoom` added to `toolsMap` in `ai.ts`
 - Cal.com API key added to GCP secrets
-- Bot sends booking link when `qualifying_score` crosses threshold
+- Agent sends booking link when `qualifying_score` crosses threshold
 - Booking confirmed → notification to operator
 
-### 3. Bot First Impression
-
-### 4. Bot First Impression
-On the very first `Start` message, bot greets in 4 languages to demonstrate intelligence, then locks to the prospect's language for the remainder of the conversation.
+### 4. Agent First Impression
+On the very first `Start` message, agent greets in 4 languages to demonstrate intelligence, then locks to the prospect's language for the remainder of the conversation.
 
 Greeting (English):
 > "Hi, I'm [Agent Name]. I'm here to take you by the hand and lead you to a brighter future."
@@ -94,7 +92,6 @@ Confirm Tiger Strike Engage fired and `engagement_status` rows moved from `uneng
 
 - [ ] Brentstiger01 responding as a hunter, not an interviewer
 - [ ] `tiger_book_zoom` tool live and tested
-- [ ] Wizard reduced to 3 questions
-- [ ] Bot first impression ships in 4 languages
+- [ ] Agent first impression ships in 4 languages
 - [ ] Tiger Strike Engage wired to mine cycle
 - [ ] At least 1 real cold conversation documented
