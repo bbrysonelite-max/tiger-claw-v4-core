@@ -55,6 +55,7 @@ export interface ProvisionInput {
   vertical?: string;
   hiveOptIn?: boolean;
   botId?: string;  // Required for Stan Store wizard flow; absent for admin manual provisioning
+  product?: string; // Optional product/company name (e.g. "Nuskin") — pre-seeds identity
 }
 
 export interface ProvisionResult {
@@ -289,12 +290,43 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
     };
   }
 
-  // 4. Status → onboarding (Bot is instantly LIVE and listening on the master router)
+  // 4. Pre-seed onboarding state — bot wakes up already calibrated, no interview required.
+  //    The flavor config supplies the ICP. Operator answers nothing.
+  try {
+    const existing = await getBotState<{ phase?: string }>(tenant.id, "onboard_state.json");
+    if (!existing || existing.phase !== "complete") {
+      const { FLAVOR_REGISTRY } = await import('../config/flavors/index.js');
+      const flavorConfig = (FLAVOR_REGISTRY as any)[input.flavor] ?? {};
+      const defaultIcp = flavorConfig.defaultBuilderICP ?? {};
+      const twoOar = input.flavor === "network-marketer";
+      await setBotState(tenant.id, "onboard_state.json", {
+        phase: "complete",
+        questionIndex: 0,
+        identity: {
+          name: input.name,
+          botName: input.name,
+          ...(input.product ? { productOrOpportunity: input.product } : {}),
+        },
+        icpBuilder: twoOar ? defaultIcp : {},
+        icpCustomer: {},
+        icpSingle: !twoOar ? defaultIcp : {},
+        primaryKeyValidated: true,
+        fallbackKeyValidated: false,
+        flavor: input.flavor,
+        language: input.language,
+        tenantId: tenant.id,
+        startedAt: new Date().toISOString(),
+      });
+      steps.push("Onboarding pre-seeded from flavor config — no interview required");
+    }
+  } catch (err) {
+    console.warn("[provisioner] Failed to pre-seed onboard state (non-fatal):", err);
+    steps.push("Onboard state pre-seed skipped (non-fatal)");
+  }
+
+  // 5. Status → onboarding (Bot is instantly LIVE and listening on the master router)
   await updateTenantStatus(tenant.id, "onboarding");
   steps.push("Status: onboarding");
-
-  // Bot is live. Waiting for tenant to trigger it via Telegram.
-  steps.push("Bot ready — awaiting tenant's first inbound message to start onboarding");
 
   await logAdminEvent("provision", tenant.id, {
     slug: input.slug,
