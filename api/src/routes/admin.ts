@@ -1390,4 +1390,98 @@ router.post("/fix-pool-orphans", async (_req: Request, res: Response) => {
   }
 });
 
+// ── POST /admin/hatch ─────────────────────────────────────────────────────────
+// Admin-direct bot provisioning. Bypasses the payment gate — for operator use,
+// internal testing, and custom-flavor bots (YouTube flywheel, admin, etc.).
+//
+// Body: { botToken, name, flavor, email, aiKey?, region?, language? }
+// Returns: { ok, botId, slug, telegramLink }
+router.post("/hatch", async (req: Request, res: Response) => {
+  const { botToken, name, flavor, email, aiKey, region, language } = req.body ?? {};
+
+  if (!botToken || !name || !flavor || !email) {
+    return res.status(400).json({ error: "botToken, name, flavor, and email are required" });
+  }
+
+  const { VALID_FLAVOR_KEYS } = await import('../tools/flavorConfig.js');
+  if (!(VALID_FLAVOR_KEYS as readonly string[]).includes(flavor)) {
+    return res.status(400).json({ error: `Unknown flavor: ${flavor}. Valid: ${VALID_FLAVOR_KEYS.join(', ')}` });
+  }
+
+  try {
+    const {
+      createBYOKUser, createBYOKBot, createBYOKSubscription, logAdminEvent: logEvent,
+    } = await import('../services/db.js');
+    const { encryptToken } = await import('../services/pool.js');
+    const { addAIKey, validateAIKey } = await import('../services/ai.js');
+    const { upsertBYOKConfig } = await import('../services/db.js');
+    const { provisionQueue } = await import('../services/queue.js');
+
+    // 1. Create / find user
+    const userId = await createBYOKUser(email, name);
+
+    // 2. Create tenant record (pending_setup)
+    const botId = await createBYOKBot(userId, name, flavor, 'pending_setup', email);
+
+    // 3. Create active subscription (admin hatch skips pending_setup → provisioner activates it)
+    await createBYOKSubscription({
+      userId,
+      botId,
+      stripeSubscriptionId: `admin_hatch_${Date.now()}`,
+      planTier: 'admin',
+      status: 'pending_setup',
+    });
+
+    // 4. Install AI key if provided
+    if (aiKey) {
+      const { valid, error: keyErr } = await validateAIKey('google', aiKey);
+      if (!valid) {
+        return res.status(400).json({ error: keyErr ?? 'Invalid Gemini API key' });
+      }
+      const encrypted = encryptToken(aiKey);
+      const preview = `${aiKey.slice(0, 4)}...${aiKey.slice(-4)}`;
+      await addAIKey({ botId, provider: 'google', model: 'gemini-2.0-flash', encryptedKey: encrypted, keyPreview: preview, priority: 0 });
+      await upsertBYOKConfig({ botId, connectionType: 'byok', provider: 'google', model: 'gemini-2.0-flash', encryptedKey: encrypted, keyPreview: preview });
+    }
+
+    // 5. Enqueue provisioning (same path as wizard/hatch)
+    const finalRegion = region ?? (language === 'th' ? 'th-th' : 'us-en');
+    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 30) + '-' + Date.now().toString(36);
+
+    await provisionQueue.add('tenant-provisioning', {
+      userId,
+      botId,
+      slug,
+      name,
+      email,
+      flavor,
+      region: finalRegion,
+      language: language ?? 'en',
+      preferredChannel: 'telegram',
+      timezone: 'UTC',
+      botToken,
+    }, {
+      attempts: 5,
+      backoff: { type: 'exponential', delay: 10000 },
+      jobId: `provision-${botId}`,
+    });
+
+    await logEvent('admin_hatch', botId, { name, flavor, email });
+    await sendAdminAlert(`Admin hatch: ${name} (${flavor}) — ${email}`);
+
+    console.log(`[admin] Hatch triggered — botId: ${botId}, flavor: ${flavor}, name: ${name}`);
+    return res.json({
+      ok: true,
+      botId,
+      slug,
+      flavor,
+      telegramLink: `https://t.me/`,  // username available after provisioning completes
+      statusUrl: `/wizard/bot-status?botId=${botId}`,
+    });
+  } catch (err) {
+    console.error('[admin] POST /admin/hatch error:', err);
+    return res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
 export default router;
