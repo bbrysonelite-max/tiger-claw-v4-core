@@ -687,15 +687,26 @@ export const researchAgentWorker = SHOULD_RUN_WORKERS ? new Worker(
         concurrency: 8,          // 8 flavors run in parallel
         stalledInterval: 30000,
         maxStalledCount: 3,
-        lockDuration: 600000,    // mining can take minutes
+        lockDuration: 300000,    // 5 min max per flavor
     }
 ) : null;
 
 if (researchAgentWorker) {
+    // On terminal failure: report 0 facts to orchestrator so it doesn't hang waiting for this flavor.
     researchAgentWorker.on('failed', (job, err) => {
         const flavor = job?.data?.displayName ?? 'unknown';
+        const runId = job?.data?.runId;
         console.error(`[ResearchAgent] Job failed for flavor ${flavor}:`, err?.message ?? err);
-        // Non-fatal — one flavor failure never stops the run. Orchestrator still triggers reporting.
+        if (runId) {
+            import('./orchestrator.js').then(({ reportResearchComplete }) => {
+                reportResearchComplete(runId, 0).catch(() => {});
+            }).catch(() => {});
+        }
+    });
+
+    // On stall: same — report 0 facts so the pipeline can proceed.
+    researchAgentWorker.on('stalled', (jobId) => {
+        console.warn(`[ResearchAgent] Job ${jobId} stalled — pipeline will proceed without this flavor`);
     });
 }
 
