@@ -990,7 +990,7 @@ export async function buildSystemPrompt(tenant: any): Promise<string> {
         // Re-injecting it here doubled the voice signal and bloated the prompt.
         `You are ${botName}, deployed as a Tiger Claw Agent for ${operatorName}.`,
         `Industry: ${flavor.displayName} (${flavor.professionLabel}).`,
-        `Respond in: ${tenant.language ?? 'English'}.`,
+        `Respond in: ${tenant.language ?? 'English'}. Always detect the language the prospect is writing in and match it exactly — if they write in Thai, reply in Thai; if Spanish, reply in Spanish. Never switch their language back to English unless they do first.`,
         `Lead scoring threshold: 80 (LOCKED — never contact a prospect scoring below 80).`,
         `Key prospect signals for this vertical: ${flavor.defaultKeywords.slice(0, 8).join(', ')}.`,
         operatorBlock,
