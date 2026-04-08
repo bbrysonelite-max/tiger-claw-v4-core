@@ -81,6 +81,7 @@ Confirm Tiger Strike Engage fired and `engagement_status` rows moved from `uneng
 ## Parking Lot — Do Not Touch This Session
 
 - Karpathy Ratchet (mine self-improvement) — after pipeline proven at volume
+- Regional top-of-funnel intelligence — mine should identify and recommend best signal sources per region as part of daily brief. SE Asia: LINE OpenChat, Pantip, Facebook Groups. North America: Reddit, LinkedIn, Facebook Groups. Europe: LinkedIn, local forums. Different markets, different surfaces. Mine already knows the region from the signals — it should surface where to find more.
 - Additional signal sources (LINE OpenChat, Facebook Groups, Pantip, LinkedIn, Bright Data, Oxylabs Amplify) — after Tiger Strike Engage proven on current sources
 - Paddle product + price — waiting on merchant of record approval
 - Orphan tenant cleanup (`brents-tiger-01-mnpcril3`) — low priority, do when convenient
