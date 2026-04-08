@@ -1420,8 +1420,10 @@ router.post("/hatch", async (req: Request, res: Response) => {
     // 1. Create / find user
     const userId = await createBYOKUser(email, name);
 
-    // 2. Create tenant record (pending_setup)
-    const botId = await createBYOKBot(userId, name, flavor, 'pending_setup', email);
+    // 2. Create tenant record (pending_setup) — generate slug once, pass it in so
+    //    the provisioner receives the same slug the tenant was created with.
+    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 30) + '-' + Date.now().toString(36);
+    const botId = await createBYOKBot(userId, name, flavor, 'pending_setup', email, slug);
 
     // 3. Create active subscription (admin hatch skips pending_setup → provisioner activates it)
     await createBYOKSubscription({
@@ -1446,7 +1448,6 @@ router.post("/hatch", async (req: Request, res: Response) => {
 
     // 5. Enqueue provisioning (same path as wizard/hatch)
     const finalRegion = region ?? (language === 'th' ? 'th-th' : 'us-en');
-    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 30) + '-' + Date.now().toString(36);
 
     await provisionQueue.add('tenant-provisioning', {
       userId,
