@@ -31,15 +31,7 @@ The bot's conversion event is a booked Zoom call. This tool must exist before th
 - Bot sends booking link when `qualifying_score` crosses threshold
 - Booking confirmed → notification to operator
 
-### 3. Wizard — Remove ICP Step
-The wizard currently has 4 steps. Step 3 asks three ICP sub-questions (ideal customer, problem, where they spend time online). Remove it entirely.
-
-**Target wizard:**
-1. Choose your flavor
-2. Give your agent a name
-3. Connect your Telegram bot token
-
-PR #255 already pre-seeds the ICP from the flavor config on the backend. The frontend just hasn't caught up. This is a UI-only change — delete step 3 from the wizard form.
+### 3. Bot First Impression
 
 ### 4. Bot First Impression
 On the very first `Start` message, bot greets in 4 languages to demonstrate intelligence, then locks to the prospect's language for the remainder of the conversation.

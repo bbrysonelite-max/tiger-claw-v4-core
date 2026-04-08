@@ -10,20 +10,15 @@ Tiger Claw is an AI agent that hunts for qualified prospects 24/7 and books them
 
 This is what the platform is being built to do. Items marked ⚠️ are not yet live.
 
-### Signup — 3 Steps Only ⚠️ Not yet built
+### Signup — 5 Steps ✅ Live
 
-**Current wizard (live today):**
-1. Choose your flavor
-2. Give your agent a name
-3. Who are you trying to reach? ← 3 ICP sub-questions (ideal customer, problem, where they spend time online)
-4. Connect your Telegram bot token
+1. **Identity** — choose flavor, give agent a name
+2. **Channel Setup** — connect Telegram bot token
+3. **AI Connection** — provide Gemini API key (BYOK)
+4. **Customer Profile** — describe ideal customer, problem, where they spend time online
+5. **Review + Hatch** — confirm and launch
 
-**Target wizard (to build):**
-1. Choose your flavor
-2. Give your agent a name
-3. Connect your Telegram bot token
-
-Step 3 (ICP questions) must be removed entirely. The flavor already knows the ICP. PR #255 pre-seeds the backend state correctly — the wizard UI just hasn't been updated yet to match. The operator should never be asked to define their ICP.
+The ICP questions in step 4 give the operator a sense of ownership — they feel like they're programming their agent, not buying a generic tool. This is intentional. Do not remove or simplify the wizard. It works. Leave it alone.
 
 ### After Signup
 The agent hatches immediately — calibrated, hunting-ready, no interview. ✅ Live (PR #255)
@@ -47,7 +42,7 @@ The operator sets their availability: one or two Zoom slots per day. ⚠️ Cale
 | Item | State |
 |------|-------|
 | Agent hatches calibrated, no interview | ✅ Live — PR #255 |
-| Wizard questions | ⚠️ Still more than 3 — simplification not built |
+| Wizard | ✅ Live — 5 steps, working, do not change |
 | First impression in 4 languages | ⚠️ Not built |
 | Cal.com Zoom booking | ⚠️ Not built — `tiger_book_zoom` tool does not exist |
 | Tiger Strike Engage wired to mine | ⚠️ Not built — 1,679 facts unengaged |
