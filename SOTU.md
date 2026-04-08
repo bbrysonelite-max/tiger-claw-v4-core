@@ -1,6 +1,6 @@
 # Tiger Claw — State of the Union
 
-**Last updated:** 2026-04-08 (Session 16 COMPLETE)
+**Last updated:** 2026-04-07 (Session 16 continued — PRs #257–#261 merged)
 **This is the single source of truth. Read nothing else until you finish this file.**
 
 ---
@@ -27,14 +27,17 @@
 
 ---
 
-## Ground Truth as of 2026-04-08
+## Ground Truth as of 2026-04-07
 
-**Brents Tiger 01 is live and responding on Telegram. This is the first confirmed production conversation.**
+**Brents Tiger 01 is live, responding on Telegram, and now calibrated with no interview.**
 
 - Bot `@Brentstiger01_bot` (tenant `56d45bfd-08f9-46e7-9767-bf1bb60f8f07`, slug `brents-tiger-01-mnpcripl`) provisioned via `POST /admin/hatch`.
 - Confirmed responding to messages at 6:26 PM 2026-04-07.
-- Bot completed onboarding interview (this was the last bot to go through the interview — all future bots skip it).
-- No prospect conversations yet — operator is testing.
+- `onboard_state.json` written directly to DB — phase forced to `complete`, Nuskin identity + defaultBuilderICP pre-seeded. Bot is hunting-ready.
+- First impression: 4-language greeting on `/start`, then language-matching for all subsequent replies.
+- `tiger_book_zoom` tool built and registered. Needs `calcomBookingUrl` written to settings.json to activate.
+- Tiger Strike Engage pipeline wired to run after 2 AM mine cycle. Has not yet fired at 2 AM — unverified in production.
+- No real prospect conversations yet — operator is the only person who has messaged.
 
 The full loop (pay → provision → hatch → scout → contact → reply) still has not closed on a *paying customer via Paddle*. That remains day zero for the Paddle path.
 
@@ -42,10 +45,35 @@ The full loop (pay → provision → hatch → scout → contact → reply) stil
 
 ## Current Platform State
 
-**Last deployed revision:** `tiger-claw-api-00403-xtj` (deployed 2026-04-08, Session 16)
-**Health (last verified 2026-04-08):** postgres OK, redis OK, workers OK
-**Tests:** 457/457 passing
+**Last deployed revision:** `tiger-claw-api-00417-4qf` (deployed 2026-04-07, Session 16 continued)
+**Health (last verified 2026-04-07):** postgres OK, redis OK, workers OK
+**Tests:** 462/462 passing
 **Wizard:** `wizard.tigerclaw.io` — Vercel, auto-deploy confirmed working
+
+---
+
+## What Was Done This Session (Session 16 continued — 2026-04-07)
+
+**PRs #257–#261 merged:**
+
+1. **PR #258 — WHAT_TIGER_CLAW_DOES.md added**
+   - Docs only. New document capturing product vision with ⚠️ markers for what is not yet live.
+
+2. **PR #260 — `tiger_book_zoom` tool**
+   - New tool in `api/src/tools/tiger_book_zoom.ts`, registered in `toolsMap` in `ai.ts`.
+   - Reads `calcomBookingUrl` from tenant settings.json. Generates a pre-filled Cal.com booking link.
+   - Fires admin Telegram alert when a prospect books.
+   - **Activation required:** operator must write `calcomBookingUrl` into Brents Tiger 01 settings to use.
+
+3. **PR #261 — first impression + language matching + strike pipeline + wizard cleanup**
+   - `slashCommands.ts`: `/start` now shows 4-language greeting on first contact per chatId. State stored in `first_impression_shown.json` (per-tenant bot_states). Subsequent `/start` calls redirect to dashboard.
+   - `ai.ts` system prompt: language-matching directive added. Agent detects prospect's language and mirrors it for the conversation. Never switches back to English unless the prospect does.
+   - `strike_auto_pipeline.ts` (new file): `runStrikeAutoPipeline()` — harvests top 20 unengaged facts (confidence ≥ 70), drafts contextual replies via platform Gemini key, generates Web Intent URLs (Reddit deep links or X tweet intents), sends admin Telegram alert with one-click links, marks facts as `queued`.
+   - `reporting_agent.ts`: wired to call `runStrikeAutoPipeline()` after mine cycle completes (non-fatal).
+   - `web-onboarding/src/app/signup/page.tsx`: Interior Designer flavor card removed.
+
+4. **Direct DB fix — Brents Tiger 01**
+   - `onboard_state.json` in `bot_states` overwritten directly. Phase forced to `complete`, Nuskin identity, full NM defaultBuilderICP. Bot no longer asks interview questions.
 
 ---
 
@@ -142,11 +170,12 @@ Note: `mnpcril3` is the orphan from the duplicate-tenant bug. It has a subscript
 |---|---|---|
 | DAY ZERO | Paddle purchase → provision → hatch → scout → contact → reply has never closed on a paying customer. Brents Tiger 01 proves admin hatch works. Paddle path unproven. | IMMEDIATE |
 | PADDLE PRODUCT | Webhook live but no Paddle product/price created. No checkout URL. Create before testing end-to-end payment flow. | IMMEDIATE |
+| CALCOM URL | `tiger_book_zoom` is live but inactive. `calcomBookingUrl` not yet written to Brents Tiger 01 settings.json. Set before testing booking flow. | IMMEDIATE |
+| STRIKE PIPELINE UNVERIFIED | Strike auto pipeline wired — has NOT yet fired at 2 AM. Verify after next mine cycle that `engagement_status` rows moved to `queued` and admin alert arrived. | HIGH |
 | ORPHAN TENANT | `brents-tiger-01-mnpcril3` (1ed77b8f) — created by duplicate-tenant bug, no bot token, subscription active. Terminate when convenient. | LOW |
 | ADMIN ALERT BUG | Underscores in error messages break Telegram Markdown parser. Admin alerts with error text silently fail. Fix before launch. | HIGH |
 | C4 | Payment gate still open for direct wizard access (no Paddle purchase required). Fix after Paddle loop proven. | NEXT SESSION |
 | TOOL AUDIT | tiger_drive_list confirmed safe to remove from toolsMap. Not yet done. | LOW |
-| INTERIOR DESIGNER IN WIZARD | `web-onboarding/src/app/signup/page.tsx` still lists Interior Designer. Cut from API registry in PR #233. Anyone selecting it gets an agent with no valid flavor. Remove from wizard frontend. | HIGH |
 
 **Past customers owed bots (3 people paid, never received service):**
 `chana.loh@gmail.com`, `nancylimsk@gmail.com`, `lily.vergara@gmail.com` — offer complimentary re-activation when platform is proven live.
@@ -242,11 +271,11 @@ Payment processor status:
 
 ## Live Service Status
 
-Last verified 2026-04-08:
+Last verified 2026-04-07:
 
 | Service | Status | Notes |
 |---------|--------|-------|
-| Cloud Run | OK | Revision 00403-xtj |
+| Cloud Run | OK | Revision 00417-4qf |
 | Postgres | OK | Healthy |
 | Redis | OK | Healthy |
 | Workers | OK | ENABLE_WORKERS=true confirmed, 11 workers |
@@ -308,7 +337,7 @@ Full details in `MODULE_ASSESSMENT.md`.
 | 2. Hive | Working — passive learning via emitHiveEvent in scout/convert | 6,545 facts in DB |
 | 3. Cognitive Architecture | buildSystemPrompt() wired: ICP, hive benchmarks, market facts, activeContext, fact_anchors | Tested live with Brents Tiger 01 |
 | 4. Hatchery | BYOB/BYOK flow built. No interview. ICP pre-seeded at provision time. | Brents Tiger 01 confirmed live |
-| 5. Orchestration | Daily mine: Orchestrator → 8 Research Agents (parallel) → Reporting Agent | Running nightly |
+| 5. Orchestration | Daily mine: Orchestrator → 8 Research Agents (parallel) → Reporting Agent → Strike Auto Pipeline | Running nightly. Strike pipeline wired — not yet verified at 2 AM |
 | 6. Tools | 25 tools registered. Audit complete. 2 load-bearing identified. | No live usage data yet |
 | 7. Memory | Short-term, hive, fact_anchors all wired | Never validated in real prospect conversation |
 | 8. Payment/Dashboard | Payment gate open (C4). Admin dashboard operational. | C4 is the only public launch blocker |
