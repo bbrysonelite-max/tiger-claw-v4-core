@@ -1186,7 +1186,13 @@ router.get("/pipeline/health", async (_req: Request, res: Response) => {
         newest: r.newest
       })),
       staleVerticals,
-      healthy: !!healthy
+      healthy: !!healthy,
+      byCapturedBy: await pool.query(`
+        SELECT captured_by, COUNT(*) as count, MAX(created_at) as latest
+        FROM market_intelligence
+        GROUP BY captured_by
+        ORDER BY latest DESC
+      `).then(r => r.rows.map(row => ({ capturedBy: row.captured_by, count: parseInt(row.count, 10), latest: row.latest }))),
     });
   } catch (err) {
     console.error("[admin] GET /pipeline/health error:", err);
