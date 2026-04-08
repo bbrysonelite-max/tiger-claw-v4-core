@@ -146,6 +146,7 @@ Note: `mnpcril3` is the orphan from the duplicate-tenant bug. It has a subscript
 | ADMIN ALERT BUG | Underscores in error messages break Telegram Markdown parser. Admin alerts with error text silently fail. Fix before launch. | HIGH |
 | C4 | Payment gate still open for direct wizard access (no Paddle purchase required). Fix after Paddle loop proven. | NEXT SESSION |
 | TOOL AUDIT | tiger_drive_list confirmed safe to remove from toolsMap. Not yet done. | LOW |
+| INTERIOR DESIGNER IN WIZARD | `web-onboarding/src/app/signup/page.tsx` still lists Interior Designer. Cut from API registry in PR #233. Anyone selecting it gets an agent with no valid flavor. Remove from wizard frontend. | HIGH |
 
 **Past customers owed bots (3 people paid, never received service):**
 `chana.loh@gmail.com`, `nancylimsk@gmail.com`, `lily.vergara@gmail.com` — offer complimentary re-activation when platform is proven live.

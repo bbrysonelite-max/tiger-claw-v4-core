@@ -10,15 +10,20 @@ Tiger Claw is an AI agent that hunts for qualified prospects 24/7 and books them
 
 This is what the platform is being built to do. Items marked ⚠️ are not yet live.
 
-### Signup — 5 Steps ✅ Live
+### Signup — Single Page, 5 Sections ✅ Live
 
-1. **Identity** — choose flavor, give agent a name
-2. **Channel Setup** — connect Telegram bot token
-3. **AI Connection** — provide Gemini API key (BYOK)
-4. **Customer Profile** — describe ideal customer, problem, where they spend time online
-5. **Review + Hatch** — confirm and launch
+The wizard is a single scrolling page at `wizard.tigerclaw.io`. All sections visible at once. No modal steps.
 
-The ICP questions in step 4 give the operator a sense of ownership — they feel like they're programming their agent, not buying a generic tool. This is intentional. Do not remove or simplify the wizard. It works. Leave it alone.
+1. **What kind of agent do you want?** — 9 flavor cards (Network Marketer, Real Estate Agent, Health & Wellness, Mortgage Broker, Lawyer/Attorney, Airbnb Host, Interior Designer*, Plumber/Trades, Sales Tiger)
+2. **Give your agent a name** — display name, 30 char limit
+3. **Who are you trying to reach?** — ideal customer description, problem, where they spend time online
+4. **Connect your Telegram bot** — BotFather instructions + token input (AES-256-GCM encrypted)
+5. **Add your AI key** — Gemini API key from aistudio.google.com
+6. **LAUNCH MY AGENT** button
+
+The ICP questions in section 3 give the operator a sense of ownership — they feel like they're programming their agent. This is intentional. Do not remove or simplify the wizard.
+
+*⚠️ Interior Designer shows in the wizard but was cut from the API flavor registry (PR #233). Bug — anyone selecting it gets an agent with no valid flavor on the backend. Needs to be removed from `web-onboarding/src/app/signup/page.tsx`.
 
 ### After Signup
 The agent hatches immediately — calibrated, hunting-ready, no interview. ✅ Live (PR #255)
