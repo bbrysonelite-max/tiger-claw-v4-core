@@ -1,6 +1,6 @@
 # Tiger Claw — State of the Union
 
-**Last updated:** 2026-04-06 (Session 15 COMPLETE)
+**Last updated:** 2026-04-08 (Session 16 COMPLETE)
 **This is the single source of truth. Read nothing else until you finish this file.**
 
 ---
@@ -16,24 +16,69 @@
 
 ---
 
-## Ground Truth as of 2026-04-06
+## Ground Truth as of 2026-04-08
 
-**This system has never run in production. Not once.**
+**Brents Tiger 01 is live and responding on Telegram. This is the first confirmed production conversation.**
 
-No agent has ever had a real conversation with a real prospect. No operator has ever completed onboarding end-to-end via a real payment and watched their bot scout and contact someone. Every assessment of what "works" is based on code review and unit tests — not live observation. Do not assume otherwise.
+- Bot `@Brentstiger01_bot` (tenant `56d45bfd-08f9-46e7-9767-bf1bb60f8f07`, slug `brents-tiger-01-mnpcripl`) provisioned via `POST /admin/hatch`.
+- Confirmed responding to messages at 6:26 PM 2026-04-07.
+- Bot completed onboarding interview (this was the last bot to go through the interview — all future bots skip it).
+- No prospect conversations yet — operator is testing.
 
-The test suite passes. The infrastructure is healthy. The Paddle webhook is live. But the full loop — pay → provision → hatch → scout → contact → reply — has never closed on a real person.
-
-**That is the first milestone. Everything else is secondary.**
+The full loop (pay → provision → hatch → scout → contact → reply) still has not closed on a *paying customer via Paddle*. That remains day zero for the Paddle path.
 
 ---
 
 ## Current Platform State
 
-**Last deployed revision:** `tiger-claw-api-00372-mg2` (deployed 2026-04-06, Session 15)
-**Health (last verified 2026-04-06):** postgres OK, redis OK, workers OK
-**Tests:** 458/458 passing
+**Last deployed revision:** `tiger-claw-api-00403-xtj` (deployed 2026-04-08, Session 16)
+**Health (last verified 2026-04-08):** postgres OK, redis OK, workers OK
+**Tests:** 457/457 passing
 **Wizard:** `wizard.tigerclaw.io` — Vercel, auto-deploy confirmed working
+
+---
+
+## What Was Done This Session (Session 16 — 2026-04-08)
+
+**PRs #251–#255 merged:**
+
+1. **PR #251 — bot-status fix**
+   - `GET /wizard/bot-status` returned `"pending"` for admin-hatched bots even after successful provisioning.
+   - Provisioner sets `status = 'live'`; endpoint only checked `active` and `onboarding`.
+   - Fixed: added `|| tenant.status === "live"` to both isLive checks in `wizard.ts`.
+
+2. **PR #252 — duplicate tenant on hatch (critical)**
+   - `POST /admin/hatch` was creating two tenant records per call (200ms apart).
+   - Root cause: slug generated twice with different `Date.now()` — once in `createBYOKBot()`, again in the hatch handler. Provisioner got slug #2, couldn't find tenant (created with slug #1), inserted a second row.
+   - Fixed: generate slug once in admin hatch, pass as `precomputedSlug` to `createBYOKBot()`. Fallback preserved for all other callers.
+
+3. **PR #253 — dashboard isLive + Stan Store cleanup**
+   - `dashboard.ts`: `bot.isLive` missing `"live"` status — bot showed offline in dashboard despite being provisioned.
+   - `StepReviewPayment.tsx`: removed two user-facing "Stan Store" references. Replaced with neutral copy.
+
+4. **PR #254 — SOTU docs: ICP hard-wire decision recorded**
+   - Docs only.
+
+5. **PR #255 — ICP hard-wire (no onboarding interview)**
+   - Provisioner now writes a complete `onboard_state.json` at hatch time before the bot ever receives a message.
+   - State pre-populated: `phase: complete`, `icpBuilder` from `flavor.defaultBuilderICP` (NM), `icpSingle` for all other flavors, operator name + product in `identity`.
+   - `POST /admin/hatch` gains optional `product` field (e.g. `"Nuskin"`) passed through to provisioner.
+   - Bot wakes up calibrated. First message from a prospect → agent responds intelligently. No interview.
+   - Existing complete states never overwritten (idempotent on re-provision).
+
+**Parallel sub-agent audit conducted:**
+- Mine health: ✅ 2 AM runs `startOrchestratedRun`, all 11 workers healthy, stall handlers wired.
+- NM `defaultBuilderICP`: ✅ Solid, gated correctly, only fires when ICP empty post-onboarding.
+- Webhook query: ✅ Includes `status = 'live'` tenants.
+- No critical issues found beyond the bugs fixed above.
+
+**Active fleet as of session end:**
+| Tenant | Bot | Flavor | Status |
+|---|---|---|---|
+| `brents-tiger-01-mnpcripl` | @Brentstiger01_bot | network-marketer | live |
+| `brents-tiger-01-mnpcril3` | (orphan — no token) | network-marketer | live |
+
+Note: `mnpcril3` is the orphan from the duplicate-tenant bug. It has a subscription and email but no bot token. Can be terminated when convenient.
 
 ---
 
@@ -57,7 +102,7 @@ The test suite passes. The infrastructure is healthy. The Paddle webhook is live
 
 3. **Wizard flavor fix — PR #237**
    - Removed 5 cut flavors from wizard signup: personal-trainer, dorm-design, baker, candle-maker, gig-economy.
-   - Wizard now shows the canonical 9 flavors matching the API registry.
+   - Wizard now shows the canonical 8 flavors matching the API registry.
 
 4. **Deployed:** Cloud Run revision `00372-mg2`. Health verified. `fix-all-webhooks` run (2 tenants fixed).
 
@@ -65,7 +110,7 @@ The test suite passes. The infrastructure is healthy. The Paddle webhook is live
 
 ---
 
-## What Was Done This Session (Session 14 — 2026-04-06)
+## Session 14 — What Was Done (2026-04-06)
 
 **PR #233 merged:**
 
@@ -74,32 +119,9 @@ The test suite passes. The infrastructure is healthy. The Paddle webhook is live
    - Admin fleet table: 3 new columns — Onboard (green check or phase label), Scout (leads qualified + age of last burst scan), Focus (currentFocus + activeLead from activeContext).
    - Both fetches fire-and-forget after main dashboard load.
 
-2. **Flavor simplification: 13 -> 9**
-   - Cut: `gig-economy` (duplicate of network-marketer signals), `personal-trainer` (duplicate of health-wellness), `baker` (no viable prospecting use case via messenger), `candle-maker` (same).
-   - Replaced `dorm-design` with `interior-designer`: rewritten as a full-service interior design business agent. Homeowner/renovation intent signals, real scout queries (r/malelivingspace, r/HomeDecorating, r/interiordesign), professional objection handling.
-   - Remaining 9 customer-facing flavors: network-marketer, real-estate, health-wellness, airbnb-host, lawyer, plumber, sales-tiger, interior-designer, mortgage-broker.
-   - Files for cut flavors remain on disk (dormant). Registry and VALID_FLAVOR_KEYS updated.
-
-3. **Test fix (pre-existing)**
-   - `tiger_scout.httpsGet` uses global `fetch` (Node 18+), not Node's `https` module. Phase 1 autonomous loop test was mocking the wrong layer. Replaced `vi.mock('https')` with `vi.stubGlobal('fetch')`. Phase 1 now reliably discovers mock prospects.
-
-**Tool audit conducted (no changes made):**
-- 25 tools in toolsMap audited in full.
-- `tiger_aftercare` is load-bearing — tiger_convert hands off to it. Do not remove.
-- `tiger_objection` is load-bearing — tiger_nurture imports its functions at compile time. Do not remove.
-- `tiger_email` (Resend) is needed — email capability is required for autonomous operation.
-- `tiger_drive_list` is the only confirmed safe cut. Not yet made.
-- No tool changes made this session. Simplification paused pending first live conversation.
-
----
-
-## Session 13 — What Was Done (2026-04-05)
-
-- PR #220: MODULE_ASSESSMENT + SOTU updated. C1/C2/H1/H3/M1/M3 marked resolved.
-- PR #221 (fix/C3): Hatch email personalized — agent name + flavor, Tiger's voice, null-safe botUsername.
-- PR #222 (fix/M2): makeSerperFetcher() factory in market_miner. getSerperKey() round-robin in tiger_scout — all 3 Serper keys used.
-- Website PR #1: Refund policy added to tigerclaw.io for Paddle compliance.
-- Deployed: revision 00353-947.
+2. **Flavor simplification: 13 -> 8**
+   - Cut: `gig-economy`, `personal-trainer`, `baker`, `candle-maker`, `interior-designer` (one-off favor — not a platform flavor).
+   - Remaining 8 customer-facing flavors: network-marketer, real-estate, health-wellness, airbnb-host, lawyer, plumber, sales-tiger, mortgage-broker.
 
 ---
 
@@ -107,12 +129,12 @@ The test suite passes. The infrastructure is healthy. The Paddle webhook is live
 
 | # | Issue | Priority |
 |---|---|---|
-| DAY ZERO | System has never run in production. First priority: prove full loop — Paddle purchase → provision → hatch → scout → contact → reply. | IMMEDIATE |
+| DAY ZERO | Paddle purchase → provision → hatch → scout → contact → reply has never closed on a paying customer. Brents Tiger 01 proves admin hatch works. Paddle path unproven. | IMMEDIATE |
 | PADDLE PRODUCT | Webhook live but no Paddle product/price created. No checkout URL. Create before testing end-to-end payment flow. | IMMEDIATE |
+| ORPHAN TENANT | `brents-tiger-01-mnpcril3` (1ed77b8f) — created by duplicate-tenant bug, no bot token, subscription active. Terminate when convenient. | LOW |
 | ADMIN ALERT BUG | Underscores in error messages break Telegram Markdown parser. Admin alerts with error text silently fail. Fix before launch. | HIGH |
 | C4 | Payment gate still open for direct wizard access (no Paddle purchase required). Fix after Paddle loop proven. | NEXT SESSION |
 | TOOL AUDIT | tiger_drive_list confirmed safe to remove from toolsMap. Not yet done. | LOW |
-| ICP HARD-WIRE | **Decided 2026-04-07:** Remove operator-supplied `customerProfile` from wizard hatch. Load `icpSingle` automatically from the flavor config at hatch time. Operator no longer specifies their own ICP — the flavor IS the ICP. Applies to all 9 flavors. Do not ask the operator for ICP data during signup. | HIGH |
 
 **Past customers owed bots (3 people paid, never received service):**
 `chana.loh@gmail.com`, `nancylimsk@gmail.com`, `lily.vergara@gmail.com` — offer complimentary re-activation when platform is proven live.
@@ -134,7 +156,7 @@ The test suite passes. The infrastructure is healthy. The Paddle webhook is live
 
 ## What This Product Is
 
-Stateless agent hatchery. Operator brings their own Telegram bot token (BYOB) and Gemini API key (BYOK). One-page signup. Agent hatches knowing its ICP. Agent prospects while operator sleeps. Hive gets smarter with every run.
+Stateless agent hatchery. Operator brings their own Telegram bot token (BYOB) and Gemini API key (BYOK). One-page signup. Agent hatches knowing its ICP — no interview, no questions. Agent prospects while operator sleeps. Hive gets smarter with every run.
 
 **The value proposition: Your bot hunts while you sleep.**
 
@@ -142,9 +164,32 @@ Stateless agent hatchery. Operator brings their own Telegram bot token (BYOB) an
 
 ---
 
+## Admin Hatch (Operator Fleet)
+
+Use `POST /admin/hatch` to provision bots directly without going through the payment gate. For the operator's own fleet.
+
+```bash
+ADMIN_TOKEN=$(gcloud secrets versions access latest --secret="tiger-claw-admin-token" --project="hybrid-matrix-472500-k5")
+curl -X POST https://api.tigerclaw.io/admin/hatch \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "botToken": "<BotFather token>",
+    "name": "Brents Tiger 02",
+    "flavor": "network-marketer",
+    "email": "bbryson@me.com",
+    "aiKey": "<Gemini key>",
+    "product": "Nuskin"
+  }'
+```
+
+**BotFather rate limit:** ~1 new bot per 8 minutes to avoid 24-hour lockout.
+
+---
+
 ## Current Onboarding Path
 
-**Paddle is the active payment path as of Session 15.**
+**Paddle is the active payment path.**
 
 ```
 Operator pays via Paddle checkout (checkout URL not yet created — build tomorrow)
@@ -152,16 +197,16 @@ Operator pays via Paddle checkout (checkout URL not yet created — build tomorr
   → Webhook provisions: createBYOKUser + createBYOKBot + createBYOKSubscription(pending_setup)
   → Operator navigates to wizard.tigerclaw.io
   → Wizard starts at "What kind of agent do you want?" (no email step — Paddle already provisioned)
-  → POST /wizard/hatch → BullMQ job → bot registered, webhook set, ICP loaded
+  → POST /wizard/hatch → BullMQ job → bot registered, webhook set, onboard state pre-seeded
+  → Bot is immediately operational — no interview
 ```
 
 **Payment gate is still open** for direct wizard access (no Paddle purchase required). This is C4. Fix after Paddle loop is proven.
 
 Payment processor status:
-- **Paddle:** ✅ LIVE. Webhook at `https://api.tigerclaw.io/webhooks/paddle`. Secrets in GCP. Product/price not yet created — do this tomorrow.
+- **Paddle:** ✅ LIVE. Webhook at `https://api.tigerclaw.io/webhooks/paddle`. Secrets in GCP. Product/price not yet created.
 - **Stan Store:** Active front door for existing customers. Not the primary new-customer path.
 - **Stripe:** Placeholder. Not used.
-- **Lemon Squeezy:** Rejected. Dead end.
 
 ---
 
@@ -171,11 +216,11 @@ Payment processor status:
 |---|---|---|
 | Compute | Google Cloud Run | Node.js/Express, port 4000, `tiger-claw-api` |
 | Database | Cloud SQL PostgreSQL | `tiger_claw_shared`, proxy port **5433** locally (NOT 5432) |
-| Cache / Queues | Cloud Redis + BullMQ | 8 queues. `ENABLE_WORKERS=true` required in deploy. |
+| Cache / Queues | Cloud Redis + BullMQ | 11 workers. `ENABLE_WORKERS=true` required in deploy. |
 | AI | Gemini 2.0 Flash | LOCKED. Do not switch to 2.5-flash (GCP function-calling bug). |
 | Signup + Dashboard | Next.js, `web-onboarding/` | `wizard.tigerclaw.io` — Vercel. Auto-deploy working. |
 | Website | Static HTML | `tigerclaw.io` — separate repo |
-| Payments | Stan Store (active) | Paddle pending. LS rejected. Stripe fallback. |
+| Payments | Paddle (active) | Stan Store legacy. Stripe placeholder. |
 | Scout search | Serper | `SERPER_KEY_1/2/3` — round-robin rotation active |
 | Reddit | Blocked | 403 from Cloud Run egress. Oxylabs fix pending. |
 | Email | Resend | Domain verified. `RESEND_API_KEY` in deploy. Needed for autonomous operation. |
@@ -186,16 +231,16 @@ Payment processor status:
 
 ## Live Service Status
 
-Last verified 2026-04-06:
+Last verified 2026-04-08:
 
 | Service | Status | Notes |
 |---------|--------|-------|
-| Cloud Run | OK | Revision 00372-mg2 |
+| Cloud Run | OK | Revision 00403-xtj |
 | Postgres | OK | Healthy |
 | Redis | OK | Healthy |
-| Workers | OK | ENABLE_WORKERS=true confirmed |
+| Workers | OK | ENABLE_WORKERS=true confirmed, 11 workers |
 | Serper keys (x3) | OK | Round-robin active |
-| Oxylabs | OK | Username/password in GCP. Mine produced 209 posts on last run. |
+| Oxylabs | OK | Mine produced 1,684 facts in last 24h |
 | Platform Gemini key | OK | Active |
 | Admin Telegram bot | PARTIAL | Alerts fire but fail when message contains underscores (Markdown bug) |
 | Resend | OK | Test email confirmed delivered |
@@ -204,21 +249,21 @@ Last verified 2026-04-06:
 | Paddle webhook | OK | Live at /webhooks/paddle. Secrets in GCP. Product/price not yet created. |
 | Reddit (scout) | BLOCKED | 403 from Cloud Run. Oxylabs + Serper fallback active. |
 | LINE | NOT ACTIVE | Future only |
+| Brents Tiger 01 | LIVE | @Brentstiger01_bot — responding on Telegram |
 
 ---
 
-## Flavor Registry (9 customer-facing)
+## Flavor Registry (8 customer-facing)
 
 | Key | Flavor | Notes |
 |---|---|---|
-| network-marketer | Network Marketer | Dual-oar (builder + customer) |
+| network-marketer | Network Marketer | Dual-oar (builder + customer). defaultBuilderICP baked in. |
 | real-estate | Real Estate Agent | |
 | health-wellness | Health & Wellness | |
 | airbnb-host | Airbnb Host | STR-specific |
 | lawyer | Lawyer / Attorney | |
 | plumber | Plumber / Trades | Emergency-first signals |
 | sales-tiger | Sales Tiger | Dual-oar (talent + B2B buyer) |
-| interior-designer | Interior Designer | Full-service business. Written for specific personal commitment. |
 | mortgage-broker | Mortgage Broker | Dual-oar (buyers + refinancers) |
 
 Internal/non-customer: `admin`, `researcher` (in registry, not in VALID_FLAVOR_KEYS)
@@ -249,12 +294,12 @@ Full details in `MODULE_ASSESSMENT.md`.
 | Module | Status | Notes |
 |---|---|---|
 | 1. Scout | Degraded — Reddit 403, Serper fallback active | Oxylabs fix pending |
-| 2. Hive | Working — passive learning via emitHiveEvent in scout/convert | 313 facts on first run |
-| 3. Cognitive Architecture | buildSystemPrompt() wired: ICP, hive benchmarks, market facts, activeContext, fact_anchors | Never tested live |
-| 4. Hatchery | BYOB/BYOK/ICP flow built | Never completed with a real operator watching |
-| 5. Orchestration | Daily scout, nurture, value gap, briefing all built | Never run against real leads |
-| 6. Tools | 25 tools registered. Audit complete. 2 load-bearing identified. | No live usage data |
-| 7. Memory | Short-term, hive, fact_anchors all wired | Never validated in real conversation |
+| 2. Hive | Working — passive learning via emitHiveEvent in scout/convert | 6,545 facts in DB |
+| 3. Cognitive Architecture | buildSystemPrompt() wired: ICP, hive benchmarks, market facts, activeContext, fact_anchors | Tested live with Brents Tiger 01 |
+| 4. Hatchery | BYOB/BYOK flow built. No interview. ICP pre-seeded at provision time. | Brents Tiger 01 confirmed live |
+| 5. Orchestration | Daily mine: Orchestrator → 8 Research Agents (parallel) → Reporting Agent | Running nightly |
+| 6. Tools | 25 tools registered. Audit complete. 2 load-bearing identified. | No live usage data yet |
+| 7. Memory | Short-term, hive, fact_anchors all wired | Never validated in real prospect conversation |
 | 8. Payment/Dashboard | Payment gate open (C4). Admin dashboard operational. | C4 is the only public launch blocker |
 
 ---
@@ -263,11 +308,7 @@ Full details in `MODULE_ASSESSMENT.md`.
 
 ```bash
 # 1. Deploy API
-gcloud run deploy tiger-claw-api \
-  --source ./api \
-  --region us-central1 \
-  --project hybrid-matrix-472500-k5 \
-  --quiet
+GCP_PROJECT_ID=hybrid-matrix-472500-k5 bash ./ops/deploy-cloudrun.sh
 
 # 2. Health check
 curl https://api.tigerclaw.io/health
@@ -295,7 +336,7 @@ npx vercel deploy --prod --yes
 - Cloud SQL proxy runs on port **5433** locally, not 5432.
 - One PR per fix. Test before opening a PR. Delete branch after merge.
 - `tiger_gmail_send` and `tiger_postiz` are NOT in toolsMap by design. Do not re-add.
-- 449 tests must pass before any PR is opened. Run `npm test` from `api/`.
+- 457 tests must pass before any PR is opened. Run `npm test` from `api/`.
 
 ---
 
