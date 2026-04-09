@@ -111,6 +111,14 @@ Tools that take irreversible public actions (sending emails, posting to social m
 
 ---
 
-## 13. Never Reference Individual People by Name
+## 13. Update RULES.md After Every Merge
+
+After every PR is merged, update `RULES.md` to reflect any new constraints, patterns, or decisions that emerged from the work. If a bug revealed a new rule (e.g. "always read logs before assuming"), write it down. Rules that aren't written are forgotten.
+
+Also update `SOTU.md` — mark resolved issues closed, add new ones, update service status if anything changed.
+
+---
+
+## 14. Never Reference Individual People by Name
 
 Do not reference specific individuals (distributors, contacts, partners, or anyone in the operator's network) by name in code, documentation, comments, prompts, or conversation. The platform must stand on its own merit independent of any specific person. Refer to roles only (e.g. "operator," "distributor," "contact") — never names.
