@@ -1052,3 +1052,46 @@ export async function getLeadScoutProfile(
   }
 }
 
+
+/** Update a tenant's channel config (whatsapp, LINE fields). */
+export async function updateTenantChannelConfig(
+  id: string,
+  config: {
+    whatsappEnabled?: boolean;
+    lineToken?: string | null;
+    lineChannelSecret?: string | null;
+    lineChannelAccessToken?: string | null;
+    postizApiKey?: string | null;
+  },
+): Promise<void> {
+  const sets: string[] = ["updated_at = NOW()"];
+  const values: unknown[] = [];
+  let idx = 1;
+
+  if (config.whatsappEnabled !== undefined) {
+    sets.push(`whatsapp_enabled = $${idx++}`);
+    values.push(config.whatsappEnabled);
+  }
+  if (config.lineToken !== undefined) {
+    sets.push(`line_token = $${idx++}`);
+    values.push(config.lineToken);
+  }
+  if (config.lineChannelSecret !== undefined) {
+    sets.push(`line_channel_secret = $${idx++}`);
+    values.push(config.lineChannelSecret);
+  }
+  if (config.lineChannelAccessToken !== undefined) {
+    sets.push(`line_channel_access_token = $${idx++}`);
+    values.push(config.lineChannelAccessToken);
+  }
+  if (config.postizApiKey !== undefined) {
+    sets.push(`postiz_api_key = $${idx++}`);
+    values.push(config.postizApiKey);
+  }
+
+  values.push(id);
+  await getPool().query(
+    `UPDATE tenants SET ${sets.join(", ")} WHERE id = $${idx}`,
+    values,
+  );
+}
