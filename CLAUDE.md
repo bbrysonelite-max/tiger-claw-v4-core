@@ -4,54 +4,47 @@
 
 ---
 
-## Current Session State (2026-04-09 — Session 17 CLOSED — PRs #263–#272 merged)
+## Current Session State (2026-04-09 — Session 18 IN PROGRESS)
 
-### 462/462 tests passing. PRs #251–#272 merged. Cloud Run revision 00434-c6h live. Wizard on Vercel (auto-deploy).
+### 456/456 tests passing. PRs #274–#277 merged. Cloud Run revision tiger-claw-api-00442-tjd live. Wizard on Vercel (auto-deploy). **0 active bots.**
 
-**Session 17 shipped (PRs #263–#272):**
-- **PR #263 — Orchestrator dedup + strike queuing fix:** Research agent retry failures pushed `completed` past `expected`, re-triggering Reporting Agent 5x. Fixed with Redis SETNX one-shot guard. Also moved `markFactsQueued` before `draftReplies` so facts are always queued even on Gemini failure.
-- **PR #264 — Strike harvest verbatim column fix (ROOT CAUSE):** `harvestFacts()` selected `verbatim` from `market_intelligence` — column does not exist. Every pipeline run crashed silently. Removed from SELECT + interface + prompt. **First successful run: 20-link alert received.**
-- **PR #265 — Rule 13 added to RULES.md:** After every merge, update RULES.md and SOTU.md.
-- **PR #267 — Dashboard contrast fix:** Admin + customer dashboard — all `text-zinc-400/500/600` labels bumped to readable `zinc-200/300/400`. Zero-state indicators preserved.
-- **PR #268 — Session 17 docs update (partial):** START_HERE, ARCHITECTURE, STATE_OF_THE_TIGER_PATH_FORWARD updated.
-- **PR #269 — Provisioner botName top-level fix (CRITICAL):** `botName` was written inside `identity{}` only. Code reads `state.botName` at top level. Gemini saw "Bot name: —" and entered confused self-onboarding loop, asking prospects "What is your name?" Fixed: `botName` + `completedAt` now written at top level on every hatch. Direct DB fix applied to live bot. Polluted fact_anchors cleaned.
-- **PR #270 — Prospect engagement mode:** System prompt had no prospect context — bot was 100% operator-management frame. Added: WHO YOU ARE TALKING TO block, dream injection directive, covenant opening, explicit voice examples, HARD RULE: never surface internal system state.
-- **PR #271 — Bot description + /start message:** Description was "AI-powered network-marketer agent for Brents Tiger 01. Managed by Tiger Claw." Replaced with covenant line. Live bot updated immediately via Telegram Bot API. /start ending fixed: "Let's get to work! I'm having my nails done later!" → "What's going on for you right now?"
-- **PR #272 — No tool names in responses:** Previous rule missed shorthand variants (tigerlead, tigernurture, tigerstrikedraft, etc.). Explicitly listed all variants. Added: never explain reasoning out loud mid-message.
+**PR #278 is open and NOT yet merged.** Merge this before any other work.
 
-**Session 16 shipped (PRs #251–#261):**
-- **PR #255 — ICP hard-wire:** Provisioner pre-seeds `onboard_state.json` at hatch. Bot wakes calibrated — **no interview, no questions asked.**
-- **PR #261 — 4-language /start + language matching + Strike pipeline wired.**
-- (Other PRs: #251 bot-status, #252 duplicate tenant, #253 dashboard isLive, #258 WHAT_TIGER_CLAW_DOES, #260 tiger_book_zoom)
+**Session 18 shipped (PRs #274–#277):**
+- **PR #274 — Remove bot pool:** 5,559 lines deleted. All `bot_pool` DB functions, `/admin/pool/*` routes, ops scripts, docs gone. `pool.ts` is crypto/Telegram utilities only. Eliminated the silent fallback chain (missing BYOK → platform key → 429 → OpenRouter) that burned $100.
+- **PR #275 — Post-#274 collateral fix:** `updateTenantChannelConfig` accidentally deleted from `db.ts`. `/admin/fix-pool-orphans` route still referenced deleted function. Both fixed. Deploy was failing; this unblocked it.
+- **PR #276 — Session docs update:** SOTU.md and STATE_OF_THE_TIGER_PATH_FORWARD.md updated for PRs #274–#275.
+- **PR #277 — Repo cleanup:** `api/cloud-sql-proxy` (32 MB binary) untracked from git. 37 loose scripts moved from `api/` root → `api/scripts/`. 4 stale audit markdown files → `docs/archive/`. `.claude/worktrees/` added to `.gitignore`.
 
-**Full assessment in `MODULE_ASSESSMENT.md`. Read it before writing any code.**
+**PR #278 — Open, not merged — agent context fix:**
+- `hasOnboarding` now requires real identity fields (`productOrOpportunity` or `biggestWin`), not just `phase=complete`
+- `displayOperatorName` falls back to "my operator" when identity is missing
+- Empty identity fields omitted from operator block (no blank lines to Gemini)
+- Provisioner writes `phase="identity"` when no product provided at hatch
 
-### FIRST PRIORITY NEXT SESSION
+**Context audit this session revealed:** Tigeralldaytest had `phase: "complete"` but empty identity. Gemini had nothing real to anchor on and improvised feature lists. Bot terminated. Root cause fixed in PR #278.
 
-1. **CHECK PROSPECT CONVERSATIONS** — Two people were messaging @Brentstiger01_bot at session close (11:40 PM PT). Check what they actually received. Screenshot needed.
-2. **Validate prospect engagement mode** — was the conversation warm and human or still broken?
-3. **Create Paddle product + price** — No checkout URL exists. No Paddle path without it.
-4. **Fix admin alert markdown bug** — Underscores in error messages break Telegram Markdown parser.
+### FIRST PRIORITY THIS SESSION
+
+1. **Merge PR #278** — do this before anything else.
+2. **Provision a real bot** — with actual operator name, product description, real Gemini key. Use admin hatch with `product` field populated.
+3. **Verify prospect conversation** — send bot link to a real contact. Read what they get.
+4. **Create Paddle product + price** — no checkout URL exists. Paddle path completely unproven.
 
 ### Critical Open Issues
 
-- **PROSPECT MODE UNVALIDATED:** Deployed but no confirmed successful prospect conversation. Two people messaged at close — check first.
-- **PADDLE PRODUCT:** Webhook live, no product/price yet. No checkout URL. Create before testing.
-- **C4:** Payment gate still open for direct wizard access. Fix after Paddle loop proven.
+- **PR #278 NOT MERGED:** Agent context fix sitting open. Zero active bots until this is deployed.
+- **PADDLE PRODUCT:** Webhook live, no product/price yet. No checkout URL.
+- **C4:** Payment gate open — direct wizard access bypasses payment. Fix after Paddle loop proven.
 - **Admin alert markdown bug:** Underscores in error messages break Telegram Markdown parser.
-- **Orphan + Tiger Test 102:** Both suspended. Terminate when convenient.
-- **Fleet debris:** FiretestApril5, Teddy Tiger Claw, Tigertest100, etc. — cleanup when convenient.
-- **LINE:** Future only. Telegram is the only active channel.
-- **Cal.com booking:** `tiger_book_zoom` built. Deferred pending platform booking architecture decision.
-
-### Key Lesson from Session 17 — Mandatory for Next Agent
-The bot had no prospect mode at all. When real people messaged they got status reports, tool names, and internal platform language. This was broken from day one. **Always test from a FRESH chatId to see what a prospect sees.** Read Cloud Run logs before diagnosing — root cause was visible immediately every time.
+- **LINE:** Deferred. Telegram only.
+- **Cal.com booking:** `tiger_book_zoom` built. Inactive pending `calcomBookingUrl` set.
 
 ### Active Business Context
 
-- Operator is building this for their own distribution network. Do not treat any individual names as launch gates. The platform must stand on its own merit.
-- Founding members: comped provisioning via admin hatch. Payment gate fix comes after first live prospect conversation is confirmed.
-- Window to prove agent intelligence is short. Do not waste it on interviews, forms, or friction.
+- Operator is building this for their own distribution network. Platform must stand on its own merit.
+- BYOB only. Every operator provides their own Telegram bot token from BotFather. No exceptions.
+- Test every bot from a FRESH chatId to see what a prospect actually sees. Never from the operator account.
 
 ---
 
@@ -117,7 +110,7 @@ The bot had no prospect mode at all. When real people messaged they got status r
 - New tools in `api/src/tools/` MUST be registered in `toolsMap` in `ai.ts`. Missing = infinite tool loop.
 - **`tiger_gmail_send` and `tiger_postiz` are intentionally NOT in toolsMap.** Do not re-add them.
 - **Gemini 2.0 Flash only.** Do not switch to 2.5-flash (GCP function-calling bug).
-- **462 tests must pass** before any PR is opened. Run `npm test` from `api/`.
+- **456 tests must pass** before any PR is opened. Run `npm test` from `api/`.
 
 ---
 

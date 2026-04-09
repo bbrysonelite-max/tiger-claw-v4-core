@@ -1,102 +1,189 @@
 # Tiger Claw V4 — Core Architecture
 
-**Last updated:** 2026-04-09 (Session 17 close — PRs #263–#272, prospect engagement mode, revision 00434-c6h)
+**Last updated:** 2026-04-09 (Session 18 — ground truth rewrite, verified against codebase)
 **Status:** LIVE. Locked. Do not rewrite.
 
 ---
 
 ## Standing Rule
 
-**No lying. No assuming. No guessing.** If you do not know the state of something, say so. Do not mark things working unless you have tested them live.
+**No lying. No assuming. No guessing.** Every fact in this document was verified by reading the source code on 2026-04-09.
 
 ---
 
 ## 1. The Paradigm
 
-Tiger Claw V4 is **stateless**. No long-running Docker containers per tenant. No RAG. No OpenClaw. No Mini-RAG. One shared Node.js Cloud Run process handles all tenants. Context is resolved per-request.
+Tiger Claw V4 is **stateless**. No long-running Docker containers per tenant. No RAG. No OpenClaw. No Mini-RAG. One shared Node.js/Express Cloud Run process handles all tenants. Context is resolved per-request from PostgreSQL and Redis.
+
+**BYOB / BYOK only:** Every operator provides their own Telegram bot token (from BotFather) and their own Gemini API key. The platform holds no bot pool and no shared API keys for production use.
 
 ---
 
-## 2. Component Stack
+## 2. Component Stack (Verified)
 
-| Component | Technology | Actual Status |
+| Component | Technology | Status |
 |---|---|---|
-| Compute | Google Cloud Run, Node.js/Express, port 4000 | ✅ Live. Revision 00434-c6h |
-| Database | Cloud SQL PostgreSQL HA — `tiger_claw_shared` | ✅ Live |
-| Cache & Queues | Cloud Redis HA + BullMQ (8 queues) | ✅ Live |
+| Compute | Google Cloud Run, Node.js/Express, port 4000 | ✅ Live. Revision `tiger-claw-api-00442-tjd` |
+| Database | Cloud SQL PostgreSQL HA — `tiger_claw_shared` | ✅ Live. 25 migrations applied. |
+| Cache & Queues | Cloud Redis HA + BullMQ (10 queues, 6 active workers) | ✅ Live |
 | AI Provider | Gemini 2.0 Flash — `@google/generative-ai` SDK | ✅ Live. **LOCKED — do not switch to 2.5-flash** (GCP function-calling bug) |
-| Frontend (signup + dashboard) | Next.js on Vercel — `wizard.tigerclaw.io` | ✅ Live. Auto-deploy confirmed working. |
-| Frontend (website) | Static HTML — `tigerclaw.io` | ✅ Live |
-| Payments | **Paddle** (primary) + Stan Store (legacy) | ✅ Paddle webhook live. Product/price not yet created. |
-| Email (Resend) | Resend — `tigerclaw.io` domain verified | ✅ Live. `RESEND_API_KEY` in deploy script. |
-| Serper (search) | 3 keys: `SERPER_KEY_1/2/3` | ✅ All confirmed working. Round-robin active. |
-| Oxylabs | Realtime API — `OXYLABS_USERNAME` / `OXYLABS_PASSWORD` | ✅ Live. Mine producing 1,684+ facts per run. |
-| Reddit (mine source) | Public JSON API | ❌ 403 from Cloud Run egress. Oxylabs + Serper fallback active. |
-| Stripe | Placeholder | ❌ Not used. Do not wire up. |
-| Zapier | Dead code | ❌ Not used. `/webhooks/stan-store` dormant. |
-| LINE | Deferred | ❌ Phase 2/3. Code preserved. LINE Official Account required. |
+| AI Fallback | OpenRouter — circuit breaker activates after 3 Gemini errors/hour | ✅ Active |
+| Frontend | Next.js on Vercel — `wizard.tigerclaw.io` | ✅ Live. Auto-deploy confirmed working. |
+| Payments | Paddle (primary) | ✅ Webhook live. Product/price not yet created. |
+| Email | Resend — `tigerclaw.io` domain verified | ✅ Live |
+| Search | Serper — 3 keys round-robin (`SERPER_KEY_1/2/3`) | ✅ Active |
+| Web scraping | Oxylabs Realtime API | ✅ Live. 684 facts on last run. |
+| Reddit | Public JSON API | ❌ 403 from Cloud Run egress. Oxylabs + Serper fallback active. |
+| Stripe | Placeholder only | ❌ Not used |
+| LINE | Deferred | ❌ Phase 2. Code present, not active. |
 | GCP Project | `hybrid-matrix-472500-k5` | |
-| Multi-region | `us-central1` (primary) + `asia-southeast1`. Global HTTPS LB at `api.tigerclaw.io` (IP: `34.54.146.69`) | ✅ Live |
+| Multi-region | `us-central1` primary + `asia-southeast1`. Global HTTPS LB at `api.tigerclaw.io` | ✅ Live |
 
 ---
 
-## 3. Customer Onboarding Flow (Current — Paddle, as of Session 17)
+## 3. Customer Onboarding Flow (Paddle — Current)
 
 ```
 Customer pays via Paddle checkout
   → Paddle fires POST /webhooks/paddle (transaction.completed)
   → Webhook: createBYOKUser + createBYOKBot + createBYOKSubscription(pending_setup)
   → Customer navigates to wizard.tigerclaw.io
-  → Wizard starts at flavor selection (no email step)
-  → Customer fills form: agent name, Telegram bot token, Gemini key
-  → POST /wizard/hatch
-  → BullMQ tenant-provisioning job
-  → Provisioner: registers Telegram webhook (with TELEGRAM_WEBHOOK_SECRET), pre-seeds onboard_state.json with full ICP
-  → status → live
-  → First message: confident ICP-based intro, no interview, no questions asked
+  → Wizard: flavor selection → agent name → Telegram bot token → Gemini key
+  → POST /wizard/hatch → BullMQ tenant-provisioning job
+  → Provisioner:
+      - Registers Telegram webhook (with TELEGRAM_WEBHOOK_SECRET)
+      - Pre-seeds onboard_state.json: phase="complete" IF product provided, else "identity"
+      - ICP pre-seeded from flavor defaultBuilderICP
+  → Status → live
+  → First message: confident ICP-based response, no interview required
 ```
 
-**NOTE:** Paddle product + price not yet created. No checkout URL exists. This must be done before testing the full flow.
+**NOTE:** Paddle product + price not yet created. No checkout URL exists.
 
-**PROSPECT MODE:** Bot is a direct prospect interface. Plain text messages → prospect engagement frame. Operator management commands via `/` slash commands only. System prompt has explicit WHO YOU ARE TALKING TO block with dream injection directives and HARD RULE against exposing internal state.
-
-**BYOB (Bring Your Own Bot):** Customer provides their own Telegram bot token. No pool. No bottleneck.
-**BYOK (Bring Your Own Key):** Customer provides their own Gemini API key. Platform key is fallback only.
+**Payment gate is open (C4).** Direct wizard access bypasses payment.
 
 ---
 
-## 4. Core Intelligence (The Brain — 25 Tools)
+## 4. Route Architecture (Verified)
 
-- Tools live in `api/src/tools/`
-- Every tool uses `ToolContext` (`api/src/tools/ToolContext.ts`)
-- `ai.ts` builds `ToolContext` statelessly on every message
-- **Tools missing from `toolsMap` in `ai.ts` cause infinite loops — always register new tools**
-- Scoring threshold: **80** — not configurable
+22 route files mounted in `api/src/index.ts`:
 
-### Registered Tools (26)
-tiger_onboard, tiger_scout, tiger_contact, tiger_aftercare, tiger_briefing, tiger_convert, tiger_export, tiger_email, tiger_hive, tiger_import, tiger_keys, tiger_lead, tiger_move, tiger_note, tiger_nurture, tiger_objection, tiger_score, tiger_score_1to10, tiger_search, tiger_settings, tiger_drive_list, tiger_strike_harvest, tiger_strike_draft, tiger_strike_engage, tiger_refine, tiger_book_zoom
+| Mount | File | Key Endpoints |
+|-------|------|--------------|
+| `/health` | health.ts | GET — system health check |
+| `/auth` | auth.ts | POST verify-purchase, POST session |
+| `/wizard` | wizard.ts | POST trial, POST hatch, POST import-contacts, POST validate-key |
+| `/dashboard` | dashboard.ts | GET /:slug, POST /:slug/update-key |
+| `/tenants` | tenants.ts | PATCH /:id/status, POST /:id/keys/activate, POST /:id/scout |
+| `/subscriptions` | subscriptions.ts | POST register, POST checkout, GET trial-checkout |
+| `/webhooks` | webhooks.ts | POST stripe, POST telegram/:id, POST line/:id, POST email, POST stan-store, POST lemon-squeezy, POST paddle |
+| `/webhooks/ops` | ops.ts | POST — admin ops Telegram bot |
+| `/mining` | mining.ts | POST refine |
+| `/keys` | keys.ts | POST validate |
+| `/flavors` | flavors.ts | GET — all flavor configs |
+| `/hive` | hive.ts | GET patterns, POST patterns |
+| `/admin` | admin.ts | ~40 endpoints — fleet mgmt, provisioning, dashboard, skills curation, mine controls |
+| `/go/:code` | index.ts (inline) | GET — magic link short redirect |
 
-### Intentionally NOT Registered
-- `tiger_gmail_send` — removed Session 8. Gemini must never send from operator's personal Gmail without explicit human approval. File preserved in `api/src/tools/tiger_google_workspace.ts`.
-- `tiger_postiz` — removed Session 8. Social media broadcasting is not Tiger's job. File preserved in `api/src/tools/tiger_postiz.ts`.
-
-### Tool Loop
-1. Incoming message → `processTelegramMessage` (LINE deferred)
-2. ICP Fast-Path Check — if `onboard_state.json` has `customerProfile` and onboarding incomplete, skip `tiger_onboard()`, send confident intro
-3. `startFocus()` — writes `focus_state` Redis key
-4. `buildSystemPrompt(tenant)` (async — always `await` it) — injects ICP, hive patterns, lead stats, market intel
-5. `getChatHistory()` — loads history + `chat_memory` summary
-6. Gemini function-calling loop via `runToolLoop()` — **only `{ output }` passed to Gemini**, raw data stripped
-7. `saveChatHistory()` — triggers Sawtooth compression if threshold exceeded
-8. `completeFocus()` — triggers compression if tool calls ≥ 12
-9. Fire-and-forget: `factExtractionQueue.add()`
-
-### Tool Behavior Rules
-- When a tool fails or returns an error: **do not report the failure to the operator. Do not ask what to do next. Silently try the next best action.** (Enforced in system prompt — added Session 7 PR #185)
+**Total:** ~82 endpoints across 22 route files.
 
 ---
 
-## 5. Memory Architecture
+## 5. AI Tools (Verified — 26 Registered)
+
+Tools live in `api/src/tools/`. All use `ToolContext` (`api/src/tools/ToolContext.ts`). Registered in `toolsMap` in `api/src/services/ai.ts`.
+
+**Missing registration = infinite tool loop. Always register new tools.**
+
+| Tool | Purpose |
+|------|---------|
+| `tiger_onboard` | Guided identity + ICP setup |
+| `tiger_scout` | Find prospects via web/Serper |
+| `tiger_contact` | Send Telegram contact message |
+| `tiger_aftercare` | Post-conversion follow-up |
+| `tiger_briefing` | Market briefing + pipeline summary |
+| `tiger_convert` | Log a prospect as converted |
+| `tiger_export` | Export leads/data |
+| `tiger_email` | Send email (Layer 4 key only) |
+| `tiger_hive` | Submit anonymous patterns |
+| `tiger_import` | Import contact list |
+| `tiger_keys` | Manage AI keys + record telemetry |
+| `tiger_lead` | Create/log lead record |
+| `tiger_move` | Move lead between pipeline stages |
+| `tiger_note` | Add internal note to lead |
+| `tiger_nurture` | Nurture sequence automation |
+| `tiger_objection` | Handle sales objections |
+| `tiger_score` | ML-based prospect scoring |
+| `tiger_score_1to10` | Manual 1–10 scoring framework |
+| `tiger_search` | Web search via Serper |
+| `tiger_settings` | Update bot settings |
+| `tiger_drive_list` | Google Workspace integration |
+| `tiger_strike_harvest` | Pull high-confidence leads from data refinery |
+| `tiger_strike_draft` | Draft contextual reply in operator's voice |
+| `tiger_strike_engage` | Generate Web Intent URLs for approved drafts |
+| `tiger_refine` | Data refinery — mine and extract facts |
+| `tiger_book_zoom` | Cal.com booking link generation (inactive — no calcomBookingUrl set) |
+
+**Intentionally NOT registered:** `tiger_gmail_send`, `tiger_postiz` — removed Session 8. Do not re-add.
+
+---
+
+## 6. System Prompt Architecture (`buildSystemPrompt`)
+
+Async. Called on every message. Always `await` it.
+
+Loads in parallel:
+1. `onboard_state.json` — operator identity + ICP (pre-seeded at hatch)
+2. Approved skills for this tenant/flavor
+3. `SOUL.md` voice block + FITFAO operating protocol
+4. Hive benchmarks (cross-tenant, anonymized)
+5. Market intelligence (up to 5 facts, confidence ≥ 70, within 7 days)
+
+**`hasOnboarding` requires:** `phase === 'complete'` AND at least one real identity field (`productOrOpportunity` or `biggestWin`). Phase=complete with empty identity falls back to incomplete-onboarding branch.
+
+**`displayOperatorName`:** Falls back to `"my operator"` when identity is missing — prevents incoherent prospect-facing phrases.
+
+Domain key for market intelligence = flavor **displayName** (e.g. `"Real Estate Agent"`), NOT flavor key (`"real-estate"`).
+
+---
+
+## 7. Circuit Breaker (Gemini → OpenRouter)
+
+- Tracks Gemini errors per tenant in Redis: `circuit_breaker:gemini:errors:{tenantId}` (1-hour TTL)
+- After 3 errors in 1 hour: circuit trips, flag set at `circuit_breaker:gemini:tripped:{tenantId}`
+- Tripped circuit: all AI calls route to OpenRouter for 1 hour
+- Admin alert fires when circuit trips
+- Reset: `POST /admin/fleet/:tenantId/clear-circuit-breaker`
+
+**This is production-grade.** It burned $100 in OpenRouter charges when a tenant had no BYOK key and was running platform-key calls at mine volume. The root cause (missing BYOK) was fixed in PR #274.
+
+---
+
+## 8. Queue Architecture (BullMQ — 10 Queues)
+
+| Queue | Worker | Status | Purpose |
+|-------|--------|--------|---------|
+| `tenant-provisioning` | `provisionWorker` | ✅ Active | New tenant setup |
+| `telegram-webhooks` | `telegramWorker` | ✅ Active | Incoming Telegram messages |
+| `line-webhooks` | `lineWorker` | ✅ Active (deferred flow) | Incoming LINE messages |
+| `fact-extraction` | `factExtractionWorker` | ✅ Active | Async fact anchor extraction |
+| `ai-routines` | `routineWorker` | ✅ Active | Scout, nurture, value-gap, check-ins |
+| `email-support` | `emailWorker` | ✅ Active | Inbound support emails |
+| `global-cron` | ⚠️ No worker | Queue defined, no implementation | Heartbeat scheduler |
+| `market-mining` | ⚠️ No worker | Queue defined, no implementation | Daily intelligence mine |
+| `market-intelligence-batch` | ⚠️ No worker | Queue defined, no implementation | Batch fact processing |
+| `stan-store-onboarding` | ⚠️ No worker | Queue defined, no implementation | Stan Store pre-sale setup |
+
+`ENABLE_WORKERS=true` must be set in deploy. It is. Do not remove it.
+
+### Cron Schedule (ai-routines worker handles scheduling)
+- **2 AM UTC** — global market mining job
+- **8 AM UTC** — platform key health check
+- **Hourly** — nurture checks, value-gap checks, daily scout (eligible tenants)
+
+---
+
+## 9. Memory Architecture
 
 ### Redis Keys
 | Key | Purpose | TTL |
@@ -109,97 +196,51 @@ tiger_onboard, tiger_scout, tiger_contact, tiger_aftercare, tiger_briefing, tige
 | `magic_short:{code}` | Short magic link → full URL | Same TTL as token |
 
 ### PostgreSQL (`tenant_states` table)
-| `state_key` | Purpose |
+| key | Purpose |
 |---|---|
-| `scout_state.json` | Scout run timestamps, burst count, lead totals |
-| `onboard_state.json` | Onboarding answers + ICP pre-loaded at hatch |
+| `onboard_state.json` | Operator identity + ICP — pre-seeded at hatch |
 | `fact_anchors` | Extracted business facts from conversations |
-| `score_1to10_sessions.json` | 1-10 scoring framework sessions |
-
-### Dynamic System Prompt (`buildSystemPrompt`)
-Async. Loads 4 signals in `Promise.all()`. DB failure = graceful degradation.
-1. ICP summary (`icpSingle`, falling back to `customerProfile`) + `fact_anchors`
-2. Hive patterns — top signals for tenant's flavor/region
-3. Lead stats — live counts from `tenant_leads`
-4. Market intelligence — up to 5 facts (confidence ≥ 70, within 7 days). Domain key = flavor **displayName** (e.g. `"Real Estate Agent"`), NOT flavor key (`"real-estate"`)
+| `scout_state.json` | Scout run timestamps, burst count, lead totals |
+| `score_1to10_sessions.json` | 1-10 scoring sessions |
 
 ---
 
-## 6. Key Management (4-Layer Fallback)
+## 10. Key Management (4-Layer)
 
 | Layer | Source | Threshold |
 |---|---|---|
 | 1 | Platform Onboarding Key | 50 msg/day |
 | 2 | Tenant Primary BYOK | Unlimited |
 | 3 | Tenant Fallback BYOK | Unlimited |
-| 4 | Platform Emergency Key | ✅ Active (renewed Session 7) |
+| 4 | Platform Emergency Key | Active |
 
-Dead key detection fires admin Telegram alert via `sendAdminAlert()` → `ADMIN_TELEGRAM_BOT_TOKEN` / `ADMIN_TELEGRAM_CHAT_ID`.
-
----
-
-## 7. Queue Architecture (BullMQ — 8 Queues)
-
-| Queue | Purpose |
-|---|---|
-| `tenant-provisioning` | New tenant setup |
-| `telegram-webhooks` | Telegram message processing |
-| `line-webhooks` | LINE (deferred — queue exists, worker active) |
-| `fact-extraction` | Async fact anchor extraction |
-| `ai-routines` | Scout, nurture, value-gap, check-ins |
-| `global-cron` | Heartbeat scheduler (every minute) |
-| `market-mining` | Daily intelligence mine (2 AM UTC) |
-| `market-intelligence-batch` | Batch fact processing |
-
-`ENABLE_WORKERS=true` must be set in deploy. It is. Do not remove it.
-
-### Cron Schedule (global-cron heartbeat, every minute)
-- **2 AM UTC** — `global_market_mining` job enqueued (date-stamped jobId prevents duplicates)
-- **8 AM UTC** — Platform key health check; fires admin alert if expired
-- **Hourly** — nurture checks, value-gap checks, daily scout (for eligible tenants)
-
-### Mine Status
-- `GET /admin/mine/status` — returns `{ isRunning, queueDepth, lastRun: { flavorsProcessed, postsFound, factsSaved, completedAt } }`
-- `POST /admin/mine/run` — triggers immediate mine run (bypasses 2 AM cron)
-- Mine worker logs `mine_complete` to `admin_events` on success
+Dead key detection fires admin Telegram alert via `sendAdminAlert()`.
 
 ---
 
-## 8. Scout Architecture
+## 11. Admin
 
-- **Burst mode**: user-triggered on-demand runs. Max 3/day, min 1h between.
-- **Scheduled mode**: nightly cron at 5 AM tenant time. Must be passed explicitly: `mode: 'scheduled'`.
-- **Sources (in order):**
-  1. Reddit public JSON (currently 403 from Cloud Run egress — fallback active)
-  2. Serper fallback (`SERPER_KEY_2`) — confirmed working
-- Scoring threshold: **80** (platform default). Configurable per flavor via `FlavorConfig.scoreThreshold` — threaded through `runHunt → buildAndSaveLead → recomputeAndSave` (PR #204). Scoring uses profileFit + intentSignals only when engagement data absent (weights normalized — fixed Session 7 PR #180).
-
----
-
-## 9. Admin
-
-- **Dashboard URL:** `wizard.tigerclaw.io/admin`
-- **Fleet ops URL:** `wizard.tigerclaw.io/admin/dashboard`
+- **Dashboard:** `wizard.tigerclaw.io/admin/dashboard`
 - **Token:** `gcloud secrets versions access latest --secret="tiger-claw-admin-token" --project="hybrid-matrix-472500-k5"`
-- **Webhook fix:** `POST /admin/fix-all-webhooks` — idempotent. TELEGRAM_WEBHOOK_SECRET now baked into deploy so this is a safety net, not mandatory.
-- **Active tenant count:** `/admin/metrics` counts `status IN ('active', 'live')` only. `onboarding` and `pending` do NOT count as active.
+- **Active tenant count:** counts `status IN ('active', 'live')` only. `onboarding` and `pending` do NOT count.
 
-### Key Admin Endpoints
+Key admin endpoints:
+
 | Endpoint | Purpose |
 |----------|---------|
-| `GET /admin/fleet` | All tenants with status |
-| `GET /admin/platform-health` | Live probe of all 10 services |
-| `GET /admin/pipeline/health` | Data mine health (facts/24h, stale verticals) |
-| `GET /admin/mine/status` | Current mine queue state + last run result |
-| `POST /admin/mine/run` | Trigger immediate mine run |
+| `GET /admin/fleet` | All tenants |
+| `GET /admin/dashboard/tenants` | Structured tenant table with onboarding state |
+| `POST /admin/hatch` | Provision bot directly (requires product for full identity) |
 | `POST /admin/fix-all-webhooks` | Re-register all Telegram webhooks |
-| `POST /admin/fleet/:id/report` | Trigger manual scout for a tenant |
-| `POST /admin/fleet/:id/suspend` | Suspend a tenant |
-| `POST /admin/fleet/:id/resume` | Resume a tenant |
+| `GET /admin/mine/status` | Mine queue state + last run result |
+| `POST /admin/mine/run` | Trigger immediate mine |
+| `POST /admin/fleet/:id/reset-conversation` | Clear Redis chat history + onboard_state |
+| `DELETE /admin/fleet/:id` | Terminate tenant |
+| `POST /admin/fleet/:id/clear-circuit-breaker` | Reset Gemini circuit breaker |
 
 ---
 
-## 10. Deployment
+## 12. Deployment
 
 ### API (Cloud Run)
 ```bash
@@ -207,14 +248,12 @@ GCP_PROJECT_ID=hybrid-matrix-472500-k5 bash ./ops/deploy-cloudrun.sh
 ```
 
 ### Wizard (Vercel)
-Auto-deploy is **working**. Push to main triggers Vercel deploy automatically. Confirmed Session 15+.
+Auto-deploy: push to main → Vercel deploys automatically.
 
-### Post-Deploy Protocol (mandatory, every time)
+### Post-Deploy (mandatory every time)
 ```bash
-# Verify health
 curl https://api.tigerclaw.io/health
 
-# Fix webhooks (idempotent — just confirms secret is wired)
 ADMIN_TOKEN=$(gcloud secrets versions access latest --secret="tiger-claw-admin-token" --project="hybrid-matrix-472500-k5")
 curl -X POST https://api.tigerclaw.io/admin/fix-all-webhooks \
   -H "Authorization: Bearer $ADMIN_TOKEN"
@@ -222,28 +261,34 @@ curl -X POST https://api.tigerclaw.io/admin/fix-all-webhooks \
 
 ---
 
-## 11. Test Coverage
+## 13. Test Coverage
 
-- **462 tests** across 44 test files. All passing as of Session 17 (PRs #263–#272).
-- Every tool in `toolsMap` has test coverage.
+- **456 tests** across 44 test files. All passing as of 2026-04-09.
 - Run: `npm test` from `api/`
-- CI runs on every PR push.
+- CI runs on every PR push (Test + CI Pipeline + Deploy to Cloud Run).
 
 ---
 
-## 12. Known Broken / Not Built
+## 14. Flavor Registry (16 Flavors)
+
+network-marketer, real-estate, sales-tiger, lawyer, doctor, health-wellness, baker, plumber, personal-trainer, interior-designer, airbnb-host, candle-maker, gig-economy, admin, dorm-design, researcher
+
+Each flavor provides: `displayName`, `professionLabel`, `defaultKeywords`, `defaultBuilderICP`, `fallbackIntelligence`.
+
+---
+
+## 15. Known Broken / Not Built
 
 | Item | Status |
 |------|--------|
 | Reddit mine source | ❌ 403 from Cloud Run egress. Oxylabs + Serper fallback working. |
-| Vercel auto-deploy | ✅ Confirmed working. Push to main → Vercel deploys automatically. |
-| Paddle product/price | ❌ Not yet created. Webhook live, but no checkout URL exists. |
-| Admin alert markdown | ⚠️ Partial — fails when error text contains underscores. Telegram Markdown v1 bug. |
-| Stripe | ❌ Placeholder. Not used. |
-| Zapier | ❌ Dead code. |
+| Paddle product/price | ❌ Not yet created. Webhook live, no checkout URL. |
+| Admin alert markdown | ⚠️ Fails when error text contains underscores. |
+| 4 BullMQ queues (global-cron, market-mining, market-intelligence-batch, stan-store-onboarding) | ⚠️ Queues defined, no workers implemented. |
+| Stripe | ❌ Placeholder. Dead code in routes. |
 | LINE | ❌ Deferred. Requires LINE Official Account. |
-| Customer-facing dashboard | ✅ Built and readable. `GET/POST /dashboard/:slug` — session-token auth + ownership check (PR #210). Contrast fixed PR #267. |
+| Cal.com booking | ⚠️ `tiger_book_zoom` built. Inactive — no `calcomBookingUrl` set. |
 
 ---
 
-> **Note to all agents:** Architecture is locked. No RAG. No containers. No OpenClaw. No switching AI providers. If you see a TypeScript error, fix the interface — do not rewrite the system. `tiger_gmail_send` and `tiger_postiz` are intentionally absent from toolsMap — do not re-add them.
+> **Architecture is locked.** No RAG. No containers. No OpenClaw. No switching AI providers. `tiger_gmail_send` and `tiger_postiz` are intentionally absent from toolsMap. There is no bot pool — BYOB only.

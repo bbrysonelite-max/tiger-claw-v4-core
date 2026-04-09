@@ -38,7 +38,7 @@ No chaining unrelated changes into one PR. Each PR does one thing. The title des
 
 ## 4. Test Before Opening a PR
 
-Run `npm test` from `api/`. All 455 tests must pass. If they fail, fix them before opening the PR.
+Run `npm test` from `api/`. All **456 tests** must pass. If they fail, fix them before opening the PR.
 
 ---
 
@@ -52,18 +52,13 @@ Run `npm test` from `api/`. All 455 tests must pass. If they fail, fix them befo
 
 After every API deploy:
 ```bash
-# 1. Deploy
-GCP_PROJECT_ID=hybrid-matrix-472500-k5 bash ./ops/deploy-cloudrun.sh
-
-# 2. Verify health
+# 1. Verify health
 curl https://api.tigerclaw.io/health
 
-# 3. Fix webhooks (idempotent — TELEGRAM_WEBHOOK_SECRET is in deploy script, this is a safety net)
+# 2. Fix webhooks (idempotent — safety net)
 ADMIN_TOKEN=$(gcloud secrets versions access latest --secret="tiger-claw-admin-token" --project="hybrid-matrix-472500-k5")
 curl -X POST https://api.tigerclaw.io/admin/fix-all-webhooks \
   -H "Authorization: Bearer $ADMIN_TOKEN"
-
-# 4. Deploy wizard (Vercel auto-deploy is broken — deploy manually)
 ```
 
 ---
@@ -82,20 +77,19 @@ Build only what a paying customer has asked for. Do not add "improvements," refa
 - No switching from Gemini 2.0 Flash to any other model
 - No calling the Mac cluster (192.168.0.2) from Cloud Run
 - `tiger_gmail_send` and `tiger_postiz` are intentionally NOT in toolsMap — do not re-add them
-
-If you see a TypeScript error, fix the interface. Do not rewrite the architecture.
+- **There is no bot pool. BYOB only. See Rule 15.**
 
 ---
 
 ## 9. Read SOTU.md First
 
-Before writing a single line of code, read `SOTU.md`. It is the single source of truth. Run the cold start checklist. Do not assume anything about the state of the platform without verifying it.
+Before writing a single line of code, read `SOTU.md`. It is the single source of truth. Do not assume anything about the state of the platform without verifying it first.
 
 ---
 
-## 10. Update SOTU.md Before Closing a Session
+## 10. Update Docs After Every Merge
 
-A session that ends without updating `SOTU.md` leaves the next agent blind. Update the last-updated date, service status, tenant fleet, and open issues before closing.
+A PR that changes behavior, endpoints, tools, schema, or architecture **must** update the relevant documents in the same PR or a follow-up PR opened immediately after. See Rule 16 for the full protocol.
 
 ---
 
@@ -111,11 +105,20 @@ Tools that take irreversible public actions (sending emails, posting to social m
 
 ---
 
-## 13. Update RULES.md After Every Merge
+## 13. Read Cloud Run Logs Before Diagnosing
 
-After every PR is merged, update `RULES.md` to reflect any new constraints, patterns, or decisions that emerged from the work. If a bug revealed a new rule (e.g. "always read logs before assuming"), write it down. Rules that aren't written are forgotten.
+The root cause of almost every production bug is visible in Cloud Run logs within 30 seconds of it happening. Read logs first. Do not guess.
 
-Also update `SOTU.md` — mark resolved issues closed, add new ones, update service status if anything changed.
+```bash
+gcloud logging read 'resource.type="cloud_run_revision" AND resource.labels.service_name="tiger-claw-api"' \
+  --project=hybrid-matrix-472500-k5 --limit=50 --format="value(timestamp,textPayload)"
+```
+
+---
+
+## 14. Never Reference Individuals by Name
+
+Do not reference specific people (distributors, contacts, partners) by name in code, docs, comments, prompts, or conversation. Refer to roles only: "operator," "distributor," "contact." Never names.
 
 ---
 
@@ -124,13 +127,41 @@ Also update `SOTU.md` — mark resolved issues closed, add new ones, update serv
 **ALL Telegram bot tokens come from BotFather. The operator provides their own token. The platform never holds a pool.**
 
 - No `bot_pool` table queries. No pool assignment. No pool replenishment.
-- `pool.ts` is a crypto/Telegram utility file only. It does not manage a pool.
-- If you find pool code anywhere, delete it — do not refactor, migrate, or preserve it.
-- Admin tokens are operator-held. Failed tokens get replaced by the operator.
-- This is permanent. Violation of this rule has cost real money (OpenRouter drain from silent fallback). Do not repeat it.
+- `pool.ts` is a crypto/Telegram utility file only.
+- If you find pool code anywhere, delete it — do not refactor or preserve it.
+- This is permanent. Violation cost real money (OpenRouter drain). Do not repeat it.
 
 ---
 
-## 14. Never Reference Individual People by Name
+## 16. Documentation Protocol — Non-Negotiable
 
-Do not reference specific individuals (distributors, contacts, partners, or anyone in the operator's network) by name in code, documentation, comments, prompts, or conversation. The platform must stand on its own merit independent of any specific person. Refer to roles only (e.g. "operator," "distributor," "contact") — never names.
+Documents are the ground truth for every agent session. Stale docs cause hallucinations, repeated work, and broken code. This protocol is mandatory.
+
+### What must be updated and when
+
+| Document | Update trigger |
+|----------|---------------|
+| `SOTU.md` | After every merged PR. Before closing any session. |
+| `STATE_OF_THE_TIGER_PATH_FORWARD.md` | After every merged PR. |
+| `CLAUDE.md` (Current Session State block) | At the **start** of each session — update to reflect what is actually deployed and what is open. |
+| `ARCHITECTURE.md` | Whenever routes, services, tools, workers, or schema change. |
+| `START_HERE.md` | Whenever the onboarding flow, first priorities, or key commands change. |
+| `RULES.md` | Whenever a new rule is needed or an existing rule changes. |
+
+### The protocol
+
+1. **Before closing a PR:** ask yourself: does this change affect any of the documents above? If yes, include the doc update in the same PR or open a follow-up immediately.
+2. **At session start:** read `SOTU.md`. If anything in it is wrong, fix it before touching code.
+3. **At session close:** update `SOTU.md` and `STATE_OF_THE_TIGER_PATH_FORWARD.md` before ending. No exceptions.
+4. **CLAUDE.md current session block** is updated at session START, not end — because the end is when context runs out.
+
+### What causes docs to rot
+
+- Updating docs "later" (later never comes)
+- Doc updates bundled as the last step of a long session
+- Not verifying what's in the docs before writing new ones
+- Writing docs from memory instead of from the code
+
+### The standard
+
+Every fact in every document must be verifiable by reading the codebase or querying the live system. If you cannot verify it, do not write it. If you wrote it and can no longer verify it, remove it.

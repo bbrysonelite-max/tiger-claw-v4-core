@@ -1,84 +1,97 @@
 # Next Session Priorities
 
-**Read SOTU.md first. Then HOW_TIGER_WINS.md. Then this file.**
+**Read SOTU.md first. Then this file. No exceptions.**
 
-These are the marching orders. Do them in order. Do not skip ahead. Do not add features not on this list.
-
-*** Recommend how multiple agents can be used. 
+**No lying. No assuming. No guessing. Do not claim anything works until tested live.**
 
 ---
 
-## Immediate — Do Before Anything Else
-
-### 1. Fix Brentstiger01 — DONE (unverified)
-
-### 2. Top-of-funnel resources reviewed, defined, and researched. 
-
-### 3. Cal.com Zoom Booking — `tiger_book_zoom` — (unverified) (needs activation) HIGH purpose of platform. 
-
-Tool is live and registered. Reads `calcomBookingUrl` from tenant settings.json. Generates pre-filled booking link when prospect qualifies. Admin alert fires on booking confirmation.  (unverified)
-
-**Operator action required:** Write `calcomBookingUrl` to settings.json before testing. Set up Cal.com availability (10) slots/day).
-
-### 4. ✅ Agent First Impression — (unverified)
-
-4-language greeting on first `/start` per chatId. State stored in `first_impression_shown.json`. Language-matching in system prompt — agent mirrors prospect's language for the full conversation.
-
-### 5. ✅ Wire Tiger Strike Engage After Mine Cycle — DONE (unverified)
-
-`runStrikeAutoPipeline()` wired to fire after every 2 AM mine cycle via Reporting Agent. Has not yet fired at 2 AM.
+## Do These In Order. Do Not Skip Ahead.
 
 ---
 
-## This Session — Do In Order
+### 1. Merge PR #278 — FIRST
 
-### 6. Verify Tiger Strike Engage at 2 AM
+PR #278 is the agent context fix. It is open and not merged. Nothing else can be done until this is deployed.
 
-After next mine cycle, check:
-- `engagement_status` rows moved from `unengaged` to `queued` in `market_intelligence`
-- Admin Telegram alert arrived with one-click links
-- Alert is readable (no Markdown parse failure from underscores)
+```bash
+gh pr merge 278 --squash --delete-branch
+gh pr view 278  # verify state=MERGED
+curl https://api.tigerclaw.io/health  # verify deploy succeeded
+```
 
-If the alert failed due to the Markdown bug, fix it now: escape underscores in the strike report message (`_` → `\_`).
-
-### 7. Send Bot Link to 5 Warm Contacts-verify conversation 
-
-Not a build task — an operator task. Brent sends `t.me/Brentstiger01_bot` to two people in the network with a personal note. Watch the first cold conversation. Document it.
-
-### 8. Set calcomBookingUrl for all tenents of the Plateform HIGH
-
-Write the Cal.com booking URL to settings.json for tenant `56d45bfd-08f9-46e7-9767-bf1bb60f8f07`. Test by triggering `tiger_book_zoom` manually.
+After merge, run post-deploy protocol:
+```bash
+ADMIN_TOKEN=$(gcloud secrets versions access latest --secret="tiger-claw-admin-token" --project="hybrid-matrix-472500-k5")
+curl -X POST https://api.tigerclaw.io/admin/fix-all-webhooks \
+  -H "Authorization: Bearer $ADMIN_TOKEN"
+```
 
 ---
 
-## Before Next Session Ends
+### 2. Provision a Real Bot
 
-### 9. Admin dashboad and customer dashboard  Contrast Fix and all end points— HIGH
+Use admin hatch. **`product` is required** — without it, the bot wakes in `phase="identity"` and cannot represent the operator.
 
-The instructional/helper text under each step heading is gray on a black background. It is illegible. The step headings are white and work. The gray supporting text does not.
+```bash
+ADMIN_TOKEN=$(gcloud secrets versions access latest --secret="tiger-claw-admin-token" --project="hybrid-matrix-472500-k5")
+curl -X POST https://api.tigerclaw.io/admin/hatch \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "botToken": "<BotFather token>",
+    "name": "<persona name>",
+    "flavor": "network-marketer",
+    "email": "bbryson@me.com",
+    "aiKey": "<Gemini key>",
+    "product": "<what they sell — required>"
+  }'
+```
 
-Fix: in `web-onboarding/`, replace all `text-gray-*` and `text-slate-*` classes on instructional/helper text with `text-white` or `text-slate-200` minimum. Apply this rule to every web property going forward — gray text on dark backgrounds is banned for any text a user needs to read to complete an action.
+Verify hatch response includes `phase: "complete"` in onboard_state.
 
 ---
 
-## Review —  This Session
+### 3. Verify Prospect Conversation
 
-- Karpathy Ratchet (mine self-improvement) — after pipeline proven at volume run after mine is running
-- Paddle product + price — waiting on merchant of record approval
-- Admin alert Markdown bug (underscore breaks Telegram) — fix only if Strike alert fails
-- Orphan tenant cleanup (`brents-tiger-01-mnpcril3`) — low priority
-- Oxylabs Amplify — planned,  built- (unverified)
-- Bright Data — planned, never built
-- LINE OpenChat, Facebook Groups, Pantip, LinkedIn — planned signal sources, not this session
-- Regional top-of-funnel intelligence (mine recommends best signal sources per region) — after volume
+Send bot link to a real contact. **Use a FRESH chatId** — not the operator account. Read what they receive. Check Cloud Run logs. Confirm:
+- Bot does not surface internal state
+- Bot does not use tiger_* tool names in responses
+- Bot voice is warm and human, not a feature list
+- WHO YOU ARE TALKING TO block is loading correctly
+
+If anything is broken, read Cloud Run logs before diagnosing. Root cause will be there.
 
 ---
 
-## Definition of Done for This Session
--fill the calander build and verify
--paddle activated
+### 4. Create Paddle Product + Price
 
+No checkout URL exists. The Paddle webhook is live but there is nothing to purchase. Create the product and price in the Paddle dashboard. Then test the full flow:
 
-- [ ] Tiger Strike Engage verified firing at 2 AM and generating admin alert
-- [ ] `calcomBookingUrl` set — `tiger_book_zoom` testable
-- [ ] First cold conversation documented (even if brief)
+```
+Checkout → Paddle fires transaction.completed → POST /webhooks/paddle → user + bot + subscription created
+→ Wizard hatch → bot live
+```
+
+This is the entire business model. It has never been tested end to end.
+
+---
+
+## Known Broken When This Session Starts
+
+| Item | Fix |
+|------|-----|
+| No active bots | Provision after PR #278 merged |
+| Paddle product/price | Create in Paddle dashboard |
+| Admin alert markdown bug | Escape underscores in `sendAdminAlert()` |
+| Payment gate open (C4) | Fix after Paddle loop is proven |
+| Reddit 403 from Cloud Run egress | Oxylabs + Serper fallback working — low priority |
+
+---
+
+## Do Not Build
+
+- Cal.com booking: `tiger_book_zoom` is built. Inactive until `calcomBookingUrl` is set by operator. Not a code task.
+- LINE: Deferred. Requires LINE Official Account. Not a roadmap item this phase.
+- Any new features: no new features without a paying customer asking.
+- Any refactors, cleanup, or "improvements" not listed above.
