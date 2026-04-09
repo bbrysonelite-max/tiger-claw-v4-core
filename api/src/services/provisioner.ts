@@ -300,11 +300,15 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
       const defaultIcp = flavorConfig.defaultBuilderICP ?? {};
       const twoOar = input.flavor === "network-marketer";
       const now = new Date().toISOString();
+      // phase is "complete" only when real identity exists (product at minimum).
+      // Without it, buildSystemPrompt would inject blank identity fields and confuse the model.
+      // Bots provisioned without product wake in "identity" phase and are invited to fill it in.
+      const hasRealIdentity = !!input.product?.trim();
       await setBotState(tenant.id, "onboard_state.json", {
-        phase: "complete",
+        phase: hasRealIdentity ? "complete" : "identity",
         questionIndex: 0,
         botName: input.name,
-        completedAt: now,
+        ...(hasRealIdentity ? { completedAt: now } : {}),
         identity: {
           name: input.name,
           botName: input.name,
@@ -320,7 +324,9 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
         tenantId: tenant.id,
         startedAt: now,
       });
-      steps.push("Onboarding pre-seeded from flavor config — no interview required");
+      steps.push(hasRealIdentity
+        ? "Onboarding pre-seeded from flavor config — no interview required"
+        : "Onboarding pre-seeded (ICP only) — operator identity required before bot goes live");
     }
   } catch (err) {
     console.warn("[provisioner] Failed to pre-seed onboard state (non-fatal):", err);
