@@ -197,7 +197,7 @@ export default function DashboardPage() {
                     <form onSubmit={handleEmailSubmit} className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 space-y-4">
                         <div>
                             <h2 className="text-white font-semibold mb-1">Access your dashboard</h2>
-                            <p className="text-zinc-400 text-sm">Enter the email you used to sign up.</p>
+                            <p className="text-zinc-200 text-sm">Enter the email you used to sign up.</p>
                         </div>
                         <div>
                             <input
