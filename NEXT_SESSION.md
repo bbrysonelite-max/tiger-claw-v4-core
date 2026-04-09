@@ -12,7 +12,7 @@ These are the marching orders. Do them in order. Do not skip ahead. Do not add f
 
 ### 2. Top-of-funnel resources reviewed, defined, and researched. 
 
-### 3. ✅ Cal.com Zoom Booking — `tiger_book_zoom` — (unverified) (needs activation) HIGH purpose of platform. 
+### 3. Cal.com Zoom Booking — `tiger_book_zoom` — (unverified) (needs activation) HIGH purpose of platform. 
 
 Tool is live and registered. Reads `calcomBookingUrl` from tenant settings.json. Generates pre-filled booking link when prospect qualifies. Admin alert fires on booking confirmation.  (unverified)
 
