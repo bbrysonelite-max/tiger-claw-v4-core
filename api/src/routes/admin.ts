@@ -1152,19 +1152,6 @@ router.post("/flush-redis", async (_req: Request, res: Response) => {
   }
 });
 
-// ── POST /admin/fix-pool-orphans ──────────────────────────────────────────────
-// Recovers bot pool entries that were assigned but whose tenant was hard-deleted,
-// leaving status='assigned' and tenant_id=NULL. Also runs automatically at startup.
-router.post("/fix-pool-orphans", async (_req: Request, res: Response) => {
-  try {
-    const { fixBotPoolOrphans } = await import("../services/db.js");
-    const recovered = await fixBotPoolOrphans();
-    return res.json({ ok: true, recovered });
-  } catch (err) {
-    return res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
-  }
-});
-
 // ── POST /admin/hatch ─────────────────────────────────────────────────────────
 // Admin-direct bot provisioning. Bypasses the payment gate — for operator use,
 // internal testing, and custom-flavor bots (YouTube flywheel, admin, etc.).
