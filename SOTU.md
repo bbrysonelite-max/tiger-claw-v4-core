@@ -1,6 +1,6 @@
 # Tiger Claw — State of the Union
 
-**Last updated:** 2026-04-08 (Session 17 — PRs #263–#265 merged)
+**Last updated:** 2026-04-08 (Session 17 — PRs #263–#267 merged)
 **This is the single source of truth. Read nothing else until you finish this file.**
 
 ---
@@ -36,7 +36,7 @@
 - `onboard_state.json` written directly to DB — phase forced to `complete`, Nuskin identity + defaultBuilderICP pre-seeded. Bot is hunting-ready.
 - First impression: 4-language greeting on `/start`, then language-matching for all subsequent replies.
 - `tiger_book_zoom` tool built and registered. Needs `calcomBookingUrl` written to settings.json to activate.
-- Tiger Strike Engage pipeline wired to run after 2 AM mine cycle. Has not yet fired at 2 AM — unverified in production.
+- Tiger Strike pipeline confirmed firing. First successful run produced 20 engagement links. Operator received Telegram alert. Watch next 2 AM cycle to confirm consistent.
 - No real prospect conversations yet — operator is the only person who has messaged.
 
 The full loop (pay → provision → hatch → scout → contact → reply) still has not closed on a *paying customer via Paddle*. That remains day zero for the Paddle path.
@@ -48,15 +48,20 @@ The full loop (pay → provision → hatch → scout → contact → reply) stil
 **Last deployed revision:** `tiger-claw-api-00422-xc6` (deployed 2026-04-08, Session 17)
 **Health (last verified 2026-04-08):** postgres OK, redis OK, workers OK
 **Tests:** 462/462 passing
-**Wizard:** `wizard.tigerclaw.io` — Vercel, auto-deploy confirmed working
+**Wizard:** `wizard.tigerclaw.io` — Vercel, auto-deploy confirmed working (PR #267 deployed automatically)
 
 ---
 
 ## What Was Done This Session (Session 17 — 2026-04-08)
 
-**PRs #263–#265 merged:**
+**PRs #263–#267 merged:**
 
-1. **PR #263 — Orchestrator dedup + strike queuing decoupled**
+1. **PR #267 — Dashboard contrast fix (admin + customer dashboards)**
+   - Admin dashboard (`web-onboarding/src/app/admin/dashboard/page.tsx`): stat card labels `text-zinc-400` → `text-zinc-200`, sub-text `text-zinc-500` → `text-zinc-300`, detail grid labels `text-zinc-600` → `text-zinc-400`, fleet row secondary info bumped to zinc-200/300, action buttons `text-zinc-500` → `text-zinc-300`, header buttons bumped. Zero-state indicators (Messages=0) intentionally preserved at dim level.
+   - Customer dashboard (`web-onboarding/src/app/dashboard/page.tsx`): email helper text `text-zinc-400` → `text-zinc-200`.
+   - Wizard Vercel auto-deploy will pick this up automatically.
+
+2. **PR #263 — Orchestrator dedup + strike queuing decoupled**
    - Orchestrator was triggering Reporting Agent 5x per mine run. Research Agent retry failures kept pushing `completed` past `expected`, and `removeOnComplete:true` cleared BullMQ's dedup key. Fixed with Redis `SETNX` one-shot guard — Reporting Agent now fires exactly once per run.
    - Strike pipeline was exiting without queuing facts whenever Gemini drafting failed. Moved `markFactsQueued` before `draftReplies` so facts are always queued regardless of draft success.
 
@@ -199,8 +204,8 @@ Note: `mnpcril3` is the orphan from the duplicate-tenant bug. It has a subscript
 |---|---|---|
 | DAY ZERO | Paddle purchase → provision → hatch → scout → contact → reply has never closed on a paying customer. Brents Tiger 01 proves admin hatch works. Paddle path unproven. | IMMEDIATE |
 | PADDLE PRODUCT | Webhook live but no Paddle product/price created. No checkout URL. Create before testing end-to-end payment flow. | IMMEDIATE |
-| CALCOM URL | `tiger_book_zoom` is live but inactive. `calcomBookingUrl` not yet written to Brents Tiger 01 settings.json. Set before testing booking flow. | IMMEDIATE |
-| STRIKE PIPELINE | Root cause fixed (PR #264 — verbatim column). First successful run expected next 2 AM UTC cycle. Verify alert arrives. | HIGH |
+| CALCOM URL | `tiger_book_zoom` built and registered. Requires platform-level booking architecture decision before activating — not simply a URL to set. Deferred until operator defines the booking model. | DEFERRED |
+| STRIKE PIPELINE | First successful run confirmed (operator received Telegram alert with 20 engagement links). Watch next 2 AM cycle to confirm consistent. | MONITOR |
 | ORPHAN TENANT | `brents-tiger-01-mnpcril3` (1ed77b8f) — created by duplicate-tenant bug, no bot token, subscription active. Terminate when convenient. | LOW |
 | ADMIN ALERT BUG | Underscores in error messages break Telegram Markdown parser. Admin alerts with error text silently fail. Fix before launch. | HIGH |
 | C4 | Payment gate still open for direct wizard access (no Paddle purchase required). Fix after Paddle loop proven. | NEXT SESSION |
@@ -366,7 +371,7 @@ Full details in `MODULE_ASSESSMENT.md`.
 | 2. Hive | Working — passive learning via emitHiveEvent in scout/convert | 6,545 facts in DB |
 | 3. Cognitive Architecture | buildSystemPrompt() wired: ICP, hive benchmarks, market facts, activeContext, fact_anchors | Tested live with Brents Tiger 01 |
 | 4. Hatchery | BYOB/BYOK flow built. No interview. ICP pre-seeded at provision time. | Brents Tiger 01 confirmed live |
-| 5. Orchestration | Daily mine: Orchestrator → 8 Research Agents (parallel) → Reporting Agent → Strike Auto Pipeline | Running nightly. Strike pipeline wired — not yet verified at 2 AM |
+| 5. Orchestration | Daily mine: Orchestrator → 8 Research Agents (parallel) → Reporting Agent → Strike Auto Pipeline | Running nightly. Strike pipeline confirmed firing — operator received 20-link alert. |
 | 6. Tools | 25 tools registered. Audit complete. 2 load-bearing identified. | No live usage data yet |
 | 7. Memory | Short-term, hive, fact_anchors all wired | Never validated in real prospect conversation |
 | 8. Payment/Dashboard | Payment gate open (C4). Admin dashboard operational. | C4 is the only public launch blocker |
@@ -405,7 +410,7 @@ npx vercel deploy --prod --yes
 - Cloud SQL proxy runs on port **5433** locally, not 5432.
 - One PR per fix. Test before opening a PR. Delete branch after merge.
 - `tiger_gmail_send` and `tiger_postiz` are NOT in toolsMap by design. Do not re-add.
-- 457 tests must pass before any PR is opened. Run `npm test` from `api/`.
+- 462 tests must pass before any PR is opened. Run `npm test` from `api/`.
 
 ---
 

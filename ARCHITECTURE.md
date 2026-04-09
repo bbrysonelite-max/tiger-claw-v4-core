@@ -1,6 +1,6 @@
 # Tiger Claw V4 — Core Architecture
 
-**Last updated:** 2026-04-06 (Session 15 — Paddle integration + Oxylabs confirmed live)
+**Last updated:** 2026-04-08 (Session 17 — Strike pipeline confirmed, dashboard contrast fixed, 462 tests)
 **Status:** LIVE. Locked. Do not rewrite.
 
 ---
@@ -21,7 +21,7 @@ Tiger Claw V4 is **stateless**. No long-running Docker containers per tenant. No
 
 | Component | Technology | Actual Status |
 |---|---|---|
-| Compute | Google Cloud Run, Node.js/Express, port 4000 | ✅ Live. Revision 00372-mg2 |
+| Compute | Google Cloud Run, Node.js/Express, port 4000 | ✅ Live. Revision 00422-xc6 |
 | Database | Cloud SQL PostgreSQL HA — `tiger_claw_shared` | ✅ Live |
 | Cache & Queues | Cloud Redis HA + BullMQ (8 queues) | ✅ Live |
 | AI Provider | Gemini 2.0 Flash — `@google/generative-ai` SDK | ✅ Live. **LOCKED — do not switch to 2.5-flash** (GCP function-calling bug) |
@@ -30,7 +30,7 @@ Tiger Claw V4 is **stateless**. No long-running Docker containers per tenant. No
 | Payments | **Paddle** (primary) + Stan Store (legacy) | ✅ Paddle webhook live. Product/price not yet created. |
 | Email (Resend) | Resend — `tigerclaw.io` domain verified | ✅ Live. `RESEND_API_KEY` in deploy script. |
 | Serper (search) | 3 keys: `SERPER_KEY_1/2/3` | ✅ All confirmed working. Round-robin active. |
-| Oxylabs | Realtime API — `OXYLABS_USERNAME` / `OXYLABS_PASSWORD` | ✅ Live. Mine produced 209 posts on last run. |
+| Oxylabs | Realtime API — `OXYLABS_USERNAME` / `OXYLABS_PASSWORD` | ✅ Live. Mine producing 1,684+ facts per run. |
 | Reddit (mine source) | Public JSON API | ❌ 403 from Cloud Run egress. Oxylabs + Serper fallback active. |
 | Stripe | Placeholder | ❌ Not used. Do not wire up. |
 | Zapier | Dead code | ❌ Not used. `/webhooks/stan-store` dormant. |
@@ -40,7 +40,7 @@ Tiger Claw V4 is **stateless**. No long-running Docker containers per tenant. No
 
 ---
 
-## 3. Customer Onboarding Flow (Current — Paddle, as of Session 15)
+## 3. Customer Onboarding Flow (Current — Paddle, as of Session 17)
 
 ```
 Customer pays via Paddle checkout
@@ -48,12 +48,12 @@ Customer pays via Paddle checkout
   → Webhook: createBYOKUser + createBYOKBot + createBYOKSubscription(pending_setup)
   → Customer navigates to wizard.tigerclaw.io
   → Wizard starts at flavor selection (no email step)
-  → Customer fills form: agent name, ICP, Telegram bot token, Gemini key
+  → Customer fills form: agent name, Telegram bot token, Gemini key
   → POST /wizard/hatch
   → BullMQ tenant-provisioning job
-  → Provisioner: registers Telegram webhook (with TELEGRAM_WEBHOOK_SECRET), sets bot name/description
-  → status → onboarding
-  → First message: confident ICP-based intro, no interview
+  → Provisioner: registers Telegram webhook (with TELEGRAM_WEBHOOK_SECRET), pre-seeds onboard_state.json with full ICP
+  → status → live
+  → First message: confident ICP-based intro, no interview, no questions asked
 ```
 
 **NOTE:** Paddle product + price not yet created. No checkout URL exists. This must be done before testing the full flow.
@@ -71,8 +71,8 @@ Customer pays via Paddle checkout
 - **Tools missing from `toolsMap` in `ai.ts` cause infinite loops — always register new tools**
 - Scoring threshold: **80** — not configurable
 
-### Registered Tools (25)
-tiger_onboard, tiger_scout, tiger_contact, tiger_aftercare, tiger_briefing, tiger_convert, tiger_export, tiger_email, tiger_hive, tiger_import, tiger_keys, tiger_lead, tiger_move, tiger_note, tiger_nurture, tiger_objection, tiger_score, tiger_score_1to10, tiger_search, tiger_settings, tiger_drive_list, tiger_strike_harvest, tiger_strike_draft, tiger_strike_engage, tiger_refine
+### Registered Tools (26)
+tiger_onboard, tiger_scout, tiger_contact, tiger_aftercare, tiger_briefing, tiger_convert, tiger_export, tiger_email, tiger_hive, tiger_import, tiger_keys, tiger_lead, tiger_move, tiger_note, tiger_nurture, tiger_objection, tiger_score, tiger_score_1to10, tiger_search, tiger_settings, tiger_drive_list, tiger_strike_harvest, tiger_strike_draft, tiger_strike_engage, tiger_refine, tiger_book_zoom
 
 ### Intentionally NOT Registered
 - `tiger_gmail_send` — removed Session 8. Gemini must never send from operator's personal Gmail without explicit human approval. File preserved in `api/src/tools/tiger_google_workspace.ts`.
@@ -205,7 +205,7 @@ GCP_PROJECT_ID=hybrid-matrix-472500-k5 bash ./ops/deploy-cloudrun.sh
 ```
 
 ### Wizard (Vercel)
-**Auto-deploy is broken.** Deploy manually from Vercel dashboard until Root Directory setting is fixed.
+Auto-deploy is **working**. Push to main triggers Vercel deploy automatically. Confirmed Session 15+.
 
 ### Post-Deploy Protocol (mandatory, every time)
 ```bash
@@ -222,7 +222,7 @@ curl -X POST https://api.tigerclaw.io/admin/fix-all-webhooks \
 
 ## 11. Test Coverage
 
-- **458 tests** across 43 test files. All passing as of Session 15 (PR #236).
+- **462 tests** across 44 test files. All passing as of Session 17 (PR #264).
 - Every tool in `toolsMap` has test coverage.
 - Run: `npm test` from `api/`
 - CI runs on every PR push.
@@ -234,13 +234,13 @@ curl -X POST https://api.tigerclaw.io/admin/fix-all-webhooks \
 | Item | Status |
 |------|--------|
 | Reddit mine source | ❌ 403 from Cloud Run egress. Oxylabs + Serper fallback working. |
-| Vercel auto-deploy | ✅ Confirmed working as of Session 15. |
+| Vercel auto-deploy | ✅ Confirmed working. Push to main → Vercel deploys automatically. |
 | Paddle product/price | ❌ Not yet created. Webhook live, but no checkout URL exists. |
 | Admin alert markdown | ⚠️ Partial — fails when error text contains underscores. Telegram Markdown v1 bug. |
 | Stripe | ❌ Placeholder. Not used. |
 | Zapier | ❌ Dead code. |
 | LINE | ❌ Deferred. Requires LINE Official Account. |
-| Customer-facing dashboard | ✅ Built. `GET/POST /dashboard/:slug` — session-token auth + ownership check (PR #210). |
+| Customer-facing dashboard | ✅ Built and readable. `GET/POST /dashboard/:slug` — session-token auth + ownership check (PR #210). Contrast fixed PR #267. |
 
 ---
 

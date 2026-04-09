@@ -1,6 +1,6 @@
 # State of the Tiger — Path Forward
 
-**Last Updated:** 2026-04-05 (Session 11)
+**Last Updated:** 2026-04-08 (Session 17 — PRs #263–#267 merged)
 
 **No lying. No assuming. No guessing.**
 
@@ -24,14 +24,47 @@
 | 12 | Tool Safety Audit + Admin Mine Controls | ✅ Done (Session 8) |
 | 13 | Full Reliability & Security Audit (57 issues) | ✅ Done (Sessions 9+10) — PRs #189–#209 |
 | 14 | Round 2 Audit (38 issues) + Phase 1 Security Fixes | ✅ Done (Session 11) — PR #210 |
+| 15 | Paddle Integration + Verbatim Mine Fix | ✅ Done (Session 15) — PRs #235–#237 |
+| 16 | ICP Hard-Wire + BYOB/BYOK Hatch Fixes | ✅ Done (Sessions 16–17) — PRs #251–#261 |
+| 17 | Strike Pipeline + Orchestrator Dedup + Dashboard Contrast | ✅ Done (Session 17) — PRs #263–#267 |
 
 ---
 
 ## Current Focus
 
-**Get first 10 customers running.** Operator + Jeff Mack + John (Thailand) have access to ~60,000 NuSkin distributors. Target: first 10 onboarded, running for one week, no fires. Then expand to next 40.
+**Get the bot into the hands of real prospects.** Brents Tiger 01 is live. No prospect has contacted it yet. Operator needs to send the bot link to warm contacts tonight.
 
-Jeff, John, and Debbie all need to complete the wizard. Links go to `wizard.tigerclaw.io/signup`.
+After first real conversations are confirmed: create Paddle product + price, prove the full payment loop, then expand to operator's distribution network (~60,000 NuSkin distributors via existing contacts).
+
+Bot link: `t.me/Brentstiger01_bot`
+
+---
+
+## Sessions 15–17 — What Was Done (2026-04-06 to 2026-04-08)
+
+### Session 17 — PRs #263–#267
+
+| PR | Fix |
+|----|-----|
+| #263 | Orchestrator Redis SETNX dedup — Reporting Agent was firing 5x per mine run due to research agent retry counts. Moved `markFactsQueued` before `draftReplies` in Strike pipeline. |
+| #264 | Strike harvest root cause: `verbatim` column doesn't exist in `market_intelligence`. SQL crash on every run since wiring. Removed from SELECT, interface, and prompt. First successful run confirmed: 20 engagement links, admin alert delivered. |
+| #265 | Rule 13 added to RULES.md: update RULES.md + SOTU.md after every merge. |
+| #267 | Dashboard contrast fix — admin fleet dashboard and customer dashboard illegible gray-on-dark text bumped to readable contrast levels. |
+
+### Sessions 15–16 — PRs #235–#261
+
+| PR | Fix |
+|----|-----|
+| #235 | Verbatim field in `tiger_refine.ts` — exact quotes required, 15-char minimum. Mine producing 1,684 facts/run with Oxylabs. |
+| #236 | Paddle webhook integration — HMAC-SHA256 verification, Redis idempotency, provisions BYOK user+bot+subscription on `transaction.completed`. |
+| #237 | Wizard flavor fix — 5 cut flavors removed, 8 canonical flavors remain. |
+| #251 | Bot-status fix — `wizard/bot-status` returned `pending` for admin-hatched bots. Added `'live'` status to isLive checks. |
+| #252 | Duplicate tenant bug — hatch was creating two records due to slug generated twice with different `Date.now()`. |
+| #253 | Dashboard isLive fix + Stan Store copy cleanup. |
+| #255 | ICP hard-wire — provisioner pre-seeds `onboard_state.json` at hatch. Bot wakes fully calibrated. No interview. |
+| #258 | WHAT_TIGER_CLAW_DOES.md — new product vision doc. |
+| #260 | `tiger_book_zoom` — Cal.com booking tool built and registered. Inactive pending booking architecture decision. |
+| #261 | 4-language `/start` greeting, language-matching system prompt, Strike pipeline wired to Reporting Agent, Interior Designer removed from wizard. |
 
 ---
 
@@ -144,10 +177,12 @@ On April 2, a live Zoom onboarding call with John (Thailand) failed completely. 
 
 | Item | Impact | Fix |
 |------|--------|-----|
-| Jeff / John / Debbie not onboarded | No paying customers running | Send them wizard link |
-| Vercel auto-deploy broken | Wizard must be deployed manually | Fix Root Directory in Vercel settings |
-| Reddit 403 from Cloud Run egress | Mine uses Serper fallback (working) | Awaiting Reddit API approval |
-| R2-P1-6: Stan Store Zapier race | Same-ms timestamp hits UNIQUE on stripe_subscription_id | Add Redis idempotency key on email+minute window (same pattern as Stripe dedup) |
+| No real prospect conversations yet | Bot live but no outsiders have contacted it | Operator sends `t.me/Brentstiger01_bot` to warm contacts |
+| Paddle product/price not created | No checkout URL — Paddle path unproven | Create product + price in Paddle dashboard |
+| Reddit 403 from Cloud Run egress | Mine uses Oxylabs + Serper fallback (working) | Awaiting Reddit API approval or Oxylabs Reddit proxy |
+| Admin alert markdown bug | Alerts with underscores in error text fail silently | Escape underscores in sendAdminAlert() |
+| Payment gate open (C4) | Anyone can access wizard without paying | Fix after Paddle loop proven |
+| Orphan tenant brents-tiger-01-mnpcril3 | Subscription active, no bot token | Terminate manually via admin |
 
 ---
 
@@ -187,10 +222,10 @@ On April 2, a live Zoom onboarding call with John (Thailand) failed completely. 
 |----------|-------|
 | GCP Project | `hybrid-matrix-472500-k5` |
 | Cloud Run | `tiger-claw-api` (us-central1 primary, asia-southeast1 secondary) |
-| Cloud SQL proxy | port **5433** locally, user `botcraft`, DB `tiger_claw_shared` |
+| Cloud SQL proxy | port **5433** locally, instance `tiger-claw-postgres-ha`, user `botcraft`, DB `tiger_claw_shared` |
 | Admin | `wizard.tigerclaw.io/admin` |
 | Deploys (API) | `GCP_PROJECT_ID=hybrid-matrix-472500-k5 bash ./ops/deploy-cloudrun.sh` |
-| Deploys (Wizard) | Manual — Vercel auto-deploy is broken |
+| Deploys (Wizard) | Vercel auto-deploy — push to main triggers deploy automatically |
 | Post-deploy | Run `POST /admin/fix-all-webhooks` (idempotent — webhook secret now baked into deploy) |
 
 ---
