@@ -271,7 +271,7 @@ export default function FleetDashboard() {
           </div>
           <form onSubmit={handleLogin} className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 space-y-4">
             <div>
-              <label className="text-xs text-zinc-400 font-medium block mb-1">Admin Token</label>
+              <label className="text-xs text-zinc-200 font-medium block mb-1">Admin Token</label>
               <input
                 type="password"
                 value={token}
@@ -304,14 +304,14 @@ export default function FleetDashboard() {
         <div className="flex items-center gap-3">
           <Shield className="w-5 h-5 text-orange-500" />
           <span className="font-bold text-white">Tiger Claw Fleet</span>
-          <span className="text-zinc-600 text-sm">|</span>
-          <span className="text-zinc-400 text-sm">
+          <span className="text-zinc-500 text-sm">|</span>
+          <span className="text-zinc-200 text-sm">
             {activeTenants} active · {tenants.length} total
           </span>
         </div>
         <div className="flex items-center gap-3">
           {lastRefreshed && (
-            <span className="text-zinc-500 text-xs">
+            <span className="text-zinc-300 text-xs">
               Updated {relativeTime(lastRefreshed.toISOString())}
             </span>
           )}
@@ -319,7 +319,7 @@ export default function FleetDashboard() {
             onClick={fixAllWebhooks}
             disabled={!!actionLoading["fix-webhooks"]}
             title="Re-register all Telegram webhooks with the secret token"
-            className="flex items-center gap-1.5 text-zinc-400 hover:text-orange-400 text-sm transition-colors disabled:opacity-50"
+            className="flex items-center gap-1.5 text-zinc-200 hover:text-orange-400 text-sm transition-colors disabled:opacity-50"
           >
             <Link className={`w-4 h-4 ${actionLoading["fix-webhooks"] ? "animate-pulse" : ""}`} />
             Fix Webhooks
@@ -327,14 +327,14 @@ export default function FleetDashboard() {
           <button
             onClick={() => fetchAll(token)}
             disabled={loading}
-            className="flex items-center gap-1.5 text-zinc-400 hover:text-white text-sm transition-colors disabled:opacity-50"
+            className="flex items-center gap-1.5 text-zinc-200 hover:text-white text-sm transition-colors disabled:opacity-50"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
             Refresh
           </button>
           <button
             onClick={handleLogout}
-            className="flex items-center gap-1.5 text-zinc-500 hover:text-red-400 text-sm transition-colors"
+            className="flex items-center gap-1.5 text-zinc-300 hover:text-red-400 text-sm transition-colors"
           >
             <LogOut className="w-4 h-4" />
             Out
@@ -360,7 +360,7 @@ export default function FleetDashboard() {
         {webhookFixResult && (
           <div className="bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 flex items-start justify-between gap-2">
             <span className="text-zinc-300 text-sm">{webhookFixResult}</span>
-            <button onClick={() => setWebhookFixResult(null)} className="text-zinc-600 hover:text-zinc-400 text-xs shrink-0">✕</button>
+            <button onClick={() => setWebhookFixResult(null)} className="text-zinc-400 hover:text-zinc-200 text-xs shrink-0">✕</button>
           </div>
         )}
 
@@ -370,14 +370,14 @@ export default function FleetDashboard() {
           <div className={`rounded-xl border p-4 ${pool ? poolStatusBg(pool.status) : "bg-zinc-900 border-zinc-800"}`}>
             <div className="flex items-center gap-2 mb-2">
               <Database className="w-4 h-4 text-zinc-400" />
-              <span className="text-xs text-zinc-400 font-medium">Bot Pool</span>
+              <span className="text-xs text-zinc-200 font-medium">Bot Pool</span>
             </div>
             {pool ? (
               <>
                 <div className={`text-2xl font-bold ${poolStatusColor(pool.status)}`}>
                   {pool.available}
                 </div>
-                <div className="text-xs text-zinc-500 mt-1">
+                <div className="text-xs text-zinc-300 mt-1">
                   {pool.assigned} assigned · {pool.total} total · <span className="capitalize">{pool.status}</span>
                 </div>
               </>
@@ -390,22 +390,22 @@ export default function FleetDashboard() {
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
             <div className="flex items-center gap-2 mb-2">
               <Activity className="w-4 h-4 text-zinc-400" />
-              <span className="text-xs text-zinc-400 font-medium">Active Agents</span>
+              <span className="text-xs text-zinc-200 font-medium">Active Agents</span>
             </div>
             <div className="text-2xl font-bold text-emerald-400">{activeTenants}</div>
-            <div className="text-xs text-zinc-500 mt-1">{tenants.length} total tenants</div>
+            <div className="text-xs text-zinc-300 mt-1">{tenants.length} total tenants</div>
           </div>
 
           {/* Messages 24h — heartbeat metric */}
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
             <div className="flex items-center gap-2 mb-2">
               <MessageSquare className="w-4 h-4 text-zinc-400" />
-              <span className="text-xs text-zinc-400 font-medium">Messages 24h</span>
+              <span className="text-xs text-zinc-200 font-medium">Messages 24h</span>
             </div>
             <div className={`text-2xl font-bold ${(conversations?.totalLast24h ?? 0) > 0 ? "text-orange-400" : "text-zinc-600"}`}>
               {conversations?.totalLast24h ?? "—"}
             </div>
-            <div className="text-xs text-zinc-500 mt-1">
+            <div className="text-xs text-zinc-300 mt-1">
               {conversations ? `${conversations.totalToday} today` : "loading..."}
             </div>
           </div>
@@ -414,24 +414,24 @@ export default function FleetDashboard() {
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
             <div className="flex items-center gap-2 mb-2">
               <Zap className="w-4 h-4 text-zinc-400" />
-              <span className="text-xs text-zinc-400 font-medium">Onboarding</span>
+              <span className="text-xs text-zinc-200 font-medium">Onboarding</span>
             </div>
             <div className="text-2xl font-bold text-blue-400">
               {tenants.filter((t) => t.status === "onboarding").length}
             </div>
-            <div className="text-xs text-zinc-500 mt-1">in progress</div>
+            <div className="text-xs text-zinc-300 mt-1">in progress</div>
           </div>
 
           {/* Issues */}
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
             <div className="flex items-center gap-2 mb-2">
               <AlertTriangle className="w-4 h-4 text-zinc-400" />
-              <span className="text-xs text-zinc-400 font-medium">Issues</span>
+              <span className="text-xs text-zinc-200 font-medium">Issues</span>
             </div>
             <div className={`text-2xl font-bold ${alarms.length > 0 ? "text-red-400" : "text-zinc-400"}`}>
               {alarms.length}
             </div>
-            <div className="text-xs text-zinc-500 mt-1">
+            <div className="text-xs text-zinc-300 mt-1">
               {alarms.length === 0 ? "all clear" : "need attention"}
             </div>
           </div>
@@ -444,7 +444,7 @@ export default function FleetDashboard() {
               <Bot className="w-4 h-4 text-orange-500" />
               <span className="font-semibold text-sm">Fleet</span>
             </div>
-            <span className="text-xs text-zinc-500">{tenants.length} tenants</span>
+            <span className="text-xs text-zinc-300">{tenants.length} tenants</span>
           </div>
 
           {tenants.length === 0 ? (
@@ -466,7 +466,7 @@ export default function FleetDashboard() {
                       {/* Expand toggle */}
                       <button
                         onClick={() => setExpandedTenant(isExpanded ? null : t.id)}
-                        className="text-zinc-600 hover:text-zinc-400 transition-colors shrink-0"
+                        className="text-zinc-400 hover:text-zinc-200 transition-colors shrink-0"
                       >
                         {isExpanded
                           ? <ChevronDown className="w-4 h-4" />
@@ -476,16 +476,16 @@ export default function FleetDashboard() {
                       {/* Name + email */}
                       <div className="flex-1 min-w-0">
                         <div className="text-sm font-medium text-white truncate">{t.name}</div>
-                        <div className="text-xs text-zinc-500 truncate">{t.email ?? t.slug}</div>
+                        <div className="text-xs text-zinc-300 truncate">{t.email ?? t.slug}</div>
                       </div>
 
                       {/* Flavor */}
-                      <div className="hidden md:block w-36 text-xs text-zinc-400 truncate">
+                      <div className="hidden md:block w-36 text-xs text-zinc-200 truncate">
                         {flavorLabel(t.flavor)}
                       </div>
 
                       {/* Channel */}
-                      <div className="hidden sm:block w-20 text-xs text-zinc-500 uppercase">
+                      <div className="hidden sm:block w-20 text-xs text-zinc-300 uppercase">
                         {t.preferredChannel}
                       </div>
 
@@ -497,7 +497,7 @@ export default function FleetDashboard() {
                       </div>
 
                       {/* Last active */}
-                      <div className="hidden lg:block w-24 text-xs text-zinc-500 text-right shrink-0">
+                      <div className="hidden lg:block w-24 text-xs text-zinc-300 text-right shrink-0">
                         {relativeTime(t.lastActivityAt)}
                       </div>
 
@@ -509,7 +509,7 @@ export default function FleetDashboard() {
                               onClick={() => tenantAction(t.id, "report")}
                               disabled={!!reportLoading}
                               title="Trigger daily scout"
-                              className="text-zinc-500 hover:text-orange-400 transition-colors disabled:opacity-40"
+                              className="text-zinc-300 hover:text-orange-400 transition-colors disabled:opacity-40"
                             >
                               <Eye className={`w-4 h-4 ${reportLoading ? "animate-pulse" : ""}`} />
                             </button>
@@ -517,7 +517,7 @@ export default function FleetDashboard() {
                               onClick={() => tenantAction(t.id, "suspend")}
                               disabled={!!suspendLoading}
                               title="Suspend tenant"
-                              className="text-zinc-500 hover:text-red-400 transition-colors disabled:opacity-40"
+                              className="text-zinc-300 hover:text-red-400 transition-colors disabled:opacity-40"
                             >
                               <Pause className={`w-4 h-4 ${suspendLoading ? "animate-pulse" : ""}`} />
                             </button>
@@ -528,7 +528,7 @@ export default function FleetDashboard() {
                             onClick={() => tenantAction(t.id, "resume")}
                             disabled={!!resumeLoading}
                             title="Resume tenant"
-                            className="text-zinc-500 hover:text-emerald-400 transition-colors disabled:opacity-40"
+                            className="text-zinc-300 hover:text-emerald-400 transition-colors disabled:opacity-40"
                           >
                             <Play className={`w-4 h-4 ${resumeLoading ? "animate-pulse" : ""}`} />
                           </button>
@@ -545,40 +545,40 @@ export default function FleetDashboard() {
                       return (
                         <div className="px-14 pb-4 pt-1 bg-zinc-800/30 text-xs text-zinc-400 grid grid-cols-2 md:grid-cols-4 gap-3">
                           <div>
-                            <div className="text-zinc-600 mb-0.5">Tenant ID</div>
+                            <div className="text-zinc-400 mb-0.5">Tenant ID</div>
                             <div className="font-mono text-zinc-300 truncate">{t.id}</div>
                           </div>
                           <div>
-                            <div className="text-zinc-600 mb-0.5">Slug</div>
+                            <div className="text-zinc-400 mb-0.5">Slug</div>
                             <div className="font-mono text-zinc-300">{t.slug}</div>
                           </div>
                           <div>
-                            <div className="text-zinc-600 mb-0.5">Region / Language</div>
+                            <div className="text-zinc-400 mb-0.5">Region / Language</div>
                             <div className="text-zinc-300">{t.region} / {t.language}</div>
                           </div>
                           <div>
-                            <div className="text-zinc-600 mb-0.5">Created</div>
+                            <div className="text-zinc-400 mb-0.5">Created</div>
                             <div className="text-zinc-300">{relativeTime(t.createdAt)}</div>
                           </div>
                           <div>
-                            <div className="text-zinc-600 mb-0.5">Messages (24h / today)</div>
+                            <div className="text-zinc-400 mb-0.5">Messages (24h / today)</div>
                             <div className={`font-medium ${(convoStat?.messagesLast24h ?? 0) > 0 ? "text-orange-300" : "text-zinc-500"}`}>
                               {convoStat ? `${convoStat.messagesLast24h} / ${convoStat.messagesToday}` : "—"}
                             </div>
                           </div>
                           <div>
-                            <div className="text-zinc-600 mb-0.5">Last Message</div>
+                            <div className="text-zinc-400 mb-0.5">Last Message</div>
                             <div className="text-zinc-300">{relativeTime(convoStat?.lastMessageAt ?? t.lastActivityAt)}</div>
                           </div>
                           {t.suspendedReason && (
                             <div className="col-span-2 md:col-span-4">
-                              <div className="text-zinc-600 mb-0.5">Suspension Reason</div>
+                              <div className="text-zinc-400 mb-0.5">Suspension Reason</div>
                               <div className="text-red-400">{t.suspendedReason}</div>
                             </div>
                           )}
                           {t.canaryGroup && (
                             <div>
-                              <div className="text-zinc-600 mb-0.5">Canary Group</div>
+                              <div className="text-zinc-400 mb-0.5">Canary Group</div>
                               <div className="text-purple-400">{t.canaryGroup}</div>
                             </div>
                           )}
@@ -596,7 +596,7 @@ export default function FleetDashboard() {
         {pool && pool.status !== "healthy" && (
           <div className={`rounded-xl border p-4 text-sm ${poolStatusBg(pool.status)}`}>
             <div className={`font-semibold mb-1 ${poolStatusColor(pool.status)}`}>Pool Action Required</div>
-            <div className="text-zinc-400 font-mono text-xs">{pool.action}</div>
+            <div className="text-zinc-200 font-mono text-xs">{pool.action}</div>
           </div>
         )}
 
