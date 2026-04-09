@@ -104,6 +104,17 @@ export async function reportResearchComplete(runId: string, factsSaved: number):
     console.log(`[Orchestrator] Research progress: ${completed}/${expected} flavors complete (run: ${runId})`);
 
     if (completed >= expected) {
+        // One-shot guard — only trigger Reporting Agent once per run.
+        // Research Agent failure retries can push `completed` past `expected`,
+        // and removeOnComplete:true clears the BullMQ dedup key. SETNX prevents
+        // the reporting agent from firing more than once for the same runId.
+        const claimed = await orchestratorConnection.setnx(`orchestrator:run:${runId}:reported`, '1');
+        await orchestratorConnection.expire(`orchestrator:run:${runId}:reported`, 86400);
+        if (!claimed) {
+            console.log(`[Orchestrator] Reporting Agent already triggered for run ${runId} — skipping duplicate`);
+            return;
+        }
+
         const totalStr = await orchestratorConnection.get(`orchestrator:run:${runId}:facts_saved`);
         const totalFacts = parseInt(totalStr ?? '0', 10);
         console.log(`[Orchestrator] All research complete. Total facts: ${totalFacts}. Triggering Reporting Agent.`);
