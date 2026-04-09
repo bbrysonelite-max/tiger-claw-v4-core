@@ -28,20 +28,23 @@
 | 16 | ICP Hard-Wire + BYOB/BYOK Hatch Fixes | ✅ Done (Sessions 16–17) — PRs #251–#261 |
 | 17 | Strike Pipeline + Orchestrator Dedup + Dashboard Contrast | ✅ Done (Session 17) — PRs #263–#267 |
 | 18 | Prospect Engagement Mode + Bot Persona Fixes | ✅ Done (Session 17 close) — PRs #269–#272 |
+| 19 | Remove Bot Pool — BYOB only, all tokens from BotFather | ✅ Done (Session 18) — PR #274 |
 
 ---
 
 ## Current Focus
 
-**Validate the first real prospect conversation.** Brents Tiger 01 is live with prospect engagement mode deployed. Two people were messaging at session close (11:40 PM PT 2026-04-09). Check what they actually received — was it warm and human or did something break?
-
-After first real conversation is confirmed: create Paddle product + price, prove the full payment loop, then expand to operator's distribution network (~60,000 NuSkin distributors via existing contacts).
-
-Bot link: `t.me/Brentstiger01_bot`
+**Agent intelligence + first real conversation.** Tigeralldaytest is the active bot with a valid BYOK Gemini key. Bot pool dead code is gone. Next: validate agent conversation quality and wire Cal.com booking.
 
 ---
 
 ## Sessions 15–17 — What Was Done (2026-04-06 to 2026-04-08)
+
+### Session 18 — PR #274
+
+| PR | Fix |
+|----|-----|
+| #274 | Remove bot pool: 5,559 lines deleted. All `bot_pool` DB functions, `/admin/pool/*` routes, ops scripts, docs gone. `pool.ts` is crypto/Telegram utilities only. BYOB rule added loudly to CLAUDE.md and RULES.md. Eliminated the silent fallback chain (missing BYOK → platform key → 429 → OpenRouter) that burned $100. 456/456 tests passing. |
 
 ### Session 17 — PRs #263–#272
 
