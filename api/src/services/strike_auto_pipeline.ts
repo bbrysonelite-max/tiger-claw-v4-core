@@ -47,21 +47,23 @@ export async function runStrikeAutoPipeline(): Promise<void> {
     }
     console.log(`[StrikePipeline] Harvested ${facts.length} facts`);
 
-    // 2. Draft replies using platform Gemini key
+    // 2. Mark facts as queued immediately — before drafting.
+    // Drafts are best-effort. A Gemini failure must not prevent facts from
+    // being marked queued, otherwise every failed run re-processes the same facts.
+    await markFactsQueued(facts.map(f => f.id));
+
+    // 3. Draft replies using platform Gemini key
     const drafts = await draftReplies(facts, platformKey);
     if (drafts.length === 0) {
-        console.log('[StrikePipeline] No drafts generated');
+        console.log('[StrikePipeline] No drafts generated — facts queued, alert skipped');
         return;
     }
 
-    // 3. Generate Web Intent URLs
+    // 4. Generate Web Intent URLs
     const links = generateIntentLinks(facts, drafts);
 
-    // 4. Send admin alert with links
+    // 5. Send admin alert with links
     await sendStrikeReport(facts.length, links);
-
-    // 5. Mark facts as queued
-    await markFactsQueued(facts.map(f => f.id));
 
     console.log(`[StrikePipeline] Done — ${links.length} engagement links generated`);
 }
