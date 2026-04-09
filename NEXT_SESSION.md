@@ -4,6 +4,8 @@
 
 These are the marching orders. Do them in order. Do not skip ahead. Do not add features not on this list.
 
+*** Recommend how multiple agents can be used. 
+
 ---
 
 ## Immediate — Do Before Anything Else
