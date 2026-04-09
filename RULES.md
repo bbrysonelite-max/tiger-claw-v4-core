@@ -119,6 +119,18 @@ Also update `SOTU.md` — mark resolved issues closed, add new ones, update serv
 
 ---
 
+## 15. There Is No Bot Pool — BYOB Always
+
+**ALL Telegram bot tokens come from BotFather. The operator provides their own token. The platform never holds a pool.**
+
+- No `bot_pool` table queries. No pool assignment. No pool replenishment.
+- `pool.ts` is a crypto/Telegram utility file only. It does not manage a pool.
+- If you find pool code anywhere, delete it — do not refactor, migrate, or preserve it.
+- Admin tokens are operator-held. Failed tokens get replaced by the operator.
+- This is permanent. Violation of this rule has cost real money (OpenRouter drain from silent fallback). Do not repeat it.
+
+---
+
 ## 14. Never Reference Individual People by Name
 
 Do not reference specific individuals (distributors, contacts, partners, or anyone in the operator's network) by name in code, documentation, comments, prompts, or conversation. The platform must stand on its own merit independent of any specific person. Refer to roles only (e.g. "operator," "distributor," "contact") — never names.

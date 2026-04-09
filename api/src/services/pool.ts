@@ -1,43 +1,16 @@
-// Tiger Claw — Bot Token Pool Service
-// Pre-created Telegram bots assigned to customers at payment time.
-// Customer never touches BotFather — LOCKED (Block 5.3 Decision 1)
-//
-// Tokens are stored AES-256-GCM encrypted in PostgreSQL.
-// Encryption key: ENCRYPTION_KEY env var (any string, SHA-256 derived to 32 bytes).
-//
-// Lifecycle:
-//   importToken  → validate → clearWebhook → insert as 'available'
-//   getNextAvailable → select oldest available
-//   assignToTenant   → status: 'assigned', records tenant_id + assigned_at
-//   releaseBot       → reset display name/description via Telegram API → status: 'available'
-//   retireBot        → status: 'retired' (token revoked or problem)
-//
-// Reset on release:
-//   - deleteWebhook (clear any existing webhook)
-//   - setMyName: "Tiger Claw Agent"
-//   - setMyDescription: "Tiger Claw powered agent."
-//   - setMyShortDescription: "Tiger Claw Agent"
+// Tiger Claw — Token Crypto & Telegram Utilities
+// AES-256-GCM encryption for bot tokens stored at rest.
+// All bot tokens are BYOB — operators provide their own BotFather token.
+// There is no platform bot pool. Do not re-introduce pool operations here.
 
 import * as crypto from "crypto";
 import * as https from "https";
 import * as http from "http";
-import {
-  insertBotPoolEntry,
-  getNextAvailableBotEntry,
-  getBotPoolEntry,
-  getBotPoolEntryByUsername,
-  assignBotToTenant,
-  releaseBotToPool,
-  retireBotFromPool,
-  getPoolCounts,
-  type BotPoolEntry,
-} from "./db.js";
 
 // ---------------------------------------------------------------------------
 // Encryption helpers
 // AES-256-GCM with a 32-byte key derived from ENCRYPTION_KEY via SHA-256.
 // Stored format: "enc:iv_hex:authtag_hex:ciphertext_hex"
-// Plaintext fallback if ENCRYPTION_KEY is not set (dev/test only).
 // ---------------------------------------------------------------------------
 
 function getEncKey(): Buffer | null {
@@ -79,7 +52,7 @@ export function decryptToken(stored: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// Telegram API helper — uses a specific bot token for API calls
+// Telegram API helper
 // ---------------------------------------------------------------------------
 
 interface TelegramResponse<T> {
@@ -127,140 +100,8 @@ function telegramRequest<T>(
 }
 
 // ---------------------------------------------------------------------------
-// Pool operations
-// ---------------------------------------------------------------------------
-
-export interface ImportResult {
-  ok: boolean;
-  botId?: string;
-  username?: string;
-  telegramBotId?: string;
-  error?: string;
-}
-
-/**
- * Validate a token against Telegram getMe, clear its webhook,
- * and insert into the pool as 'available'.
- */
-export async function importToken(token: string, phoneAccount?: string): Promise<ImportResult> {
-  // Validate via getMe
-  let getMeResult: TelegramResponse<{ id: number; username: string; first_name: string }>;
-  try {
-    getMeResult = await telegramRequest(token, "getMe");
-  } catch (err) {
-    return { ok: false, error: `Telegram unreachable: ${err instanceof Error ? err.message : String(err)}` };
-  }
-
-  if (!getMeResult.ok || !getMeResult.result) {
-    return { ok: false, error: `Invalid token: ${getMeResult.description ?? "unknown error"}` };
-  }
-
-  const { id: botId, username } = getMeResult.result;
-
-  // Clear any existing webhook so the pool bot doesn't receive conflicting updates
-  try {
-    await telegramRequest(token, "deleteWebhook", { drop_pending_updates: true });
-  } catch {
-    // Non-fatal — continue
-  }
-
-  // Encrypt and store
-  const encryptedToken = encryptToken(token);
-  try {
-    const entry = await insertBotPoolEntry({
-      botToken: encryptedToken,
-      botUsername: username,
-      telegramBotId: String(botId),
-      phoneAccount,
-    });
-    return { ok: true, botId: entry.id, username, telegramBotId: String(botId) };
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    // Duplicate telegram_bot_id → already imported
-    if (msg.includes("unique") || msg.includes("duplicate")) {
-      return { ok: false, error: `Bot @${username} (id: ${botId}) already in pool.` };
-    }
-    return { ok: false, error: `DB insert failed: ${msg}` };
-  }
-}
-
-export interface BatchImportResult {
-  imported: number;
-  failed: number;
-  results: ImportResult[];
-}
-
-/** Run importToken on each token, return summary. */
-export async function importBatch(tokens: string[], phoneAccount?: string): Promise<BatchImportResult> {
-  const results: ImportResult[] = [];
-  for (const token of tokens) {
-    const t = token.trim();
-    if (!t) continue;
-    results.push(await importToken(t, phoneAccount));
-  }
-  return {
-    imported: results.filter((r) => r.ok).length,
-    failed: results.filter((r) => !r.ok).length,
-    results,
-  };
-}
-
-/** Return the next available bot from the pool, or null if pool is empty. */
-export async function getNextAvailable(): Promise<BotPoolEntry | null> {
-  return getNextAvailableBotEntry();
-}
-
-/** Mark a bot as assigned to a tenant. */
-export async function assignToTenant(botId: string, tenantId: string): Promise<void> {
-  await assignBotToTenant(botId, tenantId);
-}
-
-/**
- * Reset bot identity via Telegram API and return to available pool.
- * Clears webhook, resets display name, description, short description.
- */
-export async function releaseBot(botId: string): Promise<void> {
-  const entry = await getBotPoolEntry(botId);
-  if (!entry) throw new Error(`Bot pool entry ${botId} not found`);
-
-  const token = decryptToken(entry.botToken);
-
-  // Best-effort Telegram resets — don't throw if any fail
-  const resets: Array<[string, Record<string, unknown>]> = [
-    ["deleteWebhook", { drop_pending_updates: true }],
-    ["setMyName", { name: "Tiger Claw Agent" }],
-    ["setMyDescription", { description: "Tiger Claw powered agent." }],
-    ["setMyShortDescription", { short_description: "Tiger Claw Agent" }],
-  ];
-
-  for (const [method, body] of resets) {
-    try {
-      await telegramRequest(token, method, body);
-    } catch {
-      // Non-fatal — bot identity reset is best-effort
-    }
-  }
-
-  await releaseBotToPool(botId);
-}
-
-/** Permanently retire a bot (token revoked, reported, or problematic). */
-export async function retireBot(botId: string): Promise<void> {
-  await retireBotFromPool(botId);
-}
-
-/** Return counts: available, assigned, retired. */
-export async function getPoolStatus(): Promise<{ available: number; assigned: number; retired: number }> {
-  return getPoolCounts();
-}
-
-// Re-export for use in admin routes
-export { getBotPoolEntry, getBotPoolEntryByUsername };
-
-// ---------------------------------------------------------------------------
-// Bot customization — call from tiger_onboard after naming ceremony
-// Updates the assigned bot's display name and description.
-// Called with the bot's own token so it can update itself.
+// Bot customization — updates the BYOB bot's display name and description.
+// Called with the operator's bot token after hatch.
 // ---------------------------------------------------------------------------
 
 export async function customizeBotIdentity(
@@ -285,7 +126,6 @@ export async function customizeBotIdentity(
         console.warn(`[pool] ${method} returned not-ok: ${result.description}`);
       }
     } catch (err) {
-      // Non-fatal — bot name update is best-effort
       console.warn(`[pool] ${method} failed:`, err instanceof Error ? err.message : err);
     }
   }
@@ -293,7 +133,6 @@ export async function customizeBotIdentity(
 
 // ---------------------------------------------------------------------------
 // HTTP request helper for internal API calls (non-Telegram)
-// Used by pool alerts path in index.ts
 // ---------------------------------------------------------------------------
 export function httpPost(url: string, body: Record<string, unknown>, authToken: string): void {
   const parsed = new URL(url);
@@ -312,7 +151,7 @@ export function httpPost(url: string, body: Record<string, unknown>, authToken: 
         "Authorization": `Bearer ${authToken}`,
       },
     },
-    () => {} // fire-and-forget
+    () => {}
   );
   req.on("error", (err) => { console.error("[pool] httpPost failed:", err.message); });
   req.write(bodyStr);

@@ -52,7 +52,28 @@ The full loop (pay → provision → hatch → scout → contact → reply with 
 
 ---
 
-## What Was Done This Session (Session 17 — 2026-04-08/09)
+## What Was Done This Session (Session 18 — 2026-04-09)
+
+**PR #274 merged:**
+
+1. **PR #274 — Remove bot pool (BYOB only)**
+   - Deleted 5,559 lines of dead bot pool code: all `bot_pool` DB functions, all `/admin/pool/*` routes, `ops/create-bot-pool/`, `ops/botpool/`, `docs/operations/BOT-POOL-MANUAL-IMPORT.md`, `ops/admin-bot/src/commands/pool.ts`.
+   - `pool.ts` is now crypto/Telegram utilities only — no pool logic.
+   - `getTenantBotToken` / `getTenantBotUsername` read from `tenants` table only — bot_pool fallback removed.
+   - `fixBotPoolOrphans()` startup call removed from `index.ts`.
+   - CLAUDE.md and RULES.md (Rule 15) now loudly declare BYOB. No agent can miss it.
+   - Root cause of OpenRouter $100 drain: missing BYOK → platform key → 429 → circuit breaker → OpenRouter. That fallback chain is dead.
+   - 456/456 tests passing.
+
+**Also this session:**
+- Fleet cleaned: 8 test/orphan tenants terminated (FiretestApril5, Teddy Tiger Claw, Tigertest100, Tigertest1001, Tiger Test 102, orphan brents-tiger-01-mnpcril3, Zapier Test, FiretestagentApril6)
+- Old Brents Tiger 01 (56d45bfd) terminated — had no BYOK key, was burning platform key every minute
+- Tigeralldaytest (3bf45773) provisioned with valid BYOK Gemini key — confirmed `source=bot_ai_config`
+- Manual mine forced: 684 facts saved, all 8 flavors, 2 minutes
+
+---
+
+## What Was Done Previously (Session 17 — 2026-04-08/09)
 
 **PRs #263–#272 merged:**
 
