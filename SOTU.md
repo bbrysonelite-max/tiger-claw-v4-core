@@ -1,6 +1,6 @@
 # Tiger Claw — State of the Union
 
-**Last updated:** 2026-04-09 (Session 17 close — PRs #263–#272 merged)
+**Last updated:** 2026-04-09 (Session 18 — PRs #274–#275 merged)
 **This is the single source of truth. Read nothing else until you finish this file.**
 
 ---
@@ -45,16 +45,22 @@ The full loop (pay → provision → hatch → scout → contact → reply with 
 
 ## Current Platform State
 
-**Last deployed revision:** `tiger-claw-api-00434-c6h` (deployed 2026-04-09, Session 17 close)
-**Health (last verified 2026-04-09):** postgres OK, redis OK, workers OK
-**Tests:** 462/462 passing
+**Last deployed revision:** PR #275 (deployed 2026-04-09, Session 18)
+**Health (last verified 2026-04-09):** postgres OK, redis OK, workers OK, disk OK
+**Tests:** 456/456 passing
 **Wizard:** `wizard.tigerclaw.io` — Vercel, auto-deploy confirmed working
 
 ---
 
 ## What Was Done This Session (Session 18 — 2026-04-09)
 
-**PR #274 merged:**
+**PRs #274–#275 merged:**
+
+2. **PR #275 — Restore updateTenantChannelConfig + remove /fix-pool-orphans route**
+   - PR #274 accidentally deleted `updateTenantChannelConfig` from `db.ts` — it was defined immediately after the bot pool block and was caught in the deletion. Used in `tenants.ts` and `wizard.ts` for WhatsApp/LINE channel config updates.
+   - `/admin/fix-pool-orphans` route in `admin.ts` was missed during pool cleanup — still dynamically imported deleted `fixBotPoolOrphans`. Removed.
+   - Deploy had failed (build error). This unblocked it. All three CI workflows green.
+   - 456/456 tests passing, zero TS errors, health confirmed live.
 
 1. **PR #274 — Remove bot pool (BYOB only)**
    - Deleted 5,559 lines of dead bot pool code: all `bot_pool` DB functions, all `/admin/pool/*` routes, `ops/create-bot-pool/`, `ops/botpool/`, `docs/operations/BOT-POOL-MANUAL-IMPORT.md`, `ops/admin-bot/src/commands/pool.ts`.

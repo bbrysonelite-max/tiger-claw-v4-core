@@ -28,7 +28,7 @@
 | 16 | ICP Hard-Wire + BYOB/BYOK Hatch Fixes | ✅ Done (Sessions 16–17) — PRs #251–#261 |
 | 17 | Strike Pipeline + Orchestrator Dedup + Dashboard Contrast | ✅ Done (Session 17) — PRs #263–#267 |
 | 18 | Prospect Engagement Mode + Bot Persona Fixes | ✅ Done (Session 17 close) — PRs #269–#272 |
-| 19 | Remove Bot Pool — BYOB only, all tokens from BotFather | ✅ Done (Session 18) — PR #274 |
+| 19 | Remove Bot Pool — BYOB only, all tokens from BotFather | ✅ Done (Session 18) — PRs #274–#275 |
 
 ---
 
@@ -40,11 +40,12 @@
 
 ## Sessions 15–17 — What Was Done (2026-04-06 to 2026-04-08)
 
-### Session 18 — PR #274
+### Session 18 — PRs #274–#275
 
 | PR | Fix |
 |----|-----|
 | #274 | Remove bot pool: 5,559 lines deleted. All `bot_pool` DB functions, `/admin/pool/*` routes, ops scripts, docs gone. `pool.ts` is crypto/Telegram utilities only. BYOB rule added loudly to CLAUDE.md and RULES.md. Eliminated the silent fallback chain (missing BYOK → platform key → 429 → OpenRouter) that burned $100. 456/456 tests passing. |
+| #275 | Post-#274 collateral fix: `updateTenantChannelConfig` accidentally deleted from `db.ts` (WhatsApp/LINE channel config — not pool code). `/admin/fix-pool-orphans` route still referenced deleted `fixBotPoolOrphans`. Both fixed. Deploy was failing; this unblocked it. All CI green. |
 
 ### Session 17 — PRs #263–#272
 
