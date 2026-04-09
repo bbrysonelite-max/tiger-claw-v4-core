@@ -70,7 +70,7 @@ async function handleStart(tenantId: string, botToken: string, chatId: number) {
         `สวัสดี ฉัน${agentName} ฉันพร้อมที่จะพาคุณไปสู่อนาคตที่สดใสกว่า\n\n` +
         `Hola, soy ${agentName}. Estoy aquí para guiarte hacia un futuro más brillante.\n\n` +
         `Hallo, ich bin ${agentName}. Ich bin hier, um dich in eine bessere Zukunft zu führen.\n\n` +
-        `Let's get to work! I'm having my nails done later!`;
+        `What's going on for you right now?`;
 
     await tgSend(botToken, chatId, greeting);
 

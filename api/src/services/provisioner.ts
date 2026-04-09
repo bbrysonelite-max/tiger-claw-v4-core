@@ -206,7 +206,7 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
       try {
         console.log(`[provisioner] Rebranding Telegram profile...`);
         await tgFetch(`https://api.telegram.org/bot${resolvedBotToken}/setMyName?name=${encodeURIComponent(tenant.name)}`);
-        const description = `AI-powered ${input.flavor} agent for ${tenant.name}. Managed by Tiger Claw.`;
+        const description = `Let me take you by the hand and lead you to your brighter future.`;
         await tgFetch(`https://api.telegram.org/bot${resolvedBotToken}/setMyDescription?description=${encodeURIComponent(description)}`);
         steps.push(`Telegram profile rebranded to: ${tenant.name}`);
       } catch (rebrandErr) {
