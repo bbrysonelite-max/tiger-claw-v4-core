@@ -1,6 +1,6 @@
 # State of the Tiger — Path Forward
 
-**Last Updated:** 2026-04-08 (Session 17 — PRs #263–#267 merged)
+**Last Updated:** 2026-04-09 (Session 17 close — PRs #263–#272 merged)
 
 **No lying. No assuming. No guessing.**
 
@@ -27,14 +27,15 @@
 | 15 | Paddle Integration + Verbatim Mine Fix | ✅ Done (Session 15) — PRs #235–#237 |
 | 16 | ICP Hard-Wire + BYOB/BYOK Hatch Fixes | ✅ Done (Sessions 16–17) — PRs #251–#261 |
 | 17 | Strike Pipeline + Orchestrator Dedup + Dashboard Contrast | ✅ Done (Session 17) — PRs #263–#267 |
+| 18 | Prospect Engagement Mode + Bot Persona Fixes | ✅ Done (Session 17 close) — PRs #269–#272 |
 
 ---
 
 ## Current Focus
 
-**Get the bot into the hands of real prospects.** Brents Tiger 01 is live. No prospect has contacted it yet. Operator needs to send the bot link to warm contacts tonight.
+**Validate the first real prospect conversation.** Brents Tiger 01 is live with prospect engagement mode deployed. Two people were messaging at session close (11:40 PM PT 2026-04-09). Check what they actually received — was it warm and human or did something break?
 
-After first real conversations are confirmed: create Paddle product + price, prove the full payment loop, then expand to operator's distribution network (~60,000 NuSkin distributors via existing contacts).
+After first real conversation is confirmed: create Paddle product + price, prove the full payment loop, then expand to operator's distribution network (~60,000 NuSkin distributors via existing contacts).
 
 Bot link: `t.me/Brentstiger01_bot`
 
@@ -42,7 +43,7 @@ Bot link: `t.me/Brentstiger01_bot`
 
 ## Sessions 15–17 — What Was Done (2026-04-06 to 2026-04-08)
 
-### Session 17 — PRs #263–#267
+### Session 17 — PRs #263–#272
 
 | PR | Fix |
 |----|-----|
@@ -50,6 +51,11 @@ Bot link: `t.me/Brentstiger01_bot`
 | #264 | Strike harvest root cause: `verbatim` column doesn't exist in `market_intelligence`. SQL crash on every run since wiring. Removed from SELECT, interface, and prompt. First successful run confirmed: 20 engagement links, admin alert delivered. |
 | #265 | Rule 13 added to RULES.md: update RULES.md + SOTU.md after every merge. |
 | #267 | Dashboard contrast fix — admin fleet dashboard and customer dashboard illegible gray-on-dark text bumped to readable contrast levels. |
+| #268 | Session docs update (partial) — START_HERE, ARCHITECTURE, STATE_OF_THE_TIGER_PATH_FORWARD updated. |
+| #269 | Provisioner botName top-level fix (CRITICAL) — `botName` written inside `identity{}` only; code reads at top level. Gemini saw "Bot name: —" and entered confused self-onboarding loop. Fixed: `botName` + `completedAt` written at top level on every hatch. Direct DB fix + polluted fact_anchors cleaned on live bot. |
+| #270 | Prospect engagement mode — system prompt was 100% operator-management frame. Added: WHO YOU ARE TALKING TO block, dream injection directive, covenant opening for new conversations, HARD RULE: never surface internal state. 4 prospect voice examples added. |
+| #271 | Bot description + /start message — description exposed "Tiger Claw" brand to prospects. Replaced with covenant line. /start ending "I'm having my nails done later!" → "What's going on for you right now?" Live bot updated immediately. |
+| #272 | No tool names in responses — previous rule missed shorthand variants (tigerlead, tigernurture, tigerstrikedraft, etc.). Explicitly listed all variants. Added: never explain reasoning out loud mid-message. |
 
 ### Sessions 15–16 — PRs #235–#261
 
@@ -177,7 +183,7 @@ On April 2, a live Zoom onboarding call with John (Thailand) failed completely. 
 
 | Item | Impact | Fix |
 |------|--------|-----|
-| No real prospect conversations yet | Bot live but no outsiders have contacted it | Operator sends `t.me/Brentstiger01_bot` to warm contacts |
+| Prospect mode unvalidated | Deployed but no confirmed successful prospect conversation. Two messaged at session close. | Check conversations first thing next session |
 | Paddle product/price not created | No checkout URL — Paddle path unproven | Create product + price in Paddle dashboard |
 | Reddit 403 from Cloud Run egress | Mine uses Oxylabs + Serper fallback (working) | Awaiting Reddit API approval or Oxylabs Reddit proxy |
 | Admin alert markdown bug | Alerts with underscores in error text fail silently | Escape underscores in sendAdminAlert() |

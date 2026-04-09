@@ -4,45 +4,48 @@
 
 ---
 
-## Current Session State (2026-04-08 — Session 17 — PRs #263–#267 merged)
+## Current Session State (2026-04-09 — Session 17 CLOSED — PRs #263–#272 merged)
 
-### 462/462 tests passing. PRs #251–#267 merged. Cloud Run revision 00422-xc6 live. Wizard on Vercel (auto-deploy).
+### 462/462 tests passing. PRs #251–#272 merged. Cloud Run revision 00434-c6h live. Wizard on Vercel (auto-deploy).
 
-**Session 17 shipped (PRs #263–#267):**
+**Session 17 shipped (PRs #263–#272):**
 - **PR #263 — Orchestrator dedup + strike queuing fix:** Research agent retry failures pushed `completed` past `expected`, re-triggering Reporting Agent 5x. Fixed with Redis SETNX one-shot guard. Also moved `markFactsQueued` before `draftReplies` so facts are always queued even on Gemini failure.
-- **PR #264 — Strike harvest verbatim column fix (ROOT CAUSE):** `harvestFacts()` selected `verbatim` from `market_intelligence` — column does not exist. Every pipeline run crashed silently at first DB query. Removed from SELECT + interface + prompt. **First successful run confirmed: operator received 20-link Telegram alert.**
+- **PR #264 — Strike harvest verbatim column fix (ROOT CAUSE):** `harvestFacts()` selected `verbatim` from `market_intelligence` — column does not exist. Every pipeline run crashed silently. Removed from SELECT + interface + prompt. **First successful run: 20-link alert received.**
 - **PR #265 — Rule 13 added to RULES.md:** After every merge, update RULES.md and SOTU.md.
-- **PR #267 — Dashboard contrast fix:** Admin fleet dashboard + customer dashboard — all `text-zinc-400/500/600` labels on dark backgrounds bumped to readable `zinc-200/300/400`. Zero-state indicators preserved.
+- **PR #267 — Dashboard contrast fix:** Admin + customer dashboard — all `text-zinc-400/500/600` labels bumped to readable `zinc-200/300/400`. Zero-state indicators preserved.
+- **PR #268 — Session 17 docs update (partial):** START_HERE, ARCHITECTURE, STATE_OF_THE_TIGER_PATH_FORWARD updated.
+- **PR #269 — Provisioner botName top-level fix (CRITICAL):** `botName` was written inside `identity{}` only. Code reads `state.botName` at top level. Gemini saw "Bot name: —" and entered confused self-onboarding loop, asking prospects "What is your name?" Fixed: `botName` + `completedAt` now written at top level on every hatch. Direct DB fix applied to live bot. Polluted fact_anchors cleaned.
+- **PR #270 — Prospect engagement mode:** System prompt had no prospect context — bot was 100% operator-management frame. Added: WHO YOU ARE TALKING TO block, dream injection directive, covenant opening, explicit voice examples, HARD RULE: never surface internal system state.
+- **PR #271 — Bot description + /start message:** Description was "AI-powered network-marketer agent for Brents Tiger 01. Managed by Tiger Claw." Replaced with covenant line. Live bot updated immediately via Telegram Bot API. /start ending fixed: "Let's get to work! I'm having my nails done later!" → "What's going on for you right now?"
+- **PR #272 — No tool names in responses:** Previous rule missed shorthand variants (tigerlead, tigernurture, tigerstrikedraft, etc.). Explicitly listed all variants. Added: never explain reasoning out loud mid-message.
 
 **Session 16 shipped (PRs #251–#261):**
-- **PR #251 — bot-status fix:** `GET /wizard/bot-status` returned `pending` for admin-hatched bots. Added `'live'` to both isLive checks in `wizard.ts`.
-- **PR #252 — duplicate tenant fix (critical):** Hatch was creating two tenant records. Slug generated twice. Fixed: generate slug once, pass as `precomputedSlug`.
-- **PR #253 — dashboard isLive + Stan Store cleanup.**
-- **PR #255 — ICP hard-wire:** Provisioner pre-seeds `onboard_state.json` at hatch. Bot wakes up calibrated — **no interview, no questions asked**.
-- **PR #258 — WHAT_TIGER_CLAW_DOES.md:** New product vision doc.
-- **PR #260 — `tiger_book_zoom`:** Cal.com booking tool built and registered. Deferred — needs platform booking architecture decision.
-- **PR #261 — first impression + language matching + strike pipeline + wizard cleanup.**
-- **Brents Tiger 01 (@Brentstiger01_bot) confirmed live and responding on Telegram.**
+- **PR #255 — ICP hard-wire:** Provisioner pre-seeds `onboard_state.json` at hatch. Bot wakes calibrated — **no interview, no questions asked.**
+- **PR #261 — 4-language /start + language matching + Strike pipeline wired.**
+- (Other PRs: #251 bot-status, #252 duplicate tenant, #253 dashboard isLive, #258 WHAT_TIGER_CLAW_DOES, #260 tiger_book_zoom)
 
 **Full assessment in `MODULE_ASSESSMENT.md`. Read it before writing any code.**
 
 ### FIRST PRIORITY NEXT SESSION
 
-1. **Send bot link to warm contacts** — Operator action. `t.me/Brentstiger01_bot`. Document first real prospect conversation.
-2. **Create Paddle product + price** — No checkout URL exists. No Paddle path without it.
-3. **Prove full Paddle loop** — pay → provision → hatch → first message.
+1. **CHECK PROSPECT CONVERSATIONS** — Two people were messaging @Brentstiger01_bot at session close (11:40 PM PT). Check what they actually received. Screenshot needed.
+2. **Validate prospect engagement mode** — was the conversation warm and human or still broken?
+3. **Create Paddle product + price** — No checkout URL exists. No Paddle path without it.
 4. **Fix admin alert markdown bug** — Underscores in error messages break Telegram Markdown parser.
 
 ### Critical Open Issues
 
-- **NO REAL PROSPECT CONVERSATIONS YET:** Brents Tiger 01 live. Operator is the only one who has messaged. Bot link not yet sent to warm contacts.
+- **PROSPECT MODE UNVALIDATED:** Deployed but no confirmed successful prospect conversation. Two people messaged at close — check first.
 - **PADDLE PRODUCT:** Webhook live, no product/price yet. No checkout URL. Create before testing.
 - **C4:** Payment gate still open for direct wizard access. Fix after Paddle loop proven.
-- **Admin alert markdown bug:** Underscores in error messages break Telegram Markdown parser. Fix before launch.
-- **Orphan tenant:** `brents-tiger-01-mnpcril3` (1ed77b8f) — duplicate from bug. No bot token. Terminate when convenient.
-- **Test tenant cleanup:** Toon's 3 records, Tiger Test 102, FiretestApril5, Teddy Tiger Claw — defer to a cleanup session.
+- **Admin alert markdown bug:** Underscores in error messages break Telegram Markdown parser.
+- **Orphan + Tiger Test 102:** Both suspended. Terminate when convenient.
+- **Fleet debris:** FiretestApril5, Teddy Tiger Claw, Tigertest100, etc. — cleanup when convenient.
 - **LINE:** Future only. Telegram is the only active channel.
 - **Cal.com booking:** `tiger_book_zoom` built. Deferred pending platform booking architecture decision.
+
+### Key Lesson from Session 17 — Mandatory for Next Agent
+The bot had no prospect mode at all. When real people messaged they got status reports, tool names, and internal platform language. This was broken from day one. **Always test from a FRESH chatId to see what a prospect sees.** Read Cloud Run logs before diagnosing — root cause was visible immediately every time.
 
 ### Active Business Context
 
