@@ -299,9 +299,12 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
       const flavorConfig = (FLAVOR_REGISTRY as any)[input.flavor] ?? {};
       const defaultIcp = flavorConfig.defaultBuilderICP ?? {};
       const twoOar = input.flavor === "network-marketer";
+      const now = new Date().toISOString();
       await setBotState(tenant.id, "onboard_state.json", {
         phase: "complete",
         questionIndex: 0,
+        botName: input.name,
+        completedAt: now,
         identity: {
           name: input.name,
           botName: input.name,
@@ -315,7 +318,7 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
         flavor: input.flavor,
         language: input.language,
         tenantId: tenant.id,
-        startedAt: new Date().toISOString(),
+        startedAt: now,
       });
       steps.push("Onboarding pre-seeded from flavor config — no interview required");
     }
