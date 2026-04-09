@@ -4,49 +4,45 @@
 
 ---
 
-## Current Session State (2026-04-07 — Session 16 continued — PRs #257–#261 merged)
+## Current Session State (2026-04-08 — Session 17 — PRs #263–#267 merged)
 
-### 462/462 tests passing. PRs #251–#261 merged. Cloud Run revision 00417-4qf live.
+### 462/462 tests passing. PRs #251–#267 merged. Cloud Run revision 00422-xc6 live. Wizard on Vercel (auto-deploy).
 
-**Session 16 shipped (PRs #251–#255):**
-- **PR #251 — bot-status fix:** `GET /wizard/bot-status` returned `pending` for admin-hatched bots. Provisioner sets `status = 'live'`; endpoint only checked `active`/`onboarding`. Added `'live'` to both isLive checks in `wizard.ts`.
-- **PR #252 — duplicate tenant fix (critical):** Hatch was creating two tenant records. Slug generated twice with different `Date.now()` — once in `createBYOKBot()`, again in hatch handler. Fixed: generate slug once, pass as `precomputedSlug`.
-- **PR #253 — dashboard isLive + Stan Store cleanup:** `dashboard.ts` isLive missing `'live'` status. Removed two user-facing "Stan Store" references from `StepReviewPayment.tsx`.
-- **PR #254 — SOTU docs:** Recorded ICP hard-wire decision.
-- **PR #255 — ICP hard-wire:** Provisioner pre-seeds `onboard_state.json` at hatch time. `phase: complete`, ICP from flavor config. Bot wakes up calibrated — **no interview, no questions asked**. Optional `product` field on `/admin/hatch`.
+**Session 17 shipped (PRs #263–#267):**
+- **PR #263 — Orchestrator dedup + strike queuing fix:** Research agent retry failures pushed `completed` past `expected`, re-triggering Reporting Agent 5x. Fixed with Redis SETNX one-shot guard. Also moved `markFactsQueued` before `draftReplies` so facts are always queued even on Gemini failure.
+- **PR #264 — Strike harvest verbatim column fix (ROOT CAUSE):** `harvestFacts()` selected `verbatim` from `market_intelligence` — column does not exist. Every pipeline run crashed silently at first DB query. Removed from SELECT + interface + prompt. **First successful run confirmed: operator received 20-link Telegram alert.**
+- **PR #265 — Rule 13 added to RULES.md:** After every merge, update RULES.md and SOTU.md.
+- **PR #267 — Dashboard contrast fix:** Admin fleet dashboard + customer dashboard — all `text-zinc-400/500/600` labels on dark backgrounds bumped to readable `zinc-200/300/400`. Zero-state indicators preserved.
+
+**Session 16 shipped (PRs #251–#261):**
+- **PR #251 — bot-status fix:** `GET /wizard/bot-status` returned `pending` for admin-hatched bots. Added `'live'` to both isLive checks in `wizard.ts`.
+- **PR #252 — duplicate tenant fix (critical):** Hatch was creating two tenant records. Slug generated twice. Fixed: generate slug once, pass as `precomputedSlug`.
+- **PR #253 — dashboard isLive + Stan Store cleanup.**
+- **PR #255 — ICP hard-wire:** Provisioner pre-seeds `onboard_state.json` at hatch. Bot wakes up calibrated — **no interview, no questions asked**.
+- **PR #258 — WHAT_TIGER_CLAW_DOES.md:** New product vision doc.
+- **PR #260 — `tiger_book_zoom`:** Cal.com booking tool built and registered. Deferred — needs platform booking architecture decision.
+- **PR #261 — first impression + language matching + strike pipeline + wizard cleanup.**
 - **Brents Tiger 01 (@Brentstiger01_bot) confirmed live and responding on Telegram.**
-- **Parallel sub-agent audit:** Mine healthy (2 AM orchestrated run), NM defaultBuilderICP solid, webhook query correct.
-
-**Session 16 continued shipped (PRs #257–#261):**
-- **PR #258 — WHAT_TIGER_CLAW_DOES.md:** New doc, product vision with ⚠️ markers.
-- **PR #260 — `tiger_book_zoom`:** Cal.com booking tool. Registered in `toolsMap`. Reads `calcomBookingUrl` from settings.json. Fires admin alert on booking. Inactive until `calcomBookingUrl` is set.
-- **PR #261 — first impression + language matching + strike pipeline + wizard cleanup:**
-  - 4-language `/start` greeting (per-chatId, state in `first_impression_shown.json`).
-  - System prompt: language-matching directive — agent mirrors prospect's language.
-  - `strike_auto_pipeline.ts` (new): harvest → draft → Web Intent URLs → admin alert → mark queued.
-  - `reporting_agent.ts`: calls `runStrikeAutoPipeline()` after mine cycle (non-fatal).
-  - Interior Designer removed from wizard frontend.
-- **Direct DB fix:** Brents Tiger 01 `onboard_state.json` force-written with `phase: complete`, Nuskin identity, full NM defaultBuilderICP.
 
 **Full assessment in `MODULE_ASSESSMENT.md`. Read it before writing any code.**
 
 ### FIRST PRIORITY NEXT SESSION
 
-1. **Verify Tiger Strike at 2 AM** — Check that `engagement_status` rows moved to `queued` and admin alert arrived after mine cycle.
-2. **Set `calcomBookingUrl`** — Write Cal.com booking URL to Brents Tiger 01 settings.json. Test `tiger_book_zoom`.
-3. **Send bot link to 5 warm contacts** — Operator action. `t.me/Brentstiger01_bot`. Document first cold conversation.
-4. **Wizard contrast fix** — Gray instructional text on dark backgrounds is illegible. Replace `text-gray-*` / `text-slate-*` on helper text with `text-white` or `text-slate-200`.
-5. **Create Paddle product + price** — No checkout URL exists. Build before testing payment loop.
+1. **Send bot link to warm contacts** — Operator action. `t.me/Brentstiger01_bot`. Document first real prospect conversation.
+2. **Create Paddle product + price** — No checkout URL exists. No Paddle path without it.
+3. **Prove full Paddle loop** — pay → provision → hatch → first message.
+4. **Fix admin alert markdown bug** — Underscores in error messages break Telegram Markdown parser.
 
 ### Critical Open Issues
 
-- **CALCOM URL:** `tiger_book_zoom` built, not active. Set `calcomBookingUrl` in Brents Tiger 01 settings before testing booking.
-- **STRIKE PIPELINE UNVERIFIED:** Wired. Has not yet fired at 2 AM. Check after next mine cycle.
+- **NO REAL PROSPECT CONVERSATIONS YET:** Brents Tiger 01 live. Operator is the only one who has messaged. Bot link not yet sent to warm contacts.
 - **PADDLE PRODUCT:** Webhook live, no product/price yet. No checkout URL. Create before testing.
 - **C4:** Payment gate still open for direct wizard access. Fix after Paddle loop proven.
 - **Admin alert markdown bug:** Underscores in error messages break Telegram Markdown parser. Fix before launch.
 - **Orphan tenant:** `brents-tiger-01-mnpcril3` (1ed77b8f) — duplicate from bug. No bot token. Terminate when convenient.
+- **Test tenant cleanup:** Toon's 3 records, Tiger Test 102, FiretestApril5, Teddy Tiger Claw — defer to a cleanup session.
 - **LINE:** Future only. Telegram is the only active channel.
+- **Cal.com booking:** `tiger_book_zoom` built. Deferred pending platform booking architecture decision.
 
 ### Active Business Context
 
@@ -118,7 +114,7 @@
 - New tools in `api/src/tools/` MUST be registered in `toolsMap` in `ai.ts`. Missing = infinite tool loop.
 - **`tiger_gmail_send` and `tiger_postiz` are intentionally NOT in toolsMap.** Do not re-add them.
 - **Gemini 2.0 Flash only.** Do not switch to 2.5-flash (GCP function-calling bug).
-- 462 tests must pass before any PR is opened. Run `npm test` from `api/`.
+- **462 tests must pass** before any PR is opened. Run `npm test` from `api/`.
 
 ---
 
