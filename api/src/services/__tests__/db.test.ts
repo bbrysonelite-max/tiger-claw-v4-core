@@ -23,17 +23,16 @@ import {
   listTenants,
   getTenant,
   logAdminEvent,
-  listBotPool,
-  releaseBotToPool,
-  assignBotToken,
   getTenantBotToken,
   getTenantBotUsername,
 } from '../../services/db.js'
 
-// ... rest of imports and mocks ...
+beforeEach(() => {
+  vi.resetAllMocks()
+})
 
 describe('getTenantBotToken', () => {
-  it('returns token from tenants table if present (BYOB path)', async () => {
+  it('returns token from tenants table (BYOB)', async () => {
     mockQuery.mockResolvedValueOnce({ rows: [{ bot_token: 'byob-token' }] })
 
     const result = await getTenantBotToken('t1')
@@ -45,23 +44,17 @@ describe('getTenantBotToken', () => {
     )
   })
 
-  it('falls back to bot_pool if not in tenants table', async () => {
-    mockQuery
-      .mockResolvedValueOnce({ rows: [] }) // tenants check
-      .mockResolvedValueOnce({ rows: [{ bot_token: 'pool-token' }] }) // pool fallback
+  it('returns null when tenant has no bot token', async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [] })
 
     const result = await getTenantBotToken('t1')
 
-    expect(result).toBe('pool-token')
-    expect(mockQuery).toHaveBeenCalledWith(
-      expect.stringContaining('FROM bot_pool WHERE tenant_id = $1'),
-      ['t1']
-    )
+    expect(result).toBeNull()
   })
 })
 
 describe('getTenantBotUsername', () => {
-  it('returns username from tenants table if present (BYOB path)', async () => {
+  it('returns username from tenants table (BYOB)', async () => {
     mockQuery.mockResolvedValueOnce({ rows: [{ bot_username: 'byob-user' }] })
 
     const result = await getTenantBotUsername('t1')
@@ -73,24 +66,13 @@ describe('getTenantBotUsername', () => {
     )
   })
 
-  it('falls back to bot_pool if not in tenants table', async () => {
-    mockQuery
-      .mockResolvedValueOnce({ rows: [] }) // tenants check
-      .mockResolvedValueOnce({ rows: [{ bot_username: 'pool-user' }] }) // pool fallback
+  it('returns null when tenant has no bot username', async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [] })
 
     const result = await getTenantBotUsername('t1')
 
-    expect(result).toBe('pool-user')
-    expect(mockQuery).toHaveBeenCalledWith(
-      expect.stringContaining('FROM bot_pool WHERE tenant_id = $1'),
-      ['t1']
-    )
+    expect(result).toBeNull()
   })
-})
-
-
-beforeEach(() => {
-  vi.resetAllMocks()
 })
 
 describe('listTenants', () => {
@@ -149,93 +131,5 @@ describe('logAdminEvent', () => {
     const [sql, params] = mockQuery.mock.calls[0]
     expect(sql).toMatch(/INSERT/i)
     expect(params).toContain('provision')
-  })
-})
-
-describe('listBotPool', () => {
-  it('returns bots from the pool', async () => {
-    const bots = [
-      { id: 'b1', status: 'available', created_at: '2025-01-01T00:00:00.000Z', updated_at: '2025-01-01T00:00:00.000Z' },
-      { id: 'b2', status: 'assigned', tenantId: 't1', created_at: '2025-01-01T00:00:00.000Z', updated_at: '2025-01-01T00:00:00.000Z' },
-    ]
-    mockQuery.mockResolvedValueOnce({ rows: bots })
-
-    const result = await listBotPool()
-
-    expect(result.length).toBe(2)
-  })
-})
-
-// Phase 2: bot pool release cool-down
-describe('releaseBotToPool', () => {
-  it('stamps released_at=NOW() when releasing bot back to pool', async () => {
-    mockQuery.mockResolvedValue({ rows: [] })
-
-    await releaseBotToPool('bot-uuid-1')
-
-    expect(mockQuery).toHaveBeenCalledWith(
-      expect.stringContaining('released_at=NOW()'),
-      ['bot-uuid-1']
-    )
-  })
-
-  it('clears tenant_id and assigned_at on release', async () => {
-    mockQuery.mockResolvedValue({ rows: [] })
-
-    await releaseBotToPool('bot-uuid-2')
-
-    const [sql] = mockQuery.mock.calls[0] as [string]
-    expect(sql).toContain('tenant_id=NULL')
-    expect(sql).toContain('assigned_at=NULL')
-  })
-})
-
-describe('assignBotToken — cool-down enforcement', () => {
-  it('excludes bots released within the last 30 minutes from pool selection', async () => {
-    // withClient uses pool.connect() → client
-    const mockClient = {
-      query: vi.fn()
-        .mockResolvedValueOnce(undefined) // BEGIN
-        .mockResolvedValueOnce({ rows: [] }) // SELECT (empty — no bots pass cool-down filter)
-        .mockResolvedValueOnce(undefined), // ROLLBACK
-      release: vi.fn(),
-    }
-    mockConnect.mockResolvedValueOnce(mockClient)
-
-    const result = await assignBotToken('tenant-uuid-1')
-
-    expect(result).toBeNull() // pool appears empty due to cool-down filter
-
-    // Verify the SELECT query contains the cool-down WHERE clause
-    const selectCall = mockClient.query.mock.calls.find(
-      (call: any[]) => typeof call[0] === 'string' && (call[0] as string).includes('SELECT')
-    )
-    expect(selectCall).toBeDefined()
-    const selectSql = selectCall![0] as string
-    expect(selectSql).toContain('released_at IS NULL OR released_at <')
-    expect(selectSql).toContain('30 minutes')
-  })
-
-  it('assigns the oldest available bot that passes the cool-down filter', async () => {
-    const mockBot = {
-      id: 'pool-bot-1',
-      bot_token: 'enc:valid-token',
-      bot_username: 'TestBot',
-    }
-    const mockClient = {
-      query: vi.fn()
-        .mockResolvedValueOnce(undefined) // BEGIN
-        .mockResolvedValueOnce({ rows: [mockBot] }) // SELECT returns one bot
-        .mockResolvedValueOnce(undefined) // UPDATE assigned
-        .mockResolvedValueOnce(undefined), // COMMIT
-      release: vi.fn(),
-    }
-    mockConnect.mockResolvedValueOnce(mockClient)
-
-    const result = await assignBotToken('tenant-xyz')
-
-    expect(result).not.toBeNull()
-    expect(result?.botToken).toBe('enc:valid-token')
-    expect(result?.botUsername).toBe('TestBot')
   })
 })

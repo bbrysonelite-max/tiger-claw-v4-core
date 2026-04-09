@@ -121,6 +121,19 @@ The bot had no prospect mode at all. When real people messaged they got status r
 
 ---
 
+## ⚠️ THERE IS NO BOT POOL. THIS IS NON-NEGOTIABLE. ⚠️
+
+**ALL Telegram bot tokens are BYOB — Bring Your Own Bot.**
+- Every operator gets their token directly from BotFather.
+- The platform does NOT maintain, store, or provision a pool of pre-registered bot tokens.
+- There is no `bot_pool` table in active use. There are no pool management endpoints.
+- `api/src/services/pool.ts` contains ONLY AES-256-GCM crypto helpers and Telegram API utilities. It is NOT a pool manager.
+- If you see any code attempting to pull a token from a pool, assign a bot from a pool, or replenish a pool — **DELETE IT. Do not "fix" it. Delete it.**
+- Admin tokens are operator-held. If an admin token fails, the operator replaces it. There is no auto-rotation.
+- This decision is permanent. Do not re-introduce pool logic under any name or abstraction.
+
+---
+
 ## Reference Files
 
 - `SOTU.md` — **single source of truth. Read this first every session.**

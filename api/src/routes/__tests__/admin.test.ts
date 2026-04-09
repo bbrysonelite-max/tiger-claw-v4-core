@@ -163,23 +163,6 @@ describe('DELETE /admin/fleet/:tenantId', () => {
 })
 
 // ---------------------------------------------------------------------------
-// GET /admin/pool/status
-// ---------------------------------------------------------------------------
-describe('GET /admin/pool/status', () => {
-  it('returns pool stats', async () => {
-    const app = await buildApp()
-    mockDb.getPoolStats.mockResolvedValue({ total: 5, unassigned: 3, assigned: 2 })
-
-    const res = await request(app)
-      .get('/admin/pool/status')
-      .set('Authorization', `Bearer ${VALID_TOKEN}`)
-
-    expect(res.status).toBe(200)
-    expect(res.body.total).toBe(5)
-  })
-})
-
-// ---------------------------------------------------------------------------
 // POST /admin/fleet/:tenantId/canary
 // ---------------------------------------------------------------------------
 describe('POST /admin/fleet/:tenantId/canary', () => {
