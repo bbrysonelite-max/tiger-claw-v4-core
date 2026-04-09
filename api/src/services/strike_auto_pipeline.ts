@@ -19,7 +19,6 @@ interface HarvestedFact {
     id: string;
     domain: string;
     fact_summary: string;
-    verbatim: string | null;
     source_url: string;
     confidence_score: number;
 }
@@ -71,7 +70,7 @@ export async function runStrikeAutoPipeline(): Promise<void> {
 async function harvestFacts(): Promise<HarvestedFact[]> {
     const pool = getReadPool();
     const { rows } = await pool.query<HarvestedFact>(`
-        SELECT id, domain, fact_summary, verbatim, source_url, confidence_score
+        SELECT id, domain, fact_summary, source_url, confidence_score
         FROM market_intelligence
         WHERE COALESCE(engagement_status, 'unengaged') = 'unengaged'
           AND confidence_score >= $1
@@ -98,7 +97,7 @@ For each fact below, write a SHORT (1-3 sentence) public reply that:
 Output ONLY a JSON array of reply strings, one per fact, in the same order as the input. Nothing else.
 
 Facts:
-${facts.map((f, i) => `${i + 1}. [${f.domain}] ${f.fact_summary}${f.verbatim ? '\nQuote: "' + f.verbatim.slice(0, 200) + '"' : ''}`).join('\n\n')}`;
+${facts.map((f, i) => `${i + 1}. [${f.domain}] ${f.fact_summary}`).join('\n\n')}`;
 
     try {
         const result = await model.generateContent(prompt);
