@@ -2,7 +2,7 @@
 
 ## The One-Sentence Version
 
-Tiger Claw is an AI agent that hunts for qualified prospects 24/7 and books them into the operator's calendar — so the operator wakes up with meetings, not leads.
+Tiger Claw is an AI agent that hunts for qualified prospects 24/7 and books them into the operator's calendar for zoom or other online meetings— so the operator wakes up with meetings, not leads.
 
 ---
 
@@ -104,7 +104,7 @@ The agent runs 24/7. It does not sleep, forget, or have a bad day.
 
 ## Payment Flow — Paddle (The Only Path)
 
-Stan Store, Zapier, and Stripe are dead. The Zapier webhook never worked. Payment gate is intentionally open until Paddle merchant of record approval comes through.
+Stan Store-current payment and traffice flow.  Zapier will not work with Stanstore.  Stan's store has no ability to do webhooks, and Stripe  stripe is a viable option and should be considered in the case that paddle doesn't work out. The Zapier webhook never worked. Payment gate is intentionally open until Paddle merchant of record approval comes through. Paddle is currently in review tokens are live.
 
 ```mermaid
 flowchart TD
