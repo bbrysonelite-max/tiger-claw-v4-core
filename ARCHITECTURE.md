@@ -1,6 +1,6 @@
 # Tiger Claw V4 — Core Architecture
 
-**Last updated:** 2026-04-08 (Session 17 — Strike pipeline confirmed, dashboard contrast fixed, 462 tests)
+**Last updated:** 2026-04-09 (Session 17 close — PRs #263–#272, prospect engagement mode, revision 00434-c6h)
 **Status:** LIVE. Locked. Do not rewrite.
 
 ---
@@ -21,7 +21,7 @@ Tiger Claw V4 is **stateless**. No long-running Docker containers per tenant. No
 
 | Component | Technology | Actual Status |
 |---|---|---|
-| Compute | Google Cloud Run, Node.js/Express, port 4000 | ✅ Live. Revision 00422-xc6 |
+| Compute | Google Cloud Run, Node.js/Express, port 4000 | ✅ Live. Revision 00434-c6h |
 | Database | Cloud SQL PostgreSQL HA — `tiger_claw_shared` | ✅ Live |
 | Cache & Queues | Cloud Redis HA + BullMQ (8 queues) | ✅ Live |
 | AI Provider | Gemini 2.0 Flash — `@google/generative-ai` SDK | ✅ Live. **LOCKED — do not switch to 2.5-flash** (GCP function-calling bug) |
@@ -57,6 +57,8 @@ Customer pays via Paddle checkout
 ```
 
 **NOTE:** Paddle product + price not yet created. No checkout URL exists. This must be done before testing the full flow.
+
+**PROSPECT MODE:** Bot is a direct prospect interface. Plain text messages → prospect engagement frame. Operator management commands via `/` slash commands only. System prompt has explicit WHO YOU ARE TALKING TO block with dream injection directives and HARD RULE against exposing internal state.
 
 **BYOB (Bring Your Own Bot):** Customer provides their own Telegram bot token. No pool. No bottleneck.
 **BYOK (Bring Your Own Key):** Customer provides their own Gemini API key. Platform key is fallback only.
@@ -222,7 +224,7 @@ curl -X POST https://api.tigerclaw.io/admin/fix-all-webhooks \
 
 ## 11. Test Coverage
 
-- **462 tests** across 44 test files. All passing as of Session 17 (PR #264).
+- **462 tests** across 44 test files. All passing as of Session 17 (PRs #263–#272).
 - Every tool in `toolsMap` has test coverage.
 - Run: `npm test` from `api/`
 - CI runs on every PR push.

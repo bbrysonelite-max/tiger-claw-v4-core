@@ -1,6 +1,6 @@
 # Tiger Claw — State of the Union
 
-**Last updated:** 2026-04-08 (Session 17 — PRs #263–#267 merged)
+**Last updated:** 2026-04-09 (Session 17 close — PRs #263–#272 merged)
 **This is the single source of truth. Read nothing else until you finish this file.**
 
 ---
@@ -12,7 +12,6 @@
 | 1 | `SOTU.md` ← you are here | What is true right now. Platform state, what's broken, what's working. No opinion, just facts. |
 | 2 | `WHAT_TIGER_CLAW_DOES.md` | What the platform is, what the agent can do, the payment flow, the sale. Product vision. |
 | 3 | `HOW_TIGER_WINS.md` | Why things fail and the expert fix for each. The strategy. Read this before forming any plan. |
-| 4 | `NEXT_SESSION.md` | Marching orders. Exactly what to build this session, in order. Do not skip ahead. |
 
 ---
 
@@ -23,178 +22,78 @@
 - Do not mark a session complete if known broken items remain.
 - The operator is running a real business. False confidence causes real damage.
 - No AI agent pushes directly to `main`. All changes via `feat/` or `fix/` branch + PR.
-- "I merged it" means nothing until confirmed. After every PR, verify with `gh pr view <number>` that state is `MERGED`. After every deploy, verify health endpoint returns 200. Do not tell the operator something is done until you have proof it is done.
+- After every PR: verify with `gh pr view <number>` that state is `MERGED`. After every deploy, verify health endpoint returns 200. Do not tell the operator something is done until you have proof it is done.
+- **Read Cloud Run logs before diagnosing anything.** The root cause is almost always visible immediately in the logs. Do not guess.
 
 ---
 
-## Ground Truth as of 2026-04-07
+## Ground Truth as of 2026-04-09
 
-**Brents Tiger 01 is live, responding on Telegram, and now calibrated with no interview.**
+**Brents Tiger 01 (@Brentstiger01_bot) is live. Prospect engagement mode is deployed.**
 
-- Bot `@Brentstiger01_bot` (tenant `56d45bfd-08f9-46e7-9767-bf1bb60f8f07`, slug `brents-tiger-01-mnpcripl`) provisioned via `POST /admin/hatch`.
-- Confirmed responding to messages at 6:26 PM 2026-04-07.
-- `onboard_state.json` written directly to DB — phase forced to `complete`, Nuskin identity + defaultBuilderICP pre-seeded. Bot is hunting-ready.
-- First impression: 4-language greeting on `/start`, then language-matching for all subsequent replies.
-- `tiger_book_zoom` tool built and registered. Needs `calcomBookingUrl` written to settings.json to activate.
-- Tiger Strike pipeline confirmed firing. First successful run produced 20 engagement links. Operator received Telegram alert. Watch next 2 AM cycle to confirm consistent.
-- No real prospect conversations yet — operator is the only person who has messaged.
+- Bot provisioned, ICP pre-seeded, webhook registered.
+- Bot description updated: *"Let me take you by the hand and lead you to your brighter future."* — no Tiger Claw branding visible to prospects.
+- `/start` opens with 4-language covenant greeting, ends with *"What's going on for you right now?"*
+- System prompt: prospect engagement mode active — warm opening, no tool names, no status reports, no internal language exposed.
+- Two real prospects were messaging the bot at session close (11:40 PM PT). Results unknown — too late to verify. **Check first thing next session.**
+- Operator asked 5 warm contacts to message the bot. No confirmed successful prospect conversation yet.
+- Tiger Strike pipeline confirmed firing — 20 engagement links generated, admin alert received.
 
-The full loop (pay → provision → hatch → scout → contact → reply) still has not closed on a *paying customer via Paddle*. That remains day zero for the Paddle path.
+The full loop (pay → provision → hatch → scout → contact → reply with a real prospect) has not yet closed. That remains day zero.
 
 ---
 
 ## Current Platform State
 
-**Last deployed revision:** `tiger-claw-api-00422-xc6` (deployed 2026-04-08, Session 17)
-**Health (last verified 2026-04-08):** postgres OK, redis OK, workers OK
+**Last deployed revision:** `tiger-claw-api-00434-c6h` (deployed 2026-04-09, Session 17 close)
+**Health (last verified 2026-04-09):** postgres OK, redis OK, workers OK
 **Tests:** 462/462 passing
-**Wizard:** `wizard.tigerclaw.io` — Vercel, auto-deploy confirmed working (PR #267 deployed automatically)
+**Wizard:** `wizard.tigerclaw.io` — Vercel, auto-deploy confirmed working
 
 ---
 
-## What Was Done This Session (Session 17 — 2026-04-08)
+## What Was Done This Session (Session 17 — 2026-04-08/09)
 
-**PRs #263–#267 merged:**
+**PRs #263–#272 merged:**
 
-1. **PR #267 — Dashboard contrast fix (admin + customer dashboards)**
-   - Admin dashboard (`web-onboarding/src/app/admin/dashboard/page.tsx`): stat card labels `text-zinc-400` → `text-zinc-200`, sub-text `text-zinc-500` → `text-zinc-300`, detail grid labels `text-zinc-600` → `text-zinc-400`, fleet row secondary info bumped to zinc-200/300, action buttons `text-zinc-500` → `text-zinc-300`, header buttons bumped. Zero-state indicators (Messages=0) intentionally preserved at dim level.
-   - Customer dashboard (`web-onboarding/src/app/dashboard/page.tsx`): email helper text `text-zinc-400` → `text-zinc-200`.
-   - Wizard Vercel auto-deploy will pick this up automatically.
+1. **PR #263 — Orchestrator SETNX dedup + strike queuing order**
+   - Reporting Agent was firing 5x per mine run — research agent retry failures pushed completed counter past expected. Fixed with Redis SETNX one-shot guard.
+   - Strike pipeline was exiting without queuing facts if Gemini drafting failed. Moved `markFactsQueued` before `draftReplies`.
 
-2. **PR #263 — Orchestrator dedup + strike queuing decoupled**
-   - Orchestrator was triggering Reporting Agent 5x per mine run. Research Agent retry failures kept pushing `completed` past `expected`, and `removeOnComplete:true` cleared BullMQ's dedup key. Fixed with Redis `SETNX` one-shot guard — Reporting Agent now fires exactly once per run.
-   - Strike pipeline was exiting without queuing facts whenever Gemini drafting failed. Moved `markFactsQueued` before `draftReplies` so facts are always queued regardless of draft success.
+2. **PR #264 — Strike harvest verbatim column (ROOT CAUSE)**
+   - `harvestFacts()` selected `verbatim` from `market_intelligence` — column does not exist. Every run crashed silently. First successful pipeline run confirmed: 20 links, admin alert received.
 
-2. **PR #264 — Strike harvest verbatim column fix (ROOT CAUSE)**
-   - `harvestFacts()` was selecting `verbatim` from `market_intelligence` — a column that does not exist. Every strike pipeline run since wiring has crashed at the first DB query. The pipeline has never successfully completed.
-   - Removed `verbatim` from SELECT, `HarvestedFact` interface, and draft prompt.
-   - **First successful pipeline run expected at next 2 AM UTC mine cycle.**
+3. **PR #265 — Rule 13: update docs after every merge**
 
-3. **PR #265 — Rule 13: update RULES.md and SOTU.md after every merge**
-   - New standing rule: after every PR is merged, update both documents.
+4. **PR #267 — Dashboard contrast fix**
+   - All `text-zinc-400/500/600` labels on dark backgrounds bumped to readable levels. Zero-state indicators preserved.
 
-**Session 17 discovery — always read logs first:**
-- Three PRs were needed to fix Tiger Strike because the root cause (missing DB column) was only visible in Cloud Run logs. Assumptions about Gemini failures, key expiry, and proxy issues were all wrong. The log showed `column "verbatim" does not exist` immediately.
-- **Rule going forward: read the logs before diagnosing.**
+5. **PR #268 — Session docs updated**
 
-**Cloud SQL proxy instance name corrected:**
-- SOTU had `tiger-claw-shared` — actual instance is `tiger-claw-postgres-ha`.
-- Proxy command: `cloud-sql-proxy "hybrid-matrix-472500-k5:us-central1:tiger-claw-postgres-ha" --port=5433`
+6. **PR #269 — Provisioner botName top-level fix (CRITICAL)**
+   - `botName` was written inside `identity{}` only. Code reads it at top level (`state.botName`). Gemini saw "Bot name: —. Completed: —" and entered a confused self-onboarding loop, asking prospects "What is your name?" and offering to reset settings.
+   - Fixed: `botName` and `completedAt` now written at top level on every hatch.
+   - Direct DB fix applied to Brents Tiger 01. Polluted fact_anchors cleaned.
 
-**Google account note:**
-- Operator set up `brent@tigerclaw.io` as Google Workspace — disrupted all GCP auth. Fixed via `gcloud auth application-default login`. Use separate Chrome profiles going forward to prevent cross-contamination.
+7. **PR #270 — Prospect engagement mode**
+   - System prompt was operator-management first. Prospects got status reports and tool lists.
+   - Added: WHO YOU ARE TALKING TO block, dream injection directive, covenant opening for new conversations, explicit answers for "what can you do?", "who are you?", "hi/start". Four voice examples for prospect conversations.
+   - HARD RULE: never surface internal system state in responses.
 
----
+8. **PR #271 — Bot description + /start message**
+   - Bot Telegram description was "AI-powered network-marketer agent for Brents Tiger 01. Managed by Tiger Claw." Replaced with covenant line. Live bot updated immediately via Bot API.
+   - /start greeting ended with "Let's get to work! I'm having my nails done later!" — replaced with "What's going on for you right now?"
 
-## What Was Done This Session (Session 16 continued — 2026-04-07)
+9. **PR #272 — No tool names in responses**
+   - Previous rule caught full names but not shorthand (tigerlead, tigernurture, tigerstrikedraft, etc.). Explicitly listed all variants. Added rule: never explain reasoning out loud mid-message.
 
-**PRs #257–#261 merged:**
+**Fleet cleanup:**
+- Tiger Test 102 (`b7df9821`) and orphan Brents Tiger 01 (`1ed77b8f`) were generating circuit breaker alerts — both suspended.
 
-1. **PR #258 — WHAT_TIGER_CLAW_DOES.md added**
-   - Docs only. New document capturing product vision with ⚠️ markers for what is not yet live.
-
-2. **PR #260 — `tiger_book_zoom` tool**
-   - New tool in `api/src/tools/tiger_book_zoom.ts`, registered in `toolsMap` in `ai.ts`.
-   - Reads `calcomBookingUrl` from tenant settings.json. Generates a pre-filled Cal.com booking link.
-   - Fires admin Telegram alert when a prospect books.
-   - **Activation required:** operator must write `calcomBookingUrl` into Brents Tiger 01 settings to use.
-
-3. **PR #261 — first impression + language matching + strike pipeline + wizard cleanup**
-   - `slashCommands.ts`: `/start` now shows 4-language greeting on first contact per chatId. State stored in `first_impression_shown.json` (per-tenant bot_states). Subsequent `/start` calls redirect to dashboard.
-   - `ai.ts` system prompt: language-matching directive added. Agent detects prospect's language and mirrors it for the conversation. Never switches back to English unless the prospect does.
-   - `strike_auto_pipeline.ts` (new file): `runStrikeAutoPipeline()` — harvests top 20 unengaged facts (confidence ≥ 70), drafts contextual replies via platform Gemini key, generates Web Intent URLs (Reddit deep links or X tweet intents), sends admin Telegram alert with one-click links, marks facts as `queued`.
-   - `reporting_agent.ts`: wired to call `runStrikeAutoPipeline()` after mine cycle completes (non-fatal).
-   - `web-onboarding/src/app/signup/page.tsx`: Interior Designer flavor card removed.
-
-4. **Direct DB fix — Brents Tiger 01**
-   - `onboard_state.json` in `bot_states` overwritten directly. Phase forced to `complete`, Nuskin identity, full NM defaultBuilderICP. Bot no longer asks interview questions.
-
----
-
-## What Was Done This Session (Session 16 — 2026-04-08)
-
-**PRs #251–#255 merged:**
-
-1. **PR #251 — bot-status fix**
-   - `GET /wizard/bot-status` returned `"pending"` for admin-hatched bots even after successful provisioning.
-   - Provisioner sets `status = 'live'`; endpoint only checked `active` and `onboarding`.
-   - Fixed: added `|| tenant.status === "live"` to both isLive checks in `wizard.ts`.
-
-2. **PR #252 — duplicate tenant on hatch (critical)**
-   - `POST /admin/hatch` was creating two tenant records per call (200ms apart).
-   - Root cause: slug generated twice with different `Date.now()` — once in `createBYOKBot()`, again in the hatch handler. Provisioner got slug #2, couldn't find tenant (created with slug #1), inserted a second row.
-   - Fixed: generate slug once in admin hatch, pass as `precomputedSlug` to `createBYOKBot()`. Fallback preserved for all other callers.
-
-3. **PR #253 — dashboard isLive + Stan Store cleanup**
-   - `dashboard.ts`: `bot.isLive` missing `"live"` status — bot showed offline in dashboard despite being provisioned.
-   - `StepReviewPayment.tsx`: removed two user-facing "Stan Store" references. Replaced with neutral copy.
-
-4. **PR #254 — SOTU docs: ICP hard-wire decision recorded**
-   - Docs only.
-
-5. **PR #255 — ICP hard-wire (no onboarding interview)**
-   - Provisioner now writes a complete `onboard_state.json` at hatch time before the bot ever receives a message.
-   - State pre-populated: `phase: complete`, `icpBuilder` from `flavor.defaultBuilderICP` (NM), `icpSingle` for all other flavors, operator name + product in `identity`.
-   - `POST /admin/hatch` gains optional `product` field (e.g. `"Nuskin"`) passed through to provisioner.
-   - Bot wakes up calibrated. First message from a prospect → agent responds intelligently. No interview.
-   - Existing complete states never overwritten (idempotent on re-provision).
-
-**Parallel sub-agent audit conducted:**
-- Mine health: ✅ 2 AM runs `startOrchestratedRun`, all 11 workers healthy, stall handlers wired.
-- NM `defaultBuilderICP`: ✅ Solid, gated correctly, only fires when ICP empty post-onboarding.
-- Webhook query: ✅ Includes `status = 'live'` tenants.
-- No critical issues found beyond the bugs fixed above.
-
-**Active fleet as of session end:**
-| Tenant | Bot | Flavor | Status |
-|---|---|---|---|
-| `brents-tiger-01-mnpcripl` | @Brentstiger01_bot | network-marketer | live |
-| `brents-tiger-01-mnpcril3` | (orphan — no token) | network-marketer | live |
-
-Note: `mnpcril3` is the orphan from the duplicate-tenant bug. It has a subscription and email but no bot token. Can be terminated when convenient.
-
----
-
-## What Was Done This Session (Session 15 — 2026-04-06)
-
-**PRs #235, #236, #237 merged:**
-
-1. **Verbatim fix — PR #235**
-   - `tiger_refine.ts`: field renamed `rawText` → `verbatim`. Prompt now requires exact word-for-word quotes from source text. Added CRITICAL RULE: if no exact quote exists, do not save the fact. Filter enforces minimum 15 chars.
-   - Tests updated: `verbatim` field validated, new test rejects facts with empty/missing verbatim.
-   - Mine confirmed producing 209 posts with Oxylabs (vs 14 from Serper fallback).
-
-2. **Paddle webhook integration — PR #236**
-   - `POST /webhooks/paddle` endpoint: HMAC-SHA256 signature verification, Redis idempotency (24h TTL), fail closed on Redis unavailability (503).
-   - Provisions BYOK user + bot + subscription on `transaction.completed`.
-   - 8 tests in isolated file (`paddle-webhook.test.ts`) — avoids `vi.resetModules()` contamination.
-   - GCP secrets created: `paddle-webhook-secret`, `paddle-api-key`.
-   - Paddle dashboard configured: webhook URL `https://api.tigerclaw.io/webhooks/paddle`, event `transaction.completed`.
-   - Deploy script updated with both Paddle secrets.
-   - **What's still missing:** A Paddle product + price. No checkout URL exists yet. Create before testing end-to-end.
-
-3. **Wizard flavor fix — PR #237**
-   - Removed 5 cut flavors from wizard signup: personal-trainer, dorm-design, baker, candle-maker, gig-economy.
-   - Wizard now shows the canonical 8 flavors matching the API registry.
-
-4. **Deployed:** Cloud Run revision `00372-mg2`. Health verified. `fix-all-webhooks` run (2 tenants fixed).
-
-5. **Discovered — Admin alert markdown bug:** Underscores in error messages (e.g. `pending_setup`, `botId=`) break Telegram's Markdown v1 parser. Admin alerts containing error text fail to deliver. Fix needed before launch.
-
----
-
-## Session 14 — What Was Done (2026-04-06)
-
-**PR #233 merged:**
-
-1. **Admin agent visibility**
-   - New endpoint: `GET /admin/agent-health` — returns per-tenant scout state + activeContext for all tenants in parallel. Per-tenant errors silenced to null, never block.
-   - Admin fleet table: 3 new columns — Onboard (green check or phase label), Scout (leads qualified + age of last burst scan), Focus (currentFocus + activeLead from activeContext).
-   - Both fetches fire-and-forget after main dashboard load.
-
-2. **Flavor simplification: 13 -> 8**
-   - Cut: `gig-economy`, `personal-trainer`, `baker`, `candle-maker`, `interior-designer` (one-off favor — not a platform flavor).
-   - Remaining 8 customer-facing flavors: network-marketer, real-estate, health-wellness, airbnb-host, lawyer, plumber, sales-tiger, mortgage-broker.
+**Lesson from this session — MANDATORY for next agent:**
+- The bot had no prospect mode at all. It was built entirely for operator management. When real prospects messaged it they got status reports, tool names, and onboarding language. This was broken from day one and only discovered when real people tried to use it.
+- **Always test from a FRESH chatId (not the operator's own account) to see what a prospect actually sees.**
+- **Read Cloud Run logs before diagnosing.** Every bug this session was visible in the logs immediately.
 
 ---
 
@@ -202,14 +101,13 @@ Note: `mnpcril3` is the orphan from the duplicate-tenant bug. It has a subscript
 
 | # | Issue | Priority |
 |---|---|---|
-| DAY ZERO | Paddle purchase → provision → hatch → scout → contact → reply has never closed on a paying customer. Brents Tiger 01 proves admin hatch works. Paddle path unproven. | IMMEDIATE |
-| PADDLE PRODUCT | Webhook live but no Paddle product/price created. No checkout URL. Create before testing end-to-end payment flow. | IMMEDIATE |
-| CALCOM URL | `tiger_book_zoom` built and registered. Requires platform-level booking architecture decision before activating — not simply a URL to set. Deferred until operator defines the booking model. | DEFERRED |
-| STRIKE PIPELINE | First successful run confirmed (operator received Telegram alert with 20 engagement links). Watch next 2 AM cycle to confirm consistent. | MONITOR |
-| ORPHAN TENANT | `brents-tiger-01-mnpcril3` (1ed77b8f) — created by duplicate-tenant bug, no bot token, subscription active. Terminate when convenient. | LOW |
-| ADMIN ALERT BUG | Underscores in error messages break Telegram Markdown parser. Admin alerts with error text silently fail. Fix before launch. | HIGH |
-| C4 | Payment gate still open for direct wizard access (no Paddle purchase required). Fix after Paddle loop proven. | NEXT SESSION |
-| TOOL AUDIT | tiger_drive_list confirmed safe to remove from toolsMap. Not yet done. | LOW |
+| DAY ZERO | No confirmed successful prospect conversation yet. Two people were messaging at session close — check results first thing. | IMMEDIATE |
+| FIRST CONVERSATION | Verify the two people who messaged got a real conversation, not internal language. Screenshot needed. | FIRST THING |
+| PADDLE PRODUCT | Webhook live but no Paddle product/price. No checkout URL. Operator cannot monetize until this exists. | HIGH |
+| C4 | Payment gate open — direct wizard access bypasses payment. Fix after Paddle loop proven. | NEXT |
+| ADMIN ALERT BUG | Underscores in error messages break Telegram Markdown parser. Alerts with error text fail silently. | HIGH |
+| FLEET DEBRIS | Tiger Test 102 + orphan suspended. FiretestApril5, Teddy Tiger Claw, Tigertest100, etc. still cluttering fleet. Terminate when convenient. | LOW |
+| PROSPECT VALIDATION | Prospect engagement mode deployed but not yet validated with a confirmed successful conversation. | NEXT SESSION |
 
 **Past customers owed bots (3 people paid, never received service):**
 `chana.loh@gmail.com`, `nancylimsk@gmail.com`, `lily.vergara@gmail.com` — offer complimentary re-activation when platform is proven live.
@@ -220,18 +118,18 @@ Note: `mnpcril3` is the orphan from the duplicate-tenant bug. It has a subscript
 
 1. Read this file top to bottom
 2. Run `curl https://api.tigerclaw.io/health` — confirm postgres, redis, workers all OK
-3. Read `MODULE_ASSESSMENT.md`
-4. Check current deployed revision vs latest merged commits
+3. **Check if any prospects messaged overnight — read their conversations before touching any code**
+4. Read Cloud Run logs for errors: `gcloud logging read "resource.type=cloud_run_revision AND resource.labels.service_name=tiger-claw-api AND severity>=ERROR" --project=hybrid-matrix-472500-k5 --limit=20 --format=json`
 5. Do not touch anything until you know what is broken and what is not
 
 **Admin token:** `gcloud secrets versions access latest --secret="tiger-claw-admin-token" --project="hybrid-matrix-472500-k5"`
-**DB (local):** port `5433`, user `botcraft`, DB `tiger_claw_shared`, password `TigerClaw2026Secure`
+**DB (local):** `cloud-sql-proxy "hybrid-matrix-472500-k5:us-central1:tiger-claw-postgres-ha" --port=5433` then port `5433`, user `botcraft`, DB `tiger_claw_shared`, password `TigerClaw2026Secure`
 
 ---
 
 ## What This Product Is
 
-Stateless agent hatchery. Operator brings their own Telegram bot token (BYOB) and Gemini API key (BYOK). One-page signup. Agent hatches knowing its ICP — no interview, no questions. Agent prospects while operator sleeps. Hive gets smarter with every run.
+Stateless agent hatchery. Operator brings their own Telegram bot token (BYOB) and Gemini API key (BYOK). One-page signup. Agent hatches knowing its ICP — no interview, no questions. Bot talks to prospects directly on Telegram. Hive gets smarter with every run.
 
 **The value proposition: Your agent hunts while you sleep.**
 
@@ -239,9 +137,18 @@ Stateless agent hatchery. Operator brings their own Telegram bot token (BYOB) an
 
 ---
 
-## Admin Hatch (Operator Fleet)
+## How the Bot Talks to Prospects — Critical Context
 
-Use `POST /admin/hatch` to provision bots directly without going through the payment gate. For the operator's own fleet.
+The bot is deployed as a DIRECT PROSPECT INTERFACE. Operator sends `t.me/Brentstiger01_bot` to warm contacts. Prospects message the bot directly on Telegram. The bot's job: warm conversation, find their pain, install the dream, qualify them for the NuSkin opportunity.
+
+The bot is NOT primarily an operator management tool. Operator management commands (scout, status, etc.) work via `/` commands. Plain text conversations are always treated as prospect interactions.
+
+**The opening:** "Let me take you by the hand and lead you to your brighter future."
+**Then:** Ask one question about them. Find their situation. Never mention the platform, tools, or internal state.
+
+---
+
+## Admin Hatch (Operator Fleet)
 
 ```bash
 ADMIN_TOKEN=$(gcloud secrets versions access latest --secret="tiger-claw-admin-token" --project="hybrid-matrix-472500-k5")
@@ -264,23 +171,17 @@ curl -X POST https://api.tigerclaw.io/admin/hatch \
 
 ## Current Onboarding Path
 
-**Paddle is the active payment path.**
-
 ```
-Operator pays via Paddle checkout (checkout URL not yet created — build tomorrow)
+Operator pays via Paddle checkout (checkout URL not yet created)
   → Paddle fires POST /webhooks/paddle (transaction.completed)
   → Webhook provisions: createBYOKUser + createBYOKBot + createBYOKSubscription(pending_setup)
   → Operator navigates to wizard.tigerclaw.io
-  → Wizard starts at "What kind of agent do you want?" (no email step — Paddle already provisioned)
   → POST /wizard/hatch → BullMQ job → bot registered, webhook set, onboard state pre-seeded
   → Bot is immediately operational — no interview
+  → Prospects message the bot directly via Telegram link
 ```
 
-**Payment gate is still open** for direct wizard access (no Paddle purchase required). This is C4. Fix after Paddle loop is proven.
-
-Payment processor status:
-- **Paddle:** ✅ LIVE. Webhook at `https://api.tigerclaw.io/webhooks/paddle`. Secrets in GCP. Product/price not yet created. Merchant of record approval pending — this is the payment path.
-- **Stan Store / Zapier / Stripe:** Dead. The Zapier webhook never worked. Payment gate is open and intentionally held until Paddle approval comes through. Do not attempt to wire Zapier again.
+**Payment gate is still open** for direct wizard access (C4). Fix after Paddle loop is proven.
 
 ---
 
@@ -289,15 +190,13 @@ Payment processor status:
 | Layer | Technology | Notes |
 |---|---|---|
 | Compute | Google Cloud Run | Node.js/Express, port 4000, `tiger-claw-api` |
-| Database | Cloud SQL PostgreSQL | `tiger_claw_shared`, proxy port **5433** locally (NOT 5432) |
+| Database | Cloud SQL PostgreSQL HA | `tiger_claw_shared`, instance `tiger-claw-postgres-ha`, proxy port **5433** locally (NOT 5432) |
 | Cache / Queues | Cloud Redis + BullMQ | 11 workers. `ENABLE_WORKERS=true` required in deploy. |
 | AI | Gemini 2.0 Flash | LOCKED. Do not switch to 2.5-flash (GCP function-calling bug). |
 | Signup + Dashboard | Next.js, `web-onboarding/` | `wizard.tigerclaw.io` — Vercel. Auto-deploy working. |
-| Website | Static HTML | `tigerclaw.io` — separate repo |
-| Payments | Paddle (active) | Stan Store / Zapier / Stripe dead. Paddle is the only payment path. |
-| Scout search | Serper | `SERPER_KEY_1/2/3` — round-robin rotation active |
-| Reddit | Blocked | 403 from Cloud Run egress. Oxylabs fix pending. |
-| Email | Resend | Domain verified. `RESEND_API_KEY` in deploy. Needed for autonomous operation. |
+| Payments | Paddle (active) | Stan Store dead. Paddle webhook live. No product/price yet. |
+| Scout search | Serper + Oxylabs | 3 Serper keys round-robin. Oxylabs for Reddit (1,684+ facts/run). |
+| Email | Resend | Domain verified. `RESEND_API_KEY` in deploy. |
 | GCP Project | `hybrid-matrix-472500-k5` | |
 | Multi-region | `us-central1` (primary) + `asia-southeast1` | Global LB at `api.tigerclaw.io` |
 
@@ -305,76 +204,64 @@ Payment processor status:
 
 ## Live Service Status
 
-Last verified 2026-04-07:
+Last verified 2026-04-09:
 
 | Service | Status | Notes |
 |---------|--------|-------|
-| Cloud Run | OK | Revision 00422-xc6 |
+| Cloud Run | OK | Revision 00434-c6h |
 | Postgres | OK | Healthy |
 | Redis | OK | Healthy |
 | Workers | OK | ENABLE_WORKERS=true confirmed, 11 workers |
 | Serper keys (x3) | OK | Round-robin active |
-| Oxylabs | OK | Mine produced 1,684 facts in last 24h |
+| Oxylabs | OK | 1,684+ facts per mine run |
 | Platform Gemini key | OK | Active |
 | Admin Telegram bot | PARTIAL | Alerts fire but fail when message contains underscores (Markdown bug) |
 | Resend | OK | Test email confirmed delivered |
 | TELEGRAM_WEBHOOK_SECRET | OK | secretWired: true confirmed |
 | Vercel (wizard.tigerclaw.io) | OK | Auto-deploy confirmed working |
-| Paddle webhook | OK | Live at /webhooks/paddle. Secrets in GCP. Product/price not yet created. |
-| Reddit (scout) | BLOCKED | 403 from Cloud Run. Oxylabs + Serper fallback active. |
-| LINE | NOT ACTIVE | Future only |
-| Brents Tiger 01 | LIVE | @Brentstiger01_bot — responding on Telegram |
+| Paddle webhook | OK | Live at /webhooks/paddle. No product/price yet. |
+| Tiger Strike pipeline | OK | Confirmed firing — 20-link alert received |
+| Brents Tiger 01 | LIVE | @Brentstiger01_bot — prospect mode active |
+| Tiger Test 102 | SUSPENDED | No valid keys. Suspended to stop circuit breaker alerts. |
+| Orphan (mnpcril3) | SUSPENDED | Duplicate tenant, no bot token. Suspend only — terminate when convenient. |
 
 ---
 
-## Flavor Registry (8 customer-facing)
+## Fleet Status
 
-| Key | Flavor | Notes |
-|---|---|---|
-| network-marketer | Network Marketer | Dual-oar (builder + customer). defaultBuilderICP baked in. |
-| real-estate | Real Estate Agent | |
-| health-wellness | Health & Wellness | |
-| airbnb-host | Airbnb Host | STR-specific |
-| lawyer | Lawyer / Attorney | |
-| plumber | Plumber / Trades | Emergency-first signals |
-| sales-tiger | Sales Tiger | Dual-oar (talent + B2B buyer) |
-| mortgage-broker | Mortgage Broker | Dual-oar (buyers + refinancers) |
-
-Internal/non-customer: `admin`, `researcher` (in registry, not in VALID_FLAVOR_KEYS)
+| Tenant | Bot | Status | Notes |
+|---|---|---|---|
+| brents-tiger-01-mnpcripl | @Brentstiger01_bot | onboarding* | *Provisioned pre-status fix. Bot IS live and responding. |
+| brents-tiger-01-mnpcril3 | (none) | suspended | Orphan from duplicate-tenant bug. Terminate when convenient. |
+| brent-bryson-mnp4j46n | Tiger Test 102 | suspended | No valid keys. Noise only. |
+| Various | FiretestApril5, Teddy, Tigertest100, etc. | error/onboarding/pending | Test debris. Terminate in bulk when convenient. |
 
 ---
 
-## Tool Registry (25 tools in toolsMap)
-
-All tools live in `api/src/tools/`. All must be in `toolsMap` in `ai.ts` or Gemini enters an infinite loop.
+## Tool Registry (26 tools in toolsMap)
 
 **Registered:**
-tiger_onboard, tiger_scout, tiger_contact, tiger_aftercare, tiger_briefing, tiger_convert, tiger_export, tiger_email, tiger_hive, tiger_import, tiger_keys, tiger_lead, tiger_move, tiger_note, tiger_nurture, tiger_objection, tiger_score, tiger_score_1to10, tiger_search, tiger_settings, tiger_drive_list, tiger_strike_harvest, tiger_strike_draft, tiger_strike_engage, tiger_refine
+tiger_onboard, tiger_scout, tiger_contact, tiger_aftercare, tiger_briefing, tiger_convert, tiger_export, tiger_email, tiger_hive, tiger_import, tiger_keys, tiger_lead, tiger_move, tiger_note, tiger_nurture, tiger_objection, tiger_score, tiger_score_1to10, tiger_search, tiger_settings, tiger_drive_list, tiger_strike_harvest, tiger_strike_draft, tiger_strike_engage, tiger_refine, tiger_book_zoom
 
-**Load-bearing (do not remove without major refactor):**
-- `tiger_aftercare` — tiger_convert hands off to it post-conversion. Entire retention pipeline.
-- `tiger_objection` — tiger_nurture imports its functions at compile time. Removing breaks nurture.
-
-**Intentionally NOT registered:**
-- `tiger_gmail_send` — must never send from operator's personal Gmail without human approval.
-- `tiger_postiz` — social broadcasting is not Tiger's job.
+**Intentionally NOT registered:** `tiger_gmail_send`, `tiger_postiz`
 
 ---
 
-## Module Assessment Summary
+## Engineering Constraints (Non-Negotiable)
 
-Full details in `MODULE_ASSESSMENT.md`.
-
-| Module | Status | Notes |
-|---|---|---|
-| 1. Scout | Degraded — Reddit 403, Serper fallback active | Oxylabs fix pending |
-| 2. Hive | Working — passive learning via emitHiveEvent in scout/convert | 6,545 facts in DB |
-| 3. Cognitive Architecture | buildSystemPrompt() wired: ICP, hive benchmarks, market facts, activeContext, fact_anchors | Tested live with Brents Tiger 01 |
-| 4. Hatchery | BYOB/BYOK flow built. No interview. ICP pre-seeded at provision time. | Brents Tiger 01 confirmed live |
-| 5. Orchestration | Daily mine: Orchestrator → 8 Research Agents (parallel) → Reporting Agent → Strike Auto Pipeline | Running nightly. Strike pipeline confirmed firing — operator received 20-link alert. |
-| 6. Tools | 25 tools registered. Audit complete. 2 load-bearing identified. | No live usage data yet |
-| 7. Memory | Short-term, hive, fact_anchors all wired | Never validated in real prospect conversation |
-| 8. Payment/Dashboard | Payment gate open (C4). Admin dashboard operational. | C4 is the only public launch blocker |
+- `main` is branch-protected. Always `feat/` or `fix/` branch + PR. No AI agent pushes to main.
+- **Gemini 2.0 Flash only.** 2.5-flash has a GCP function-calling bug. Do not change.
+- No Docker containers per tenant. No OpenClaw. No Mini-RAG. Gone permanently.
+- `buildSystemPrompt()` is async. Always `await` it.
+- New tools in `api/src/tools/` MUST be registered in `toolsMap` in `ai.ts`. Missing = infinite tool loop.
+- Market intelligence domain key = flavor **displayName** (e.g. `"Real Estate Agent"`), NOT flavor key.
+- `node-fetch` is not in `package.json`. Use native `fetch` (Node 18+).
+- Cloud SQL proxy: binary is `cloud-sql-proxy`, instance `hybrid-matrix-472500-k5:us-central1:tiger-claw-postgres-ha`, port **5433** locally.
+- One PR per fix. Test before opening a PR. Delete branch after merge.
+- `tiger_gmail_send` and `tiger_postiz` are NOT in toolsMap by design. Do not re-add.
+- **462 tests must pass** before any PR is opened. Run `npm test` from `api/`.
+- After every PR merge: update RULES.md and SOTU.md.
+- Read logs before diagnosing. Cloud Run logs are ground truth.
 
 ---
 
@@ -391,47 +278,23 @@ curl https://api.tigerclaw.io/health
 ADMIN_TOKEN=$(gcloud secrets versions access latest --secret="tiger-claw-admin-token" --project="hybrid-matrix-472500-k5")
 curl -X POST https://api.tigerclaw.io/admin/fix-all-webhooks \
   -H "Authorization: Bearer $ADMIN_TOKEN"
-
-# 4. Deploy wizard (from web-onboarding/ directory)
-npx vercel deploy --prod --yes
 ```
-
----
-
-## Engineering Constraints (Non-Negotiable)
-
-- `main` is branch-protected. Always `feat/` or `fix/` branch + PR. No AI agent pushes to main.
-- **Gemini 2.0 Flash only.** 2.5-flash has a GCP function-calling bug. Do not change.
-- No Docker containers per tenant. No OpenClaw. No Mini-RAG. Gone permanently.
-- `buildSystemPrompt()` is async. Always `await` it.
-- New tools in `api/src/tools/` MUST be registered in `toolsMap` in `ai.ts`. Missing = infinite tool loop.
-- Market intelligence domain key = flavor **displayName** (e.g. `"Real Estate Agent"`), NOT flavor key.
-- `node-fetch` is not in `package.json`. Use native `fetch` (Node 18+).
-- Cloud SQL proxy runs on port **5433** locally, not 5432.
-- One PR per fix. Test before opening a PR. Delete branch after merge.
-- `tiger_gmail_send` and `tiger_postiz` are NOT in toolsMap by design. Do not re-add.
-- 462 tests must pass before any PR is opened. Run `npm test` from `api/`.
-
----
-
-## Future Vision (Do Not Build Yet)
-
-- **Reflexion Loop:** Outcome signals feed back into fact_anchors and hive_signals. Agent wakes smarter. Build after 10+ agents have real outcome data.
-- **Agent Leaderboard:** Opt-in fleet ranking by leads surfaced, pipeline activity, conversion rate. Build after Reflexion Loop.
-- **Affiliate tracking:** `?ref=` tag on signup URL. Build when first referral sale actually happens.
-
-Do not mention any of these publicly until built.
 
 ---
 
 ## Session Protocol
 
-**Start of session:** Run cold start checklist. Read this file. Read `MODULE_ASSESSMENT.md`. Do not code until you know what is broken.
+**Start of session:**
+1. Run cold start checklist above
+2. Read this file
+3. **Check prospect conversations first — before any code**
+4. Do not code until you know what is broken
 
 **End of session:** Update this file before closing:
 1. Update "Last updated" line
-2. Update Live Service Status if anything changed
-3. Update Open Issues (mark resolved, add new)
-4. Add session summary above
+2. Update Live Service Status
+3. Update Open Issues
+4. Add session summary
+5. Update RULES.md with any new constraints discovered
 
 A session that ends without updating this file leaves the next agent blind.

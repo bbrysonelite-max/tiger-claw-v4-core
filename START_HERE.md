@@ -1,6 +1,6 @@
 # START HERE — Tiger Claw Session Brief
 
-**Last Updated:** 2026-04-08 (Session 17 — PRs #263–#267 merged)
+**Last Updated:** 2026-04-09 (Session 17 close — PRs #263–#272 merged)
 
 **Read SOTU.md first. That is the single source of truth. This file is a fast orientation — SOTU has the details.**
 
@@ -10,9 +10,11 @@
 
 ## The Most Important Thing to Know
 
-**Brents Tiger 01 is live and responding on Telegram (@Brentstiger01_bot). First production bot confirmed.**
+**Check prospect conversations FIRST. Two people were messaging @Brentstiger01_bot at session close (11:40 PM PT). Results unknown. Read their conversations before touching any code.**
 
-The full Paddle loop (pay → provision → hatch → scout → contact → reply) has not yet closed on a paying customer. That remains day zero for the Paddle path. Admin hatch is proven. Paddle checkout URL does not yet exist.
+**Brents Tiger 01 is live with prospect engagement mode deployed.** Bot description: "Let me take you by the hand and lead you to your brighter future." /start ends with "What's going on for you right now?" Tool names blocked. Internal state blocked.
+
+The full loop (pay → provision → hatch → scout → contact → reply with a real prospect) has not yet closed. That remains day zero. No confirmed successful prospect conversation yet.
 
 **Tiger Strike pipeline confirmed working.** First successful run produced 20 engagement links. Operator received Telegram alert. Fires automatically after 2 AM UTC mine cycle.
 
@@ -76,11 +78,11 @@ curl -X POST https://api.tigerclaw.io/admin/hatch \
 ## What Is and Is Not Working Right Now
 
 ### Infrastructure — OK
-- Cloud Run API healthy (revision 00422-xc6)
+- Cloud Run API healthy (revision **00434-c6h** — deployed 2026-04-09)
 - Postgres, Redis, Workers (11) all OK
 - Telegram webhook delivery + TELEGRAM_WEBHOOK_SECRET wired
 - Serper keys (x3) round-robin rotation active
-- Oxylabs working — 1,684+ facts in last 24h, 6,545+ total in DB
+- Oxylabs working — 1,684+ facts per mine run
 - Resend email confirmed working
 - Admin fleet dashboard operational (`wizard.tigerclaw.io/admin/dashboard`)
 - Vercel auto-deploy confirmed working
@@ -89,13 +91,14 @@ curl -X POST https://api.tigerclaw.io/admin/hatch \
 - Daily mine: Orchestrator → 8 Research Agents (parallel) → Reporting Agent → Strike Pipeline — running at 2 AM UTC
 - **Tiger Strike pipeline:** confirmed firing. 20 engagement links generated. Admin alert delivered.
 - **Dashboard contrast:** fixed. All labels, sub-text, and buttons readable on dark backgrounds.
+- **Prospect engagement mode:** deployed. Bot never exposes internal state, tool names, or operator management language to prospects.
 
 ### Not Working / Not Yet Proven
 | What | Status |
 |------|--------|
 | Reddit scout | Blocked — 403 from Cloud Run egress. Oxylabs + Serper fallback active. |
 | Paddle checkout | Webhook live but no product/price yet. No checkout URL. |
-| Real prospect conversation | Brents Tiger 01 live. No prospect has contacted it yet. Operator to send link to warm contacts. |
+| Real prospect conversation | Prospect mode deployed but no CONFIRMED successful conversation yet. Two people messaged at session close — check first thing. |
 | Payment gate | Open — C4. Fix after Paddle loop proven. |
 | Admin alerts | Partial — fail when error message contains underscores (Markdown bug). |
 | Cal.com booking | `tiger_book_zoom` built. Deferred — needs platform booking architecture decision first. |
@@ -113,9 +116,9 @@ Interior-designer removed (was a one-off, not a platform flavor). Files remain o
 
 ## First Priority This Session
 
-1. **Send bot link to warm contacts** — `t.me/Brentstiger01_bot`. Operator action. Document first real conversation.
-2. **Create Paddle product + price** → get checkout URL. No Paddle path without this.
-3. **Prove full Paddle loop:** pay → provision → hatch → first message.
+1. **CHECK PROSPECT CONVERSATIONS** — Two people were messaging at session close. Read what they got before touching anything.
+2. **Validate prospect engagement mode** — was the conversation warm and human, or did they still get broken responses?
+3. **Create Paddle product + price** → get checkout URL. No Paddle path without this.
 4. **Fix admin alert markdown bug** — underscores in error messages break Telegram Markdown parser.
 
 ---
@@ -124,16 +127,15 @@ Interior-designer removed (was a one-off, not a platform flavor). Files remain o
 
 | Item | Priority |
 |------|----------|
-| Send bot link to 5 warm contacts | OPERATOR ACTION |
-| Create Paddle product + price → get checkout URL | IMMEDIATE |
-| Prove full loop: Paddle pay → provision → hatch → first message | IMMEDIATE |
+| Check overnight prospect conversations — read before coding | DAY ZERO / IMMEDIATE |
+| Validate prospect engagement mode end-to-end | IMMEDIATE |
+| Create Paddle product + price → get checkout URL | HIGH |
 | Fix admin alert markdown bug (underscores break Telegram Markdown) | HIGH |
-| Terminate orphan tenant `brents-tiger-01-mnpcril3` (1ed77b8f) | LOW |
-| Clean up Toon's 3 tenant records (phaitoon2010-*) | LOW |
-| Clean up test bots: Tiger Test 102, FiretestApril5, Teddy Tiger Claw | LOW |
-| C4: Harden payment gate | NEXT |
-| tiger_drive_list: confirmed safe to remove from toolsMap | LOW |
-| Past customers owed service: chana.loh@gmail.com, nancylimsk@gmail.com, lily.vergara@gmail.com | WHEN READY |
+| Terminate orphan tenant `brents-tiger-01-mnpcril3` | LOW |
+| Clean up test debris: FiretestApril5, Teddy Tiger Claw, Tigertest100, etc. | LOW |
+| Tiger Test 102 + orphan already suspended — terminate when convenient | LOW |
+| C4: Harden payment gate | NEXT (after Paddle loop proven) |
+| Past customers owed service: chana.loh@gmail.com, nancylimsk@gmail.com, lily.vergara@gmail.com | WHEN PLATFORM PROVEN |
 
 ---
 
