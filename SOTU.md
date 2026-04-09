@@ -1,6 +1,6 @@
 # Tiger Claw — State of the Union
 
-**Last updated:** 2026-04-07 (Session 16 continued — PRs #257–#261 merged)
+**Last updated:** 2026-04-08 (Session 17 — PRs #263–#265 merged)
 **This is the single source of truth. Read nothing else until you finish this file.**
 
 ---
@@ -45,10 +45,39 @@ The full loop (pay → provision → hatch → scout → contact → reply) stil
 
 ## Current Platform State
 
-**Last deployed revision:** `tiger-claw-api-00417-4qf` (deployed 2026-04-07, Session 16 continued)
-**Health (last verified 2026-04-07):** postgres OK, redis OK, workers OK
+**Last deployed revision:** `tiger-claw-api-00422-xc6` (deployed 2026-04-08, Session 17)
+**Health (last verified 2026-04-08):** postgres OK, redis OK, workers OK
 **Tests:** 462/462 passing
 **Wizard:** `wizard.tigerclaw.io` — Vercel, auto-deploy confirmed working
+
+---
+
+## What Was Done This Session (Session 17 — 2026-04-08)
+
+**PRs #263–#265 merged:**
+
+1. **PR #263 — Orchestrator dedup + strike queuing decoupled**
+   - Orchestrator was triggering Reporting Agent 5x per mine run. Research Agent retry failures kept pushing `completed` past `expected`, and `removeOnComplete:true` cleared BullMQ's dedup key. Fixed with Redis `SETNX` one-shot guard — Reporting Agent now fires exactly once per run.
+   - Strike pipeline was exiting without queuing facts whenever Gemini drafting failed. Moved `markFactsQueued` before `draftReplies` so facts are always queued regardless of draft success.
+
+2. **PR #264 — Strike harvest verbatim column fix (ROOT CAUSE)**
+   - `harvestFacts()` was selecting `verbatim` from `market_intelligence` — a column that does not exist. Every strike pipeline run since wiring has crashed at the first DB query. The pipeline has never successfully completed.
+   - Removed `verbatim` from SELECT, `HarvestedFact` interface, and draft prompt.
+   - **First successful pipeline run expected at next 2 AM UTC mine cycle.**
+
+3. **PR #265 — Rule 13: update RULES.md and SOTU.md after every merge**
+   - New standing rule: after every PR is merged, update both documents.
+
+**Session 17 discovery — always read logs first:**
+- Three PRs were needed to fix Tiger Strike because the root cause (missing DB column) was only visible in Cloud Run logs. Assumptions about Gemini failures, key expiry, and proxy issues were all wrong. The log showed `column "verbatim" does not exist` immediately.
+- **Rule going forward: read the logs before diagnosing.**
+
+**Cloud SQL proxy instance name corrected:**
+- SOTU had `tiger-claw-shared` — actual instance is `tiger-claw-postgres-ha`.
+- Proxy command: `cloud-sql-proxy "hybrid-matrix-472500-k5:us-central1:tiger-claw-postgres-ha" --port=5433`
+
+**Google account note:**
+- Operator set up `brent@tigerclaw.io` as Google Workspace — disrupted all GCP auth. Fixed via `gcloud auth application-default login`. Use separate Chrome profiles going forward to prevent cross-contamination.
 
 ---
 
@@ -171,7 +200,7 @@ Note: `mnpcril3` is the orphan from the duplicate-tenant bug. It has a subscript
 | DAY ZERO | Paddle purchase → provision → hatch → scout → contact → reply has never closed on a paying customer. Brents Tiger 01 proves admin hatch works. Paddle path unproven. | IMMEDIATE |
 | PADDLE PRODUCT | Webhook live but no Paddle product/price created. No checkout URL. Create before testing end-to-end payment flow. | IMMEDIATE |
 | CALCOM URL | `tiger_book_zoom` is live but inactive. `calcomBookingUrl` not yet written to Brents Tiger 01 settings.json. Set before testing booking flow. | IMMEDIATE |
-| STRIKE PIPELINE UNVERIFIED | Strike auto pipeline wired — has NOT yet fired at 2 AM. Verify after next mine cycle that `engagement_status` rows moved to `queued` and admin alert arrived. | HIGH |
+| STRIKE PIPELINE | Root cause fixed (PR #264 — verbatim column). First successful run expected next 2 AM UTC cycle. Verify alert arrives. | HIGH |
 | ORPHAN TENANT | `brents-tiger-01-mnpcril3` (1ed77b8f) — created by duplicate-tenant bug, no bot token, subscription active. Terminate when convenient. | LOW |
 | ADMIN ALERT BUG | Underscores in error messages break Telegram Markdown parser. Admin alerts with error text silently fail. Fix before launch. | HIGH |
 | C4 | Payment gate still open for direct wizard access (no Paddle purchase required). Fix after Paddle loop proven. | NEXT SESSION |
@@ -275,7 +304,7 @@ Last verified 2026-04-07:
 
 | Service | Status | Notes |
 |---------|--------|-------|
-| Cloud Run | OK | Revision 00417-4qf |
+| Cloud Run | OK | Revision 00422-xc6 |
 | Postgres | OK | Healthy |
 | Redis | OK | Healthy |
 | Workers | OK | ENABLE_WORKERS=true confirmed, 11 workers |
