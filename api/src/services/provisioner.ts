@@ -56,6 +56,8 @@ export interface ProvisionInput {
   hiveOptIn?: boolean;
   botId?: string;  // Required for Stan Store wizard flow; absent for admin manual provisioning
   product?: string; // Optional product/company name (e.g. "Nuskin") — pre-seeds identity
+  icpProspect?: Record<string, string>; // Optional custom ICP — overrides flavor defaultBuilderICP
+  icpProduct?: Record<string, string>; // Optional custom customer ICP (network-marketer two-oar)
 }
 
 export interface ProvisionResult {
@@ -314,9 +316,9 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
           botName: input.name,
           ...(input.product ? { productOrOpportunity: input.product } : {}),
         },
-        icpProspect: twoOar ? defaultIcp : {},
-        icpProduct: {},
-        icpSingle: !twoOar ? defaultIcp : {},
+        icpProspect: twoOar ? (input.icpProspect ?? defaultIcp) : {},
+        icpProduct: input.icpProduct ?? {},
+        icpSingle: !twoOar ? (input.icpProspect ?? defaultIcp) : {},
         primaryKeyValidated: true,
         fallbackKeyValidated: false,
         flavor: input.flavor,
