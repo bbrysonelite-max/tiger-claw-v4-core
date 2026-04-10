@@ -41,7 +41,7 @@ export default function StepReviewPayment({ state, isDeploying, setIsDeploying, 
 
             const hatchData = await hatchResponse.json();
             if (!hatchResponse.ok || !hatchData.ok) {
-                throw new Error(hatchData.error || "Failed to hatch agent.");
+                throw new Error(hatchData.error || "Something went wrong. Try again.");
             }
 
             // Success! Proceed to the hatching spinner screen

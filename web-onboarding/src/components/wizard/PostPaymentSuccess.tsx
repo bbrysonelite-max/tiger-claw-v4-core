@@ -15,7 +15,7 @@ import { API_BASE } from "@/lib/config";
 const STEPS = [
     { label: "Subscription confirmed", detail: "Payment verified — you're in." },
     { label: "Bot registered", detail: "Tiger has a name. Your token is live." },
-    { label: "ICP loaded", detail: "Tiger knows exactly who to hunt for." },
+    { label: "Your Tiger knows who to hunt.", detail: "Tiger knows exactly who to hunt for." },
     { label: "First hunt begins at dawn", detail: "Morning report incoming at 7 AM UTC." },
 ];
 

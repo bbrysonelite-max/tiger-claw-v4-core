@@ -21,7 +21,7 @@ const NICHES = [
     { id: "gig-economy", name: "Gig / Freelance", icon: "🎸" },
     { id: "lawyer", name: "Legal Services", icon: "⚖️" },
     { id: "plumber", name: "Home Services", icon: "🔧" },
-    { id: "sales-tiger", name: "Sales Professional", icon: "📈" },
+    { id: "sales-tiger", name: "Network Marketing Professional", icon: "📈" },
 ];
 
 export default function StepIdentity({ state, updateState, onNext }: IdentityProps) {

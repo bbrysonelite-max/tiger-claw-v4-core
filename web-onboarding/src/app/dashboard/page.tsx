@@ -281,7 +281,7 @@ export default function DashboardPage() {
                                     )}
                                 </h2>
                                 <p className="text-white/50 mt-1">
-                                    {data.tenant.flavor.replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase())} Agent
+                                    Tiger Agent
                                     · {data.tenant.region.toUpperCase()}
                                 </p>
                             </div>
@@ -527,7 +527,6 @@ export default function DashboardPage() {
                 <div className="border-t border-white/5 pt-6 pb-8">
                     <p className="text-white/20 text-xs text-center">
                         Agent created {new Date(data.tenant.createdAt).toLocaleDateString()} ·
-                        Flavor: {data.tenant.flavor} ·
                         Region: {data.tenant.region} ·
                         Tiger Claw v4
                     </p>
