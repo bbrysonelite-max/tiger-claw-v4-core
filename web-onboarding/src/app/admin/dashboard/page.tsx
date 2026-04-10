@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   Activity, AlertTriangle, Bot, CheckCircle2, ChevronDown, ChevronRight,
-  Database, Eye, Link, LogOut, MessageSquare, Pause, Play, RefreshCw, Shield, Zap,
+  Eye, Link, LogOut, MessageSquare, Pause, Play, RefreshCw, Shield, Zap,
 } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://api.tigerclaw.io";
@@ -11,14 +11,6 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://api.tigerclaw.io";
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
-
-interface PoolHealth {
-  status: "healthy" | "low" | "critical" | "empty";
-  available: number;
-  assigned: number;
-  total: number;
-  action: string;
-}
 
 interface TenantRow {
   id: string;
@@ -76,26 +68,6 @@ function statusColor(status: string): string {
   }
 }
 
-function poolStatusColor(status: string): string {
-  switch (status) {
-    case "healthy":  return "text-emerald-400";
-    case "low":      return "text-amber-400";
-    case "critical": return "text-orange-400";
-    case "empty":    return "text-red-400";
-    default:         return "text-zinc-400";
-  }
-}
-
-function poolStatusBg(status: string): string {
-  switch (status) {
-    case "healthy":  return "bg-emerald-500/10 border-emerald-500/20";
-    case "low":      return "bg-amber-500/10 border-amber-500/20";
-    case "critical": return "bg-orange-500/10 border-orange-500/20";
-    case "empty":    return "bg-red-500/10 border-red-500/20";
-    default:         return "bg-zinc-800 border-zinc-700";
-  }
-}
-
 function flavorLabel(flavor: string): string {
   return flavor.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
@@ -104,19 +76,12 @@ function flavorLabel(flavor: string): string {
 // Alarms
 // ---------------------------------------------------------------------------
 
-function computeAlarms(pool: PoolHealth | null, tenants: TenantRow[]): string[] {
+function computeAlarms(tenants: TenantRow[]): string[] {
   const alarms: string[] = [];
-  if (pool?.status === "empty")    alarms.push("ℹ️ Bot pool is EMPTY — all new signups must be BYOB");
-  if (pool?.status === "critical") alarms.push(`⚠️ Bot pool critical — only ${pool.available} tokens left`);
-  if (pool?.status === "low")      alarms.push(`⚠️ Bot pool low — ${pool.available} tokens remaining`);
 
   const suspended = tenants.filter((t) => t.status === "suspended");
   if (suspended.length > 0)
     alarms.push(`⛔ ${suspended.length} tenant${suspended.length > 1 ? "s" : ""} suspended: ${suspended.map((t) => t.name).join(", ")}`);
-
-  const waitlisted = tenants.filter((t) => t.status === "waitlisted");
-  if (waitlisted.length > 0)
-    alarms.push(`⏳ ${waitlisted.length} tenant${waitlisted.length > 1 ? "s" : ""} waitlisted (pool was empty when they signed up)`);
 
   const stuckOnboarding = tenants.filter((t) => {
     if (t.status !== "onboarding") return false;
@@ -136,7 +101,6 @@ function computeAlarms(pool: PoolHealth | null, tenants: TenantRow[]): string[] 
 export default function FleetDashboard() {
   const [token, setToken] = useState("");
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [pool, setPool] = useState<PoolHealth | null>(null);
   const [tenants, setTenants] = useState<TenantRow[]>([]);
   const [conversations, setConversations] = useState<ConversationStats | null>(null);
   const [loading, setLoading] = useState(false);
@@ -155,13 +119,12 @@ export default function FleetDashboard() {
     setLoading(true);
     setError("");
     try {
-      const [poolRes, fleetRes, convoRes] = await Promise.all([
-        fetch(`${API_URL}/admin/pool/health`, { headers: { Authorization: `Bearer ${tok}` } }),
+      const [fleetRes, convoRes] = await Promise.all([
         fetch(`${API_URL}/admin/fleet`, { headers: { Authorization: `Bearer ${tok}` } }),
         fetch(`${API_URL}/admin/conversations`, { headers: { Authorization: `Bearer ${tok}` } }),
       ]);
 
-      if (poolRes.status === 401 || fleetRes.status === 401) {
+      if (fleetRes.status === 401) {
         setError("Invalid admin token");
         setIsAuthenticated(false);
         localStorage.removeItem("tiger_admin_token");
@@ -174,7 +137,6 @@ export default function FleetDashboard() {
         return;
       }
 
-      if (poolRes.ok) setPool(await poolRes.json());
       const fleetData = await fleetRes.json();
       setTenants(fleetData.tenants ?? []);
       if (convoRes.ok) setConversations(await convoRes.json());
@@ -215,7 +177,6 @@ export default function FleetDashboard() {
     setToken("");
     setIsAuthenticated(false);
     setTenants([]);
-    setPool(null);
   };
 
   const tenantAction = async (tenantId: string, action: "suspend" | "resume" | "report") => {
@@ -254,7 +215,7 @@ export default function FleetDashboard() {
     }
   };
 
-  const alarms = computeAlarms(pool, tenants);
+  const alarms = computeAlarms(tenants);
   const activeTenants = tenants.filter((t) => t.status === "active").length;
 
   // ---------------------------------------------------------------------------
@@ -365,27 +326,7 @@ export default function FleetDashboard() {
         )}
 
         {/* Stats row */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          {/* Pool health */}
-          <div className={`rounded-xl border p-4 ${pool ? poolStatusBg(pool.status) : "bg-zinc-900 border-zinc-800"}`}>
-            <div className="flex items-center gap-2 mb-2">
-              <Database className="w-4 h-4 text-zinc-400" />
-              <span className="text-xs text-zinc-200 font-medium">Bot Pool</span>
-            </div>
-            {pool ? (
-              <>
-                <div className={`text-2xl font-bold ${poolStatusColor(pool.status)}`}>
-                  {pool.available}
-                </div>
-                <div className="text-xs text-zinc-300 mt-1">
-                  {pool.assigned} assigned · {pool.total} total · <span className="capitalize">{pool.status}</span>
-                </div>
-              </>
-            ) : (
-              <div className="text-zinc-600 text-sm">—</div>
-            )}
-          </div>
-
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {/* Active tenants */}
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
             <div className="flex items-center gap-2 mb-2">
@@ -591,14 +532,6 @@ export default function FleetDashboard() {
             </div>
           )}
         </div>
-
-        {/* Pool action hint (only when not healthy) */}
-        {pool && pool.status !== "healthy" && (
-          <div className={`rounded-xl border p-4 text-sm ${poolStatusBg(pool.status)}`}>
-            <div className={`font-semibold mb-1 ${poolStatusColor(pool.status)}`}>Pool Action Required</div>
-            <div className="text-zinc-200 font-mono text-xs">{pool.action}</div>
-          </div>
-        )}
 
       </div>
     </div>
