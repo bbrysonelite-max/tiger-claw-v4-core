@@ -1,6 +1,6 @@
 # State of the Tiger — Path Forward
 
-**Last Updated:** 2026-04-10 (Session 19 — PRs #286–#288 merged, revision 00456-9rb deployed)
+**Last Updated:** 2026-04-10 late-night (Session 19 CLOSED — PRs #286–#291 merged, revision 00456-9rb deployed, lobotomy data fix verified live)
 
 **No lying. No assuming. No guessing.**
 
@@ -37,17 +37,44 @@
 
 ## Current Focus
 
-**Verify `brents-tiger-01-mns7wcqk` from a fresh chatId.** API deployed (revision `00456-9rb`), onboard_state complete, webhook fixed. Bot has not been tested from a prospect's perspective. Paddle product/price still not created — no checkout URL exists.
+**Voice layer — Brent's actual voice in the network-marketer flavor system prompt.** The late-night surgical UPDATE to `brents-tiger-01-mns7wcqk`'s `onboard_state.json` at 2026-04-10 00:49 UTC produced the first real-intelligence prospect response in project history. The bot now thinks. It does not yet sound like Brent. Voice examples (written by Brent, wired in by Claude Code) are the first move next session.
+
+**Second:** restore the wizard Gemini key validator removed during the one-page rewrite — dead keys are not currently caught at hatch and this must be fixed before the first paid customer.
+
+**Still open:** Paddle product/price not created — no checkout URL exists, Paddle path unproven end-to-end.
 
 ---
 
-## Session 19 — PRs #286–#288 (2026-04-10)
+## Session 19 — PRs #286–#291 (2026-04-09 / 2026-04-10)
+
+### Shipped
 
 | PR | Fix |
 |----|-----|
 | #286 | StepReviewPayment TS fix — `customerProfile` removed from hatch payload (deleted in PR #282; was blocking Vercel build). |
 | #287 | Wizard hatch pre-seed — hatch route always writes `onboard_state.json`. Root cause: `if (customerProfile)` guard meant every wizard-hatched bot woke in operator onboarding mode. Now unconditional: `phase=complete` + identity + ICP from flavor defaults. Provisioner skips write when `phase=complete` already set. |
 | #288 | Remove dead `hasWizardIcp`/`resolvedOnboardingComplete` — variables depended on deleted `customerProfile`. Always false. Masked the real `hasOnboarding` check. Removed. Single source of truth restored. |
+| #289 | Session 19 close docs — SOTU.md, CLAUDE.md, PATH_FORWARD updated for PRs #286–#288 + revision 00456-9rb. |
+| #290 | START_HERE.md Session 19 close — revision stamp + corrected open items. |
+| #291 | SOTU.md late-night addendum — lobotomy data fix writeup, priorities rewritten, branch cleanup logged, PHASE_1_SIGNUP drift flagged. |
+
+### Late-Night Surgical Data Fix (2026-04-10 00:49 UTC)
+
+Four successive bot rebuilds produced a bot that appeared to respond but had no real intelligence — hardcoded covenant opening followed by wooden fallbacks or commander onboarding mode. Root cause: `brents-tiger-01-mns7wcqk`'s `onboard_state.json` was written at 02:41:46 UTC using the OLD field names `icpBuilder`/`icpCustomer` (from the admin hatch route at commit `fdfc803`, 18:12 PDT), 18 minutes AFTER PR #281 renamed them to `icpProspect`/`icpProduct` at 19:06 PDT. The record was also stuck at `phase="identity"`, `questionIndex=2`, with no product, biggestWin, or yearsInProfession. `hasIdentity` and `hasOnboarding` both evaluated false. Every prospect turn woke the bot in commander onboarding mode.
+
+Fix: a single scoped UPDATE to `t_a15eb1a2_93e6_4197_9534_025985c8aa11.bot_states` where `state_key='onboard_state.json'`. Set `phase=complete`, `questionIndex=0`, populated identity (Nu Skin opportunity, 35 years in profession, $20M Circle member biggestWin), wrote `icpProspect` and `icpProduct` with the new field names, dropped old field names. No code touched. No services restarted. No other tenants affected.
+
+Verified live: fresh prospect message "I'm tired of my job" at 00:49 UTC. Bot responded with empathy, acknowledged the feeling, asked qualifying questions, referenced network marketing context correctly. **First time in project history that a bot has responded to a prospect with real intelligence rather than a canned fallback.**
+
+### Five Remaining Problems Flagged for Next Session
+
+1. Voice layer is still generic — Brent's actual voice needs to be captured as examples and wired into the network-marketer flavor system prompt.
+2. Wizard does not validate Gemini keys at hatch time. Key tester was removed in the one-page rewrite and never restored. MUST go back in before any paid customer hatches.
+3. The mine may not have its own dedicated Gemini key. Suspected during diagnosis, not confirmed. Requires trace of the mine's intelligence path.
+4. Admin hatch field-name audit — `fdfc803` was sending stale field names after PR #281. Need to verify all current callers use `icpProspect`/`icpProduct`.
+5. Possible Gemini model cache at `ai.ts:1350` (`getGeminiModelWithCache`) could hold stale system prompts between deploys. Not a problem during the late-night fix but flagged for future debugging.
+
+See `NEXT_SESSION.md` for the ordered priority list.
 
 ---
 
@@ -207,8 +234,12 @@ On April 2, a live Zoom onboarding call with John (Thailand) failed completely. 
 
 | Item | Impact | Fix |
 |------|--------|-----|
-| `brents-tiger-01-mns7wcqk` not tested | API live (`00450-ntm`), webhook fixed, bot not verified from a fresh chatId | Test first next session |
-| Paddle product/price not created | No checkout URL — Paddle path unproven | Create product + price in Paddle dashboard |
+| Voice layer generic | Bot responds intelligently (verified 2026-04-10 00:49 UTC on revision `00456-9rb`) but not yet in Brent's actual voice | Write voice examples, wire into network-marketer flavor system prompt |
+| Wizard Gemini key validator missing | Dead keys are not caught at hatch — key tester removed in one-page rewrite, never restored | Restore before first paid customer |
+| Mine dedicated Gemini key status unknown | Mine may be borrowing a tenant's key — billing leak + silent failure risk | Trace mine intelligence path, report findings before fixing |
+| Admin hatch field-name drift | `fdfc803` sent `icpBuilder`/`icpCustomer` 18 min after PR #281 rename landed — caused the lobotomy | Audit all callers, confirm new field names |
+| Gemini model cache staleness (potential) | `getGeminiModelWithCache` at `ai.ts:1350` may hold stale system prompt between deploys | Monitor only — flag if stale behavior appears |
+| Paddle product/price not created | No checkout URL — Paddle path unproven end-to-end | Create product + price in Paddle dashboard |
 | Reddit 403 from Cloud Run egress | Mine uses Oxylabs + Serper fallback (working) | Awaiting Reddit API approval or Oxylabs Reddit proxy |
 | Admin alert markdown bug | Alerts with underscores in error text fail silently | Escape underscores in sendAdminAlert() |
 | Payment gate open (C4) | Anyone can access wizard without paying | Fix after Paddle loop proven |
