@@ -1,6 +1,6 @@
 # State of the Tiger — Path Forward
 
-**Last Updated:** 2026-04-09 (Session 18 — ground-truth doc audit, PRs #274–#277 merged, PR #278 open)
+**Last Updated:** 2026-04-09 (Session 18 close — PRs #274–#282 all merged)
 
 **No lying. No assuming. No guessing.**
 
@@ -29,27 +29,32 @@
 | 17 | Strike Pipeline + Orchestrator Dedup + Dashboard Contrast | ✅ Done (Session 17) — PRs #263–#267 |
 | 18 | Prospect Engagement Mode + Bot Persona Fixes | ✅ Done (Session 17 close) — PRs #269–#272 |
 | 19 | Remove Bot Pool — BYOB only, all tokens from BotFather | ✅ Done (Session 18) — PRs #274–#275 |
-| 20 | Ground-truth doc audit — full codebase verified, all documents rewritten | ✅ Done (Session 18) — PRs #276–#277 + doc PR in progress |
+| 20 | Ground-truth doc audit — full codebase verified, all documents rewritten | ✅ Done (Session 18) — PRs #276–#279 |
+| 21 | ICP field rename + admin hatch custom ICP + commander-language wizard cleanup | ✅ Done (Session 18) — PRs #280–#282 |
 
 ---
 
 ## Current Focus
 
-**Merge PR #278 (agent context fix), then provision a real bot with real identity.** Tigeralldaytest was terminated — it had `phase=complete` but empty identity, causing broken responses. Zero active bots until #278 is merged and a correctly provisioned bot is live. Paddle product/price still not created.
+**Deploy the API (PRs #278/#280/#281 are merged but not live), then verify `brents-tiger-01-mns7wcqk`.** onboard_state was written directly to DB with full identity + ICP. Bot has not been verified responding correctly. Paddle product/price still not created — no checkout URL exists.
 
 ---
 
 ## Sessions 15–17 — What Was Done (2026-04-06 to 2026-04-08)
 
-### Session 18 — PRs #274–#278
+### Session 18 — PRs #274–#282
 
 | PR | Fix |
 |----|-----|
-| #274 | Remove bot pool: 5,559 lines deleted. All `bot_pool` DB functions, `/admin/pool/*` routes, ops scripts, docs gone. `pool.ts` is crypto/Telegram utilities only. BYOB rule added loudly to CLAUDE.md and RULES.md. Eliminated the silent fallback chain (missing BYOK → platform key → 429 → OpenRouter) that burned $100. 456/456 tests passing. |
-| #275 | Post-#274 collateral fix: `updateTenantChannelConfig` accidentally deleted from `db.ts` (WhatsApp/LINE channel config — not pool code). `/admin/fix-pool-orphans` route still referenced deleted `fixBotPoolOrphans`. Both fixed. Deploy was failing; this unblocked it. All CI green. |
+| #274 | Remove bot pool: 5,559 lines deleted. All `bot_pool` DB functions, `/admin/pool/*` routes, ops scripts, docs gone. `pool.ts` is crypto/Telegram utilities only. Eliminated the silent fallback chain (missing BYOK → platform key → 429 → OpenRouter) that burned $100. |
+| #275 | Post-#274 collateral fix: `updateTenantChannelConfig` accidentally deleted from `db.ts`. `/admin/fix-pool-orphans` route still referenced deleted function. Deploy was failing; this unblocked it. |
 | #276 | Session docs update — SOTU.md and STATE_OF_THE_TIGER_PATH_FORWARD.md updated for PRs #274–#275. |
 | #277 | Repo cleanup — `api/cloud-sql-proxy` (32 MB binary) untracked from git. 37 loose scripts moved from `api/` root → `api/scripts/`. 4 stale audit markdown files → `docs/archive/`. `.claude/worktrees/` added to `.gitignore`. |
-| #278 | **OPEN — NOT MERGED** — Agent context fix: `hasOnboarding` requires real identity data (not just `phase=complete`). `displayOperatorName` fallback to "my operator". Empty identity fields omitted from operator block. Provisioner writes `phase="identity"` when no product provided at hatch. |
+| #278 | Agent context fix: `hasOnboarding` requires real identity data (not just `phase=complete`). `displayOperatorName` fallback to "my operator". Empty identity fields omitted from operator block. Provisioner writes `phase="identity"` when no product provided at hatch. |
+| #279 | Ground-truth doc rewrite — full codebase audit, all documents rewritten from verified state. Rule 16 (Documentation Protocol) added to RULES.md. |
+| #280 | Admin hatch custom ICP — `/admin/hatch` accepts `icpProspect` and `icpProduct`. Bot wakes with operator's exact ICP instead of flavor defaults. |
+| #281 | ICP field rename — `icpBuilder` → `icpProspect`, `icpCustomer` → `icpProduct` everywhere: interfaces, DB reads/writes, system prompts, tools, tests, docs. No schema changes. |
+| #282 | Commander-language cleanup — wizard UI: ICP step deleted (5→4 steps), `sales-tiger` removed from signup, internal terms replaced. `StepCustomerProfile.tsx` deleted. Dashboard shows "Tiger Agent" not flavor string. |
 
 ### Session 17 — PRs #263–#272
 
@@ -191,8 +196,8 @@ On April 2, a live Zoom onboarding call with John (Thailand) failed completely. 
 
 | Item | Impact | Fix |
 |------|--------|-----|
-| PR #278 not merged | Agent context fix not deployed. Zero active bots. | Merge next session, immediately. |
-| No active bot | Nothing to test | Provision correctly after #278 merged |
+| API not deployed | PRs #278/#280/#281 merged but not live — `tiger-claw-api-00442-tjd` is the active revision | Deploy at next session start |
+| `brents-tiger-01-mns7wcqk` not verified | onboard_state written, bot has not been tested from a fresh chatId | Verify after deploy |
 | Paddle product/price not created | No checkout URL — Paddle path unproven | Create product + price in Paddle dashboard |
 | Reddit 403 from Cloud Run egress | Mine uses Oxylabs + Serper fallback (working) | Awaiting Reddit API approval or Oxylabs Reddit proxy |
 | Admin alert markdown bug | Alerts with underscores in error text fail silently | Escape underscores in sendAdminAlert() |
