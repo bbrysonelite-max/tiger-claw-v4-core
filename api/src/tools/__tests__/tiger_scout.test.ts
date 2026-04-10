@@ -21,8 +21,8 @@ const TODAY = new Date().toISOString().slice(0, 10)
 
 const BASE_ONBOARD = {
   phase: 'complete',
-  icpBuilder: { idealPerson: 'entrepreneurs', problemFaced: 'need money' },
-  icpCustomer: { idealPerson: 'tired parents' },
+  icpProspect: { idealPerson: 'entrepreneurs', problemFaced: 'need money' },
+  icpProduct: { idealPerson: 'tired parents' },
   icpSingle: {},
   flavor: 'network-marketer',
   language: 'en',

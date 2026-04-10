@@ -127,12 +127,12 @@ const COMPLETE_ONBOARD = {
     biggestWin: 'Built a team of 40 in 6 months',
     differentiator: 'Coaching-first approach — people before products',
   },
-  icpBuilder: {
+  icpProspect: {
     idealPerson: 'Side-hustle seekers, 25–45, tired of 9-5, want income flexibility',
     problemFaced: 'Stuck in a job they hate, need a way out',
     onlinePlatforms: 'Reddit r/antiwork, r/financialindependence',
   },
-  icpCustomer: {
+  icpProduct: {
     idealPerson: 'Moms who want to lose weight but have failed every diet',
     problemFaced: 'Tried everything, still struggling with energy and weight',
   },

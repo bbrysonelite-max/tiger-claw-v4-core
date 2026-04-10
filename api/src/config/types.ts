@@ -123,8 +123,8 @@ export interface OnboardingQuestion {
 
 export interface OnboardingConfig {
   identityQuestions: OnboardingQuestion[];
-  icpBuilderQuestions?: OnboardingQuestion[];   // NM only
-  icpCustomerQuestions?: OnboardingQuestion[];  // NM only
+  icpProspectQuestions?: OnboardingQuestion[];   // NM only
+  icpProductQuestions?: OnboardingQuestion[];  // NM only
   icpSingleQuestions?: OnboardingQuestion[];    // RE / HW
 }
 

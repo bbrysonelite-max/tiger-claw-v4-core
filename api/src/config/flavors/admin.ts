@@ -25,8 +25,8 @@ export const ADMIN_FLAVOR: FlavorConfig = {
   patternInterrupts: [],
   onboarding: {
     identityQuestions: [],
-    icpBuilderQuestions: [],
-    icpCustomerQuestions: [],
+    icpProspectQuestions: [],
+    icpProductQuestions: [],
   },
   soul: {
     systemPromptPreamble: [

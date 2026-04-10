@@ -139,8 +139,8 @@ interface OnboardState {
     differentiator?: string;
     monthlyIncomeGoal?: string;
   };
-  icpBuilder: { idealPerson?: string; problemFaced?: string };
-  icpCustomer: { idealPerson?: string; problemFaced?: string };
+  icpProspect: { idealPerson?: string; problemFaced?: string };
+  icpProduct: { idealPerson?: string; problemFaced?: string };
   icpSingle: { idealPerson?: string; problemFaced?: string };
   botName?: string;
   flavor: string;
@@ -258,8 +258,8 @@ function buildTouchMessage(
     years: onboard.identity.yearsInProfession ?? "several years",
     icp: onboard.flavor === "network-marketer"
       ? (record.oar === "builder"
-        ? onboard.icpBuilder?.idealPerson
-        : onboard.icpCustomer?.idealPerson)
+        ? onboard.icpProspect?.idealPerson
+        : onboard.icpProduct?.idealPerson)
       : (onboard.icpSingle?.idealPerson ?? "someone serious about results"),
     name: record.leadDisplayName,
     answer: gapAnswer ?? "what you mentioned"

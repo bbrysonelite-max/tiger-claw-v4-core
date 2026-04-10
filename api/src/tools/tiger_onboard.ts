@@ -60,8 +60,8 @@ interface OnboardState {
   phase: OnboardPhase;
   questionIndex: number;
   identity: IdentityAnswers;
-  icpBuilder: ICPAnswers;
-  icpCustomer: ICPAnswers;
+  icpProspect: ICPAnswers;
+  icpProduct: ICPAnswers;
   icpSingle: ICPAnswers;
   primaryKeyValidated: boolean;
   fallbackKeyValidated: boolean;
@@ -246,8 +246,8 @@ function initialState(tenantId: string): OnboardState {
     phase: "identity",
     questionIndex: 0,
     identity: {},
-    icpBuilder: {},
-    icpCustomer: {},
+    icpProspect: {},
+    icpProduct: {},
     icpSingle: {},
     primaryKeyValidated: false,
     fallbackKeyValidated: false,
@@ -353,10 +353,10 @@ async function handleICP(
   const isBuilder = phase === "icp_builder" || phase === "icp_builder_confirm";
   const isSingle = phase === "icp_single" || phase === "icp_single_confirm";
   const icpData = isBuilder
-    ? state.icpBuilder
+    ? state.icpProspect
     : isSingle
       ? state.icpSingle
-      : state.icpCustomer;
+      : state.icpProduct;
 
   // Confirmation phases — tenant is reviewing the summary
   if (phase === "icp_builder_confirm" || phase === "icp_customer_confirm" || phase === "icp_single_confirm") {
@@ -774,8 +774,8 @@ async function generateSOULmd(state: OnboardState): Promise<string> {
   ].join("\n"));
 
   // ICP sections (from ICP interview)
-  const builderICP = isTwoOarFlavor(state.flavor) ? state.icpBuilder : null;
-  const customerICP = isTwoOarFlavor(state.flavor) ? state.icpCustomer : state.icpSingle;
+  const builderICP = isTwoOarFlavor(state.flavor) ? state.icpProspect : null;
+  const customerICP = isTwoOarFlavor(state.flavor) ? state.icpProduct : state.icpSingle;
 
   if (builderICP) {
     tenantSections.push([
@@ -825,12 +825,12 @@ async function handleNaming(
   // ICP safety net: if idealPerson is empty, auto-populate from flavor defaults rather than
   // blocking the customer. A bot that launches with a sensible default ICP is better than
   // a bot that never launches or a bot that launches targeting nobody ("ideal customer: —").
-  const customerICP = state.icpSingle ?? state.icpCustomer;
-  const builderICP = state.icpBuilder;
+  const customerICP = state.icpSingle ?? state.icpProduct;
+  const builderICP = state.icpProspect;
   const flavorDefault = FLAVOR_DEFAULT_ICP[state.flavor ?? "network-marketer"] ?? FLAVOR_DEFAULT_ICP["network-marketer"];
 
   if (!customerICP?.idealPerson?.trim()) {
-    const target = state.icpSingle ? "icpSingle" : "icpCustomer";
+    const target = state.icpSingle ? "icpSingle" : "icpProduct";
     (state as any)[target] = {
       ...(state as any)[target],
       idealPerson: flavorDefault.idealPerson,
@@ -838,10 +838,10 @@ async function handleNaming(
     };
   }
   if (builderICP && !builderICP.idealPerson?.trim()) {
-    state.icpBuilder = {
-      ...state.icpBuilder,
+    state.icpProspect = {
+      ...state.icpProspect,
       idealPerson: flavorDefault.idealPerson,
-      problemFaced: state.icpBuilder?.problemFaced?.trim() || flavorDefault.problemFaced,
+      problemFaced: state.icpProspect?.problemFaced?.trim() || flavorDefault.problemFaced,
     };
   }
 

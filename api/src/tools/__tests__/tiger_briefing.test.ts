@@ -34,8 +34,8 @@ vi.mock('../../services/hiveEmitter.js', () => ({
 const COMPLETE_ONBOARD = {
   phase: 'complete',
   identity: { name: 'Brent', productOrOpportunity: 'supplements' },
-  icpBuilder: { idealPerson: 'entrepreneurs' },
-  icpCustomer: { idealPerson: 'parents' },
+  icpProspect: { idealPerson: 'entrepreneurs' },
+  icpProduct: { idealPerson: 'parents' },
   icpSingle: {},
   flavor: 'network-marketer',
   language: 'en',

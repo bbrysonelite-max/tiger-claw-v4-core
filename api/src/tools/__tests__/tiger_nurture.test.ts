@@ -13,7 +13,7 @@ vi.mock('../../services/tenant_data.js', () => ({
   getTenantState: vi.fn(async (tenantId, file) => {
     if (file === "onboard_state.json") return {
       phase: "complete",
-      identity: {}, icpBuilder: {}, icpCustomer: {}, icpSingle: {}, flavor: 'network-marketer'
+      identity: {}, icpProspect: {}, icpProduct: {}, icpSingle: {}, flavor: 'network-marketer'
     };
     if (file === "settings.json") return { language: 'en' };
     return null;

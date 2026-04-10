@@ -251,7 +251,7 @@ export const NETWORK_MARKETER_FLAVOR: FlavorConfig = {
         hint: "Rough number is fine. This helps calibrate how aggressively to run the flywheel.",
       },
     ],
-    icpBuilderQuestions: [
+    icpProspectQuestions: [
       {
         key: "idealBuilderPerson",
         question: "Describe your ideal business builder in one sentence. Who are they?",
@@ -265,7 +265,7 @@ export const NETWORK_MARKETER_FLAVOR: FlavorConfig = {
         hint: "Stuck in a job they hate? Looking for time freedom? Wants to build their own thing?",
       },
     ],
-    icpCustomerQuestions: [
+    icpProductQuestions: [
       {
         key: "idealCustomerPerson",
         question: "Now the customer side — who is your ideal product customer?",

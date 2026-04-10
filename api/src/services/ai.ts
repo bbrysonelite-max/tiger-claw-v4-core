@@ -797,8 +797,8 @@ export async function buildSystemPrompt(tenant: any): Promise<string> {
     }
 
     const identity = onboardState?.identity ?? {};
-    const icpBuilder = onboardState?.icpBuilder ?? {};
-    const icpCustomer = onboardState?.icpCustomer ?? {};
+    const icpProspect = onboardState?.icpProspect ?? {};
+    const icpProduct = onboardState?.icpProduct ?? {};
     const icpSingle = onboardState?.icpSingle ?? {};
     const botName = sanitizePromptField(onboardState?.botName ?? 'Tiger', 80);
     const operatorName = sanitizePromptField(identity.name ?? tenant.name ?? 'your operator', 80);
@@ -866,7 +866,7 @@ export async function buildSystemPrompt(tenant: any): Promise<string> {
 
     const icpLines: string[] = [];
     if (hasOnboarding) {
-        let primaryIcp = onboardState?.flavor === 'network-marketer' ? icpBuilder : icpSingleResolved;
+        let primaryIcp = onboardState?.flavor === 'network-marketer' ? icpProspect : icpSingleResolved;
         // Fall back to baked-in flavor default when operator hasn't completed ICP onboarding
         if (!primaryIcp?.idealPerson && flavor?.defaultBuilderICP) {
             primaryIcp = flavor.defaultBuilderICP as typeof primaryIcp;
@@ -880,10 +880,10 @@ export async function buildSystemPrompt(tenant: any): Promise<string> {
             if (primaryIcp.onlinePlatforms) icpLines.push(`Where they hang out online: ${sanitizePromptField(primaryIcp.onlinePlatforms, 300)}`);
             if (primaryIcp.typesToAvoid) icpLines.push(`Types to avoid: ${sanitizePromptField(primaryIcp.typesToAvoid, 300)}`);
         }
-        if (onboardState?.flavor === 'network-marketer' && icpCustomer?.idealPerson) {
-            icpLines.push(``, `Ideal Customer: ${sanitizePromptField(icpCustomer.idealPerson, 300)}`);
-            if (icpCustomer.problemFaced) icpLines.push(`Problem they face: ${sanitizePromptField(icpCustomer.problemFaced, 300)}`);
-            if (icpCustomer.onlinePlatforms) icpLines.push(`Where they hang out: ${sanitizePromptField(icpCustomer.onlinePlatforms, 300)}`);
+        if (onboardState?.flavor === 'network-marketer' && icpProduct?.idealPerson) {
+            icpLines.push(``, `Ideal Customer: ${sanitizePromptField(icpProduct.idealPerson, 300)}`);
+            if (icpProduct.problemFaced) icpLines.push(`Problem they face: ${sanitizePromptField(icpProduct.problemFaced, 300)}`);
+            if (icpProduct.onlinePlatforms) icpLines.push(`Where they hang out: ${sanitizePromptField(icpProduct.onlinePlatforms, 300)}`);
         }
     }
 

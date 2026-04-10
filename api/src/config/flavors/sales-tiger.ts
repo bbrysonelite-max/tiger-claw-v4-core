@@ -168,11 +168,11 @@ export const SALES_TIGER_FLAVOR: FlavorConfig = {
       { key: "biggestWin", question: "What's your biggest result — a quota record, a team build, a deal that changed your career?", required: true },
       { key: "differentiator", question: "What makes you different from every other sales professional or sales leader in your space?", required: true },
     ],
-    icpBuilderQuestions: [
+    icpProspectQuestions: [
       { key: "idealBuilderPerson", question: "Who is your ideal sales hire — experience level, background, traits?", required: true },
       { key: "builderProblemFaced", question: "What is your ideal sales hire looking for that joining your team answers?", required: true },
     ],
-    icpCustomerQuestions: [
+    icpProductQuestions: [
       { key: "idealCustomerPerson", question: "Who is your ideal buyer — title, company size, industry?", required: true },
       { key: "customerProblemFaced", question: "What business problem does your ideal buyer have that your solution solves?", required: true },
     ],

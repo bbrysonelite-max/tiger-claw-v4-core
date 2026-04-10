@@ -1156,10 +1156,10 @@ router.post("/flush-redis", async (_req: Request, res: Response) => {
 // Admin-direct bot provisioning. Bypasses the payment gate — for operator use,
 // internal testing, and custom-flavor bots (YouTube flywheel, admin, etc.).
 //
-// Body: { botToken, name, flavor, email, aiKey?, region?, language?, product?, icpBuilder?, icpCustomer? }
+// Body: { botToken, name, flavor, email, aiKey?, region?, language?, product?, icpProspect?, icpProduct? }
 // Returns: { ok, botId, slug, telegramLink }
 router.post("/hatch", async (req: Request, res: Response) => {
-  const { botToken, name, flavor, email, aiKey, region, language, product, icpBuilder, icpCustomer } = req.body ?? {};
+  const { botToken, name, flavor, email, aiKey, region, language, product, icpProspect, icpProduct } = req.body ?? {};
 
   if (!botToken || !name || !flavor || !email) {
     return res.status(400).json({ error: "botToken, name, flavor, and email are required" });
@@ -1224,8 +1224,8 @@ router.post("/hatch", async (req: Request, res: Response) => {
       timezone: 'UTC',
       botToken,
       ...(product ? { product } : {}),
-      ...(icpBuilder ? { icpBuilder } : {}),
-      ...(icpCustomer ? { icpCustomer } : {}),
+      ...(icpProspect ? { icpProspect } : {}),
+      ...(icpProduct ? { icpProduct } : {}),
     }, {
       attempts: 5,
       backoff: { type: 'exponential', delay: 10000 },
