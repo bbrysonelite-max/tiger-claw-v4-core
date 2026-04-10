@@ -243,25 +243,43 @@ router.post("/hatch", async (req: Request, res: Response) => {
       console.log(`[hatch] LINE credentials saved for botId=${botId}`);
     }
 
-    // Write ICP data to onboard_state.json so the bot starts with the customer
-    // profile already loaded — it will never need to ask these questions in conversation.
-    // Also translate customerProfile into icpSingle so buildSystemPrompt injects the ICP
-    // block correctly. Without icpSingle, the system prompt has no ICP data and the LLM
-    // calls tiger_onboard on every message after the first.
-    if (customerProfile) {
+    // Always pre-seed onboard_state.json before enqueuing the provisioner.
+    // The provisioner skips its own write when it finds phase="complete" — so this
+    // must happen first. Without it, the provisioner writes phase="identity" (no product
+    // in the queue payload) and the bot fires operator onboarding at every incoming message.
+    try {
+      const { FLAVOR_REGISTRY } = await import('../config/flavors/index.js');
+      const flavorConfig = (FLAVOR_REGISTRY as any)[flavor || "network-marketer"] ?? {};
+      const defaultIcp = flavorConfig.defaultBuilderICP ?? {};
+      const twoOar = (flavor || "network-marketer") === "network-marketer";
       const botDisplayName = name || tenant.name || 'Tiger';
+      const now = new Date().toISOString();
+
       await setBotState(botId, "onboard_state.json", {
-        customerProfile,
+        phase: "complete",
         botName: botDisplayName,
-        icpSingle: {
-          idealPerson: customerProfile.idealCustomer,
-          problemFaced: customerProfile.problem,
-          currentApproachFailing: customerProfile.notWorking ?? '',
-          onlinePlatforms: customerProfile.whereToFind ?? '',
+        completedAt: now,
+        startedAt: now,
+        identity: {
+          name: botDisplayName,
+          botName: botDisplayName,
+          // Use the flavor description as a stand-in product — the bot can prospect
+          // immediately. The operator can refine this through the identity setup flow.
+          productOrOpportunity: flavorConfig.description ?? flavorConfig.displayName ?? flavor ?? "their business",
         },
-      }).catch((err) => {
-        console.warn(`[hatch] Failed to write customerProfile to onboard_state.json for botId=${botId}:`, err.message);
+        icpProspect: twoOar ? defaultIcp : {},
+        icpProduct: {},
+        icpSingle: !twoOar ? defaultIcp : {},
+        primaryKeyValidated: true,
+        fallbackKeyValidated: false,
+        flavor: flavor || "network-marketer",
+        language: language || "en",
+        tenantId: botId,
       });
+      console.log(`[hatch] onboard_state.json pre-seeded for botId=${botId} (flavor=${flavor}, twoOar=${twoOar})`);
+    } catch (err: any) {
+      // Non-fatal — provisioner will write a fallback state. Log and continue.
+      console.warn(`[hatch] Failed to pre-seed onboard_state.json for botId=${botId}:`, err.message);
     }
 
     // Enqueue the heavy lifting
