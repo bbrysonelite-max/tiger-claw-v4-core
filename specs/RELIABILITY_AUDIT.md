@@ -70,7 +70,7 @@
 - **Impact:** Tenant can complete onboarding with empty ICP. System prompt says "ideal customer: —" forever. Scout targets nobody.
 - **Fix:**
   ```typescript
-  if (!state.icpBuilder?.idealPerson?.trim() && !state.icpCustomer?.idealPerson?.trim()) {
+  if (!state.icpProspect?.idealPerson?.trim() && !state.icpProduct?.idealPerson?.trim()) {
     return reply("⚠️ Please complete your Ideal Customer Profile before finishing setup.");
   }
   ```

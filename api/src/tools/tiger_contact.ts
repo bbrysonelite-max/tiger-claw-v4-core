@@ -101,8 +101,8 @@ interface OnboardState {
     biggestWin?: string;
     differentiator?: string;
   };
-  icpBuilder: { idealPerson?: string };
-  icpCustomer: { idealPerson?: string };
+  icpProspect: { idealPerson?: string };
+  icpProduct: { idealPerson?: string };
   icpSingle: { idealPerson?: string };
   botName?: string;
   flavor: string;
@@ -257,8 +257,8 @@ function buildIndirectMessage(
   // ICP description for the "who do you know" ask
   const icpDesc =
     onboard.flavor === "network-marketer"
-      ? (onboard.icpBuilder?.idealPerson ?? "driven, entrepreneurial types who want more control over their income")
-      : (onboard.icpSingle?.idealPerson ?? onboard.icpCustomer?.idealPerson ?? "the right kind of person");
+      ? (onboard.icpProspect?.idealPerson ?? "driven, entrepreneurial types who want more control over their income")
+      : (onboard.icpSingle?.idealPerson ?? onboard.icpProduct?.idealPerson ?? "the right kind of person");
 
   return [
     `Hey ${lead.displayName},`,

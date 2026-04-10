@@ -84,8 +84,8 @@ interface OnboardState {
     productOrOpportunity?: string;
     yearsInProfession?: string;
   };
-  icpBuilder: ICP;
-  icpCustomer: ICP;
+  icpProspect: ICP;
+  icpProduct: ICP;
   icpSingle: ICP;
   flavor: string;
   language: string;
@@ -1118,13 +1118,13 @@ async function runHunt(
   const hasCompleteOnboard = onboardState && onboardState.phase === "complete";
 
   // Extract keywords from appropriate ICP(s)
-  const builderKeywords = (hasCompleteOnboard && flavor === "network-marketer" && onboardState!.icpBuilder)
-    ? extractICPKeywords(onboardState!.icpBuilder)
+  const builderKeywords = (hasCompleteOnboard && flavor === "network-marketer" && onboardState!.icpProspect)
+    ? extractICPKeywords(onboardState!.icpProspect)
     : { positive: [], negative: [] };
   const customerKeywords = hasCompleteOnboard
     ? (flavor !== "network-marketer"
         ? (onboardState!.icpSingle ? extractICPKeywords(onboardState!.icpSingle) : { positive: [], negative: [] })
-        : (onboardState!.icpCustomer ? extractICPKeywords(onboardState!.icpCustomer) : { positive: [], negative: [] }))
+        : (onboardState!.icpProduct ? extractICPKeywords(onboardState!.icpProduct) : { positive: [], negative: [] }))
     : { positive: [], negative: [] };
 
   // Merge keywords (for search query — we search broadly and score precisely)
