@@ -46,7 +46,36 @@ Test path: hatch with a known-bad key, confirm rejection. Hatch with a real key,
 
 ---
 
-### 3. Verify the mine has a dedicated Gemini key
+### 3. Mine content pollution triage — CRITICAL, blocks paid customers
+
+**Found during DAILY_CHECKS.md item 3 dry run at 2026-04-10 ~14:20 PDT.** The mine is functioning (8,051 facts, 388 in the last 24h, `healthy: true`) but the data is NOT usable for Strike draft generation, especially for the Network Marketer flavor that is being tested live.
+
+**Finding 1 — self-referential pollution.** Two of the 5 highest-confidence (conf=100) Network Marketer facts are about the operator's own sunset product, OpenClaw Mastered. The research agent scraped old sales copy and ingested it as prospect intelligence. The mine is training on itself.
+- Row `67cb7c2a` (conf 100): *"OpenClaw Mastered has a server fee of $15 per month after a 14-day free trial period, in addition to the initial $27 cost."*
+- Row `07d6e010` (conf 100): *"The front-end offer for OpenClaw Mastered is priced at $27."*
+
+**Finding 2 — classifier drift.** The research agent is classifying completely off-topic content as Network Marketer signal:
+- Row `3c6a9bf5` (conf 100): *"The individual expects to pay between $950 and $1500 per month for housing."* (student budget Reddit thread)
+- Row `fa29d39a` (conf 100): *"The salary range for the Senior Specialty Solutions Engineer – Network position is $175,000 – $275,000 annually."* (job listing — the literal word "Network" triggered classification)
+- Row `25d1fa74` (conf 98): *"The individual reports having $50,200 in savings and is almost 21 years old."*
+
+Only the lower-confidence rows (`4f46bf3e`, `23ed60d0` — both about "side hustles with low startup costs") are actually on-topic. Lawyer flavor looks better but still has noise (row `f7c386ce`: *"Juniper wants to meet Apollo to discuss something important"* — scraped from unrelated text).
+
+**Finding 3 — `DAILY_CHECKS.md` schema error.** There is no `verbatim` column on `market_intelligence`. The real column is `fact_summary`, and every row is LLM paraphrase in third person ("The individual…", "The user…"), not real user quotes. The mine does not store prospect language verbatim anywhere. (Corrected in the same PR that added this item.)
+
+**Why this is a paid-customer blocker.** Voice examples (item 1 above) only affect the system prompt at turn time. They do not affect the Strike draft pipeline, which reads `market_intelligence` directly. If you hatch a Network Marketer bot and Strike draft generation cites "expects $950–$1500/month housing" or "OpenClaw Mastered has a $15/mo server fee" to a prospect, the draft is garbage and the prospect sees it. A paid customer would churn.
+
+**Triage plan (tomorrow):**
+1. **Targeted DELETE of self-referential rows.** Find every row where `fact_summary ILIKE '%OpenClaw%' OR fact_summary ILIKE '%Tiger Claw%' OR fact_summary ILIKE '%BotCraft%'`. Count, back up (`CREATE TABLE ... AS SELECT`), then DELETE. This is reversible from the backup if the filter is too aggressive.
+2. **Research agent classifier audit.** Find the research agent code (`api/src/services/orchestrator.ts` or similar — trace from `captured_by='research-agent'`). Read the prompt/logic that assigns a `domain` to each extracted fact. Understand how a $175K tech salary ended up tagged as "Network Marketer".
+3. **Source URL audit.** `source_url` is a column — query `SELECT source_url, COUNT(*) FROM market_intelligence WHERE domain='Network Marketer' GROUP BY source_url ORDER BY COUNT(*) DESC LIMIT 20;`. If the top sources are irrelevant domains (job boards, student forums, your own sales pages), build a blocklist.
+4. **Decision point:** after the audit, decide whether the mine needs a domain/source allowlist, tighter classifier prompts, or a full re-extraction. Do not fix until Brent has reviewed the audit findings.
+
+**Dependency:** this triage blocks trust in Strike drafts for any flavor. Voice examples (item 1) can still ship today because voice lives in the system prompt and is independent of the mine.
+
+---
+
+### 3b. Verify the mine has a dedicated Gemini key
 
 Suspected during the late-night diagnosis but not confirmed. Trace the mine's intelligence path: when `marketIntelligenceWorker` or `factExtractionWorker` runs, which Gemini key does it use? Is it (a) a dedicated mine key, (b) a platform fallback key, or (c) the first tenant's key it finds?
 
@@ -80,14 +109,14 @@ This is the entire business model. It has never been tested end to end. Cannot t
 
 Two related problems, one PR.
 
-**Problem A: almost no dependencies are surfaced on the admin dashboard.** The backend has a partial check at `GET /admin/pipeline/health` (`api/src/routes/admin.ts:906`) covering Serper×3, Gemini platform×3, and Resend. It does NOT cover Postgres, Redis, any BullMQ worker, Telegram webhook delivery, **Oxylabs** (added recently), Paddle webhook, or OpenRouter. The dashboard UI (`web-onboarding/src/app/admin/dashboard/page.tsx`) does not even call the endpoint that exists.
+**Problem A: there is no dependency health endpoint on the backend at all.** `GET /admin/pipeline/health` at `api/src/routes/admin.ts:906` looks like it should be one based on its name, but it is actually a **mine statistics** endpoint — it returns `totalFacts`, `factsLast24h`, `byVertical`, `byRegion`, `byCapturedBy`, and a single `healthy` boolean computed from "did any facts land in the last 24h AND newest fact within 48h". It does NOT check Serper, Gemini platform keys, Resend, Oxylabs, Postgres connectivity (beyond the query implicitly needing the DB), Redis, any BullMQ worker, Telegram webhook delivery, Paddle webhook, or OpenRouter. The dashboard UI (`web-onboarding/src/app/admin/dashboard/page.tsx`) does not call it either. Either build a new `GET /admin/dependencies/health` endpoint for the real dependency checks, or expand `/admin/pipeline/health` to add them alongside the mine stats (recommended — one endpoint, loud response, easy to consume).
 
-**Problem B: zombie pool code.** The dashboard still fetches `/admin/pool/health` on line 159 of the same file — PR #274 deleted that route. It 404s on every refresh. The `PoolHealth` type, `poolStatusColor()`, `poolStatusBg()`, and the pool branches of `computeAlarms()` are all dead code. This is a direct violation of the "NO BOT POOL. EVER." rule in `CLAUDE.md` — it should have been deleted in PR #274 and was missed.
+**Problem B: zombie pool code.** ✅ **Shipped as PR #294 on 2026-04-10** — `PoolHealth` type, pool state, `/admin/pool/health` fetch, pool alarms, `poolStatusColor`/`poolStatusBg`, Bot Pool stats card, and the Pool action hint block all removed from `web-onboarding/src/app/admin/dashboard/page.tsx`. The dashboard no longer 404s. This section is kept for historical context; only Problem A and the expansion steps below are still pending.
 
-**Build:**
-1. **Delete** the `PoolHealth` type, all pool state, all pool alarms, the `/admin/pool/health` fetch, `poolStatusColor()`, and `poolStatusBg()` from the dashboard component.
-2. **Expand** `GET /admin/pipeline/health` to also check: Postgres connectivity, Redis ping, each BullMQ worker in `api/src/workers/` (alive + recent heartbeat), Telegram webhook delivery (registered count vs active tenants), **Oxylabs** credentials + a test request, Paddle webhook (timestamp of last event received), OpenRouter circuit breaker state.
-3. **Wire** the dashboard to call `/admin/pipeline/health` instead of `/admin/pool/health`.
+**Build (A only, B is done):**
+1. ~~Delete pool code from the dashboard component.~~ (Done — PR #294)
+2. **Expand** `GET /admin/pipeline/health` (or build a new `/admin/dependencies/health`) to check: Postgres connectivity, Redis ping, each BullMQ worker in `api/src/workers/` (alive + recent heartbeat), Telegram webhook delivery (registered count vs active tenants), Serper×3 keys (the ones currently NOT checked anywhere), Gemini platform keys (platform + onboarding + emergency — NOT checked anywhere), Resend email (NOT checked anywhere), **Oxylabs** credentials + a test request, Paddle webhook (timestamp of last event received), OpenRouter circuit breaker state.
+3. **Wire** the dashboard to call the dependency health endpoint (and separately render the mine stats from `/admin/pipeline/health`'s existing payload).
 4. **Render** each dependency as a green/red row. Red surfaces as a loud alarm at the top of the dashboard. Never silently absent.
 
 **Acceptance:** open the admin dashboard, every dependency from `/admin/pipeline/health` is visible, Oxylabs is on the list, no pool references anywhere in the dashboard component, no 404s in the browser network tab. `DAILY_CHECKS.md` item 1 becomes fully runnable from the dashboard.
