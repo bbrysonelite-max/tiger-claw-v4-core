@@ -10,12 +10,12 @@
 
 | Fact | Value |
 |------|-------|
-| Cloud Run revision | `tiger-claw-api-00442-tjd` — **PRs #280/#281 merged but not yet deployed** |
+| Cloud Run revision | `tiger-claw-api-00450-ntm` — deployed 2026-04-09, health confirmed |
 | Health | postgres OK, redis OK, disk OK, workers OK |
 | Tests | 456/456 passing, 44 test files |
-| Active bots | **0 confirmed** — `brents-tiger-01-mns7wcqk` onboard_state written, not verified live |
+| Active bots | 1 — `brents-tiger-01-mns7wcqk` (Tiger Proof, Nu Skin) — webhook fixed, **not yet tested from fresh chatId** |
 | Open PRs | None |
-| Wizard | `wizard.tigerclaw.io` — Vercel, auto-deploy working (PRs #282 deployed) |
+| Wizard | `wizard.tigerclaw.io` — Vercel, auto-deploy working |
 | Repo | `github.com/bbrysonelite-max/tiger-claw-v4-core` |
 
 ---
@@ -60,8 +60,7 @@ AI sales agent SaaS. Operator brings their own Telegram bot token (BYOB — from
 
 | Item | Impact | Status |
 |------|--------|--------|
-| API not deployed | PRs #278/#280/#281 merged but `tiger-claw-api-00442-tjd` is still the live revision | Deploy next session |
-| `brents-tiger-01-mns7wcqk` not verified | onboard_state written, bot not confirmed responding correctly | Verify after deploy |
+| `brents-tiger-01-mns7wcqk` not tested | Webhook fixed, onboard_state complete, bot not verified from a fresh chatId | Test first next session |
 | Paddle product/price | No checkout URL — payment path unproven | Create in Paddle dashboard |
 | Admin alert markdown bug | Alerts with underscores fail silently | Fix when convenient |
 | Payment gate open (C4) | Anyone can access wizard without paying | Fix after Paddle loop proven |

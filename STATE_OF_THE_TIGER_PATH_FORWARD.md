@@ -1,6 +1,6 @@
 # State of the Tiger — Path Forward
 
-**Last Updated:** 2026-04-09 (Session 18 close — PRs #274–#282 all merged)
+**Last Updated:** 2026-04-09 (Session 18 close — PRs #274–#284 merged, revision 00450-ntm deployed)
 
 **No lying. No assuming. No guessing.**
 
@@ -36,7 +36,7 @@
 
 ## Current Focus
 
-**Deploy the API (PRs #278/#280/#281 are merged but not live), then verify `brents-tiger-01-mns7wcqk`.** onboard_state was written directly to DB with full identity + ICP. Bot has not been verified responding correctly. Paddle product/price still not created — no checkout URL exists.
+**Verify `brents-tiger-01-mns7wcqk` from a fresh chatId.** API deployed (revision `00450-ntm`), onboard_state complete, webhook fixed. Bot has not been tested from a prospect's perspective. Paddle product/price still not created — no checkout URL exists.
 
 ---
 
@@ -196,8 +196,7 @@ On April 2, a live Zoom onboarding call with John (Thailand) failed completely. 
 
 | Item | Impact | Fix |
 |------|--------|-----|
-| API not deployed | PRs #278/#280/#281 merged but not live — `tiger-claw-api-00442-tjd` is the active revision | Deploy at next session start |
-| `brents-tiger-01-mns7wcqk` not verified | onboard_state written, bot has not been tested from a fresh chatId | Verify after deploy |
+| `brents-tiger-01-mns7wcqk` not tested | API live (`00450-ntm`), webhook fixed, bot not verified from a fresh chatId | Test first next session |
 | Paddle product/price not created | No checkout URL — Paddle path unproven | Create product + price in Paddle dashboard |
 | Reddit 403 from Cloud Run egress | Mine uses Oxylabs + Serper fallback (working) | Awaiting Reddit API approval or Oxylabs Reddit proxy |
 | Admin alert markdown bug | Alerts with underscores in error text fail silently | Escape underscores in sendAdminAlert() |

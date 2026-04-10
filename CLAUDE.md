@@ -6,12 +6,12 @@
 
 ## Current Session State (2026-04-09 — Session 18 CLOSED)
 
-### 456/456 tests passing. PRs #274–#283 merged. Cloud Run revision tiger-claw-api-00442-tjd live. **API deploy required — PRs #278/#280/#281 are in main but not deployed.** Wizard on Vercel (auto-deployed, PRs #282 live).
+### 456/456 tests passing. PRs #274–#284 merged. Cloud Run revision **tiger-claw-api-00450-ntm** live. Wizard on Vercel (auto-deployed). Webhook fix confirmed: brents-tiger-01-mns7wcqk fixed.
 
-**Session 18 shipped (PRs #274–#283):**
+**Session 18 shipped (PRs #274–#284):**
 - **PR #274** — Remove bot pool (5,559 lines deleted)
 - **PR #275** — Post-#274 collateral fix
-- **PR #276/#279/#283** — Doc updates
+- **PR #276/#279/#283/#284** — Doc updates
 - **PR #277** — Repo cleanup
 - **PR #278** — Agent context fix: `hasOnboarding` requires real identity, `displayOperatorName` fallback, provisioner writes `phase="identity"` when no product
 - **PR #280** — Admin hatch accepts `icpProspect` + `icpProduct`
@@ -20,14 +20,12 @@
 
 ### FIRST PRIORITY NEXT SESSION
 
-1. **Deploy the API** — `GCP_PROJECT_ID=hybrid-matrix-472500-k5 bash ./ops/deploy-cloudrun.sh` — PRs #278/#280/#281 are merged but not live.
-2. **Verify `brents-tiger-01-mns7wcqk`** — onboard_state.json was written directly to DB (Nu Skin, full icpProspect/icpProduct). Test from a fresh chatId. Read what a prospect actually gets.
-3. **Create Paddle product + price** — no checkout URL exists. Paddle path completely unproven.
+1. **Verify `brents-tiger-01-mns7wcqk`** — onboard_state.json was written directly to DB (Nu Skin, full icpProspect/icpProduct). Test from a **fresh chatId**. Read what a prospect actually gets.
+2. **Create Paddle product + price** — no checkout URL exists. Paddle path completely unproven.
 
 ### Critical Open Issues
 
-- **API NOT DEPLOYED:** Cloud Run still at `00442-tjd`. PRs #278/#280/#281 changes not live.
-- **`brents-tiger-01-mns7wcqk` not verified:** onboard_state written, never tested.
+- **`brents-tiger-01-mns7wcqk` not verified:** API is live with correct code. Bot not yet tested from a fresh chatId.
 - **PADDLE PRODUCT:** Webhook live, no product/price yet. No checkout URL.
 - **C4:** Payment gate open — direct wizard access bypasses payment. Fix after Paddle loop proven.
 - **Admin alert markdown bug:** Underscores in error messages break Telegram Markdown parser.
