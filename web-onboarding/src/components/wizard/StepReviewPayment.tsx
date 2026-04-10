@@ -35,7 +35,6 @@ export default function StepReviewPayment({ state, isDeploying, setIsDeploying, 
                     botToken: state.telegramBotToken || undefined,
                     lineToken: state.lineToken || undefined,
                     lineChannelSecret: state.lineChannelSecret || undefined,
-                    customerProfile: state.customerProfile ?? undefined,
                 })
             });
 
