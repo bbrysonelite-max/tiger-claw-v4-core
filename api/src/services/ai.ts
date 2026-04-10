@@ -1316,13 +1316,7 @@ export async function processTelegramMessage(
         );
         if (fastPathHandled) return;
 
-        // checkWizardIcpFastPath may have written phase='complete' to the DB.
-        // Re-derive from the original onboardState — if customerProfile exists and is valid,
-        // the bot was wizard-hatched and onboarding is now complete even if phase was unset.
-        const hasWizardIcp = !!(onboardState?.customerProfile?.idealCustomer?.trim() && onboardState?.customerProfile?.problem?.trim());
-        const resolvedOnboardingComplete = onboardingComplete || hasWizardIcp;
-
-        const effectiveText = buildFirstMessageText(text, resolvedOnboardingComplete, isFirstMessage);
+        const effectiveText = buildFirstMessageText(text, onboardingComplete, isFirstMessage);
 
         // ── Check feedback loop: is this message a feedback response? ──────────
         await maybeLogFeedback(tenantId, chatId, text, bot, tenant, aiProvider, toolContext);
