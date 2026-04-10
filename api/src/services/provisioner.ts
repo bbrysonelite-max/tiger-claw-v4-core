@@ -56,6 +56,8 @@ export interface ProvisionInput {
   hiveOptIn?: boolean;
   botId?: string;  // Required for Stan Store wizard flow; absent for admin manual provisioning
   product?: string; // Optional product/company name (e.g. "Nuskin") — pre-seeds identity
+  icpBuilder?: Record<string, string>; // Optional custom ICP — overrides flavor defaultBuilderICP
+  icpCustomer?: Record<string, string>; // Optional custom customer ICP (network-marketer two-oar)
 }
 
 export interface ProvisionResult {
@@ -300,19 +302,20 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
       const defaultIcp = flavorConfig.defaultBuilderICP ?? {};
       const twoOar = input.flavor === "network-marketer";
       const now = new Date().toISOString();
+      const hasRealIdentity = !!input.product?.trim();
       await setBotState(tenant.id, "onboard_state.json", {
-        phase: "complete",
+        phase: hasRealIdentity ? "complete" : "identity",
         questionIndex: 0,
         botName: input.name,
-        completedAt: now,
+        ...(hasRealIdentity ? { completedAt: now } : {}),
         identity: {
           name: input.name,
           botName: input.name,
           ...(input.product ? { productOrOpportunity: input.product } : {}),
         },
-        icpBuilder: twoOar ? defaultIcp : {},
-        icpCustomer: {},
-        icpSingle: !twoOar ? defaultIcp : {},
+        icpBuilder: twoOar ? (input.icpBuilder ?? defaultIcp) : {},
+        icpCustomer: input.icpCustomer ?? {},
+        icpSingle: !twoOar ? (input.icpBuilder ?? defaultIcp) : {},
         primaryKeyValidated: true,
         fallbackKeyValidated: false,
         flavor: input.flavor,
@@ -320,7 +323,9 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
         tenantId: tenant.id,
         startedAt: now,
       });
-      steps.push("Onboarding pre-seeded from flavor config — no interview required");
+      steps.push(hasRealIdentity
+        ? "Onboarding pre-seeded — no interview required"
+        : "Onboarding pre-seeded (ICP only) — operator identity required before bot goes live");
     }
   } catch (err) {
     console.warn("[provisioner] Failed to pre-seed onboard state (non-fatal):", err);
