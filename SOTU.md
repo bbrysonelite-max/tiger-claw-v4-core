@@ -1,6 +1,6 @@
 # Tiger Claw — State of the Union
 
-**Last updated:** 2026-04-09 (Session 18 — in progress)
+**Last updated:** 2026-04-09 (Session 18 — close)
 **This is the single source of truth. Read nothing else until you finish this file.**
 **No lying. No assuming. No guessing. Every fact here is verified against the live system.**
 
@@ -10,13 +10,12 @@
 
 | Fact | Value |
 |------|-------|
-| Cloud Run revision | `tiger-claw-api-00442-tjd` |
+| Cloud Run revision | `tiger-claw-api-00442-tjd` — **PRs #280/#281 merged but not yet deployed** |
 | Health | postgres OK, redis OK, disk OK, workers OK |
 | Tests | 456/456 passing, 44 test files |
-| Active bots | **0** — all tenants terminated this session |
-| Pending tenant | `justagreatdirector-mne9xtna` (non-Brent account, unknown status) |
-| Open PR | #278 — agent context fix (ai.ts, provisioner.ts) — **not yet merged** |
-| Wizard | `wizard.tigerclaw.io` — Vercel, auto-deploy working |
+| Active bots | **0 confirmed** — `brents-tiger-01-mns7wcqk` onboard_state written, not verified live |
+| Open PRs | None |
+| Wizard | `wizard.tigerclaw.io` — Vercel, auto-deploy working (PRs #282 deployed) |
 | Repo | `github.com/bbrysonelite-max/tiger-claw-v4-core` |
 
 ---
@@ -42,21 +41,18 @@ AI sales agent SaaS. Operator brings their own Telegram bot token (BYOB — from
 | #274 | Remove bot pool — 5,559 lines deleted. All `bot_pool` DB functions, `/admin/pool/*` routes, ops scripts, docs gone. `pool.ts` is crypto/Telegram utilities only. Eliminated the silent fallback chain (missing BYOK → platform key → 429 → OpenRouter) that burned $100. |
 | #275 | Post-#274 collateral fix — `updateTenantChannelConfig` accidentally deleted from `db.ts`. `/admin/fix-pool-orphans` route still referenced deleted function. Deploy was failing; this unblocked it. |
 | #276 | Session docs update — SOTU.md, STATE_OF_THE_TIGER_PATH_FORWARD.md updated for PRs #274–#275. |
-| #277 | Repo cleanup — `api/cloud-sql-proxy` (32 MB binary) untracked from git. 37 loose scripts moved from `api/` root → `api/scripts/`. 4 stale audit markdown files → `docs/archive/`. `specs/legacy/` → `docs/archive/specs/`. `.claude/worktrees/` added to `.gitignore`. Nothing deleted. |
-
-### PR Open (not yet merged)
-
-| PR | What |
-|----|------|
+| #277 | Repo cleanup — `api/cloud-sql-proxy` (32 MB binary) untracked from git. 37 loose scripts moved from `api/` root → `api/scripts/`. 4 stale audit markdown files → `docs/archive/`. `.claude/worktrees/` added to `.gitignore`. |
 | #278 | Agent context fix — `buildSystemPrompt` empty identity fields no longer render as blank lines. `hasOnboarding` requires real identity data, not just `phase=complete`. `displayOperatorName` fallback in prospect phrases. Provisioner writes `phase="identity"` when no product provided at hatch. |
+| #279 | Ground-truth doc rewrite — all documents rewritten from codebase audit. Documentation protocol established as Rule 16. |
+| #280 | Admin hatch custom ICP — `/admin/hatch` now accepts `icpProspect` and `icpProduct`. Bot wakes with operator's exact ICP, not just flavor defaults. |
+| #281 | ICP field rename — `icpBuilder` → `icpProspect`, `icpCustomer` → `icpProduct` everywhere: TypeScript interfaces, DB reads/writes, system prompts, tools, tests, docs. String rename only — no schema changes. |
+| #282 | Commander-language cleanup — wizard UI: ICP step removed (4-step flow), `sales-tiger` flavor removed from signup, internal terms replaced (ICP/hatch/flavor/pipeline). `StepCustomerProfile.tsx` deleted. Dashboard shows "Tiger Agent" not flavor string. |
 
-### Also Done This Session
+### Also Done This Session (not in PRs)
 
-- Context audit: discovered bot Tigeralldaytest had empty identity (`productOrOpportunity`, `biggestWin`, `differentiator` all blank). Bot was giving feature-list responses to "what can you do for me" because Gemini had nothing real to anchor on.
-- Tigeralldaytest (3bf45773) terminated.
-- Full codebase audit — every route, service, tool, worker, migration verified against live code.
-- All documents rewritten from ground truth (this update).
-- Documentation protocol established as Rule 16 in RULES.md.
+- 18 stale tenant records deleted from DB — only `brents-tiger-01-mns7wcqk` (Tiger Proof) remains.
+- `onboard_state.json` written directly to DB for `brents-tiger-01-mns7wcqk` with full identity and ICP (phase=complete, Nu Skin, icpProspect, icpProduct blocks). Not yet verified live.
+- Documentation protocol established: done = tested, debugged, merged, and deployed. No exceptions.
 
 ---
 
@@ -64,8 +60,8 @@ AI sales agent SaaS. Operator brings their own Telegram bot token (BYOB — from
 
 | Item | Impact | Status |
 |------|--------|--------|
-| PR #278 not merged | Agent context fix not deployed | Merge next |
-| No active bot | Nothing to test | Provision correctly after #278 merged |
+| API not deployed | PRs #278/#280/#281 merged but `tiger-claw-api-00442-tjd` is still the live revision | Deploy next session |
+| `brents-tiger-01-mns7wcqk` not verified | onboard_state written, bot not confirmed responding correctly | Verify after deploy |
 | Paddle product/price | No checkout URL — payment path unproven | Create in Paddle dashboard |
 | Admin alert markdown bug | Alerts with underscores fail silently | Fix when convenient |
 | Payment gate open (C4) | Anyone can access wizard without paying | Fix after Paddle loop proven |
