@@ -4,36 +4,30 @@
 
 ---
 
-## Current Session State (2026-04-09 — Session 18 IN PROGRESS)
+## Current Session State (2026-04-09 — Session 18 CLOSED)
 
-### 456/456 tests passing. PRs #274–#277 merged. Cloud Run revision tiger-claw-api-00442-tjd live. Wizard on Vercel (auto-deploy). **0 active bots.**
+### 456/456 tests passing. PRs #274–#283 merged. Cloud Run revision tiger-claw-api-00442-tjd live. **API deploy required — PRs #278/#280/#281 are in main but not deployed.** Wizard on Vercel (auto-deployed, PRs #282 live).
 
-**PR #278 is open and NOT yet merged.** Merge this before any other work.
+**Session 18 shipped (PRs #274–#283):**
+- **PR #274** — Remove bot pool (5,559 lines deleted)
+- **PR #275** — Post-#274 collateral fix
+- **PR #276/#279/#283** — Doc updates
+- **PR #277** — Repo cleanup
+- **PR #278** — Agent context fix: `hasOnboarding` requires real identity, `displayOperatorName` fallback, provisioner writes `phase="identity"` when no product
+- **PR #280** — Admin hatch accepts `icpProspect` + `icpProduct`
+- **PR #281** — `icpBuilder` → `icpProspect`, `icpCustomer` → `icpProduct` everywhere
+- **PR #282** — Commander-language wizard cleanup: ICP step removed (5→4 steps), `sales-tiger` removed, `StepCustomerProfile.tsx` deleted
 
-**Session 18 shipped (PRs #274–#277):**
-- **PR #274 — Remove bot pool:** 5,559 lines deleted. All `bot_pool` DB functions, `/admin/pool/*` routes, ops scripts, docs gone. `pool.ts` is crypto/Telegram utilities only. Eliminated the silent fallback chain (missing BYOK → platform key → 429 → OpenRouter) that burned $100.
-- **PR #275 — Post-#274 collateral fix:** `updateTenantChannelConfig` accidentally deleted from `db.ts`. `/admin/fix-pool-orphans` route still referenced deleted function. Both fixed. Deploy was failing; this unblocked it.
-- **PR #276 — Session docs update:** SOTU.md and STATE_OF_THE_TIGER_PATH_FORWARD.md updated for PRs #274–#275.
-- **PR #277 — Repo cleanup:** `api/cloud-sql-proxy` (32 MB binary) untracked from git. 37 loose scripts moved from `api/` root → `api/scripts/`. 4 stale audit markdown files → `docs/archive/`. `.claude/worktrees/` added to `.gitignore`.
+### FIRST PRIORITY NEXT SESSION
 
-**PR #278 — Open, not merged — agent context fix:**
-- `hasOnboarding` now requires real identity fields (`productOrOpportunity` or `biggestWin`), not just `phase=complete`
-- `displayOperatorName` falls back to "my operator" when identity is missing
-- Empty identity fields omitted from operator block (no blank lines to Gemini)
-- Provisioner writes `phase="identity"` when no product provided at hatch
-
-**Context audit this session revealed:** Tigeralldaytest had `phase: "complete"` but empty identity. Gemini had nothing real to anchor on and improvised feature lists. Bot terminated. Root cause fixed in PR #278.
-
-### FIRST PRIORITY THIS SESSION
-
-1. **Merge PR #278** — do this before anything else.
-2. **Provision a real bot** — with actual operator name, product description, real Gemini key. Use admin hatch with `product` field populated.
-3. **Verify prospect conversation** — send bot link to a real contact. Read what they get.
-4. **Create Paddle product + price** — no checkout URL exists. Paddle path completely unproven.
+1. **Deploy the API** — `GCP_PROJECT_ID=hybrid-matrix-472500-k5 bash ./ops/deploy-cloudrun.sh` — PRs #278/#280/#281 are merged but not live.
+2. **Verify `brents-tiger-01-mns7wcqk`** — onboard_state.json was written directly to DB (Nu Skin, full icpProspect/icpProduct). Test from a fresh chatId. Read what a prospect actually gets.
+3. **Create Paddle product + price** — no checkout URL exists. Paddle path completely unproven.
 
 ### Critical Open Issues
 
-- **PR #278 NOT MERGED:** Agent context fix sitting open. Zero active bots until this is deployed.
+- **API NOT DEPLOYED:** Cloud Run still at `00442-tjd`. PRs #278/#280/#281 changes not live.
+- **`brents-tiger-01-mns7wcqk` not verified:** onboard_state written, never tested.
 - **PADDLE PRODUCT:** Webhook live, no product/price yet. No checkout URL.
 - **C4:** Payment gate open — direct wizard access bypasses payment. Fix after Paddle loop proven.
 - **Admin alert markdown bug:** Underscores in error messages break Telegram Markdown parser.
