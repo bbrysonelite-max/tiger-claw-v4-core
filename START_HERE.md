@@ -1,6 +1,6 @@
 # START HERE — Tiger Claw Session Brief
 
-**Last Updated:** 2026-04-09 (Session 18 — ground truth rewrite)
+**Last Updated:** 2026-04-10 (Session 19 close — PRs #286–#288, revision 00456-9rb)
 
 **Read SOTU.md first. This file is a fast orientation. SOTU has the details.**
 
@@ -8,11 +8,11 @@
 
 ---
 
-## Current State (Verified 2026-04-09)
+## Current State (Verified 2026-04-10)
 
-- **No active bots.** All test tenants terminated this session.
-- **PR #278 open** — agent context fix, not yet merged. Merge this first.
-- **Cloud Run:** healthy, revision `tiger-claw-api-00442-tjd`
+- **1 active bot:** `brents-tiger-01-mns7wcqk` (Tiger Proof, Nu Skin) — webhook set, onboard_state complete, **not yet tested from a fresh chatId**.
+- **No open PRs.**
+- **Cloud Run:** healthy, revision `tiger-claw-api-00456-9rb`
 - **Tests:** 456/456 passing
 
 ---
@@ -74,8 +74,8 @@ curl -X POST https://api.tigerclaw.io/admin/hatch \
 
 ## First Priorities This Session
 
-1. **Merge PR #278** — agent context fix. Do this before anything else.
-2. **Provision a real bot** — with actual operator name, product, and Gemini key. Test it like a real customer would.
+1. **Test `brents-tiger-01-mns7wcqk` from a fresh chatId** — verify it opens in prospect mode (NOT operator onboarding). This is the primary open item.
+2. **Create Paddle product + price** — no checkout URL exists. Paddle payment path is completely unproven.
 3. **Verify the prospect conversation** — send the bot link to a real contact and read what they get.
 
 ---
