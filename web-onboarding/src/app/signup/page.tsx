@@ -59,11 +59,6 @@ const FLAVORS: Flavor[] = [
     displayName: "Plumber / Trades Professional",
     description: "Finds homeowners and businesses that need trades work",
   },
-  {
-    key: "sales-tiger",
-    displayName: "Sales Tiger",
-    description: "Finds high-value prospects and closes deals aggressively",
-  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -96,9 +91,6 @@ interface HatchResponse {
 interface FormState {
   flavor: string;
   agentName: string;
-  whoTheyAre: string;
-  whatTheyWant: string;
-  whereTheyAre: string;
   telegramToken: string;
   aiKey: string;
 }
@@ -106,9 +98,6 @@ interface FormState {
 interface FormErrors {
   flavor?: string;
   agentName?: string;
-  whoTheyAre?: string;
-  whatTheyWant?: string;
-  whereTheyAre?: string;
   telegramToken?: string;
   aiKey?: string;
   general?: string;
@@ -332,9 +321,6 @@ function SignupForm({ email, botId }: SignupFormProps) {
   const [form, setForm] = useState<FormState>({
     flavor: "",
     agentName: "",
-    whoTheyAre: "",
-    whatTheyWant: "",
-    whereTheyAre: "",
     telegramToken: "",
     aiKey: "",
   });
@@ -370,9 +356,6 @@ function SignupForm({ email, botId }: SignupFormProps) {
     if (!form.agentName.trim()) newErrors.agentName = "Agent name is required.";
     else if (form.agentName.trim().length > 30)
       newErrors.agentName = "Agent name must be 30 characters or fewer.";
-    if (!form.whoTheyAre.trim()) newErrors.whoTheyAre = "Please describe your ideal customer.";
-    if (!form.whatTheyWant.trim()) newErrors.whatTheyWant = "Please describe what they want.";
-    if (!form.whereTheyAre.trim()) newErrors.whereTheyAre = "Please describe where they are online.";
     if (!form.telegramToken.trim()) {
       newErrors.telegramToken = "Bot token is required.";
     } else if (!telegramValid) {
@@ -398,12 +381,6 @@ function SignupForm({ email, botId }: SignupFormProps) {
         flavor: form.flavor,
         botToken: form.telegramToken.trim(),
         aiKey: form.aiKey.trim(),
-        customerProfile: {
-          idealCustomer: form.whoTheyAre.trim(),
-          problem: form.whatTheyWant.trim(),
-          notWorking: "",
-          whereToFind: form.whereTheyAre.trim(),
-        },
         preferredChannel: "telegram" as const,
         region: "us-en",
         language: "en",
@@ -555,96 +532,11 @@ function SignupForm({ email, botId }: SignupFormProps) {
           </section>
 
           {/* ---------------------------------------------------------------- */}
-          {/* Section 3 — ICP                                                  */}
+          {/* Section 3 — Telegram                                             */}
           {/* ---------------------------------------------------------------- */}
           <section>
             <SectionHeading
               number={3}
-              title="Who are you trying to reach?"
-              subtitle="Your agent reads this before every conversation. The more specific you are, the better it hunts."
-            />
-
-            <div className="flex flex-col gap-4">
-              <div>
-                <label className="block text-sm font-medium text-white/70 mb-2">
-                  Describe your ideal customer in one sentence.
-                </label>
-                <textarea
-                  value={form.whoTheyAre}
-                  onChange={(e) => updateForm("whoTheyAre", e.target.value)}
-                  rows={2}
-                  placeholder={`e.g. "Ambitious women 30–50 who are tired of their 9-to-5 and want financial independence."`}
-                  className={cn(
-                    "w-full bg-zinc-900/80 border rounded-xl px-4 py-3 text-base text-white placeholder:text-white/40 outline-none resize-none transition-colors",
-                    errors.whoTheyAre
-                      ? "border-red-500/60 focus:border-red-400"
-                      : "border-white/20 focus:border-orange-500/60"
-                  )}
-                />
-                {errors.whoTheyAre && (
-                  <p className="mt-1 text-sm text-red-400 flex items-center gap-1">
-                    <AlertCircle className="w-4 h-4 shrink-0" />
-                    {errors.whoTheyAre}
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-white/70 mb-2">
-                  What problem are they trying to solve, or what do they want more of?
-                </label>
-                <textarea
-                  value={form.whatTheyWant}
-                  onChange={(e) => updateForm("whatTheyWant", e.target.value)}
-                  rows={2}
-                  placeholder={`e.g. "They want a side income they can run from their phone without quitting their job."`}
-                  className={cn(
-                    "w-full bg-zinc-900/80 border rounded-xl px-4 py-3 text-base text-white placeholder:text-white/40 outline-none resize-none transition-colors",
-                    errors.whatTheyWant
-                      ? "border-red-500/60 focus:border-red-400"
-                      : "border-white/20 focus:border-orange-500/60"
-                  )}
-                />
-                {errors.whatTheyWant && (
-                  <p className="mt-1 text-sm text-red-400 flex items-center gap-1">
-                    <AlertCircle className="w-4 h-4 shrink-0" />
-                    {errors.whatTheyWant}
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-white/70 mb-2">
-                  Where do they spend time online?
-                </label>
-                <textarea
-                  value={form.whereTheyAre}
-                  onChange={(e) => updateForm("whereTheyAre", e.target.value)}
-                  rows={2}
-                  placeholder={`e.g. "Facebook groups, Instagram, TikTok, LinkedIn."`}
-                  className={cn(
-                    "w-full bg-zinc-900/80 border rounded-xl px-4 py-3 text-base text-white placeholder:text-white/40 outline-none resize-none transition-colors",
-                    errors.whereTheyAre
-                      ? "border-red-500/60 focus:border-red-400"
-                      : "border-white/20 focus:border-orange-500/60"
-                  )}
-                />
-                {errors.whereTheyAre && (
-                  <p className="mt-1 text-sm text-red-400 flex items-center gap-1">
-                    <AlertCircle className="w-4 h-4 shrink-0" />
-                    {errors.whereTheyAre}
-                  </p>
-                )}
-              </div>
-            </div>
-          </section>
-
-          {/* ---------------------------------------------------------------- */}
-          {/* Section 4 — Telegram                                             */}
-          {/* ---------------------------------------------------------------- */}
-          <section>
-            <SectionHeading
-              number={4}
               title="Connect your Telegram bot"
               subtitle="Your agent needs a Telegram bot token to operate."
             />
@@ -658,11 +550,11 @@ function SignupForm({ email, botId }: SignupFormProps) {
           </section>
 
           {/* ---------------------------------------------------------------- */}
-          {/* Section 5 — AI key                                               */}
+          {/* Section 4 — AI key                                               */}
           {/* ---------------------------------------------------------------- */}
           <section>
             <SectionHeading
-              number={5}
+              number={4}
               title="Add your AI key"
               subtitle="Your agent uses Google Gemini. The key stays encrypted on our servers."
             />

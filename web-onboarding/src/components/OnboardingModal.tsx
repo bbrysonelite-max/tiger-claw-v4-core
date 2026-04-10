@@ -8,7 +8,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import StepIdentity from "./wizard/StepIdentity";
 import StepChannelSetup from "./wizard/StepChannelSetup";
 import StepAIConnection from "./wizard/StepAIConnection";
-import StepCustomerProfile from "./wizard/StepCustomerProfile";
 import StepReviewPayment from "./wizard/StepReviewPayment";
 import PostPaymentSuccess from "./wizard/PostPaymentSuccess";
 
@@ -17,18 +16,6 @@ export interface AIKeyConfig {
     key: string;
     model: string;
     label: string;
-}
-
-export interface CustomerProfile {
-    idealCustomer: string;
-    problem: string;
-    notWorking: string;
-    whereToFind: string;
-    // Network marketing only — ideal prospect for the business opportunity
-    prospectIdeal?: string;
-    prospectProblem?: string;
-    prospectNotWorking?: string;
-    prospectWhereToBeThem?: string;
 }
 
 export interface WizardState {
@@ -49,7 +36,6 @@ export interface WizardState {
     contactsRaw: string;
     botId?: string;
     tenantSlug?: string;
-    customerProfile?: CustomerProfile;
 }
 
 const initialState: WizardState = {
@@ -91,7 +77,7 @@ export default function OnboardingModal({ onClose, initialEmail, initialBotId, i
     const [isDeploying, setIsDeploying] = useState(false);
     const [deploymentComplete, setDeploymentComplete] = useState(false);
 
-    const totalSteps = 5;
+    const totalSteps = 4;
 
 
     const handleNext = () => {
@@ -201,13 +187,6 @@ export default function OnboardingModal({ onClose, initialEmail, initialBotId, i
                                 />
                             )}
                             {step === 4 && (
-                                <StepCustomerProfile
-                                    state={state}
-                                    updateState={updateState}
-                                    onNext={handleNext}
-                                />
-                            )}
-                            {step === 5 && (
                                 <StepReviewPayment
                                     state={state}
                                     isDeploying={isDeploying}
