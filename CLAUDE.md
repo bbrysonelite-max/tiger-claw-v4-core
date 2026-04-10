@@ -139,6 +139,7 @@ See `NEXT_SESSION.md` for the full priority list (also includes mine Gemini key 
 - `SOTU.md` — **single source of truth. Read this first every session.**
 - `START_HERE.md` — fast orientation
 - `NEXT_SESSION.md` — priorities for the next working session
+- `DAILY_CHECKS.md` — recurring operational checklist. Run at every session open.
 - `WHAT_TIGER_CLAW_DOES.md` — product vision / one-sentence pitch
 - `ARCHITECTURE.md` — canonical system design
 - `STATE_OF_THE_TIGER_PATH_FORWARD.md` — roadmap and merged PR history
