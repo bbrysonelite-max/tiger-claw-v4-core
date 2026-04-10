@@ -4,19 +4,21 @@
 
 ---
 
-## Current Session State (2026-04-10 — Session 19 CLOSED)
+## Current Session State (2026-04-10 late-night — Session 19 CLOSED)
 
-### 456/456 tests passing. PRs #274–#288 merged. Cloud Run revision **tiger-claw-api-00456-9rb** live. Wizard on Vercel (auto-deployed).
+### 456/456 tests passing. PRs #274–#291 merged. Cloud Run revision **tiger-claw-api-00456-9rb** live. Wizard on Vercel (auto-deployed).
+
+**Session 19 late-night — lobotomy data fix verified live.** A surgical UPDATE to `brents-tiger-01-mns7wcqk`'s `onboard_state.json` at 2026-04-10 00:49 UTC produced the first real-intelligence prospect response in project history. No code touched. The architecture was working; the data was wrong. See SOTU.md's late-night addendum for the full diagnosis.
 
 **Session 19 shipped (PRs #286–#288):**
 - **PR #286** — StepReviewPayment TS fix (customerProfile removed from hatch payload)
 - **PR #287** — Wizard hatch always pre-seeds `onboard_state.json` — root cause fix: every wizard-hatched bot was waking in operator mode firing `tiger_onboard` at prospects
 - **PR #288** — Remove dead `hasWizardIcp`/`resolvedOnboardingComplete` — customerProfile gone, these were always false; single truth restored: `hasOnboarding = phase=complete && hasIdentity`
 
-**Session 18 shipped (PRs #274–#284):**
+**Session 18 shipped (PRs #274–#285):**
 - **PR #274** — Remove bot pool (5,559 lines deleted)
 - **PR #275** — Post-#274 collateral fix
-- **PR #276/#279/#283/#284** — Doc updates
+- **PR #276/#279/#283/#284/#285** — Doc updates
 - **PR #277** — Repo cleanup
 - **PR #278** — Agent context fix: `hasOnboarding` requires real identity, `displayOperatorName` fallback, provisioner writes `phase="identity"` when no product
 - **PR #280** — Admin hatch accepts `icpProspect` + `icpProduct`
@@ -25,12 +27,19 @@
 
 ### FIRST PRIORITY NEXT SESSION
 
-1. **Verify `brents-tiger-01-mns7wcqk`** — onboard_state.json was written directly to DB (Nu Skin, full icpProspect/icpProduct). Test from a **fresh chatId**. Read what a prospect actually gets.
-2. **Create Paddle product + price** — no checkout URL exists. Paddle path completely unproven.
+1. **Voice examples for network-marketer flavor** — Brent writes examples in his own voice, Claude Code wires them into the system prompt, re-test with "I'm tired of my job" and compare to the late-night baseline. Prompt engineering, not architecture.
+2. **Restore wizard Gemini key validator at hatch** — key tester removed in one-page rewrite, never restored. MUST be in place before first paid customer.
+3. **Create Paddle product + price** — no checkout URL exists. Paddle path completely unproven.
+
+See `NEXT_SESSION.md` for the full priority list (also includes mine Gemini key verification and admin hatch field audit).
 
 ### Critical Open Issues
 
-- **`brents-tiger-01-mns7wcqk` not verified:** API is live with correct code. Bot not yet tested from a fresh chatId.
+- **Voice layer generic:** Bot now responds intelligently but not in Brent's actual voice. First priority next session.
+- **Wizard Gemini key validator missing:** Removed during one-page rewrite, never restored. Dead keys are not caught at hatch. MUST restore before first paid customer.
+- **Mine dedicated Gemini key status unknown:** Suspected during late-night diagnosis. Trace mine intelligence path.
+- **Admin hatch field-name drift:** `fdfc803` was sending `icpBuilder`/`icpCustomer` 18 min after PR #281 rename landed. Audit all callers.
+- **Gemini model cache (potential):** `getGeminiModelWithCache` at `ai.ts:1350` may hold stale system prompt between deploys. Monitor only.
 - **PADDLE PRODUCT:** Webhook live, no product/price yet. No checkout URL.
 - **C4:** Payment gate open — direct wizard access bypasses payment. Fix after Paddle loop proven.
 - **Admin alert markdown bug:** Underscores in error messages break Telegram Markdown parser.
@@ -42,6 +51,7 @@
 - Operator is building this for their own distribution network. Platform must stand on its own merit.
 - BYOB only. Every operator provides their own Telegram bot token from BotFather. No exceptions.
 - Test every bot from a FRESH chatId to see what a prospect actually sees. Never from the operator account.
+- `brents-tiger-01-mns7wcqk` is verified live from a fresh chatId as of 2026-04-10 00:49 UTC (first real-intelligence prospect response in project history).
 
 ---
 
@@ -128,6 +138,8 @@
 
 - `SOTU.md` — **single source of truth. Read this first every session.**
 - `START_HERE.md` — fast orientation
+- `NEXT_SESSION.md` — priorities for the next working session
+- `WHAT_TIGER_CLAW_DOES.md` — product vision / one-sentence pitch
 - `ARCHITECTURE.md` — canonical system design
 - `STATE_OF_THE_TIGER_PATH_FORWARD.md` — roadmap and merged PR history
 - `SOUL.md` — brand voice, mission, and personality directives
