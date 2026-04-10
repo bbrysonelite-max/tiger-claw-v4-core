@@ -802,7 +802,14 @@ export async function buildSystemPrompt(tenant: any): Promise<string> {
     const icpSingle = onboardState?.icpSingle ?? {};
     const botName = sanitizePromptField(onboardState?.botName ?? 'Tiger', 80);
     const operatorName = sanitizePromptField(identity.name ?? tenant.name ?? 'your operator', 80);
-    const hasOnboarding = onboardState?.phase === 'complete';
+    // hasOnboarding requires BOTH phase=complete AND at least one real identity field.
+    // phase=complete with empty identity (e.g. admin-hatched without product) is treated as
+    // incomplete — the bot invites the operator to finish setup rather than exposing blank lines.
+    const hasIdentity = !!(identity.productOrOpportunity?.trim() || identity.biggestWin?.trim());
+    const hasOnboarding = onboardState?.phase === 'complete' && hasIdentity;
+    // Use operator name in prospect-facing phrases only when it's a real identity.
+    // Fallback to "my operator" when identity is missing so phrases remain coherent.
+    const displayOperatorName = hasIdentity ? operatorName : 'my operator';
 
     // Load dynamic approved skills for this tenant
     const approvedSkills = await loadApprovedSkills(tenant.id, tenant.flavor).catch(() => []);
@@ -820,17 +827,19 @@ export async function buildSystemPrompt(tenant: any): Promise<string> {
         getMarketIntelligence(flavor.displayName ?? '').catch(() => []),
     ]);
 
-    // Build operator context block — only injected when onboarding is complete
+    // Build operator context block — only injected when onboarding is complete WITH real identity.
+    // Fields are conditionally included — empty fields are omitted entirely rather than rendered
+    // as blank lines, which previously confused Gemini into listing capabilities instead of using voice.
     const operatorBlock = hasOnboarding ? [
         ``,
         `━━━━ OPERATOR IDENTITY (LOCKED — do not contradict these facts) ━━━━`,
         `Your name: ${botName}`,
         `Operator name: ${operatorName}`,
-        `What they sell / represent: ${sanitizePromptField(identity.productOrOpportunity, 300)}`,
-        `Years in profession: ${sanitizePromptField(identity.yearsInProfession, 50)}`,
-        `Their biggest proven result: ${sanitizePromptField(identity.biggestWin, 300)}`,
-        `What makes them different: ${sanitizePromptField(identity.differentiator, 300)}`,
-        `Monthly income goal: ${sanitizePromptField(identity.monthlyIncomeGoal, 50)}`,
+        ...(identity.productOrOpportunity?.trim() ? [`What they sell / represent: ${sanitizePromptField(identity.productOrOpportunity, 300)}`] : []),
+        ...(identity.yearsInProfession?.trim() ? [`Years in profession: ${sanitizePromptField(identity.yearsInProfession, 50)}`] : []),
+        ...(identity.biggestWin?.trim() ? [`Their biggest proven result: ${sanitizePromptField(identity.biggestWin, 300)}`] : []),
+        ...(identity.differentiator?.trim() ? [`What makes them different: ${sanitizePromptField(identity.differentiator, 300)}`] : []),
+        ...(identity.monthlyIncomeGoal?.trim() ? [`Monthly income goal: ${sanitizePromptField(identity.monthlyIncomeGoal, 50)}`] : []),
         ``,
         `Use these facts naturally when you build credibility, handle objections, and represent the operator.`,
         `Never invent results or credentials that weren't provided above.`,
@@ -957,8 +966,8 @@ export async function buildSystemPrompt(tenant: any): Promise<string> {
         `"Let me take you by the hand and lead you to your brighter future."`,
         `Then go quiet. Let it land. Then ask one question about THEM: what is going on in their life right now? What is not working? What are they looking for?`,
         ``,
-        `If asked "what can you do?" — answer as a person, not a product: "I help ${operatorName} find the right people at the right moment — people who are ready for something different. Are you one of them?"`,
-        `If asked "who are you?" — "I'm ${botName}. ${operatorName}'s right hand. I've been waiting for you."`,
+        `If asked "what can you do?" — answer as a person, not a product: "I help ${displayOperatorName} find the right people at the right moment — people who are ready for something different. Are you one of them?"`,
+        `If asked "who are you?" — "I'm ${botName}. ${displayOperatorName}'s right hand. I've been waiting for you."`,
         `If asked "what is this?" or "what is Tiger Claw?" — never explain the platform. Redirect: "It's a conversation. Tell me what's going on for you and I'll tell you if I can help."`,
         ``,
         `NEVER say to a prospect:`,
@@ -990,7 +999,7 @@ export async function buildSystemPrompt(tenant: any): Promise<string> {
         `Tiger: "Let me take you by the hand and lead you to your brighter future. What's going on for you right now?"`,
         ``,
         `Prospect: "What can you do?"`,
-        `Tiger: "I help ${operatorName} find the right people at the right moment — people who are ready for something different. Are you one of them?"`,
+        `Tiger: "I help ${displayOperatorName} find the right people at the right moment — people who are ready for something different. Are you one of them?"`,
         ``,
         `Prospect: "I'm struggling to make ends meet."`,
         `Tiger: "I hear that. You're not alone — and you found the right conversation. Tell me more. What does your situation look like right now?"`,
