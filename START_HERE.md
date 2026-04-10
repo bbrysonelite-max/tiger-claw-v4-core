@@ -1,6 +1,6 @@
 # START HERE — Tiger Claw Session Brief
 
-**Last Updated:** 2026-04-10 (Session 19 close — PRs #286–#288, revision 00456-9rb)
+**Last Updated:** 2026-04-10 late-night (Session 19 close + data fix verified live — revision 00456-9rb)
 
 **Read SOTU.md first. This file is a fast orientation. SOTU has the details.**
 
@@ -10,7 +10,7 @@
 
 ## Current State (Verified 2026-04-10)
 
-- **1 active bot:** `brents-tiger-01-mns7wcqk` (Tiger Proof, Nu Skin) — webhook set, onboard_state complete, **not yet tested from a fresh chatId**.
+- **1 active bot:** `brents-tiger-01-mns7wcqk` (Tiger Proof, Nu Skin) — webhook set, onboard_state corrected and **verified live 2026-04-10 00:49 UTC** (first real-intelligence prospect response).
 - **No open PRs.**
 - **Cloud Run:** healthy, revision `tiger-claw-api-00456-9rb`
 - **Tests:** 456/456 passing
@@ -72,11 +72,14 @@ curl -X POST https://api.tigerclaw.io/admin/hatch \
 
 ---
 
-## First Priorities This Session
+## First Priorities Tomorrow Morning
 
-1. **Test `brents-tiger-01-mns7wcqk` from a fresh chatId** — verify it opens in prospect mode (NOT operator onboarding). This is the primary open item.
-2. **Create Paddle product + price** — no checkout URL exists. Paddle payment path is completely unproven.
-3. **Verify the prospect conversation** — send the bot link to a real contact and read what they get.
+1. **Verify prospect conversation quality at scale.** Tonight proved intelligence exists with 2–3 messages. Run a proper verification pass with 5–10 realistic prospect openings (transition scenarios, skeptics, quick "what is this?" questions, objection openers, multi-language). The result is the diagnostic that tells us where the voice examples need to focus.
+2. **Write voice examples for the network-marketer flavor.** Bot now responds intelligently but in a generic "helpful assistant" tone. Brent writes examples in his own voice; Claude Code wires them into the flavor system prompt. Test again with the same prompts from step 1 and compare.
+3. **Restore Gemini key validation at wizard hatch.** Key tester was removed in the one-page rewrite and never restored. MUST be back in before any paid customer hatches.
+4. **Confirm mine has a dedicated Gemini key.** Suspected missing during tonight's diagnosis. Trace the mine's intelligence path.
+5. **Verify admin hatch route uses new field names + wider dead-schema audit.** fdfc803 was sending `icpBuilder`/`icpCustomer` 18 minutes after PR #281 renamed them. Audit current admin hatch + any other callers still sending old schema. **Also audit `specs/PHASE_1_SIGNUP.md`** — contains current-tense references to `customerProfile` (line 110, line 218) as if the field still exists and is still read by `buildSystemPrompt()`. It does not — deleted in PR #282, cleaned up in PR #288. Spec doc needs current-tense rewrite to reflect `icpProspect`/`icpProduct`. This is a drift landmine for anyone reading the spec to build against it.
+6. **Create Paddle product + price** — no checkout URL exists. Paddle payment path completely unproven.
 
 ---
 

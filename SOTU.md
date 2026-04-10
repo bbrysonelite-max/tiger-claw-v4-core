@@ -1,8 +1,33 @@
 # Tiger Claw — State of the Union
 
-**Last updated:** 2026-04-10 (Session 19 — PRs #286–#288 merged, revision 00456-9rb deployed)
+**Last updated:** 2026-04-10 late-night (Session 19 close + data fix verified live — revision 00456-9rb)
 **This is the single source of truth. Read nothing else until you finish this file.**
 **No lying. No assuming. No guessing. Every fact here is verified against the live system.**
+
+---
+
+## Session 19 late-night addendum — 2026-04-10 00:49 UTC
+
+LOBOTOMY ROOT CAUSE IDENTIFIED AND FIXED.
+
+Symptom across four rebuilds: bots appeared to respond but had no real intelligence. Covenant opening fired (hardcoded), then every subsequent turn produced the same wooden response or the bot fell back into commander onboarding mode. The soul was missing.
+
+Diagnosis: brents-tiger-01-mns7wcqk onboard_state.json was written at 2026-04-10 02:41:46 UTC (19:41 PDT) using the OLD field names icpBuilder/icpCustomer (from fdfc803 admin hatch route at 18:12), 18 minutes AFTER PR #281 renamed them to icpProspect/icpProduct at 19:06. The admin hatch client sent stale field names. The record also had phase="identity" with questionIndex=2 (stuck mid tiger_onboard interview), no productOrOpportunity, no biggestWin, no yearsInProfession. hasIdentity evaluated false. hasOnboarding evaluated false. Bot woke in commander onboarding mode on every turn.
+
+Fix: Option 1 in-place record update. Claude Code wrote a single scoped UPDATE to t_a15eb1a2_93e6_4197_9534_025985c8aa11.bot_states where state_key='onboard_state.json'. Set phase=complete, questionIndex=0, identity.name="Brent", identity.productOrOpportunity populated with Nu Skin opportunity block, yearsInProfession=35 years, biggestWin=$20 Million Circle member 20 years at that pin, differentiator written without Tiger Proof AI mention, icpProspect and icpProduct populated with new field names. All code gates verified: phase===complete, hasIdentity true, hasOnboarding true, displayOperatorName="Brent", new field names present, old field names dropped, questionIndex unstuck. No code touched. No services restarted. No other tenants affected.
+
+Verified live: fresh prospect message "I'm tired of my job" at 00:49 UTC. Bot responded with empathy, acknowledged the feeling, asked qualifying questions, referenced network marketing context correctly. First time in project history that a bot has responded to a prospect with real intelligence rather than a canned fallback.
+
+Remaining problems (not fixed tonight, scoped for tomorrow):
+1. Voice layer is still generic "helpful assistant" tone, not Brent's actual voice. System prompt needs voice examples that show how Brent talks to a transition-stage prospect. This is prompt engineering, not architecture.
+2. Wizard does not validate Gemini keys at hatch time. Key tester was removed in one-page rewrite and never restored. Every bot hatched since that rewrite could have a dead key and no one would know. MUST go back in before any paid customer hatches.
+3. The mine may not have its own dedicated key. Suspected during tonight's diagnosis but not confirmed. Requires trace of the mine's intelligence path tomorrow.
+4. Admin hatch route fdfc803 was using icpBuilder/icpCustomer at 18:12 even though PR #281 rename landed at 19:06. Need to verify that current admin hatch code uses the new field names and that no other callers are still sending the old schema.
+5. Possible Gemini model cache on Cloud Run at ai.ts:1350 (getGeminiModelWithCache) could hold stale system prompts. Not a problem tonight — fresh chatId triggered new build — but flag for future debugging if stale behavior appears.
+
+First move tomorrow morning: write voice examples for the Network Marketer flavor system prompt. Brent writes the examples in his own voice. Claude Code wires them in. Test again with "I'm tired of my job" and compare.
+
+Closing note: tonight's fix was surgical — one UPDATE, one row, zero code changes. The architecture has been working the whole time. The data was wrong. That changes what "broken" means in this project and suggests that future debugging should start with "what does the state actually look like" before "what does the code actually do."
 
 ---
 
@@ -13,7 +38,7 @@
 | Cloud Run revision | `tiger-claw-api-00456-9rb` — deployed 2026-04-10, health confirmed |
 | Health | postgres OK, redis OK, disk OK, workers OK |
 | Tests | 456/456 passing, 44 test files |
-| Active bots | 1 — `brents-tiger-01-mns7wcqk` (Tiger Proof, Nu Skin) — webhook fixed, **not yet tested from fresh chatId** |
+| Active bots | 1 — `brents-tiger-01-mns7wcqk` (Tiger Proof, Nu Skin) — webhook fixed, onboard_state corrected via surgical UPDATE, **verified live from fresh chatId at 2026-04-10 00:49 UTC** (first real-intelligence prospect response in project history) |
 | Open PRs | None |
 | Wizard | `wizard.tigerclaw.io` — Vercel, auto-deploy working |
 | Repo | `github.com/bbrysonelite-max/tiger-claw-v4-core` |
@@ -63,7 +88,7 @@ AI sales agent SaaS. Operator brings their own Telegram bot token (BYOB — from
 ### Also Done This Session (not in PRs)
 
 - 18 stale tenant records deleted from DB — only `brents-tiger-01-mns7wcqk` (Tiger Proof) remains.
-- `onboard_state.json` written directly to DB for `brents-tiger-01-mns7wcqk` with full identity and ICP (phase=complete, Nu Skin, icpProspect, icpProduct blocks). Not yet verified live.
+- `onboard_state.json` written directly to DB for `brents-tiger-01-mns7wcqk`. **⚠️ This claim was incorrect — see Session 19 late-night addendum above. The record was actually written with OLD field names (`icpBuilder`/`icpCustomer`) and stuck at `phase="identity"`, `questionIndex=2`. Corrected via surgical UPDATE 2026-04-10 00:49 UTC.**
 - Documentation protocol established: done = tested, debugged, merged, and deployed. No exceptions.
 
 ---
@@ -72,11 +97,15 @@ AI sales agent SaaS. Operator brings their own Telegram bot token (BYOB — from
 
 | Item | Impact | Status |
 |------|--------|--------|
-| `brents-tiger-01-mns7wcqk` not tested | Webhook fixed, onboard_state complete, bot not verified from a fresh chatId | Test first next session |
 | Paddle product/price | No checkout URL — payment path unproven | Create in Paddle dashboard |
 | Admin alert markdown bug | Alerts with underscores fail silently | Fix when convenient |
 | Payment gate open (C4) | Anyone can access wizard without paying | Fix after Paddle loop proven |
 | Reddit 403 from Cloud Run | Mine uses Oxylabs + Serper fallback (working) | Awaiting Reddit API or proxy |
+| Voice layer generic | Bot responds intelligently but not in Brent's voice yet | Write voice examples for network-marketer flavor system prompt |
+| Wizard Gemini key validation missing | Key tester removed in one-page rewrite, never restored — dead keys won't be caught at hatch | MUST restore before first paid customer |
+| Mine dedicated Gemini key status unknown | Suspected during tonight's diagnosis, not confirmed | Trace mine intelligence path |
+| Admin hatch stale field-name risk | fdfc803 route sent `icpBuilder`/`icpCustomer` after PR #281 rename; status of current admin hatch client unverified | Verify admin hatch + all callers use new field names |
+| Gemini model cache staleness (potential) | `getGeminiModelWithCache` at ai.ts:1350 caches system prompt per model — may hold stale prompt between deploys | Flag for future debugging if stale behavior appears |
 
 ---
 
@@ -158,3 +187,15 @@ AI sales agent SaaS. Operator brings their own Telegram bot token (BYOB — from
 | Deploys (API) | `GCP_PROJECT_ID=hybrid-matrix-472500-k5 bash ./ops/deploy-cloudrun.sh` |
 | Deploys (Wizard) | Vercel auto-deploy — push to main |
 | Post-deploy | `POST /admin/fix-all-webhooks` (idempotent) |
+
+---
+
+## Housekeeping
+
+**Branch cleanup — 2026-04-10 late-night.** Deleted 135 stale remote branches (196 → 61):
+- 64 already-merged branches pruned
+- 14 architecturally dead (LINE, bot pool, Stan/Lemon, customerProfile)
+- 17 stale docs/session-wrap branches
+- 40 superseded fix/PR branches (old numbered PR work, duplicate "rebased" branches, reworked fix attempts)
+
+Preserved: `feat/soul-voice-enforcement`, `feat/tiger-voice-overhaul`, `fix/tenant-voice-nm-cliches` (voice-related, feeds into tomorrow's priorities) and ~50 feature branches flagged as "likely-shipped / needs user review". No code touched. `main` untouched.
