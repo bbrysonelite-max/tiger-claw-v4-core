@@ -4,9 +4,14 @@
 
 ---
 
-## Current Session State (2026-04-09 — Session 18 CLOSED)
+## Current Session State (2026-04-10 — Session 19 CLOSED)
 
-### 456/456 tests passing. PRs #274–#284 merged. Cloud Run revision **tiger-claw-api-00450-ntm** live. Wizard on Vercel (auto-deployed). Webhook fix confirmed: brents-tiger-01-mns7wcqk fixed.
+### 456/456 tests passing. PRs #274–#288 merged. Cloud Run revision **tiger-claw-api-00456-9rb** live. Wizard on Vercel (auto-deployed).
+
+**Session 19 shipped (PRs #286–#288):**
+- **PR #286** — StepReviewPayment TS fix (customerProfile removed from hatch payload)
+- **PR #287** — Wizard hatch always pre-seeds `onboard_state.json` — root cause fix: every wizard-hatched bot was waking in operator mode firing `tiger_onboard` at prospects
+- **PR #288** — Remove dead `hasWizardIcp`/`resolvedOnboardingComplete` — customerProfile gone, these were always false; single truth restored: `hasOnboarding = phase=complete && hasIdentity`
 
 **Session 18 shipped (PRs #274–#284):**
 - **PR #274** — Remove bot pool (5,559 lines deleted)

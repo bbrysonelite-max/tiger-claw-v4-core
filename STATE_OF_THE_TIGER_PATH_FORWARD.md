@@ -1,6 +1,6 @@
 # State of the Tiger — Path Forward
 
-**Last Updated:** 2026-04-09 (Session 18 close — PRs #274–#284 merged, revision 00450-ntm deployed)
+**Last Updated:** 2026-04-10 (Session 19 — PRs #286–#288 merged, revision 00456-9rb deployed)
 
 **No lying. No assuming. No guessing.**
 
@@ -31,12 +31,23 @@
 | 19 | Remove Bot Pool — BYOB only, all tokens from BotFather | ✅ Done (Session 18) — PRs #274–#275 |
 | 20 | Ground-truth doc audit — full codebase verified, all documents rewritten | ✅ Done (Session 18) — PRs #276–#279 |
 | 21 | ICP field rename + admin hatch custom ICP + commander-language wizard cleanup | ✅ Done (Session 18) — PRs #280–#282 |
+| 22 | Wizard hatch pre-seed fix + dead-code removal | ✅ Done (Session 19) — PRs #286–#288 |
 
 ---
 
 ## Current Focus
 
-**Verify `brents-tiger-01-mns7wcqk` from a fresh chatId.** API deployed (revision `00450-ntm`), onboard_state complete, webhook fixed. Bot has not been tested from a prospect's perspective. Paddle product/price still not created — no checkout URL exists.
+**Verify `brents-tiger-01-mns7wcqk` from a fresh chatId.** API deployed (revision `00456-9rb`), onboard_state complete, webhook fixed. Bot has not been tested from a prospect's perspective. Paddle product/price still not created — no checkout URL exists.
+
+---
+
+## Session 19 — PRs #286–#288 (2026-04-10)
+
+| PR | Fix |
+|----|-----|
+| #286 | StepReviewPayment TS fix — `customerProfile` removed from hatch payload (deleted in PR #282; was blocking Vercel build). |
+| #287 | Wizard hatch pre-seed — hatch route always writes `onboard_state.json`. Root cause: `if (customerProfile)` guard meant every wizard-hatched bot woke in operator onboarding mode. Now unconditional: `phase=complete` + identity + ICP from flavor defaults. Provisioner skips write when `phase=complete` already set. |
+| #288 | Remove dead `hasWizardIcp`/`resolvedOnboardingComplete` — variables depended on deleted `customerProfile`. Always false. Masked the real `hasOnboarding` check. Removed. Single source of truth restored. |
 
 ---
 

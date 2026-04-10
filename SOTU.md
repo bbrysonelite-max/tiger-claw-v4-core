@@ -1,6 +1,6 @@
 # Tiger Claw — State of the Union
 
-**Last updated:** 2026-04-09 (Session 18 — close)
+**Last updated:** 2026-04-10 (Session 19 — PRs #286–#288 merged, revision 00456-9rb deployed)
 **This is the single source of truth. Read nothing else until you finish this file.**
 **No lying. No assuming. No guessing. Every fact here is verified against the live system.**
 
@@ -10,7 +10,7 @@
 
 | Fact | Value |
 |------|-------|
-| Cloud Run revision | `tiger-claw-api-00450-ntm` — deployed 2026-04-09, health confirmed |
+| Cloud Run revision | `tiger-claw-api-00456-9rb` — deployed 2026-04-10, health confirmed |
 | Health | postgres OK, redis OK, disk OK, workers OK |
 | Tests | 456/456 passing, 44 test files |
 | Active bots | 1 — `brents-tiger-01-mns7wcqk` (Tiger Proof, Nu Skin) — webhook fixed, **not yet tested from fresh chatId** |
@@ -29,6 +29,18 @@ AI sales agent SaaS. Operator brings their own Telegram bot token (BYOB — from
 - **Admin token:** `gcloud secrets versions access latest --secret="tiger-claw-admin-token" --project="hybrid-matrix-472500-k5"`
 - **DB:** Cloud SQL proxy port **5433** locally (NOT 5432), user `botcraft`, DB `tiger_claw_shared`
 - **No AI agent pushes to main.** All changes via `feat/` or `fix/` branch + PR.
+
+---
+
+## Session 19 — What Was Done (2026-04-10)
+
+| PR | What |
+|----|------|
+| #286 | StepReviewPayment TS fix — removed `customerProfile` from hatch payload (field deleted in PR #282; TypeScript build error blocking Vercel deploy). |
+| #287 | Wizard hatch pre-seed fix — `wizard.ts` hatch route now always writes `onboard_state.json` to DB before provisioner runs. The `if (customerProfile)` guard was the root cause: every wizard-hatched bot was waking in operator onboarding mode and firing `tiger_onboard` at prospects instead of prospecting. Writes `phase=complete` + identity + ICP from flavor defaults. Provisioner sees `phase=complete` and skips its own write. |
+| #288 | Remove dead `hasWizardIcp`/`resolvedOnboardingComplete` — these variables depended on `customerProfile` which no longer exists. Always evaluated to false, silently masking the real `hasOnboarding` check. Removed. `buildFirstMessageText` now receives `onboardingComplete` directly — single source of truth. |
+
+**Deployed: `tiger-claw-api-00456-9rb`. Health confirmed.**
 
 ---
 
@@ -71,7 +83,7 @@ AI sales agent SaaS. Operator brings their own Telegram bot token (BYOB — from
 ## Platform State (Verified)
 
 ### Infrastructure
-- Cloud Run: healthy, revision `tiger-claw-api-00442-tjd`
+- Cloud Run: healthy, revision `tiger-claw-api-00456-9rb`
 - Postgres, Redis, all 6 workers: OK
 - Telegram webhook delivery: wired, `TELEGRAM_WEBHOOK_SECRET` in deploy
 - Serper keys (×3): round-robin active
