@@ -1,6 +1,6 @@
 # Next Session Priorities
 
-**Read SOTU.md first. Then this file. No exceptions.**
+**Read SOTU.md first. Then this file. Then run `DAILY_CHECKS.md` before any other work. No exceptions.**
 
 **No lying. No assuming. No guessing. Do not claim anything works until tested live.**
 
@@ -73,6 +73,54 @@ Checkout → Paddle fires transaction.completed → POST /webhooks/paddle → us
 ```
 
 This is the entire business model. It has never been tested end to end. Cannot take a paying customer without this.
+
+---
+
+### 6. Admin dashboard — expand dependency monitoring + delete dead pool code
+
+Two related problems, one PR.
+
+**Problem A: almost no dependencies are surfaced on the admin dashboard.** The backend has a partial check at `GET /admin/pipeline/health` (`api/src/routes/admin.ts:906`) covering Serper×3, Gemini platform×3, and Resend. It does NOT cover Postgres, Redis, any BullMQ worker, Telegram webhook delivery, **Oxylabs** (added recently), Paddle webhook, or OpenRouter. The dashboard UI (`web-onboarding/src/app/admin/dashboard/page.tsx`) does not even call the endpoint that exists.
+
+**Problem B: zombie pool code.** The dashboard still fetches `/admin/pool/health` on line 159 of the same file — PR #274 deleted that route. It 404s on every refresh. The `PoolHealth` type, `poolStatusColor()`, `poolStatusBg()`, and the pool branches of `computeAlarms()` are all dead code. This is a direct violation of the "NO BOT POOL. EVER." rule in `CLAUDE.md` — it should have been deleted in PR #274 and was missed.
+
+**Build:**
+1. **Delete** the `PoolHealth` type, all pool state, all pool alarms, the `/admin/pool/health` fetch, `poolStatusColor()`, and `poolStatusBg()` from the dashboard component.
+2. **Expand** `GET /admin/pipeline/health` to also check: Postgres connectivity, Redis ping, each BullMQ worker in `api/src/workers/` (alive + recent heartbeat), Telegram webhook delivery (registered count vs active tenants), **Oxylabs** credentials + a test request, Paddle webhook (timestamp of last event received), OpenRouter circuit breaker state.
+3. **Wire** the dashboard to call `/admin/pipeline/health` instead of `/admin/pool/health`.
+4. **Render** each dependency as a green/red row. Red surfaces as a loud alarm at the top of the dashboard. Never silently absent.
+
+**Acceptance:** open the admin dashboard, every dependency from `/admin/pipeline/health` is visible, Oxylabs is on the list, no pool references anywhere in the dashboard component, no 404s in the browser network tab. `DAILY_CHECKS.md` item 1 becomes fully runnable from the dashboard.
+
+---
+
+### 7. Admin dashboard — mine health panel
+
+Add a mine status card to the admin dashboard surfacing:
+- Last run timestamp + duration
+- Last run fact count
+- Last 5 verbatims (read-only, for sanity check — is the data usable?)
+- Worker error count since midnight (`factExtractionWorker`, `marketIntelligenceWorker`)
+- Mine Gemini key identifier (dependent on item 3 above tracing the key first)
+
+**Acceptance:** `DAILY_CHECKS.md` item 3 becomes fully runnable from the dashboard without manual `psql` queries.
+
+---
+
+## Strategic Review — Pending Decision
+
+### Flavors strategy
+
+The current flavor system (`api/src/config/flavors/`, 16 registered flavors, flavor-aware system prompts + ICP defaults + market-intelligence domain key mapping + wizard selector) may have become a distraction from the core product. It adds complexity to every code path that reads flavor-specific state: provisioner, system prompt builder, mine domain key, wizard flavor selector, tests, onboarding, voice examples.
+
+**Decision needed:** reduce, postpone to v2+, or keep as-is. This is a think session, not a build task. Do not write code until the decision is made and documented in `SOTU.md`.
+
+**Options:**
+- **Keep all 16.** Current state. Cognitive load and test surface stays high.
+- **Reduce to 1–3 core flavors.** Start with `network-marketer` only (the flavor being tested live right now) plus 1–2 others that have proven demand. Archive the rest.
+- **Postpone flavors entirely to v2.** Collapse all flavors into a single configurable AI sales agent where the operator supplies ICP directly. Eliminates the flavor abstraction for v1.
+
+**Sooner than later.** This blocks further flavor-specific work (voice examples per flavor, admin hatch defaults, mine domain keys) and may retroactively simplify several open items if reduced or postponed.
 
 ---
 
