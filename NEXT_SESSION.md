@@ -10,14 +10,13 @@
 
 ## Context — Where We Are
 
-Session 20 closed with ground truth fully reconciled, a new revenue contract on the table, and the 6→4 doc collapse shipped. PRs #292–#298 merged. State now lives only in `SOTU.md` and `NEXT_SESSION.md`.
+Session 21 hardened the mine and introduced the MineCampaign abstraction. PRs #301–#307 shipped (see SOTU.md for the full breakdown). Flavors collapsed to 1 operator-facing (`network-marketer`) + 1 internal (`admin`). SSDI Ticket to Work is now live as a `MineCampaign`, not a flavor. CSV lead export endpoint is live at `GET /admin/campaigns/:key/leads`.
 
-**Two items are ready to execute immediately — do them before anything else:**
+**One item is ready to execute immediately:**
 
-1. **SSDI Ticket to Work flavor build** — Pat Sullivan (co-founder of ACT! CRM, 1987) invested in the business. His client pays $20K/month for SSDI leads. Full spec is written and approved. Health-wellness flavor is the base. This is first paid revenue.
-2. **Mine surgery** — 3 self-referential rows to delete, 1 bad scout query to remove, source blocklist to add. Do NOT run the mine until this is done or the next run will compound the pollution.
+1. **Run the SSDI campaign for the first time and pull the CSV.** All the pipework is in place — IPP gate, orchestrator iteration over `MINE_CAMPAIGN_REGISTRY`, `metadata.campaign_key` stamping, lead export endpoint. Nothing has actually mined SSDI subreddits yet. Trigger via `POST /admin/mine/run`, wait for completion, pull `GET /admin/campaigns/ssdi-ticket-to-work/leads?format=csv`. This is the proof that the pipeline works for Pat Sullivan's contract.
 
-`brents-tiger-01-mns7wcqk` (Tiger Proof / Nu Skin) is still the only active bot. Cloud Run revision `tiger-claw-api-00456-9rb` is live and healthy.
+`brents-tiger-01-mns7wcqk` (Tiger Proof / Nu Skin) is still the only active bot. Cloud Run is on the post-#306 revision, healthy.
 
 ---
 
@@ -25,117 +24,35 @@ Session 20 closed with ground truth fully reconciled, a new revenue contract on 
 
 ---
 
-### 1. SSDI Ticket to Work flavor build — FIRST (revenue)
+### 1. First SSDI campaign run + lead pull — proof of contract
 
-**Contract:** $20,000/month for SSDI Ticket to Work leads. Partner: Pat Sullivan (co-founder of ACT! CRM, 1987).
+The SSDI MineCampaign exists but has never run. Execute this end-to-end:
 
-**Base flavor:** health-wellness (`api/src/config/flavors/health-wellness.ts`). Repurpose it — swap the guts, keep the wiring.
+1. **Delete the 3 OpenClaw self-referential rows first** (carryover from Session 20 mine audit, never executed):
+   ```sql
+   SELECT id, LEFT(fact_summary, 60) FROM market_intelligence WHERE fact_summary ILIKE '%OpenClaw%';
+   CREATE TABLE market_intelligence_backup_20260412 AS SELECT * FROM market_intelligence WHERE fact_summary ILIKE '%OpenClaw%' OR fact_summary ILIKE '%Tiger Claw%';
+   DELETE FROM market_intelligence WHERE id IN ('<full-uuid-1>', '<full-uuid-2>', '<full-uuid-3>');
+   ```
+2. **Trigger a mine run**: `POST /admin/mine/run` with admin token. Confirm the orchestrator queues both the network-marketer flavor job AND the `campaign:ssdi-ticket-to-work` job (logs should show `count = 2` for jobs queued).
+3. **Wait for completion** — watch logs for `[ResearchAgent] SSDI — Ticket to Work complete`.
+4. **Verify metadata stamping**:
+   ```sql
+   SELECT COUNT(*) FROM market_intelligence WHERE metadata->>'campaign_key' = 'ssdi-ticket-to-work';
+   ```
+   Must be > 0. If 0, the campaign tagging is broken — file a bug.
+5. **Pull the CSV**:
+   ```
+   curl -H "Authorization: Bearer $ADMIN_TOKEN" "https://api.tigerclaw.io/admin/campaigns/ssdi-ticket-to-work/leads?format=csv&sinceDays=1" -o ssdi-leads.csv
+   ```
+6. **Eyeball the leads** — open the CSV, confirm verbatims are real prospect language from disability subs (not affiliate copy or off-topic content). The IPP gate's blocklist should have rejected ssa.gov/nolo.com/disability-benefits-help.org sources.
+7. **Send sample to Pat Sullivan** for client review.
 
-**What gets replaced entirely:**
-- `displayName` → `"SSDI Ticket to Work"`
-- `description`, `professionLabel`, `defaultKeywords`, `intentSignals`, `scoutQueries` → SSDI signals (see below)
-- `soul` → warm, empathetic, hopeful guide. NOT a salesperson. Brings good news.
-- `conversion` → single oar, goal = qualified lead capture
-- `objectionBuckets` → SSDI-specific (fear of losing benefits, "I tried before", "I don't qualify")
-- `onboarding` → qualification gates (4 yes/no gates) + lead data capture
-
-**ICP (replace entirely):**
-People who are disabled and DON'T KNOW about the SSA Ticket to Work program. Not current participants. People who need it and haven't heard of it.
-
-Mine signals to hunt:
-- "I want to work but I'll lose my benefits"
-- Financial stress on fixed disability income
-- Feeling stuck, wanting purpose or contribution
-- Life transitions: newly disabled, recently stabilized, recovery milestones
-- Posts in disability communities about employment fears
-- "Is this all there is" energy
-
-Subreddits: r/disability, r/SSDI, r/disabilitybenefits, r/ChronicIllness, r/mentalhealth, r/Anxiety, r/ChronicPain, r/careerguidance
-
-**Knowledge base (wire into soul/system prompt):**
-- Ticket to Work: free, voluntary SSA program, ages 18–64
-- Work WITHOUT losing SSDI/SSI benefits
-- Trial Work Period: earn any amount, keep full benefits
-- Medicare continues 7+ years while working
-- Benefits restart without new application if disability stops them working
-- 11 million+ eligible, most have never engaged
-- Helpline: 1-866-968-7842 | Website: choosework.ssa.gov
-
-**Qualification gates (4 yes = qualified lead):**
-1. Do they have a disability?
-2. Currently receiving or likely qualify for SSDI/SSI?
-3. Age 18–64?
-4. Interested in exploring work?
-Any no → educate, nurture, don't discard.
-
-**Lead data capture:**
-- Full name, phone, state of residence
-- General disability category (physical, mental health, cognitive, sensory — no medical details)
-- What kind of work interests them
-- Biggest concern about working
-- Channel source
-
-**BYOK:** Brent is the operator — use his Gemini key. No architectural changes needed.
-
-**After building:** hatch a test bot via admin hatch, send it a test message from a fresh chatId, verify it responds as an SSDI guide not a salesperson.
+If the run produces zero leads, the IPP is too strict for SSDI signal — tune `idealProspectProfile.traits[].language` and re-run. If the run produces obvious garbage, tighten disqualifiers or add to `sourceUrlBlocklist`.
 
 ---
 
-### 2. Mine surgery — fix before next mine run
-
-**Do NOT run the mine until these three things are done.**
-
-**A. Delete 3 self-referential rows:**
-```sql
-DELETE FROM market_intelligence
-WHERE id IN (
-  '67cb7c2a-...', -- OpenClaw Mastered $15/mo server fee (conf=100)
-  '07d6e010-...', -- OpenClaw Mastered $27 front-end price (conf=100)
-  '1550c182-...'  -- OpenClaw described as "Agentic AI" (conf=90)
-);
-```
-Get full UUIDs first: `SELECT id, LEFT(fact_summary, 60) FROM market_intelligence WHERE fact_summary ILIKE '%OpenClaw%';`
-Back up first: `CREATE TABLE market_intelligence_backup_20260411 AS SELECT * FROM market_intelligence WHERE fact_summary ILIKE '%OpenClaw%' OR fact_summary ILIKE '%Tiger Claw%';`
-
-**B. Fix network-marketer.ts scout queries:**
-Remove: `"subreddit:Entrepreneur OR subreddit:WorkFromHome network marketing direct sales home business"`
-Replace with: `"subreddit:antiwork OR subreddit:jobs I need to find a way out tired of this job"`
-
-**C. Add source blocklist to research_agent.ts:**
-Before the `isAlreadyMined` check, skip URLs matching:
-- `reddit.com/r/u_adam20141977`
-- `reddit.com/r/u_softtechhubus`
-- `reddit.com/r/LoyaltyDraw`
-- `reddit.com/r/ValueInvesting`
-- `reddit.com/r/TargetedSolutions`
-- `reddit.com/r/cscareeradvice`
-
----
-
-### 3. Research agent classifier audit — investigation, blocks trust in mine data
-
-**Why this is separate from item 2 mine surgery:** item 2 deletes the 3 known self-referential rows, swaps 1 bad scout query, and adds a source blocklist. That handles the known pollution and tightens the input side. It does NOT explain why the classifier assigned `domain="Network Marketer"` at conf=100 to content that is obviously off-topic:
-
-- Row `3c6a9bf5` (conf 100): *"The individual expects to pay between $950 and $1500 per month for housing."* (student budget thread)
-- Row `fa29d39a` (conf 100): *"The salary range for the Senior Specialty Solutions Engineer – Network position is $175,000 – $275,000 annually."* (job listing — the literal word "Network" appears to have triggered classification)
-- Row `25d1fa74` (conf 98): *"The individual reports having $50,200 in savings and is almost 21 years old."*
-
-A loose scout query explains how off-topic content gets scraped. It does NOT explain conf=100 on a student housing budget or on a salary listing for a Network *Engineer*. The classifier itself is assigning domains incorrectly. If the classifier is broken, the next mine run will produce fresh pollution even after item 2's surgical fixes. **Item 2 is necessary but not sufficient. Do NOT run the mine until this audit closes.**
-
-**Investigation (do not write fixes — read and report):**
-1. Trace the research agent code from `captured_by='research-agent'` rows in `market_intelligence`. Likely lives in `api/src/services/orchestrator.ts` or an agent file in `api/src/services/`.
-2. Find where `domain` is assigned to each extracted fact. Determine the mechanism:
-   - (a) LLM-based classification prompt ("Is this fact about X domain?")
-   - (b) Keyword matching against a list
-   - (c) Domain inherited from the scout query that produced the fact, with no post-extraction content verification
-3. For each of the 3 evidence rows above, trace **why** it got `domain="Network Marketer"`. Identify the specific prompt text, keyword list, or inheritance path responsible.
-4. Report back with: file paths, mechanism (a/b/c), and the per-row trace. **Do not fix until Brent has reviewed.** The fix approach depends on the mechanism (tighter classifier prompt, content-verification pass after extraction, source allowlist, or re-extraction from scratch).
-
-**Dependency:** item 2 mine surgery is execution-ready and can run independently of this audit. Item 3 is read-only investigation — no code changes. Both must close before the next mine run. Strike draft generation reads `market_intelligence` directly; if the classifier is broken, Strike drafts for any flavor will cite noise.
-
----
-
-### 4. Voice examples for network-marketer flavor
+### 2. Voice examples for network-marketer flavor
 
 The bot now responds intelligently. It does NOT yet respond in Brent's actual voice. The system prompt is still generic "helpful assistant" tone. This is prompt engineering, not architecture.
 
@@ -151,7 +68,7 @@ Do not write code until Brent has provided the example text. This is a pair-prog
 
 ---
 
-### 5. Verify the mine has a dedicated Gemini key
+### 3. Verify the mine has a dedicated Gemini key
 
 Suspected during the late-night diagnosis but not confirmed. Trace the mine's intelligence path: when `marketIntelligenceWorker` or `factExtractionWorker` runs, which Gemini key does it use? Is it (a) a dedicated mine key, (b) a platform fallback key, or (c) the first tenant's key it finds?
 
@@ -161,7 +78,7 @@ Report findings. Do not fix until Brent has decided the architecture.
 
 ---
 
-### 6. Verify admin hatch + all callers use new field names
+### 4. Verify admin hatch + all callers use new field names
 
 PR #281 renamed `icpBuilder` → `icpProspect` and `icpCustomer` → `icpProduct` at 19:06 PDT on 2026-04-09. The admin hatch route `fdfc803` was still sending the OLD field names at 18:12 PDT — and continued to run at 19:41 PDT (18 minutes after the rename merged), which is how the lobotomy was created.
 
@@ -169,7 +86,7 @@ PR #281 renamed `icpBuilder` → `icpProspect` and `icpCustomer` → `icpProduct
 
 ---
 
-### 7. Integrate Stripe — replace Paddle
+### 5. Integrate Stripe — replace Paddle
 
 **Decision (2026-04-11):** Paddle is dropped. Payment provider is Stripe.
 
@@ -189,7 +106,7 @@ This is the entire business model. It has never been tested end to end. Cannot t
 
 ---
 
-### 8. Admin dashboard — build dependency health endpoint
+### 6. Admin dashboard — build dependency health endpoint
 
 **There is no dependency health endpoint on the backend at all.** `GET /admin/pipeline/health` at `api/src/routes/admin.ts:906` looks like it should be one based on its name, but it is actually a **mine statistics** endpoint — it returns `totalFacts`, `factsLast24h`, `byVertical`, `byRegion`, `byCapturedBy`, and a single `healthy` boolean computed from "did any facts land in the last 24h AND newest fact within 48h". It does NOT check Serper, Gemini platform keys, Resend, Oxylabs, Postgres connectivity (beyond the query implicitly needing the DB), Redis, any BullMQ worker, Telegram webhook delivery, Stripe webhook, or OpenRouter. The dashboard UI (`web-onboarding/src/app/admin/dashboard/page.tsx`) does not call it either.
 
@@ -204,7 +121,7 @@ Either build a new `GET /admin/dependencies/health` endpoint for the real depend
 
 ---
 
-### 9. Admin dashboard — mine health panel
+### 7. Admin dashboard — mine health panel
 
 Add a mine status card to the admin dashboard surfacing:
 - Last run timestamp + duration
@@ -214,23 +131,6 @@ Add a mine status card to the admin dashboard surfacing:
 - Mine Gemini key identifier (dependent on item 5 above tracing the key first)
 
 **Acceptance:** `DAILY_CHECKS.md` item 3 becomes fully runnable from the dashboard without manual `psql` queries.
-
----
-
-## Strategic Review — Pending Decision
-
-### Flavors strategy
-
-The current flavor system (`api/src/config/flavors/`, 16 registered flavors, flavor-aware system prompts + ICP defaults + market-intelligence domain key mapping + wizard selector) may have become a distraction from the core product. It adds complexity to every code path that reads flavor-specific state: provisioner, system prompt builder, mine domain key, wizard flavor selector, tests, onboarding, voice examples.
-
-**Decision needed:** reduce, postpone to v2+, or keep as-is. This is a think session, not a build task. Do not write code until the decision is made and documented in `SOTU.md`.
-
-**Options:**
-- **Keep all 16.** Current state. Cognitive load and test surface stays high.
-- **Reduce to 1–3 core flavors.** Start with `network-marketer` only (the flavor being tested live right now) plus 1–2 others that have proven demand. Archive the rest.
-- **Postpone flavors entirely to v2.** Collapse all flavors into a single configurable AI sales agent where the operator supplies ICP directly. Eliminates the flavor abstraction for v1.
-
-**Sooner than later.** This blocks further flavor-specific work (voice examples per flavor, admin hatch defaults, mine domain keys) and may retroactively simplify several open items if reduced or postponed.
 
 ---
 
