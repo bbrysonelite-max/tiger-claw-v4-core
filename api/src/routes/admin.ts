@@ -1009,6 +1009,82 @@ router.get("/mine/status", async (_req: Request, res: Response) => {
   }
 });
 
+// ── GET /admin/mine/sample ───────────────────────────────────────────────────
+// Read-only inspection of recent market_intelligence rows. Built to verify the
+// IPP relevance gate: returns individual facts with their relevance_score and
+// relevance_reason from metadata, plus a source-domain aggregation so new
+// affiliate/review hosts can be spotted for blocklisting.
+//
+// Query params:
+//   sinceMinutes   default 60      — time window
+//   limit          default 30      — max facts returned
+//   domain         default "Network Marketer" — flavor displayName filter
+router.get("/mine/sample", async (req: Request, res: Response) => {
+  try {
+    const sinceMinutes = Math.min(Math.max(parseInt(String(req.query.sinceMinutes ?? "60"), 10) || 60, 1), 10080);
+    const limit = Math.min(Math.max(parseInt(String(req.query.limit ?? "30"), 10) || 30, 1), 200);
+    const domain = String(req.query.domain ?? "Network Marketer");
+
+    const pool = getPool();
+
+    const facts = await pool.query(
+      `SELECT
+         id,
+         fact_summary,
+         source_url,
+         captured_by,
+         created_at,
+         confidence_score,
+         (metadata->>'relevance_score')::int AS relevance_score,
+         metadata->>'relevance_reason' AS relevance_reason
+       FROM market_intelligence
+       WHERE domain = $1
+         AND created_at >= NOW() - ($2 || ' minutes')::interval
+       ORDER BY (metadata->>'relevance_score')::int DESC NULLS LAST, created_at DESC
+       LIMIT $3`,
+      [domain, String(sinceMinutes), limit],
+    );
+
+    const bySource = await pool.query(
+      `SELECT
+         COALESCE(NULLIF(regexp_replace(source_url, '^https?://([^/]+).*$', '\\1'), ''), 'unknown') AS source_domain,
+         COUNT(*)::int AS count,
+         AVG((metadata->>'relevance_score')::int)::int AS avg_score
+       FROM market_intelligence
+       WHERE domain = $1
+         AND created_at >= NOW() - ($2 || ' minutes')::interval
+       GROUP BY source_domain
+       ORDER BY count DESC
+       LIMIT 30`,
+      [domain, String(sinceMinutes)],
+    );
+
+    const totals = await pool.query(
+      `SELECT
+         COUNT(*)::int AS total,
+         AVG((metadata->>'relevance_score')::int)::int AS avg_score,
+         MIN((metadata->>'relevance_score')::int) AS min_score,
+         MAX((metadata->>'relevance_score')::int) AS max_score
+       FROM market_intelligence
+       WHERE domain = $1
+         AND created_at >= NOW() - ($2 || ' minutes')::interval`,
+      [domain, String(sinceMinutes)],
+    );
+
+    return res.json({
+      domain,
+      sinceMinutes,
+      limit,
+      totals: totals.rows[0],
+      facts: facts.rows,
+      bySourceDomain: bySource.rows,
+    });
+  } catch (err) {
+    console.error("[admin] GET /mine/sample error:", err);
+    return res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
 // ── POST /admin/mine/run ─────────────────────────────────────────────────────
 // Trigger an immediate orchestrated run (bypasses 2 AM cron schedule).
 router.post("/mine/run", async (_req: Request, res: Response) => {
