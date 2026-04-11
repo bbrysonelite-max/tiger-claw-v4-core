@@ -557,3 +557,135 @@ describe('GET /admin/mine/queries', () => {
   })
 })
 
+// ---------------------------------------------------------------------------
+// GET /admin/campaigns
+// ---------------------------------------------------------------------------
+describe('GET /admin/campaigns', () => {
+  it('returns 401 without auth', async () => {
+    const app = await buildApp()
+    const res = await request(app).get('/admin/campaigns')
+    expect(res.status).toBe(401)
+  })
+
+  it('lists every registered MineCampaign with hunting metadata', async () => {
+    const app = await buildApp()
+    const res = await request(app)
+      .get('/admin/campaigns')
+      .set('Authorization', `Bearer ${VALID_TOKEN}`)
+
+    expect(res.status).toBe(200)
+    expect(Array.isArray(res.body.campaigns)).toBe(true)
+    const ssdi = res.body.campaigns.find((c: any) => c.key === 'ssdi-ticket-to-work')
+    expect(ssdi).toBeDefined()
+    expect(ssdi.displayName).toBe('SSDI — Ticket to Work')
+    expect(ssdi.deliveryMode).toBe('admin-export')
+    expect(ssdi.scoutQueryCount).toBeGreaterThan(0)
+    expect(Array.isArray(ssdi.leadFields)).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// GET /admin/campaigns/:key/leads
+// ---------------------------------------------------------------------------
+describe('GET /admin/campaigns/:key/leads', () => {
+  const mockPool = { query: vi.fn() }
+
+  beforeEach(() => {
+    mockDb.getPool.mockReturnValue(mockPool)
+  })
+
+  it('returns 401 without auth', async () => {
+    const app = await buildApp()
+    const res = await request(app).get('/admin/campaigns/ssdi-ticket-to-work/leads')
+    expect(res.status).toBe(401)
+  })
+
+  it('404s for an unknown campaign key', async () => {
+    const app = await buildApp()
+    const res = await request(app)
+      .get('/admin/campaigns/not-a-real-campaign/leads')
+      .set('Authorization', `Bearer ${VALID_TOKEN}`)
+    expect(res.status).toBe(404)
+    expect(mockPool.query).not.toHaveBeenCalled()
+  })
+
+  it('exports CSV by default with the leadSchema columns', async () => {
+    const app = await buildApp()
+    mockPool.query.mockResolvedValue({
+      rows: [
+        {
+          created_at: new Date('2026-04-10T12:00:00Z'),
+          source_url: 'https://www.reddit.com/r/SSDI/comments/abc/title',
+          entity_id: 'u/test_user',
+          fact_summary: 'Wants to try part-time work but afraid of losing SSDI.',
+          verbatim: 'I want to work but I\'m scared.',
+          relevance_score: 87,
+          relevance_reason: 'clear work interest + benefit-loss fear',
+        },
+      ],
+    })
+
+    const res = await request(app)
+      .get('/admin/campaigns/ssdi-ticket-to-work/leads')
+      .set('Authorization', `Bearer ${VALID_TOKEN}`)
+
+    expect(res.status).toBe(200)
+    expect(res.headers['content-type']).toContain('text/csv')
+    expect(res.headers['content-disposition']).toContain('attachment')
+    expect(res.headers['content-disposition']).toContain('ssdi-ticket-to-work')
+    expect(res.text).toContain('created_at,source_url,entity_id,fact_summary,verbatim,relevance_score,relevance_reason')
+    expect(res.text).toContain('u/test_user')
+    expect(res.text).toContain('clear work interest + benefit-loss fear')
+    // Embedded apostrophe must survive — CSV escape doubles quotes, not apostrophes.
+    expect(res.text).toContain("I want to work but I'm scared.")
+
+    // Verify the SQL filters by campaign_key on metadata JSONB.
+    const [sql, params] = mockPool.query.mock.calls[0]
+    expect(sql).toContain("metadata->>'campaign_key' = $1")
+    expect(sql).toContain("created_at >= NOW() - ($2 || ' days')::interval")
+    expect(sql).toContain("ORDER BY (metadata->>'relevance_score')::int DESC NULLS LAST")
+    expect(params[0]).toBe('ssdi-ticket-to-work')
+    expect(params[1]).toBe('30')
+  })
+
+  it('returns JSON when ?format=json is passed', async () => {
+    const app = await buildApp()
+    mockPool.query.mockResolvedValue({
+      rows: [{
+        created_at: new Date(),
+        source_url: 'https://www.reddit.com/r/disability/comments/x/y',
+        entity_id: 'u/foo',
+        fact_summary: 'Test',
+        verbatim: 'Test',
+        relevance_score: 75,
+        relevance_reason: 'test',
+      }],
+    })
+
+    const res = await request(app)
+      .get('/admin/campaigns/ssdi-ticket-to-work/leads?format=json&sinceDays=14')
+      .set('Authorization', `Bearer ${VALID_TOKEN}`)
+
+    expect(res.status).toBe(200)
+    expect(res.headers['content-type']).toContain('application/json')
+    expect(res.body.campaign).toBe('ssdi-ticket-to-work')
+    expect(res.body.sinceDays).toBe(14)
+    expect(res.body.count).toBe(1)
+    expect(res.body.leads).toHaveLength(1)
+  })
+
+  it('clamps sinceDays to [1, 365]', async () => {
+    const app = await buildApp()
+    mockPool.query.mockResolvedValue({ rows: [] })
+
+    const res = await request(app)
+      .get('/admin/campaigns/ssdi-ticket-to-work/leads?format=json&sinceDays=9999')
+      .set('Authorization', `Bearer ${VALID_TOKEN}`)
+
+    expect(res.status).toBe(200)
+    expect(res.body.sinceDays).toBe(365)
+    const [, params] = mockPool.query.mock.calls[0]
+    expect(params[1]).toBe('365')
+  })
+})
+

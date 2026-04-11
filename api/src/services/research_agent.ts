@@ -176,8 +176,9 @@ export async function runResearchAgent(
     displayName: string,
     queries: string[],
     prospectProfile?: IdealProspectProfile,
+    campaignKey?: string,
 ): Promise<{ factsSaved: number; factsRejected: number; postsFound: number }> {
-    console.log(`[ResearchAgent] Starting — flavor: ${displayName}, queries: ${queries.length}, run: ${runId}, IPP gate: ${prospectProfile ? 'ON' : 'OFF'}`);
+    console.log(`[ResearchAgent] Starting — flavor: ${displayName}, queries: ${queries.length}, run: ${runId}, IPP gate: ${prospectProfile ? 'ON' : 'OFF'}${campaignKey ? `, campaign: ${campaignKey}` : ''}`);
 
     const fetchSerper = makeSerperFetcher();
     let factsSaved = 0;
@@ -220,6 +221,7 @@ export async function runResearchAgent(
                         entityId: post.entityId,
                         miningCost: 0.04,
                         prospectProfile,
+                        campaignKey,
                     },
                     mockContext,
                 );

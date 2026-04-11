@@ -1143,6 +1143,112 @@ router.get("/mine/queries", async (req: Request, res: Response) => {
   }
 });
 
+// ── GET /admin/campaigns ─────────────────────────────────────────────────────
+// List all registered MineCampaigns. Used by admin UI to know what's runnable
+// and what lead exports are available.
+router.get("/campaigns", async (_req: Request, res: Response) => {
+  try {
+    const { MINE_CAMPAIGN_REGISTRY } = await import("../config/campaigns/index.js");
+    const campaigns = Object.values(MINE_CAMPAIGN_REGISTRY).map((c) => ({
+      key: c.key,
+      displayName: c.displayName,
+      description: c.description,
+      scoutQueryCount: c.scoutQueries.length,
+      deliveryMode: c.deliveryMode,
+      leadFields: c.leadSchema.map((f) => f.name),
+    }));
+    return res.json({ campaigns });
+  } catch (err) {
+    console.error("[admin] GET /campaigns error:", err);
+    return res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+// ── GET /admin/campaigns/:key/leads ──────────────────────────────────────────
+// CSV (or JSON) export of leads collected by a MineCampaign. Filters
+// market_intelligence by metadata->>'campaign_key' so flavor mining and
+// campaign mining stay cleanly separated in the export.
+//
+// Query params:
+//   sinceDays — rolling window (default 30, max 365)
+//   format    — 'csv' (default) or 'json'
+router.get("/campaigns/:key/leads", async (req: Request, res: Response) => {
+  try {
+    const key = String(req.params.key ?? "");
+    const { MINE_CAMPAIGN_REGISTRY } = await import("../config/campaigns/index.js");
+    const campaign = MINE_CAMPAIGN_REGISTRY[key];
+    if (!campaign) {
+      return res.status(404).json({ error: `Unknown campaign: ${key}` });
+    }
+
+    const sinceDays = Math.min(
+      Math.max(parseInt(String(req.query.sinceDays ?? "30"), 10) || 30, 1),
+      365,
+    );
+    const format = String(req.query.format ?? "csv").toLowerCase();
+
+    const pool = getPool();
+    const result = await pool.query(
+      `SELECT
+         created_at,
+         source_url,
+         entity_id,
+         fact_summary,
+         metadata->>'verbatim'         AS verbatim,
+         (metadata->>'relevance_score')::int  AS relevance_score,
+         metadata->>'relevance_reason' AS relevance_reason
+       FROM market_intelligence
+       WHERE metadata->>'campaign_key' = $1
+         AND created_at >= NOW() - ($2 || ' days')::interval
+       ORDER BY (metadata->>'relevance_score')::int DESC NULLS LAST,
+                created_at DESC`,
+      [key, String(sinceDays)],
+    );
+
+    if (format === "json") {
+      return res.json({
+        campaign: key,
+        sinceDays,
+        count: result.rows.length,
+        leads: result.rows,
+      });
+    }
+
+    // CSV — simple RFC-4180 quoting. Escape any embedded double-quote by
+    // doubling it; wrap every field so commas/newlines in fact_summary or
+    // verbatim quotes don't break columns.
+    const headers = [
+      "created_at",
+      "source_url",
+      "entity_id",
+      "fact_summary",
+      "verbatim",
+      "relevance_score",
+      "relevance_reason",
+    ];
+    const escape = (v: unknown): string => {
+      if (v === null || v === undefined) return "";
+      const s = String(v).replace(/"/g, '""');
+      return `"${s}"`;
+    };
+    const lines = [headers.join(",")];
+    for (const row of result.rows) {
+      lines.push(headers.map((h) => escape((row as any)[h])).join(","));
+    }
+    const csv = lines.join("\n") + "\n";
+
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${key}-leads-${sinceDays}d.csv"`,
+    );
+    return res.status(200).send(csv);
+  } catch (err) {
+    console.error("[admin] GET /campaigns/:key/leads error:", err);
+    return res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
 // ── POST /admin/mine/run ─────────────────────────────────────────────────────
 // Trigger an immediate orchestrated run (bypasses 2 AM cron schedule).
 router.post("/mine/run", async (_req: Request, res: Response) => {
