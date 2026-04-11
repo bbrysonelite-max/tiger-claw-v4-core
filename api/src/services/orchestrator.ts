@@ -36,6 +36,12 @@ export interface ResearchAgentJobData {
     displayName: string;
     queries: string[];
     prospectProfile?: import('../config/types.js').FlavorConfig['idealProspectProfile'];
+    /**
+     * Set when this job was enqueued from MINE_CAMPAIGN_REGISTRY rather than
+     * FLAVOR_REGISTRY. Stamps `metadata.campaign_key` on every fact saved by
+     * tiger_refine so the lead-export endpoint can filter on it.
+     */
+    campaignKey?: string;
 }
 
 export interface ReportingAgentJobData {
@@ -54,6 +60,7 @@ export interface ReportingAgentJobData {
  */
 export async function startOrchestratedRun(runId: string): Promise<void> {
     const { FLAVOR_REGISTRY } = await import('../config/flavors/index.js');
+    const { MINE_CAMPAIGN_REGISTRY } = await import('../config/campaigns/index.js');
 
     const flavors = Object.entries(FLAVOR_REGISTRY).filter(([id, f]) => {
         if (id === 'admin') return false;
@@ -61,7 +68,14 @@ export async function startOrchestratedRun(runId: string): Promise<void> {
         return queries.length > 0;
     });
 
-    const count = flavors.length;
+    const campaigns = Object.entries(MINE_CAMPAIGN_REGISTRY).filter(([, c]) => {
+        return (c.scoutQueries ?? []).length > 0;
+    });
+
+    // Each flavor + each campaign produces exactly one research-agent job. The
+    // research_agent code path is the same for both — only the campaignKey
+    // tag changes downstream.
+    const count = flavors.length + campaigns.length;
     const startedAt = new Date().toISOString();
 
     // Store run state in Redis (TTL: 24h)
@@ -70,7 +84,7 @@ export async function startOrchestratedRun(runId: string): Promise<void> {
     await orchestratorConnection.set(`orchestrator:run:${runId}:facts_saved`, '0',          'EX', 86400);
     await orchestratorConnection.set(`orchestrator:run:${runId}:started_at`, startedAt,     'EX', 86400);
 
-    console.log(`[Orchestrator] Run ${runId} started — spawning ${count} Research Agent jobs`);
+    console.log(`[Orchestrator] Run ${runId} started — spawning ${count} Research Agent jobs (${flavors.length} flavors, ${campaigns.length} campaigns)`);
 
     for (const [flavorId, flavor] of flavors) {
         const queries: string[] = (flavor as any).scoutQueries ?? [];
@@ -83,6 +97,26 @@ export async function startOrchestratedRun(runId: string): Promise<void> {
             prospectProfile,
         } satisfies ResearchAgentJobData, {
             jobId: `research_${runId}_${flavorId}`,
+            removeOnComplete: true,
+            removeOnFail: { count: 100 },
+            attempts: 2,
+            backoff: { type: 'exponential', delay: 10000 },
+        });
+    }
+
+    for (const [campaignKey, campaign] of campaigns) {
+        // Campaigns piggyback on the same research-agent queue. flavorId is
+        // namespaced as `campaign:${key}` so dashboards / logs can tell them
+        // apart from real flavor jobs at a glance.
+        await researchAgentQueue.add('research', {
+            runId,
+            flavorId: `campaign:${campaignKey}`,
+            displayName: campaign.displayName,
+            queries: campaign.scoutQueries,
+            prospectProfile: campaign.idealProspectProfile,
+            campaignKey,
+        } satisfies ResearchAgentJobData, {
+            jobId: `research_${runId}_campaign_${campaignKey}`,
             removeOnComplete: true,
             removeOnFail: { count: 100 },
             attempts: 2,

@@ -676,10 +676,10 @@ if (orchestratorWorker) {
 export const researchAgentWorker = SHOULD_RUN_WORKERS ? new Worker(
     'research-agent',
     async (job: Job) => {
-        const { runId, flavorId, displayName, queries, prospectProfile } = job.data;
-        console.log(`[ResearchAgent] Job received — flavor: ${displayName}, run: ${runId}`);
+        const { runId, flavorId, displayName, queries, prospectProfile, campaignKey } = job.data;
+        console.log(`[ResearchAgent] Job received — flavor: ${displayName}, run: ${runId}${campaignKey ? `, campaign: ${campaignKey}` : ''}`);
         const { runResearchAgent } = await import('./research_agent.js');
-        const result = await runResearchAgent(runId, flavorId, displayName, queries, prospectProfile);
+        const result = await runResearchAgent(runId, flavorId, displayName, queries, prospectProfile, campaignKey);
         return result;
     },
     {

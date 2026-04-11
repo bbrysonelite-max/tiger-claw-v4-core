@@ -178,6 +178,9 @@ async function execute(
   // Optional structured IPP. When present, the new per-flavor relevance gate runs.
   // When absent, the legacy generic commercial-relevance gate runs (unchanged behavior).
   const prospectProfile = params.prospectProfile as IdealProspectProfile | undefined;
+  // Optional MineCampaign tag. When set, every saved fact is stamped with
+  // metadata.campaign_key so the lead-export endpoint can filter on it.
+  const campaignKey = (params.campaignKey as string | undefined) || undefined;
 
   logger.info("[tiger_refine] Starting purification", { sourceUrl, extractionGoal, domain, capturedBy });
 
@@ -348,7 +351,11 @@ Example: {"0": true, "1": false}`;
         mining_cost: miningCost,
         source_url: fact.sourceUrl || sourceUrl,
         captured_by: capturedBy,
-        metadata: { ...fact.metadata, verbatim: fact.verbatim },
+        metadata: {
+          ...fact.metadata,
+          verbatim: fact.verbatim,
+          ...(campaignKey ? { campaign_key: campaignKey } : {}),
+        },
         verified_at: new Date(),
         valid_until: validUntil,
       });
