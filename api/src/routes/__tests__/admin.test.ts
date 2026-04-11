@@ -472,3 +472,88 @@ describe('Skills curation routes', () => {
   })
 })
 
+// ---------------------------------------------------------------------------
+// GET /admin/mine/queries — per-scoutQuery rolling kept-rate
+// ---------------------------------------------------------------------------
+describe('GET /admin/mine/queries', () => {
+  const mockPool = { query: vi.fn() }
+
+  beforeEach(() => {
+    mockDb.getPool.mockReturnValue(mockPool)
+  })
+
+  it('returns 401 without auth', async () => {
+    const app = await buildApp()
+    const res = await request(app).get('/admin/mine/queries')
+    expect(res.status).toBe(401)
+  })
+
+  it('aggregates mine_query_metrics events and returns per-query kept rate', async () => {
+    const app = await buildApp()
+    mockPool.query.mockResolvedValue({
+      rows: [
+        {
+          query: 'subreddit:antiwork tired of this job',
+          flavor: 'network-marketer',
+          display_name: 'Network Marketer',
+          runs: 7,
+          posts: 63,
+          kept: 12,
+          rejected: 38,
+          duplicates: 4,
+          avg_duration_ms: 2100,
+          kept_rate: '0.190',
+          last_run_at: new Date('2026-04-11T02:15:00Z'),
+        },
+      ],
+    })
+
+    const res = await request(app)
+      .get('/admin/mine/queries?sinceDays=7&flavor=network-marketer')
+      .set('Authorization', `Bearer ${VALID_TOKEN}`)
+
+    expect(res.status).toBe(200)
+    expect(res.body.sinceDays).toBe(7)
+    expect(res.body.flavor).toBe('network-marketer')
+    expect(res.body.queries).toHaveLength(1)
+    expect(res.body.queries[0].kept).toBe(12)
+    expect(res.body.queries[0].kept_rate).toBe('0.190')
+
+    // Verify the SQL targets the right event action and applies the window.
+    const [sql, params] = mockPool.query.mock.calls[0]
+    expect(sql).toContain("action = 'mine_query_metrics'")
+    expect(sql).toContain("($1 || ' days')::interval")
+    expect(sql).toContain('ORDER BY kept_rate DESC NULLS LAST')
+    expect(params[0]).toBe('7')
+    expect(params[1]).toBe('network-marketer')
+  })
+
+  it('defaults sinceDays to 7 and leaves flavor filter empty', async () => {
+    const app = await buildApp()
+    mockPool.query.mockResolvedValue({ rows: [] })
+
+    const res = await request(app)
+      .get('/admin/mine/queries')
+      .set('Authorization', `Bearer ${VALID_TOKEN}`)
+
+    expect(res.status).toBe(200)
+    expect(res.body.sinceDays).toBe(7)
+    expect(res.body.flavor).toBeNull()
+    const [, params] = mockPool.query.mock.calls[0]
+    expect(params[0]).toBe('7')
+    expect(params[1]).toBe('')
+  })
+
+  it('clamps sinceDays to [1, 90]', async () => {
+    const app = await buildApp()
+    mockPool.query.mockResolvedValue({ rows: [] })
+
+    const res = await request(app)
+      .get('/admin/mine/queries?sinceDays=9999')
+      .set('Authorization', `Bearer ${VALID_TOKEN}`)
+
+    expect(res.status).toBe(200)
+    expect(res.body.sinceDays).toBe(90)
+  })
+})
+
