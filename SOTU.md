@@ -1,6 +1,6 @@
 # Tiger Claw — State of the Union
 
-**Last updated:** 2026-04-11 (Session 20 open — PRs #292–#295 reconciled, Stripe decision, mine pollution confirmed)
+**Last updated:** 2026-04-11 (Session 20 CLOSED — PRs #292–#297 merged, mine audit complete, SSDI flavor spec ready)
 **This is the single source of truth. Read nothing else until you finish this file.**
 **No lying. No assuming. No guessing. Every fact here is verified against the live system.**
 
@@ -17,9 +17,35 @@
 | #294 | Admin dashboard zombie pool code deleted — `/admin/pool/health` fetch (404ing since PR #274), `PoolHealth` type, pool state, pool alarms, Bot Pool stats card, pool action hint all removed. Grid 5→4 columns. Vercel auto-deployed. |
 | #295 | Mine content pollution finding logged + `/admin/pipeline/health` mischaracterization corrected in DAILY_CHECKS.md and NEXT_SESSION.md. |
 
+### Session 20 — Additional PRs merged
+
+| PR | What |
+|----|------|
+| #296 | SOTU reconciliation — Session 20 open state written, Stripe decision recorded, mine pollution corrections applied. |
+| #297 | NEXT_SESSION item 2 closed — Gemini key validator audited and confirmed already in place at `wizard.ts:190`. Nothing to build. |
+
 ### Decisions made this session
 
 **Stripe replaces Paddle.** Brent dropped Paddle — not waiting any longer. All payment work targets Stripe from this point forward. Paddle webhook code on the backend still exists and must be replaced.
+
+**SSDI Ticket to Work — new $20K/month lead gen contract.** Partner: Pat Solano (founder of ACT! CRM, 1984). Client wants leads for the SSA Ticket to Work program — disabled people aged 18–64 who don't know the program exists. Health-wellness flavor chosen as base to repurpose. Full spec written and approved this session. Build not yet executed — first task next session.
+
+### Mine audit — live findings (2026-04-11)
+
+Live query against `market_intelligence` (8,440 total facts, 708 Network Marketer):
+- **3 self-referential rows confirmed** — OpenClaw Mastered pricing copy at conf=100. IDs: `67cb7c2a`, `07d6e010`, `1550c182`. Delete before next mine run.
+- **Root cause of classifier drift:** one bad scout query (`"subreddit:Entrepreneur OR subreddit:WorkFromHome network marketing direct sales home business"`) pulling NM discussions into the Network Marketer domain. Fix: remove query, add replacement targeting pain signals.
+- **Source noise:** `r/u_adam20141977` (OpenClaw review account) and `r/u_softtechhubus` (content farm) appearing repeatedly. Add to blocklist.
+- **Fix is surgical.** No architectural changes. Remove 1 query, add blocklist, delete 3 rows. Do NOT run the mine until this is done.
+- **Two-oar model confirmed in code.** `defaultBuilderICP` and `icpProspect`/`icpProduct` onboarding questions already exist in `network-marketer.ts` from prior sessions. The 35-year knowledge moat is already encoded.
+
+### ICP architecture — clarified this session
+
+Network Marketer flavor has TWO distinct oars:
+- **Builder oar** — opportunity prospects: people with pain signals (job stuck, want extra income, want time freedom). Mine hunts r/sidehustle, r/antiwork, r/personalfinance for these signals. NOT network marketers — people who haven't yet found their way out.
+- **Customer oar** — product customers: people with health/wellness pain signals who want Nu Skin products.
+
+Every other flavor has a single oar (one ICP type). The two-oar model is unique to network-marketer and is the correct design.
 
 ### Corrections to prior SOTU
 
@@ -125,7 +151,8 @@ AI sales agent SaaS. Operator brings their own Telegram bot token (BYOB — from
 
 | Item | Impact | Status |
 |------|--------|--------|
-| **Mine content pollution** | Strike draft generation reads `market_intelligence` directly — bad facts → bad drafts → customer churn. Self-referential rows (OpenClaw pricing at conf=100) + classifier drift (off-topic content at conf≥95). Paid-customer blocker. | Triage next session: targeted DELETE, classifier audit, source URL audit |
+| **SSDI flavor build** | Health-wellness flavor repurposed for SSDI Ticket to Work. Full spec ready. Build not yet executed. $20K/month contract. | First task next session |
+| **Mine surgery required** | 3 self-referential rows + 1 bad scout query + source blocklist needed. Do NOT run the mine until fixed. | Execute before next mine run |
 | **No dependency health endpoint** | Flying blind — Postgres, Redis, workers, Serper, Gemini keys, Oxylabs, OpenRouter all unmonitored. `/admin/pipeline/health` is mine stats only, not dependency checks. | Build `GET /admin/dependencies/health` + wire dashboard |
 | **Stripe integration** | No checkout URL. Paddle dropped. Stripe not yet integrated. Payment path completely unproven. | Integrate Stripe — product, price, webhook handler, checkout flow |
 | Voice layer generic | Bot responds intelligently but not in Brent's voice | Write voice examples, wire into network-marketer flavor system prompt |
