@@ -49,10 +49,19 @@ export const NETWORK_MARKETER_FLAVOR: FlavorConfig = {
     "subreddit:jobs OR subreddit:Layoffs just got laid off what now rebuilding",
     "subreddit:workingmoms OR subreddit:beyondthebump want to quit job stay home with my kids",
     "subreddit:antiwork OR subreddit:careerguidance is this all there is sunday scaries burned out",
+    // Expansion 2026-04-11 — five additional transition-language surfaces
+    "subreddit:workreform burned out hate my job need a way out",
+    "subreddit:Overemployed tired of juggling want my own thing",
+    // Note: `entrepreneurs` (plural) is intentional — different sub from r/Entrepreneur.
+    // Plural skews earlier-stage and first-time founders; singular skews peer-chatter
+    // among established operators (Serial Opportunity Seeker risk).
+    "subreddit:entrepreneurs first time starting something where do I begin",
+    "subreddit:findapath don't know what to do next stuck in my job",
+    "subreddit:DecidingToBeBetter ready to change my situation tired of where I am",
     // TODO (follow-on PR): Displaced Builder scout lane — involuntarily displaced network marketers
     // (company shutdown, comp plan gutted, merger killed their leg). Different surface than Reddit
     // venting — lives on news announcements and industry chatter. Tight disqualifiers needed to
-    // avoid Serial Opportunity Seeker false positives. Deferred until the 5 queries above prove
+    // avoid Serial Opportunity Seeker false positives. Deferred until the queries above prove
     // the new relevance gate works on transition-language signals.
   ],
 
