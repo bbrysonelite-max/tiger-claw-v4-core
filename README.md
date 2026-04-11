@@ -8,7 +8,7 @@ Live at `https://api.tigerclaw.io` | Wizard at `https://wizard.tigerclaw.io` | W
 
 ## For AI Agents
 
-Read `CLAUDE.md` and `START_HERE.md` before touching anything. They contain your directives.
+Read `SOTU.md` first, then `CLAUDE.md`. SOTU is the single source of truth for platform state. CLAUDE.md contains timeless engineering directives.
 
 ---
 
