@@ -1,6 +1,6 @@
 # START HERE — Tiger Claw Session Brief
 
-**Last Updated:** 2026-04-10 late-night (Session 19 close + data fix verified live — revision 00456-9rb)
+**Last Updated:** 2026-04-11 (Session 20 close — PRs #292–#297 merged, SSDI contract, mine surgery pending)
 
 **Read SOTU.md first. This file is a fast orientation. SOTU has the details.**
 
@@ -8,12 +8,15 @@
 
 ---
 
-## Current State (Verified 2026-04-10)
+## Current State (Verified 2026-04-11)
 
-- **1 active bot:** `brents-tiger-01-mns7wcqk` (Tiger Proof, Nu Skin) — webhook set, onboard_state corrected and **verified live 2026-04-10 00:49 UTC** (first real-intelligence prospect response).
+- **1 active bot:** `brents-tiger-01-mns7wcqk` (Tiger Proof, Nu Skin) — verified live 2026-04-10 00:49 UTC.
+- **SSDI Ticket to Work flavor:** spec complete, build pending. $20K/month contract. Pat Solano's client.
+- **Mine surgery pending:** do NOT run the mine until 3 rows deleted + 1 bad query removed + blocklist added.
 - **No open PRs.**
 - **Cloud Run:** healthy, revision `tiger-claw-api-00456-9rb`
 - **Tests:** 456/456 passing
+- **Payment provider: Stripe.** Paddle dropped 2026-04-11.
 
 ---
 
@@ -29,11 +32,11 @@ AI sales agent SaaS. Operator brings their own Telegram bot token (BYOB — from
 
 ---
 
-## Onboarding Path (Paddle)
+## Onboarding Path (Stripe — not yet integrated)
 
 ```
-Operator pays via Paddle checkout
-→ Paddle fires POST /webhooks/paddle (transaction.completed)
+Operator pays via Stripe checkout (not yet built)
+→ Stripe fires POST /webhooks/stripe (checkout.session.completed)
 → Webhook: creates user + bot + subscription (pending_setup)
 → Operator navigates to wizard.tigerclaw.io
 → Wizard: flavor selection → agent name → Telegram bot token → Gemini key
@@ -41,9 +44,9 @@ Operator pays via Paddle checkout
 → Bot immediately operational — no interview required
 ```
 
-**Paddle product + price not yet created.** No checkout URL exists. This must be done before the full flow can be tested.
+**Stripe product + price not yet created.** Paddle dropped 2026-04-11. Stripe integration is NEXT_SESSION item 5.
 
-**Payment gate is open (C4).** Direct wizard access bypasses payment. Fix after Paddle loop proven.
+**Payment gate is open (C4).** Direct wizard access bypasses payment. Fix after Stripe loop proven.
 
 ---
 
@@ -72,14 +75,13 @@ curl -X POST https://api.tigerclaw.io/admin/hatch \
 
 ---
 
-## First Priorities Tomorrow Morning
+## First Priorities Next Session
 
-1. **Verify prospect conversation quality at scale.** Tonight proved intelligence exists with 2–3 messages. Run a proper verification pass with 5–10 realistic prospect openings (transition scenarios, skeptics, quick "what is this?" questions, objection openers, multi-language). The result is the diagnostic that tells us where the voice examples need to focus.
-2. **Write voice examples for the network-marketer flavor.** Bot now responds intelligently but in a generic "helpful assistant" tone. Brent writes examples in his own voice; Claude Code wires them into the flavor system prompt. Test again with the same prompts from step 1 and compare.
-3. **Restore Gemini key validation at wizard hatch.** Key tester was removed in the one-page rewrite and never restored. MUST be back in before any paid customer hatches.
-4. **Confirm mine has a dedicated Gemini key.** Suspected missing during tonight's diagnosis. Trace the mine's intelligence path.
-5. **Verify admin hatch route uses new field names + wider dead-schema audit.** fdfc803 was sending `icpBuilder`/`icpCustomer` 18 minutes after PR #281 renamed them. Audit current admin hatch + any other callers still sending old schema. **Also audit `specs/PHASE_1_SIGNUP.md`** — contains current-tense references to `customerProfile` (line 110, line 218) as if the field still exists and is still read by `buildSystemPrompt()`. It does not — deleted in PR #282, cleaned up in PR #288. Spec doc needs current-tense rewrite to reflect `icpProspect`/`icpProduct`. This is a drift landmine for anyone reading the spec to build against it.
-6. **Create Paddle product + price** — no checkout URL exists. Paddle payment path completely unproven.
+1. **SSDI Ticket to Work flavor build.** Repurpose health-wellness flavor. $20K/month contract. Full spec in NEXT_SESSION.md item 1.
+2. **Mine surgery.** Delete 3 rows, fix 1 scout query, add source blocklist. Do NOT run mine until done. Full steps in NEXT_SESSION.md item 2.
+3. **Voice examples — network-marketer flavor.** Brent writes examples in his own voice; Claude Code wires them in.
+4. **Stripe integration.** Replace Paddle webhook. Build checkout flow.
+5. **Admin dashboard dependency health endpoint.** Currently flying blind on all external dependencies.
 
 ---
 
@@ -95,7 +97,7 @@ curl -X POST https://api.tigerclaw.io/admin/hatch \
 | Resend email | ✅ Working |
 | Admin fleet dashboard | ✅ Operational |
 | Vercel auto-deploy | ✅ Working |
-| Paddle webhook | ✅ Live |
+| Paddle webhook | ⚠️ Code exists but Paddle dropped — replace with Stripe |
 | Tiger Strike pipeline | ✅ Confirmed: 20 engagement links on first run |
 | Prospect engagement mode | ✅ Deployed (PR #270) |
 | 456 tests | ✅ All passing |
@@ -104,7 +106,7 @@ curl -X POST https://api.tigerclaw.io/admin/hatch \
 
 | Item | Status |
 |------|--------|
-| Paddle checkout | No product/price created — no URL exists |
+| Stripe checkout | Paddle dropped — Stripe not yet integrated |
 | Reddit scout | 403 from Cloud Run egress — Oxylabs + Serper fallback active |
 | Admin alert markdown | Fails when error text contains underscores |
 | Payment gate (C4) | Open — anyone can access wizard without paying |

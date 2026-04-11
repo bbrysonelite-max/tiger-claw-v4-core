@@ -8,11 +8,14 @@
 
 ## Context — Where We Are
 
-Session 19 closed with a verified win: the "lobotomy" was a data problem, not a code problem. A surgical UPDATE to `brents-tiger-01-mns7wcqk`'s `onboard_state.json` at 2026-04-10 00:49 UTC produced the first real-intelligence prospect response in project history. The bot responded to "I'm tired of my job" with empathy, qualifying questions, and network-marketing context — not a canned fallback.
+Session 20 closed with ground truth fully reconciled and a new revenue contract on the table. PRs #292–#297 merged.
 
-The architecture has been working the whole time. The data was wrong. That reframes everything below.
+**Two items are ready to execute immediately — do them before anything else:**
 
-Cloud Run revision `tiger-claw-api-00456-9rb` is live. `brents-tiger-01-mns7wcqk` (Tiger Proof / Nu Skin) is the only active bot and is verified live from a fresh chatId.
+1. **SSDI Ticket to Work flavor build** — Pat Solano (founder of ACT! CRM, 1984) invested in the business. His client pays $20K/month for SSDI leads. Full spec is written and approved. Health-wellness flavor is the base. This is first paid revenue.
+2. **Mine surgery** — 3 self-referential rows to delete, 1 bad scout query to remove, source blocklist to add. Do NOT run the mine until this is done or the next run will compound the pollution.
+
+`brents-tiger-01-mns7wcqk` (Tiger Proof / Nu Skin) is still the only active bot. Cloud Run revision `tiger-claw-api-00456-9rb` is live and healthy.
 
 ---
 
@@ -20,7 +23,94 @@ Cloud Run revision `tiger-claw-api-00456-9rb` is live. `brents-tiger-01-mns7wcqk
 
 ---
 
-### 1. Voice examples for network-marketer flavor — FIRST
+### 1. SSDI Ticket to Work flavor build — FIRST (revenue)
+
+**Contract:** $20,000/month for SSDI Ticket to Work leads. Partner: Pat Solano (founder of ACT! CRM, 1984).
+
+**Base flavor:** health-wellness (`api/src/config/flavors/health-wellness.ts`). Repurpose it — swap the guts, keep the wiring.
+
+**What gets replaced entirely:**
+- `displayName` → `"SSDI Ticket to Work"`
+- `description`, `professionLabel`, `defaultKeywords`, `intentSignals`, `scoutQueries` → SSDI signals (see below)
+- `soul` → warm, empathetic, hopeful guide. NOT a salesperson. Brings good news.
+- `conversion` → single oar, goal = qualified lead capture
+- `objectionBuckets` → SSDI-specific (fear of losing benefits, "I tried before", "I don't qualify")
+- `onboarding` → qualification gates (4 yes/no gates) + lead data capture
+
+**ICP (replace entirely):**
+People who are disabled and DON'T KNOW about the SSA Ticket to Work program. Not current participants. People who need it and haven't heard of it.
+
+Mine signals to hunt:
+- "I want to work but I'll lose my benefits"
+- Financial stress on fixed disability income
+- Feeling stuck, wanting purpose or contribution
+- Life transitions: newly disabled, recently stabilized, recovery milestones
+- Posts in disability communities about employment fears
+- "Is this all there is" energy
+
+Subreddits: r/disability, r/SSDI, r/disabilitybenefits, r/ChronicIllness, r/mentalhealth, r/Anxiety, r/ChronicPain, r/careerguidance
+
+**Knowledge base (wire into soul/system prompt):**
+- Ticket to Work: free, voluntary SSA program, ages 18–64
+- Work WITHOUT losing SSDI/SSI benefits
+- Trial Work Period: earn any amount, keep full benefits
+- Medicare continues 7+ years while working
+- Benefits restart without new application if disability stops them working
+- 11 million+ eligible, most have never engaged
+- Helpline: 1-866-968-7842 | Website: choosework.ssa.gov
+
+**Qualification gates (4 yes = qualified lead):**
+1. Do they have a disability?
+2. Currently receiving or likely qualify for SSDI/SSI?
+3. Age 18–64?
+4. Interested in exploring work?
+Any no → educate, nurture, don't discard.
+
+**Lead data capture:**
+- Full name, phone, state of residence
+- General disability category (physical, mental health, cognitive, sensory — no medical details)
+- What kind of work interests them
+- Biggest concern about working
+- Channel source
+
+**BYOK:** Brent is the operator — use his Gemini key. No architectural changes needed.
+
+**After building:** hatch a test bot via admin hatch, send it a test message from a fresh chatId, verify it responds as an SSDI guide not a salesperson.
+
+---
+
+### 2. Mine surgery — fix before next mine run
+
+**Do NOT run the mine until these three things are done.**
+
+**A. Delete 3 self-referential rows:**
+```sql
+DELETE FROM market_intelligence
+WHERE id IN (
+  '67cb7c2a-...', -- OpenClaw Mastered $15/mo server fee (conf=100)
+  '07d6e010-...', -- OpenClaw Mastered $27 front-end price (conf=100)
+  '1550c182-...'  -- OpenClaw described as "Agentic AI" (conf=90)
+);
+```
+Get full UUIDs first: `SELECT id, LEFT(fact_summary, 60) FROM market_intelligence WHERE fact_summary ILIKE '%OpenClaw%';`
+Back up first: `CREATE TABLE market_intelligence_backup_20260411 AS SELECT * FROM market_intelligence WHERE fact_summary ILIKE '%OpenClaw%' OR fact_summary ILIKE '%Tiger Claw%';`
+
+**B. Fix network-marketer.ts scout queries:**
+Remove: `"subreddit:Entrepreneur OR subreddit:WorkFromHome network marketing direct sales home business"`
+Replace with: `"subreddit:antiwork OR subreddit:jobs I need to find a way out tired of this job"`
+
+**C. Add source blocklist to research_agent.ts:**
+Before the `isAlreadyMined` check, skip URLs matching:
+- `reddit.com/r/u_adam20141977`
+- `reddit.com/r/u_softtechhubus`
+- `reddit.com/r/LoyaltyDraw`
+- `reddit.com/r/ValueInvesting`
+- `reddit.com/r/TargetedSolutions`
+- `reddit.com/r/cscareeradvice`
+
+---
+
+### 3. Voice examples for network-marketer flavor — FIRST
 
 The bot now responds intelligently. It does NOT yet respond in Brent's actual voice. The system prompt is still generic "helpful assistant" tone. This is prompt engineering, not architecture.
 
