@@ -395,17 +395,17 @@ export const NETWORK_MARKETER_FLAVOR: FlavorConfig = {
     traits: [
       {
         name: "Active Transition",
-        description: "Experiencing a specific life shift right now — job loss, burnout, new baby, relocation, divorce, empty nest, or entrepreneurial curiosity. Not 'someday' — in motion today.",
+        description: "Experiencing a specific CAREER or INCOME shift right now — job loss, layoff, burnout at current job, income pressure, new-parent income squeeze, or entrepreneurial curiosity. The transition MUST have a direct career or income dimension. Generic life drama — marriage conflict, divorce, health issues, relationship problems, or personal crises WITHOUT a stated career/income component — does NOT qualify, no matter how intense the language. Someone contemplating divorce is NOT in active transition unless they are also seeking income or a new source of work.",
         language: [
           "I hate my job",
           "just got laid off",
-          "burned out",
+          "burned out at work",
           "tired of this 9-5",
           "need more time with my kids",
-          "is this all there is",
+          "need more income",
           "thinking about starting something",
           "Sunday scaries",
-          "there has to be more than this",
+          "there has to be more than this job",
         ],
       },
       {
@@ -478,6 +478,20 @@ export const NETWORK_MARKETER_FLAVOR: FlavorConfig = {
       "Peer-to-peer networking advice between established professionals",
       "Anyone already inside network marketing chasing the next voluntary opportunity",
       "Game mechanics, fictional universes, or entertainment content that happens to use financial vocabulary",
+      "Affiliate or review posts promoting 'financial freedom clubs', 'passive income systems', MLM reviews, or similar marketing content — this is content TARGETING our prospect, not content FROM our prospect",
+      "Marriage, divorce, or relationship drama with no stated career or income dimension — marital crisis alone is NOT a career transition",
+      "Health or medical struggles with no income-seeking component — struggling with a health issue is not the same as seeking a business opportunity",
+    ],
+    // Hard pre-filter: any fact whose source URL contains one of these substrings
+    // is rejected before the gate runs. Use sparingly — for sources where the
+    // extractor reliably paraphrases marketing copy into prospect-sounding language
+    // that then fools the gate. Seeded from reclassify-preview findings 2026-04-11.
+    sourceUrlBlocklist: [
+      "/u_paulusdavid",                 // Affiliate user-page, consistently extracted as prospect signal
+      "financially_free_club",          // "Financially Free Club" review posts — MLM marketing copy
+      "financially-free-club",
+      "/passive-income-review",         // Generic passive-income review funnels
+      "/mlm-review",                    // Explicit MLM review content
     ],
   },
 };

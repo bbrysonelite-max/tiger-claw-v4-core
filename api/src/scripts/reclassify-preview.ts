@@ -57,10 +57,39 @@ async function main() {
 
     const scored: Scored[] = [];
     let errored = 0;
+    let preFiltered = 0;
+
+    // Pre-filter: rows whose source URL matches the blocklist are rejected
+    // before hitting the gate. Mirrors tiger_refine.execute() runtime behavior.
+    const blocklist = profile.sourceUrlBlocklist ?? [];
+    const isBlocked = (url: string) => blocklist.some(pat => url.includes(pat));
 
     for (let i = 0; i < rows.length; i += BATCH_SIZE) {
         const batch = rows.slice(i, i + BATCH_SIZE);
-        const facts: RefinedFact[] = batch.map((r: any) => ({
+
+        // Split batch into blocked vs classifiable
+        const blockedRows = batch.filter((r: any) => isBlocked(r.source_url));
+        const classifiableRows = batch.filter((r: any) => !isBlocked(r.source_url));
+
+        for (const row of blockedRows) {
+            preFiltered++;
+            scored.push({
+                id: row.id,
+                fact_summary: row.fact_summary,
+                source_url: row.source_url,
+                confidence_score: row.confidence_score,
+                relevance_score: 0,
+                relevance_reason: 'pre-filtered: source URL blocklisted',
+                kept: false,
+            });
+        }
+
+        if (classifiableRows.length === 0) {
+            console.log(`[reclassify-preview] Batch ${i}-${i + batch.length}: all ${batch.length} pre-filtered (blocklist)`);
+            continue;
+        }
+
+        const facts: RefinedFact[] = classifiableRows.map((r: any) => ({
             type: 'intent_signal',
             sourceUrl: r.source_url,
             verbatim: r.metadata?.verbatim ?? '',
@@ -76,7 +105,7 @@ async function main() {
             const keptByFact = new Map<string, RefinedFact>();
             for (const f of kept) keptByFact.set(f.purifiedFact, f);
 
-            for (const row of batch) {
+            for (const row of classifiableRows) {
                 const k = keptByFact.get(row.fact_summary);
                 scored.push({
                     id: row.id,
@@ -88,7 +117,7 @@ async function main() {
                     kept: !!k,
                 });
             }
-            console.log(`[reclassify-preview] Batch ${i}-${i + batch.length}: kept=${kept.length}/${batch.length}`);
+            console.log(`[reclassify-preview] Batch ${i}-${i + batch.length}: kept=${kept.length}/${classifiableRows.length} (pre-filtered ${blockedRows.length})`);
         } catch (err) {
             errored += batch.length;
             console.error(`[reclassify-preview] Batch ${i}-${i + batch.length} failed:`, err);

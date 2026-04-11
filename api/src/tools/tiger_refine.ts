@@ -267,9 +267,22 @@ Return an empty array [] if no meaningful facts are present. Do not invent facts
 
   if (facts.length > 0) {
     if (prospectProfile) {
-      const gateOutcome = await runIPPGate(apiKey, domain, prospectProfile, facts, logger);
-      finalFacts = gateOutcome.kept;
-      rejectedCount = gateOutcome.rejected;
+      // Pre-filter: reject facts whose source URL matches any blocklist pattern.
+      // Applied BEFORE the gate runs so no Gemini quota is burned on known-bad sources.
+      // Catches affiliate/review/marketing content that the extractor paraphrases
+      // into prospect-sounding language.
+      const blocklist = prospectProfile.sourceUrlBlocklist ?? [];
+      const effectiveSourceUrl = sourceUrl;
+      const isBlocked = blocklist.length > 0 && blocklist.some(pat => effectiveSourceUrl.includes(pat));
+      if (isBlocked) {
+        logger.info(`[tiger_refine] Source URL blocklisted — pre-rejecting ${facts.length} facts from ${effectiveSourceUrl}`);
+        finalFacts = [];
+        rejectedCount = facts.length;
+      } else {
+        const gateOutcome = await runIPPGate(apiKey, domain, prospectProfile, facts, logger);
+        finalFacts = gateOutcome.kept;
+        rejectedCount = gateOutcome.rejected;
+      }
     } else {
       try {
         const genAI = new GoogleGenerativeAI(apiKey);

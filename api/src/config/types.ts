@@ -237,6 +237,10 @@ export interface FlavorConfig {
       signal: string;
     }>;
     rejectExamples: string[];         // Categories of content that MUST be rejected
+    sourceUrlBlocklist?: string[];    // Substring patterns — any fact whose sourceUrl contains one
+                                      // is pre-rejected without reaching the gate. Use for known
+                                      // affiliate/review/marketing sources that the extractor
+                                      // paraphrases into prospect-sounding language.
   };
 }
 
