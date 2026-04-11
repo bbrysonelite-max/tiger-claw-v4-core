@@ -1,8 +1,35 @@
 # Tiger Claw — State of the Union
 
-**Last updated:** 2026-04-10 late-night (Session 19 close + data fix verified live — revision 00456-9rb)
+**Last updated:** 2026-04-11 (Session 20 open — PRs #292–#295 reconciled, Stripe decision, mine pollution confirmed)
 **This is the single source of truth. Read nothing else until you finish this file.**
 **No lying. No assuming. No guessing. Every fact here is verified against the live system.**
+
+---
+
+## Session 20 — Ground Truth Reconciliation (2026-04-11)
+
+### PRs merged since SOTU was last written
+
+| PR | What |
+|----|------|
+| #292 | Session 19 late-night docs reconcile — NEXT_SESSION.md full rewrite (stale priorities replaced), CLAUDE.md session state patched, STATE_OF_THE_TIGER_PATH_FORWARD.md updated. SOTU intentionally not touched (already current via PR #291). |
+| #293 | DAILY_CHECKS.md created — three daily operational checks. NEXT_SESSION.md items 6 (admin dashboard dependency monitoring) and 7 (mine health panel) added. |
+| #294 | Admin dashboard zombie pool code deleted — `/admin/pool/health` fetch (404ing since PR #274), `PoolHealth` type, pool state, pool alarms, Bot Pool stats card, pool action hint all removed. Grid 5→4 columns. Vercel auto-deployed. |
+| #295 | Mine content pollution finding logged + `/admin/pipeline/health` mischaracterization corrected in DAILY_CHECKS.md and NEXT_SESSION.md. |
+
+### Decisions made this session
+
+**Stripe replaces Paddle.** Brent dropped Paddle — not waiting any longer. All payment work targets Stripe from this point forward. Paddle webhook code on the backend still exists and must be replaced.
+
+### Corrections to prior SOTU
+
+**`/admin/pipeline/health` is NOT a dependency health endpoint.** Prior SOTU and DAILY_CHECKS.md described it as checking Serper×3, Gemini platform keys, and Resend. That was wrong. It is a **mine statistics endpoint** — returns `totalFacts`, `factsLast24h`, `byVertical`, `byRegion`, `byCapturedBy`, and a single `healthy` boolean computed from "did any fact land in the last 24h AND newest fact within 48h". **No real dependency health endpoint exists anywhere on the backend.**
+
+**Mine data is polluted and NOT usable for Strike drafts.** The mine shows `healthy: true` (8,051 facts, 388 in last 24h) but the data quality is bad. Confirmed findings from a 2026-04-10 sample of the Network Marketer flavor:
+- Self-referential rows at conf=100: old OpenClaw Mastered pricing copy ingested as prospect intelligence
+- Classifier drift at conf=95–100: student housing budgets, a $175K tech salary (triggered by the word "Network"), personal savings — all tagged as Network Marketer signal
+- No `verbatim` column exists on `market_intelligence` — it's `fact_summary` (LLM paraphrase in third person). The mine does not store real prospect language anywhere.
+- This is a paid-customer blocker: Strike draft generation reads `market_intelligence` directly. Bad facts → bad drafts → churn.
 
 ---
 
@@ -40,7 +67,8 @@ Closing note: tonight's fix was surgical — one UPDATE, one row, zero code chan
 | Tests | 456/456 passing, 44 test files |
 | Active bots | 1 — `brents-tiger-01-mns7wcqk` (Tiger Proof, Nu Skin) — webhook fixed, onboard_state corrected via surgical UPDATE, **verified live from fresh chatId at 2026-04-10 00:49 UTC** (first real-intelligence prospect response in project history) |
 | Open PRs | None |
-| Wizard | `wizard.tigerclaw.io` — Vercel, auto-deploy working |
+| Wizard | `wizard.tigerclaw.io` — Vercel, auto-deploy working (PR #294 deployed — zombie pool card gone) |
+| Payment provider | **Stripe** — Paddle dropped 2026-04-11. Paddle webhook code still on backend, must be replaced. |
 | Repo | `github.com/bbrysonelite-max/tiger-claw-v4-core` |
 
 ---
@@ -97,15 +125,17 @@ AI sales agent SaaS. Operator brings their own Telegram bot token (BYOB — from
 
 | Item | Impact | Status |
 |------|--------|--------|
-| Paddle product/price | No checkout URL — payment path unproven | Create in Paddle dashboard |
-| Admin alert markdown bug | Alerts with underscores fail silently | Fix when convenient |
-| Payment gate open (C4) | Anyone can access wizard without paying | Fix after Paddle loop proven |
-| Reddit 403 from Cloud Run | Mine uses Oxylabs + Serper fallback (working) | Awaiting Reddit API or proxy |
-| Voice layer generic | Bot responds intelligently but not in Brent's voice yet | Write voice examples for network-marketer flavor system prompt |
+| **Mine content pollution** | Strike draft generation reads `market_intelligence` directly — bad facts → bad drafts → customer churn. Self-referential rows (OpenClaw pricing at conf=100) + classifier drift (off-topic content at conf≥95). Paid-customer blocker. | Triage next session: targeted DELETE, classifier audit, source URL audit |
+| **No dependency health endpoint** | Flying blind — Postgres, Redis, workers, Serper, Gemini keys, Oxylabs, OpenRouter all unmonitored. `/admin/pipeline/health` is mine stats only, not dependency checks. | Build `GET /admin/dependencies/health` + wire dashboard |
+| **Stripe integration** | No checkout URL. Paddle dropped. Stripe not yet integrated. Payment path completely unproven. | Integrate Stripe — product, price, webhook handler, checkout flow |
+| Voice layer generic | Bot responds intelligently but not in Brent's voice | Write voice examples, wire into network-marketer flavor system prompt |
 | Wizard Gemini key validation missing | Key tester removed in one-page rewrite, never restored — dead keys won't be caught at hatch | MUST restore before first paid customer |
-| Mine dedicated Gemini key status unknown | Suspected during tonight's diagnosis, not confirmed | Trace mine intelligence path |
-| Admin hatch stale field-name risk | fdfc803 route sent `icpBuilder`/`icpCustomer` after PR #281 rename; status of current admin hatch client unverified | Verify admin hatch + all callers use new field names |
-| Gemini model cache staleness (potential) | `getGeminiModelWithCache` at ai.ts:1350 caches system prompt per model — may hold stale prompt between deploys | Flag for future debugging if stale behavior appears |
+| Payment gate open (C4) | Anyone can access wizard without paying | Fix after Stripe loop proven |
+| Admin hatch stale field-name risk | fdfc803 route sent `icpBuilder`/`icpCustomer` after PR #281 rename; current caller status unverified | Verify admin hatch + all callers use new field names |
+| Mine dedicated Gemini key status unknown | Mine may be borrowing a tenant's key — billing leak + silent failure risk | Trace mine intelligence path |
+| Reddit 403 from Cloud Run | Mine uses Oxylabs + Serper fallback (working) | Awaiting Reddit API or proxy |
+| Admin alert markdown bug | Alerts with underscores fail silently | Fix when convenient |
+| Gemini model cache staleness (potential) | `getGeminiModelWithCache` at ai.ts:1350 may hold stale prompt between deploys | Monitor only |
 
 ---
 
@@ -120,6 +150,13 @@ AI sales agent SaaS. Operator brings their own Telegram bot token (BYOB — from
 - Resend email: confirmed working
 - Vercel auto-deploy: confirmed working
 - Paddle webhook: live (`POST /webhooks/paddle`)
+
+### Key Docs
+- `SOTU.md` — this file. Single source of truth. Read first every session.
+- `NEXT_SESSION.md` — ordered priority list for the next working session.
+- `DAILY_CHECKS.md` — recurring operational checklist. Run at every session open before any other work.
+- `START_HERE.md` — fast orientation.
+- `STATE_OF_THE_TIGER_PATH_FORWARD.md` — roadmap and merged PR history.
 
 ### Codebase (Verified by Session 18 Audit)
 - **Routes:** 22 route files, ~82 endpoints

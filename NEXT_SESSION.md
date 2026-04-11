@@ -93,12 +93,20 @@ PR #281 renamed `icpBuilder` → `icpProspect` and `icpCustomer` → `icpProduct
 
 ---
 
-### 5. Create Paddle product + price
+### 5. Integrate Stripe — replace Paddle
 
-No checkout URL exists. The Paddle webhook is live but there is nothing to purchase. Create the product and price in the Paddle dashboard. Then test the full flow end to end:
+**Decision (2026-04-11):** Paddle is dropped. Payment provider is Stripe.
+
+What exists today: a Paddle webhook handler (`POST /webhooks/paddle`) and Paddle-specific subscription creation logic. None of it is re-usable — Stripe's event model is different.
+
+**Build:**
+1. Create Stripe product + price in the Stripe dashboard.
+2. Replace `POST /webhooks/paddle` with `POST /webhooks/stripe` — handle `checkout.session.completed` (or `payment_intent.succeeded` depending on Stripe Checkout vs Payment Links flow). Create user + bot + subscription on success. Verify Stripe webhook signature.
+3. Replace Paddle checkout URL generation with a Stripe Checkout Session or Payment Link.
+4. Test the full flow end to end:
 
 ```
-Checkout → Paddle fires transaction.completed → POST /webhooks/paddle → user + bot + subscription created → Wizard hatch → bot live
+Checkout → Stripe fires checkout.session.completed → POST /webhooks/stripe → user + bot + subscription created → Wizard hatch → bot live
 ```
 
 This is the entire business model. It has never been tested end to end. Cannot take a paying customer without this.
@@ -115,7 +123,7 @@ Two related problems, one PR.
 
 **Build (A only, B is done):**
 1. ~~Delete pool code from the dashboard component.~~ (Done — PR #294)
-2. **Expand** `GET /admin/pipeline/health` (or build a new `/admin/dependencies/health`) to check: Postgres connectivity, Redis ping, each BullMQ worker in `api/src/workers/` (alive + recent heartbeat), Telegram webhook delivery (registered count vs active tenants), Serper×3 keys (the ones currently NOT checked anywhere), Gemini platform keys (platform + onboarding + emergency — NOT checked anywhere), Resend email (NOT checked anywhere), **Oxylabs** credentials + a test request, Paddle webhook (timestamp of last event received), OpenRouter circuit breaker state.
+2. **Expand** `GET /admin/pipeline/health` (or build a new `/admin/dependencies/health`) to check: Postgres connectivity, Redis ping, each BullMQ worker in `api/src/workers/` (alive + recent heartbeat), Telegram webhook delivery (registered count vs active tenants), Serper×3 keys (the ones currently NOT checked anywhere), Gemini platform keys (platform + onboarding + emergency — NOT checked anywhere), Resend email (NOT checked anywhere), **Oxylabs** credentials + a test request, Stripe webhook (timestamp of last event received), OpenRouter circuit breaker state.
 3. **Wire** the dashboard to call the dependency health endpoint (and separately render the mine stats from `/admin/pipeline/health`'s existing payload).
 4. **Render** each dependency as a green/red row. Red surfaces as a loud alarm at the top of the dashboard. Never silently absent.
 
