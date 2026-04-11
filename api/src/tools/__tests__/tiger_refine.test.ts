@@ -153,6 +153,87 @@ describe('tiger_refine', () => {
     expect(mockSaveMarketFact).toHaveBeenCalledOnce()
   })
 
+  // -------------------------------------------------------------------------
+  // IPP relevance gate (new, fail-closed) — exercised when the caller supplies
+  // a structured idealProspectProfile. Different response shape than legacy:
+  // {"0": {keep: bool, score: number, reason: string}}
+  // -------------------------------------------------------------------------
+
+  const SAMPLE_IPP = {
+    summary: 'Person in active career transition seeking a realistic path forward',
+    traits: [
+      {
+        name: 'Active Transition',
+        description: 'Actively leaving or considering leaving current work',
+        language: ['hate my job', 'burned out', 'need a way out'],
+      },
+    ],
+    disqualifiers: [
+      { name: 'Serial Opportunity Seeker', signal: 'Mentions multiple MLMs or get-rich-quick schemes' },
+    ],
+    rejectExamples: ['Job listings', 'Student housing ads', 'Salary stats articles'],
+  }
+
+  it('IPP gate: keeps facts classified as relevant with score + reason in metadata', async () => {
+    const IPP_KEEP = JSON.stringify({
+      '0': { keep: true, score: 85, reason: 'clear burnout + transition signal' },
+    })
+    mockGenerateContent
+      .mockResolvedValueOnce({ response: { text: () => VALID_FACTS } })
+      .mockResolvedValueOnce({ response: { text: () => IPP_KEEP } })
+    const ctx = makeContext()
+    const result = await tiger_refine.execute(
+      {
+        rawContent: 'I need more income fast. Struggling to make ends meet.',
+        prospectProfile: SAMPLE_IPP,
+      },
+      ctx,
+    )
+    expect(result.ok).toBe(true)
+    expect(mockSaveMarketFact).toHaveBeenCalledOnce()
+    const savedFact = mockSaveMarketFact.mock.calls[0]![0]
+    expect(savedFact.metadata.relevance_score).toBe(85)
+    expect(savedFact.metadata.relevance_reason).toBe('clear burnout + transition signal')
+  })
+
+  it('IPP gate: rejects facts classified as not relevant', async () => {
+    const IPP_REJECT = JSON.stringify({
+      '0': { keep: false, score: 10, reason: 'no prospect signal' },
+    })
+    mockGenerateContent
+      .mockResolvedValueOnce({ response: { text: () => VALID_FACTS } })
+      .mockResolvedValueOnce({ response: { text: () => IPP_REJECT } })
+    const ctx = makeContext()
+    const result = await tiger_refine.execute(
+      {
+        rawContent: 'I need more income fast. Struggling to make ends meet.',
+        prospectProfile: SAMPLE_IPP,
+      },
+      ctx,
+    )
+    expect(result.ok).toBe(true)
+    expect(mockSaveMarketFact).not.toHaveBeenCalled()
+    expect((result.data as any).rejectedCount).toBe(1)
+  })
+
+  it('IPP gate: FAIL-CLOSED — rejects all facts when gate call throws', async () => {
+    mockGenerateContent
+      .mockResolvedValueOnce({ response: { text: () => VALID_FACTS } })
+      .mockRejectedValueOnce(new Error('Gate Gemini quota exceeded'))
+    const ctx = makeContext()
+    const result = await tiger_refine.execute(
+      {
+        rawContent: 'I need more income fast. Struggling to make ends meet.',
+        prospectProfile: SAMPLE_IPP,
+      },
+      ctx,
+    )
+    expect(result.ok).toBe(true)
+    // Fail-closed: no facts saved even though extraction succeeded
+    expect(mockSaveMarketFact).not.toHaveBeenCalled()
+    expect((result.data as any).rejectedCount).toBe(1)
+  })
+
   it('continues saving remaining facts if one DB write fails', async () => {
     const twoFacts = JSON.stringify([
       { type: 'intent_signal', verbatim: 'Fact 1 exact quote here', purifiedFact: 'Insight 1.', confidenceScore: 80, metadata: {} },

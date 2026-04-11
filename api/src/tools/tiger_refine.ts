@@ -2,6 +2,11 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { ToolContext, ToolResult } from "./ToolContext.js";
 import { saveMarketFact } from "../services/market_intel.js";
 import { callGemini, sanitizeGeminiJSON } from "../services/geminiGateway.js";
+import type { FlavorConfig } from "../config/types.js";
+
+// Structured Ideal Prospect Profile — consumed by the new relevance gate.
+// Sourced from a flavor's idealProspectProfile field when present.
+type IdealProspectProfile = NonNullable<FlavorConfig['idealProspectProfile']>;
 
 // ---------------------------------------------------------------------------
 // Types for High-Value Data
@@ -31,6 +36,127 @@ export interface RefinementReport {
   summary: string;
 }
 
+// ---------------------------------------------------------------------------
+// IPP Relevance Gate (new, fail-closed)
+//
+// Runs when a flavor provides a structured idealProspectProfile. Classifies
+// each extracted fact against the IPP's traits + disqualifiers + reject
+// examples. Returns per-fact { keep, score, reason }. Attaches relevance_score
+// and relevance_reason to metadata for every kept fact so downstream Strike
+// draft queries can filter on relevance, not just extractor confidence.
+//
+// FAIL-CLOSED: if the gate errors (quota, network, parse), ALL facts in this
+// batch are rejected and the error is logged loudly. The legacy gate's
+// fail-open behavior is a silent-pollution bug we are explicitly NOT
+// replicating here — better to lose a batch of facts than pollute the mine.
+// ---------------------------------------------------------------------------
+export async function runIPPGate(
+  apiKey: string,
+  domain: string,
+  profile: IdealProspectProfile,
+  facts: RefinedFact[],
+  logger: ToolContext['logger'],
+): Promise<{ kept: RefinedFact[]; rejected: number }> {
+  const traitsText = profile.traits
+    .map((t, i) => {
+      const langLine = t.language.length > 0
+        ? `\n   Prospect language: ${t.language.map(l => `"${l}"`).join(", ")}`
+        : `\n   (detected by absence of hype language, not specific phrases)`;
+      return `${i + 1}. ${t.name} — ${t.description}${langLine}`;
+    })
+    .join("\n\n");
+
+  const disqualifiersText = profile.disqualifiers
+    .map((d, i) => `${i + 1}. ${d.name} — ${d.signal}`)
+    .join("\n");
+
+  const rejectExamplesText = profile.rejectExamples
+    .map(e => `- ${e}`)
+    .join("\n");
+
+  const factList = facts.map((f, i) => `${i}. ${f.purifiedFact}`).join("\n");
+
+  const gatePrompt = `You are a ruthless relevance classifier for a "${domain}" lead-generation mine.
+Your job: decide whether each extracted fact is evidence of an ideal prospect per the profile below.
+
+IDEAL PROSPECT — ${profile.summary}
+
+POSITIVE TRAITS (need at least ONE clearly present to KEEP a fact):
+
+${traitsText}
+
+DISQUALIFIERS (REJECT the fact if ANY are clearly present):
+
+${disqualifiersText}
+
+CRITICAL FILTER: A fact that is a real quote from a real person but has ZERO evidence
+of ANY trait above is NOT relevant, even if it sounds financial or commercial.
+Examples of facts that MUST be rejected:
+${rejectExamplesText}
+
+Facts to classify:
+${factList}
+
+Return JSON in this exact shape, one entry per index:
+{
+  "0": { "keep": true, "score": 85, "reason": "clear burnout + career-change seeking" },
+  "1": { "keep": false, "score": 10, "reason": "job listing, no prospect in content" }
+}
+
+Scoring guidance:
+- 80-100: clear, strong signal (A-tier)
+- 60-79: moderate signal (B-tier)
+- 40-59: borderline — keep=false unless multiple traits present
+- 0-39: reject
+
+Strictness: 9/10. When in doubt, REJECT. It is better to lose a borderline fact
+than pollute the mine with one.`;
+
+  try {
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const gateModel = genAI.getGenerativeModel({
+      model: "gemini-2.0-flash",
+      generationConfig: { responseMimeType: "application/json" },
+    });
+
+    const gateResult = await callGemini(() => gateModel.generateContent(gatePrompt));
+    const gateResponse = gateResult.response.text();
+    const classification = JSON.parse(sanitizeGeminiJSON(gateResponse));
+
+    if (!classification || typeof classification !== 'object') {
+      throw new Error(`Gate returned non-object response: ${gateResponse.slice(0, 200)}`);
+    }
+
+    const kept: RefinedFact[] = [];
+    for (let i = 0; i < facts.length; i++) {
+      const entry = classification[String(i)];
+      if (!entry || typeof entry !== 'object') continue;
+      if (entry.keep !== true) continue;
+      const score = typeof entry.score === 'number' ? entry.score : 0;
+      const reason = typeof entry.reason === 'string' ? entry.reason : '';
+      const fact = facts[i]!;
+      kept.push({
+        ...fact,
+        metadata: {
+          ...fact.metadata,
+          relevance_score: score,
+          relevance_reason: reason,
+        },
+      });
+    }
+
+    const rejected = facts.length - kept.length;
+    logger.info(`[tiger_refine] IPP gate classified ${facts.length} facts for "${domain}": kept=${kept.length}, rejected=${rejected}`);
+    return { kept, rejected };
+  } catch (gateErr) {
+    // FAIL-CLOSED. Do not pollute the mine on gate failure. Loud log, reject all.
+    logger.error(
+      `[tiger_refine] IPP RELEVANCE GATE FAILED — rejecting all ${facts.length} facts (fail-closed). domain="${domain}" err=${String(gateErr)}`,
+    );
+    return { kept: [], rejected: facts.length };
+  }
+}
+
 /**
  * tiger_refine: The v5 Purification Tool.
  * Takes raw content and extracts high-value structured market intelligence facts
@@ -49,6 +175,9 @@ async function execute(
   const capturedBy = (params.capturedBy as string) || "unknown";
   const entityId = (params.entityId as string) || null;
   const miningCost = (params.miningCost as number) || 0.05;
+  // Optional structured IPP. When present, the new per-flavor relevance gate runs.
+  // When absent, the legacy generic commercial-relevance gate runs (unchanged behavior).
+  const prospectProfile = params.prospectProfile as IdealProspectProfile | undefined;
 
   logger.info("[tiger_refine] Starting purification", { sourceUrl, extractionGoal, domain, capturedBy });
 
@@ -127,22 +256,45 @@ Return an empty array [] if no meaningful facts are present. Do not invent facts
     return { ok: false, error: `Gemini extraction failed: ${String(geminiErr)}` };
   }
 
-  // Phase 6 Task: Relevance Gate
+  // Relevance Gate — two paths:
+  //   1. IPP gate (new, fail-closed): runs when the flavor supplies an idealProspectProfile.
+  //      Classifies each fact against structured traits + disqualifiers. Attaches
+  //      relevance_score and relevance_reason to metadata. Failures reject all facts loudly.
+  //   2. Legacy commercial-relevance gate (unchanged, fail-open): runs when no profile is
+  //      supplied. Preserves original behavior for flavors that haven't migrated yet.
   let finalFacts: RefinedFact[] = [];
   let rejectedCount = 0;
 
   if (facts.length > 0) {
-    try {
-      const genAI = new GoogleGenerativeAI(apiKey);
-      const gateModel = genAI.getGenerativeModel({
-        model: "gemini-2.0-flash",
-        generationConfig: { responseMimeType: "application/json" },
-      });
+    if (prospectProfile) {
+      // Pre-filter: reject facts whose source URL matches any blocklist pattern.
+      // Applied BEFORE the gate runs so no Gemini quota is burned on known-bad sources.
+      // Catches affiliate/review/marketing content that the extractor paraphrases
+      // into prospect-sounding language.
+      const blocklist = prospectProfile.sourceUrlBlocklist ?? [];
+      const effectiveSourceUrl = sourceUrl;
+      const isBlocked = blocklist.length > 0 && blocklist.some(pat => effectiveSourceUrl.includes(pat));
+      if (isBlocked) {
+        logger.info(`[tiger_refine] Source URL blocklisted — pre-rejecting ${facts.length} facts from ${effectiveSourceUrl}`);
+        finalFacts = [];
+        rejectedCount = facts.length;
+      } else {
+        const gateOutcome = await runIPPGate(apiKey, domain, prospectProfile, facts, logger);
+        finalFacts = gateOutcome.kept;
+        rejectedCount = gateOutcome.rejected;
+      }
+    } else {
+      try {
+        const genAI = new GoogleGenerativeAI(apiKey);
+        const gateModel = genAI.getGenerativeModel({
+          model: "gemini-2.0-flash",
+          generationConfig: { responseMimeType: "application/json" },
+        });
 
-      const gatePrompt = `You are a RUTHLESS commercial relevance gate for a market intelligence engine.
+        const gatePrompt = `You are a RUTHLESS commercial relevance gate for a market intelligence engine.
 Domain: "${domain}"
 
-Your job is to filter out any facts that are not directly relevant to a REAL-WORLD professional working in the "${domain}" industry. 
+Your job is to filter out any facts that are not directly relevant to a REAL-WORLD professional working in the "${domain}" industry.
 
 CRITICAL RULE: If the fact is about a VIDEO GAME, BOARD GAME, MOVIE, BOOK, or FICTIONAL UNIVERSE, you MUST return FALSE. Even if terms like "health", "stats", "plumbing", or "design" are used, if they refer to game mechanics or lore, they are 100% IRRELEVANT.
 
@@ -164,20 +316,21 @@ Return a JSON object mapping each index to a boolean representing its relevance.
 Strictness: 6/10. Accept any fact with a plausible commercial signal. Only reject obvious non-business content.
 Example: {"0": true, "1": false}`;
 
-      const gateResult = await callGemini(() => gateModel.generateContent(gatePrompt));
-      const gateResponse = gateResult.response.text();
-      const classification = JSON.parse(gateResponse);
-      logger.info(`[tiger_refine] Gate classification results for "${domain}":`, classification);
+        const gateResult = await callGemini(() => gateModel.generateContent(gatePrompt));
+        const gateResponse = gateResult.response.text();
+        const classification = JSON.parse(gateResponse);
+        logger.info(`[tiger_refine] Gate classification results for "${domain}":`, classification);
 
-      finalFacts = facts.filter((_, i) => classification[String(i)] === true);
-      rejectedCount = facts.length - finalFacts.length;
+        finalFacts = facts.filter((_, i) => classification[String(i)] === true);
+        rejectedCount = facts.length - finalFacts.length;
 
-      if (rejectedCount > 0) {
-        logger.info(`[tiger_refine] Relevance gate rejected ${rejectedCount}/${facts.length} facts for domain "${domain}".`);
+        if (rejectedCount > 0) {
+          logger.info(`[tiger_refine] Relevance gate rejected ${rejectedCount}/${facts.length} facts for domain "${domain}".`);
+        }
+      } catch (gateErr) {
+        logger.error("[tiger_refine] Relevance gate failed, falling back to all facts", { err: String(gateErr) });
+        finalFacts = facts;
       }
-    } catch (gateErr) {
-      logger.error("[tiger_refine] Relevance gate failed, falling back to all facts", { err: String(gateErr) });
-      finalFacts = facts;
     }
   }
 

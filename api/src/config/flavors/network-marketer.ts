@@ -40,18 +40,32 @@ export const NETWORK_MARKETER_FLAVOR: FlavorConfig = {
   ],
 
   scoutQueries: [
-    "subreddit:Entrepreneur OR subreddit:sidehustle best side hustle 2026 extra income business",
-    "subreddit:WorkFromHome OR subreddit:sidehustle passive income from home legitimate ideas",
-    "subreddit:Entrepreneur OR subreddit:personalfinance tired of 9-5 want own business income",
-    "subreddit:sidehustle looking for extra income flexible work from home opportunity",
-    "subreddit:Entrepreneur OR subreddit:WorkFromHome network marketing direct sales home business",
+    // Builder-oar intent-language scouts. Hunt for people in transition, NOT peers in industry.
+    // Every query targets how real prospects TALK when venting — not how marketers describe them.
+    // "opportunity", "business", "income", "side hustle", "network marketing" are DELIBERATELY absent:
+    // those are vocabulary prospects acquire AFTER being recruited, not before.
+    "subreddit:antiwork OR subreddit:jobs tired of this job need a way out hate mondays",
+    "subreddit:careerguidance OR subreddit:careerchange ready for a change what should I do next",
+    "subreddit:jobs OR subreddit:Layoffs just got laid off what now rebuilding",
+    "subreddit:workingmoms OR subreddit:beyondthebump want to quit job stay home with my kids",
+    "subreddit:antiwork OR subreddit:careerguidance is this all there is sunday scaries burned out",
+    // TODO (follow-on PR): Displaced Builder scout lane — involuntarily displaced network marketers
+    // (company shutdown, comp plan gutted, merger killed their leg). Different surface than Reddit
+    // venting — lives on news announcements and industry chatter. Tight disqualifiers needed to
+    // avoid Serial Opportunity Seeker false positives. Deferred until the 5 queries above prove
+    // the new relevance gate works on transition-language signals.
   ],
 
   // -------------------------------------------------------------------------
   // Conversion
   // -------------------------------------------------------------------------
   conversion: {
-    oars: ["builder", "customer"],
+    // Flavor-level oar scope: Builder-only. Archived Customer oar per decision 2026-04-11.
+    // Economic rationale: a recruited distributor is a lifetime asset; an end-customer is a $10
+    // transaction. System-level Customer oar plumbing (tiger_scout intent patterns, tiger_onboard
+    // icp_customer_confirm phase, provisioner.icpProduct, etc.) is intentionally LEFT intact so
+    // other flavors can still use it. The flavor's declared oars is the authoritative scope.
+    oars: ["builder"],
     builderConversionGoal: "sign up as a distributor",
     customerConversionGoal: "place their first order",
   },
@@ -357,5 +371,127 @@ export const NETWORK_MARKETER_FLAVOR: FlavorConfig = {
     problemFaced: "They are watching AI, automation, and inflation compress their financial safety margin. Their job feels less certain than it did five years ago. Cost of living is up. Their paycheck is flat. They want income security but they are afraid of anything that looks like a gamble. They have probably dismissed network marketing before because it felt risky — they need to see it framed as a hedge, not a bet.",
     currentApproachFailing: "They are doing nothing — waiting for a raise that is not coming, hoping their job survives the next round of layoffs, or picking up gig work that trades time for dollars with no leverage. They have no residual income. Their financial plan is entirely dependent on one employer who does not owe them loyalty.",
     onlinePlatforms: "Facebook groups (income, side hustle, work from home), Reddit (r/sidehustle, r/personalfinance, r/Entrepreneur), LinkedIn (middle management, sales professionals, educators, healthcare workers), Telegram and LINE communities in markets with high employment anxiety.",
+  },
+
+  // -------------------------------------------------------------------------
+  // Ideal Prospect Profile (IPP) — consumed by the mine relevance gate.
+  //
+  // Source of truth: Brent Bryson's 35-year field knowledge, codified in AI
+  // Prospecting Playbook, 5 Agents, and Endless Referrals. Brent-authored on
+  // 2026-04-11 during the mine rebuild.
+  //
+  // This is a DIFFERENT source of truth than `defaultBuilderICP` above:
+  //   - defaultBuilderICP = demographic/economic snapshot → consumed by the
+  //     system prompt builder (ai.ts) and wizard defaults (wizard.ts) to give
+  //     the bot voice context about who it's speaking to.
+  //   - idealProspectProfile = behavioral/psychological framework → consumed
+  //     by tiger_refine's relevance gate to decide whether a mined fact is
+  //     evidence of a real prospect.
+  //
+  // Two concerns, two structures. Both correct for their consumers.
+  // -------------------------------------------------------------------------
+  idealProspectProfile: {
+    summary: "A person in transition who does not yet know network marketing is their answer.",
+    traits: [
+      {
+        name: "Active Transition",
+        description: "Experiencing a specific CAREER or INCOME shift right now — job loss, layoff, burnout at current job, income pressure, new-parent income squeeze, or entrepreneurial curiosity. The transition MUST have a direct career or income dimension. Generic life drama — marriage conflict, divorce, health issues, relationship problems, or personal crises WITHOUT a stated career/income component — does NOT qualify, no matter how intense the language. Someone contemplating divorce is NOT in active transition unless they are also seeking income or a new source of work.",
+        language: [
+          "I hate my job",
+          "just got laid off",
+          "burned out at work",
+          "tired of this 9-5",
+          "need more time with my kids",
+          "need more income",
+          "thinking about starting something",
+          "Sunday scaries",
+          "there has to be more than this job",
+        ],
+      },
+      {
+        name: "Self-Awareness",
+        description: "Knows something needs to change. Complaints paired with seeking behavior. Advice-seeking. Exploring options. Not passive venting.",
+        language: [
+          "what should I do",
+          "need to figure out",
+          "looking for a way",
+          "any advice",
+          "how do I",
+        ],
+      },
+      {
+        name: "Action-Taking History",
+        description: "They DO things. Started a business (even one that failed), took a course, asked specific questions, made investments in self-development. Movement-oriented, not dream-oriented.",
+        language: [
+          "I tried",
+          "started",
+          "took a course",
+          "been working on",
+          "finished",
+          "built",
+        ],
+      },
+      {
+        name: "Realistic Expectations",
+        description: "Grounded, effort-aware language. Understands work is required. NO get-rich-quick energy. Detected by absence of hype language, not presence of specific phrases.",
+        language: [],
+      },
+      {
+        name: "Displaced Builder",
+        description: "An active network marketer involuntarily displaced. Signal: company shutdown, comp plan destruction, merger killed their leg. HARD distinction: displacement must be INVOLUNTARY, not voluntary company-hopping. A voluntary hopper is a red-flag Serial Opportunity Seeker.",
+        language: [
+          "my company shut down",
+          "comp plan gutted",
+          "looking for a new home",
+          "company closed",
+          "merger killed",
+        ],
+      },
+    ],
+    disqualifiers: [
+      {
+        name: "Serial Opportunity Seeker",
+        signal: "History of joining 3+ ventures in 2 years, chasing shiny things, comp-plan-shopping language. Voluntary hopping, not involuntary displacement.",
+      },
+      {
+        name: "Information Collector",
+        signal: "Endless questions, 'just researching', months of inquiry without action. Time vampire.",
+      },
+      {
+        name: "Broke Dreamer",
+        signal: "Big talk without capacity. Desperation language ('I need money NOW'). No realistic timeline. Not serious.",
+      },
+      {
+        name: "Spouse Said No",
+        signal: "Defers all decisions to a partner who controls the call. No authority of their own.",
+      },
+      {
+        name: "Let Me Think About It Loop",
+        signal: "Perpetual interest, zero commitment, no urgency. Long-term nurture only — not A-tier.",
+      },
+    ],
+    rejectExamples: [
+      "Student housing costs with no life transition signal",
+      "Job salary listings (content is about a job posting, not a person in transition)",
+      "General savings or budget statistics with no action-seeking",
+      "Product reviews with no personal life context",
+      "Peer-to-peer networking advice between established professionals",
+      "Anyone already inside network marketing chasing the next voluntary opportunity",
+      "Game mechanics, fictional universes, or entertainment content that happens to use financial vocabulary",
+      "Affiliate or review posts promoting 'financial freedom clubs', 'passive income systems', MLM reviews, or similar marketing content — this is content TARGETING our prospect, not content FROM our prospect",
+      "Marriage, divorce, or relationship drama with no stated career or income dimension — marital crisis alone is NOT a career transition",
+      "Health or medical struggles with no income-seeking component — struggling with a health issue is not the same as seeking a business opportunity",
+    ],
+    // Hard pre-filter: any fact whose source URL contains one of these substrings
+    // is rejected before the gate runs. Use sparingly — for sources where the
+    // extractor reliably paraphrases marketing copy into prospect-sounding language
+    // that then fools the gate. Seeded from reclassify-preview findings 2026-04-11.
+    sourceUrlBlocklist: [
+      "/u_paulusdavid",                 // Affiliate user-page, consistently extracted as prospect signal
+      "financially_free_club",          // "Financially Free Club" review posts — MLM marketing copy
+      "financially-free-club",
+      "/passive-income-review",         // Generic passive-income review funnels
+      "/mlm-review",                    // Explicit MLM review content
+    ],
   },
 };

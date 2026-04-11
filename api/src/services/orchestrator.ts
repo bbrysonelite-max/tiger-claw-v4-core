@@ -35,6 +35,7 @@ export interface ResearchAgentJobData {
     flavorId: string;
     displayName: string;
     queries: string[];
+    prospectProfile?: import('../config/types.js').FlavorConfig['idealProspectProfile'];
 }
 
 export interface ReportingAgentJobData {
@@ -73,11 +74,13 @@ export async function startOrchestratedRun(runId: string): Promise<void> {
 
     for (const [flavorId, flavor] of flavors) {
         const queries: string[] = (flavor as any).scoutQueries ?? [];
+        const prospectProfile = (flavor as any).idealProspectProfile;
         await researchAgentQueue.add('research', {
             runId,
             flavorId,
             displayName: (flavor as any).displayName ?? flavorId,
             queries,
+            prospectProfile,
         } satisfies ResearchAgentJobData, {
             jobId: `research_${runId}_${flavorId}`,
             removeOnComplete: true,
