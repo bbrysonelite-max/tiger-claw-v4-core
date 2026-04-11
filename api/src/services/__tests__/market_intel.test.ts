@@ -105,4 +105,16 @@ describe('getMarketIntelligence', () => {
     const [, params] = mockQuery.mock.calls[0]
     expect(params[2]).toBe(5)
   })
+
+  it('orders by IPP gate relevance_score first, with legacy NULL facts last', async () => {
+    // Downstream consumers should prefer facts the IPP gate actually scored.
+    // Pre-gate rows (NULL metadata.relevance_score) must still be returnable
+    // so flavors without an IPP gate keep working — hence NULLS LAST.
+    mockQuery.mockResolvedValueOnce({ rows: [] })
+
+    await getMarketIntelligence('network-marketer')
+
+    const [sql] = mockQuery.mock.calls[0]
+    expect(sql).toContain("(metadata->>'relevance_score')::int DESC NULLS LAST")
+  })
 })

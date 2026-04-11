@@ -72,6 +72,18 @@ describe('Tiger Strike Pipeline', () => {
       expect(mockQuery).toHaveBeenCalledTimes(2);
     });
 
+    it('orders fetched facts by IPP gate relevance_score first', async () => {
+      // Strike pipeline should pick the highest-scoring prospect pain first.
+      // Legacy pre-gate facts have NULL relevance_score and sort last.
+      // Empty rows short-circuits markFactsQueued — only one query fires.
+      mockQuery.mockResolvedValueOnce({ rows: [] });
+
+      await tiger_strike_harvest.execute({ action: 'fetch' }, context);
+
+      const [sql] = mockQuery.mock.calls[0];
+      expect(sql).toContain("(mi.metadata->>'relevance_score')::int DESC NULLS LAST");
+    });
+
     it('returns status summary', async () => {
       mockQuery.mockResolvedValueOnce({
         rows: [{ total_facts: 10, unengaged_facts: 5, queued_facts: 2, engaged_facts: 2, archived_facts: 1 }],

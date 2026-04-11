@@ -175,6 +175,14 @@ export async function getMarketIntelligence(
 ): Promise<MarketFact[]> {
   if (!domain) return [];
 
+  // Ordering:
+  //   1. IPP gate relevance_score DESC (NULL = legacy pre-gate fact, sorts last)
+  //   2. created_at DESC (freshness)
+  //   3. confidence_score DESC (purity tiebreaker)
+  // The IPP gate filters at write-time for flavors with idealProspectProfile,
+  // so for those flavors new facts all carry a score and float to the top.
+  // Flavors without an IPP gate are unaffected — their facts have NULL score
+  // and fall back to the legacy created_at/confidence_score ordering.
   const result = await getPool().query(
     `SELECT id, domain, category, entity_label, fact_summary, confidence_score,
             source_url, captured_by, metadata, verified_at, valid_until
@@ -183,7 +191,9 @@ export async function getMarketIntelligence(
        AND confidence_score >= $2
        AND created_at >= NOW() - INTERVAL '30 days'
        AND (valid_until IS NULL OR valid_until > NOW())
-     ORDER BY created_at DESC, confidence_score DESC
+     ORDER BY (metadata->>'relevance_score')::int DESC NULLS LAST,
+              created_at DESC,
+              confidence_score DESC
      LIMIT $3`,
     [domain, BOT_CONFIDENCE_THRESHOLD, limit]
   );

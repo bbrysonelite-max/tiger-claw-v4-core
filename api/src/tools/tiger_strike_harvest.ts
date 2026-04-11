@@ -73,7 +73,9 @@ async function fetchEngagementBatch(
   const flavorConfig = loadFlavorConfig(flavor);
   const domain = flavorConfig.displayName;
 
-  // Build the query — fetch unengaged facts ordered by confidence DESC
+  // Build the query — fetch unengaged facts ordered by IPP relevance_score first,
+  // then confidence DESC as tiebreaker, then created_at ASC (oldest-first FIFO).
+  // Legacy pre-gate facts have NULL relevance_score and sort last (NULLS LAST).
   const params: (string | number)[] = [domain, minConfidence, Math.min(limit, MAX_BATCH_SIZE)];
   let categoryClause = "";
   if (category) {
@@ -97,7 +99,9 @@ async function fetchEngagementBatch(
       AND mi.confidence_score >= $2
       AND COALESCE(mi.engagement_status, 'unengaged') = 'unengaged'
       ${categoryClause}
-    ORDER BY mi.confidence_score DESC, mi.created_at ASC
+    ORDER BY (mi.metadata->>'relevance_score')::int DESC NULLS LAST,
+             mi.confidence_score DESC,
+             mi.created_at ASC
     LIMIT $3
   `;
 
