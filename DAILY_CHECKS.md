@@ -32,17 +32,9 @@ Open the dashboard. Every external dependency must be either green (healthy) or 
 - Resend email
 - Paddle webhook (last event received within expected window)
 
-**Current gap (as of 2026-04-10):** the admin dashboard surfaces almost none of these. The backend has a partial check at `GET /admin/pipeline/health` covering Serper×3, Gemini platform×3, and Resend — and the dashboard UI does not even call that endpoint. A zombie `/admin/pool/health` fetch is 404ing on every dashboard refresh. This is a pending build task — see `NEXT_SESSION.md` item 6.
+**Current gap (as of 2026-04-10):** the admin dashboard surfaces almost none of these, and there is **no dependency health endpoint at all** on the backend. `GET /admin/pipeline/health` despite its name is a **mine statistics** endpoint (fact counts, by-vertical breakdown, byRegion) — it does not check Serper, Gemini keys, Resend, Oxylabs, Postgres, Redis, workers, Paddle, or OpenRouter. A zombie `/admin/pool/health` fetch was 404ing on every dashboard refresh until PR #294 removed it. Building the real dependency health endpoint + wiring + loud alarms is `NEXT_SESSION.md` item 6 Problem A.
 
-**Until the build lands**, run the backend check directly:
-
-```bash
-ADMIN_TOKEN=$(gcloud secrets versions access latest --secret="tiger-claw-admin-token" --project="hybrid-matrix-472500-k5")
-curl -s https://api.tigerclaw.io/admin/pipeline/health \
-  -H "Authorization: Bearer $ADMIN_TOKEN" | jq
-```
-
-Every entry must return `ok: true`. Any `ok: false` is stop-the-world.
+**Until the build lands**, this check is **NOT RUNNABLE from a single endpoint**. Workarounds: (1) watch Cloud Run logs for errors, (2) test specific dependencies by calling their own endpoints, (3) the existing `/admin/pipeline/health` DOES tell you whether the mine produced facts in the last 24h (its `healthy` boolean is true iff `factsLast24h > 0` AND newest fact within 48h), which is a partial signal for the mine only.
 
 ---
 
@@ -64,24 +56,36 @@ The one-page signup must reject a dead Gemini key at hatch time with a user-visi
 
 The bar for the mine is **qualitative**, not quantitative. There is no "≥ N facts" minimum. What matters is: is the data usable for Strike draft generation and is it representative of real prospects?
 
+**Schema note (corrected 2026-04-10):** the `market_intelligence` table has **no `verbatim` column**. The content column is `fact_summary`, and every row is an LLM paraphrase in third person ("The individual expresses…", "The user lacks…"), not a real user quote. The mine does not store prospect language verbatim anywhere. When this check says "read the facts", it means reading paraphrased summaries — use your gut on whether the paraphrase reflects a real, topically-relevant prospect statement. This design limitation is flagged in `NEXT_SESSION.md` item 3 for triage tomorrow.
+
 **Verify daily:**
-- **Last run time** is recent (within expected cron cadence)
+- **Last run time** is recent (within expected cron cadence) — check `/admin/pipeline/health` → `newestFact` field, or query `MAX(created_at)` directly
 - **Last run did not fail** — no silent worker errors in `factExtractionWorker` or `marketIntelligenceWorker`
-- **Facts are usable** — sample the 5 most recent rows from `market_intelligence`. Read the `verbatim` column. Each should be a real user quote with real sentiment relevant to the flavor's ICP. Not noise, not boilerplate, not a bot echo.
-- **Mine has a dedicated Gemini key** (not borrowing a tenant's key — status unknown as of 2026-04-10, `NEXT_SESSION.md` item 3)
+- **Facts are usable** — sample the 5 most recent rows from `market_intelligence`. Read the `fact_summary` column. Each should paraphrase a real, topically-relevant statement relevant to the flavor's ICP. Not noise, not boilerplate, not your own sales copy (self-reference pollution was found on 2026-04-10), not an unrelated Reddit thread that tripped a keyword classifier.
+- **Mine has a dedicated Gemini key** (not borrowing a tenant's key — status unknown as of 2026-04-10, `NEXT_SESSION.md` item 3b)
 - **Reddit 403 fallback path** (Oxylabs / Serper) still producing facts despite the Reddit API block
 
-**Until the mine panel is on the admin dashboard**, sample facts directly via cloud-sql-proxy (port 5433):
+**Until the mine panel is on the admin dashboard**, sample facts directly via cloud-sql-proxy (port 5433). Extract creds from the database URL secret (the DB password is not stored as a standalone secret):
 
 ```bash
-psql -h localhost -p 5433 -U botcraft -d tiger_claw_shared \
-  -c "SELECT id, source_domain, verbatim, created_at
-      FROM market_intelligence
-      ORDER BY created_at DESC
-      LIMIT 5;"
+DATABASE_URL=$(gcloud secrets versions access latest --secret="tiger-claw-database-url" --project="hybrid-matrix-472500-k5")
+USER=$(echo "$DATABASE_URL" | sed -E 's|^postgres(ql)?://([^:]+):.*|\2|')
+PASS=$(echo "$DATABASE_URL" | sed -E 's|^postgres(ql)?://[^:]+:([^@]+)@.*|\2|')
+
+PGPASSWORD="$PASS" psql -h 127.0.0.1 -p 5433 -U "$USER" -d tiger_claw_shared -c "
+  SELECT LEFT(id::text, 8) AS id, domain, category, captured_by, confidence_score AS conf,
+         LEFT(fact_summary, 400) AS fact,
+         TO_CHAR(created_at, 'MM-DD HH24:MI') AS created
+  FROM market_intelligence
+  WHERE domain = 'Network Marketer'
+  ORDER BY created_at DESC
+  LIMIT 5;
+"
 ```
 
-Read the verbatims. Trust your gut. If they read like noise, stop and diagnose before any other work.
+**Gotcha:** cloud-sql-proxy caches ADC at startup. If `gcloud auth application-default login` was re-run, restart the proxy (`kill <pid>`, relaunch) before expecting new auth to take effect.
+
+Read the summaries. Trust your gut. If they read like noise, self-references, or off-topic content, stop and diagnose before any other work.
 
 ---
 
