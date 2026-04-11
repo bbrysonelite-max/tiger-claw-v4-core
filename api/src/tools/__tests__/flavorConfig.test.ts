@@ -11,41 +11,32 @@ import {
 } from '../flavorConfig.js';
 
 // ─── VALID_FLAVOR_KEYS ────────────────────────────────────────────────────────
+//
+// Tiger Claw is a single-flavor product as of PR A (flavor shelf). The only
+// customer-facing flavor is network-marketer. Hunting-only pipelines (e.g.,
+// SSDI Ticket to Work) run as MineCampaigns, not flavors. Archived flavor
+// configs live in api/_archive/flavors/ — see README there.
 
 describe('VALID_FLAVOR_KEYS', () => {
-  it('contains exactly 8 customer-facing flavors', () => {
-    expect(VALID_FLAVOR_KEYS).toHaveLength(8);
+  it('contains exactly 1 customer-facing flavor (network-marketer)', () => {
+    expect(VALID_FLAVOR_KEYS).toHaveLength(1);
+    expect(VALID_FLAVOR_KEYS).toContain('network-marketer');
   });
 
   it('does not include admin (internal-only, never provisioned)', () => {
     expect(VALID_FLAVOR_KEYS).not.toContain('admin');
   });
 
-  it('does not include removed invalid flavor: director-of-operations', () => {
-    expect(VALID_FLAVOR_KEYS).not.toContain('director-of-operations');
-  });
-
-  it('does not include removed invalid flavor: intelligence-specialist', () => {
-    expect(VALID_FLAVOR_KEYS).not.toContain('intelligence-specialist');
-  });
-
-  it('does not include removed flavor: doctor (healthcare compliance risk)', () => {
-    expect(VALID_FLAVOR_KEYS).not.toContain('doctor');
-  });
-
-  it('includes all 9 expected valid flavor keys', () => {
-    const expected = [
-      'network-marketer',
-      'real-estate',
-      'health-wellness',
-      'airbnb-host',
-      'lawyer',
-      'plumber',
-      'sales-tiger',
-      'mortgage-broker',
+  it('does not include archived flavors', () => {
+    const archived = [
+      'real-estate', 'health-wellness', 'airbnb-host', 'lawyer',
+      'plumber', 'sales-tiger', 'mortgage-broker', 'researcher',
+      'baker', 'candle-maker', 'doctor', 'dorm-design', 'gig-economy',
+      'interior-designer', 'personal-trainer',
+      'director-of-operations', 'intelligence-specialist',
     ];
-    for (const key of expected) {
-      expect(VALID_FLAVOR_KEYS).toContain(key);
+    for (const key of archived) {
+      expect(VALID_FLAVOR_KEYS).not.toContain(key);
     }
   });
 });
@@ -53,15 +44,16 @@ describe('VALID_FLAVOR_KEYS', () => {
 // ─── validateAllFlavors ───────────────────────────────────────────────────────
 
 describe('validateAllFlavors', () => {
-  it('returns valid:true — all flavor files are present', () => {
+  it('returns valid:true — network-marketer is present', () => {
     const result = validateAllFlavors();
     expect(result.valid).toBe(true);
     expect(result.missing).toHaveLength(0);
   });
 
-  it('reports 8 loaded flavors', () => {
+  it('reports exactly 1 loaded customer-facing flavor', () => {
     const result = validateAllFlavors();
-    expect(result.loaded).toHaveLength(8);
+    expect(result.loaded).toHaveLength(1);
+    expect(result.loaded).toContain('network-marketer');
   });
 
   it('loaded list contains every key in VALID_FLAVOR_KEYS', () => {
@@ -102,18 +94,18 @@ describe('loadFlavorConfig', () => {
 // ─── listFlavors ──────────────────────────────────────────────────────────────
 
 describe('listFlavors', () => {
-  it('returns at least 9 flavor IDs (registry includes internal flavors)', () => {
+  it('returns exactly 2 registry entries (network-marketer + admin)', () => {
     const flavors = listFlavors();
-    expect(flavors.length).toBeGreaterThanOrEqual(9);
+    expect(flavors).toHaveLength(2);
+    expect(flavors).toContain('network-marketer');
+    expect(flavors).toContain('admin');
   });
 
-  it('includes network-marketer', () => {
-    expect(listFlavors()).toContain('network-marketer');
-  });
-
-  it('includes mortgage-broker', () => {
+  it('does not include archived flavors', () => {
     const flavors = listFlavors();
-    expect(flavors).toContain('mortgage-broker');
+    expect(flavors).not.toContain('mortgage-broker');
+    expect(flavors).not.toContain('real-estate');
+    expect(flavors).not.toContain('lawyer');
   });
 });
 
