@@ -2,62 +2,15 @@
 
 **Every AI reading this file must treat these as non-negotiable constraints, not suggestions. They apply to every line of code, every UI flow, every API endpoint, and every background job.**
 
----
-
-## Current Session State (2026-04-10 late-night — Session 19 CLOSED)
-
-### 456/456 tests passing. PRs #274–#291 merged. Cloud Run revision **tiger-claw-api-00456-9rb** live. Wizard on Vercel (auto-deployed).
-
-**Session 19 late-night — lobotomy data fix verified live.** A surgical UPDATE to `brents-tiger-01-mns7wcqk`'s `onboard_state.json` at 2026-04-10 00:49 UTC produced the first real-intelligence prospect response in project history. No code touched. The architecture was working; the data was wrong. See SOTU.md's late-night addendum for the full diagnosis.
-
-**Session 19 shipped (PRs #286–#288):**
-- **PR #286** — StepReviewPayment TS fix (customerProfile removed from hatch payload)
-- **PR #287** — Wizard hatch always pre-seeds `onboard_state.json` — root cause fix: every wizard-hatched bot was waking in operator mode firing `tiger_onboard` at prospects
-- **PR #288** — Remove dead `hasWizardIcp`/`resolvedOnboardingComplete` — customerProfile gone, these were always false; single truth restored: `hasOnboarding = phase=complete && hasIdentity`
-
-**Session 18 shipped (PRs #274–#285):**
-- **PR #274** — Remove bot pool (5,559 lines deleted)
-- **PR #275** — Post-#274 collateral fix
-- **PR #276/#279/#283/#284/#285** — Doc updates
-- **PR #277** — Repo cleanup
-- **PR #278** — Agent context fix: `hasOnboarding` requires real identity, `displayOperatorName` fallback, provisioner writes `phase="identity"` when no product
-- **PR #280** — Admin hatch accepts `icpProspect` + `icpProduct`
-- **PR #281** — `icpBuilder` → `icpProspect`, `icpCustomer` → `icpProduct` everywhere
-- **PR #282** — Commander-language wizard cleanup: ICP step removed (5→4 steps), `sales-tiger` removed, `StepCustomerProfile.tsx` deleted
-
-### FIRST PRIORITY NEXT SESSION
-
-1. **Voice examples for network-marketer flavor** — Brent writes examples in his own voice, Claude Code wires them into the system prompt, re-test with "I'm tired of my job" and compare to the late-night baseline. Prompt engineering, not architecture.
-2. **Restore wizard Gemini key validator at hatch** — key tester removed in one-page rewrite, never restored. MUST be in place before first paid customer.
-3. **Create Paddle product + price** — no checkout URL exists. Paddle path completely unproven.
-
-See `NEXT_SESSION.md` for the full priority list (also includes mine Gemini key verification and admin hatch field audit).
-
-### Critical Open Issues
-
-- **Voice layer generic:** Bot now responds intelligently but not in Brent's actual voice. First priority next session.
-- **Wizard Gemini key validator missing:** Removed during one-page rewrite, never restored. Dead keys are not caught at hatch. MUST restore before first paid customer.
-- **Mine dedicated Gemini key status unknown:** Suspected during late-night diagnosis. Trace mine intelligence path.
-- **Admin hatch field-name drift:** `fdfc803` was sending `icpBuilder`/`icpCustomer` 18 min after PR #281 rename landed. Audit all callers.
-- **Gemini model cache (potential):** `getGeminiModelWithCache` at `ai.ts:1350` may hold stale system prompt between deploys. Monitor only.
-- **PADDLE PRODUCT:** Webhook live, no product/price yet. No checkout URL.
-- **C4:** Payment gate open — direct wizard access bypasses payment. Fix after Paddle loop proven.
-- **Admin alert markdown bug:** Underscores in error messages break Telegram Markdown parser.
-- **LINE:** Deferred. Telegram only.
-- **Cal.com booking:** `tiger_book_zoom` built. Inactive pending `calcomBookingUrl` set.
-
-### Active Business Context
-
-- Operator is building this for their own distribution network. Platform must stand on its own merit.
-- BYOB only. Every operator provides their own Telegram bot token from BotFather. No exceptions.
-- Test every bot from a FRESH chatId to see what a prospect actually sees. Never from the operator account.
-- `brents-tiger-01-mns7wcqk` is verified live from a fresh chatId as of 2026-04-10 00:49 UTC (first real-intelligence prospect response in project history).
+**Current state lives in `SOTU.md`. Read it first every session. This file is timeless rules only — no session state, no priorities, no "what's broken right now."**
 
 ---
 
 ## Product Philosophy: Integrity First
 
 > "Every system we build must adhere to a strict ethical code: Value must exceed Cost. Do not write code that traps users, obfuscates pricing, or adds unnecessary complexity. Prioritize the user's time and success as a moral obligation. If a feature does not provide immediate, tangible value, it is friction and must be eliminated."
+
+Operator is building this platform for their own distribution network. Platform must stand on its own merit.
 
 ---
 
@@ -107,6 +60,7 @@ See `NEXT_SESSION.md` for the full priority list (also includes mine Gemini key 
 - After every PR: verify with `gh pr view <number>` that state is `MERGED`.
 - After every deploy: verify `curl https://api.tigerclaw.io/health` returns 200.
 - Never push directly to `main`. Never use `--no-verify` or `--force` on main.
+- **Test every bot from a FRESH chatId** to see what a prospect actually sees. Never from the operator account.
 - OpenClaw, Mini-RAG, and per-tenant Docker containers are permanently gone.
 - The Mac cluster at 192.168.0.2 is offline only. Cloud Run never calls it.
 - `buildSystemPrompt()` is async. Always `await` it.
@@ -136,12 +90,20 @@ See `NEXT_SESSION.md` for the full priority list (also includes mine Gemini key 
 
 ## Reference Files
 
-- `SOTU.md` — **single source of truth. Read this first every session.**
-- `START_HERE.md` — fast orientation
-- `NEXT_SESSION.md` — priorities for the next working session
-- `DAILY_CHECKS.md` — recurring operational checklist. Run at every session open.
-- `WHAT_TIGER_CLAW_DOES.md` — product vision / one-sentence pitch
+**The 4-doc model — only SOTU and NEXT_SESSION contain state:**
+
+- `SOTU.md` — **single source of truth. Read this first every session.** Everything stateful lives here.
+- `NEXT_SESSION.md` — ordered action list for next session. Deletion-only.
+- `CLAUDE.md` — this file. Timeless engineering directives. No state.
+- `DAILY_CHECKS.md` — session-open operational ritual. Pure procedure. No state.
+
+**Supporting docs (domain-specific, rarely change):**
+
 - `ARCHITECTURE.md` — canonical system design
-- `STATE_OF_THE_TIGER_PATH_FORWARD.md` — roadmap and merged PR history
-- `SOUL.md` — brand voice, mission, and personality directives
 - `RULES.md` — engineering rules of engagement
+- `SOUL.md` — brand voice, mission, personality directives
+- `WHAT_TIGER_CLAW_DOES.md` — product vision / one-sentence pitch
+
+**Archived:**
+
+- `docs/archive/STATE_OF_THE_TIGER_PATH_FORWARD.md` — pre-Session-20 session history

@@ -137,23 +137,35 @@ Do not reference specific people (distributors, contacts, partners) by name in c
 
 Documents are the ground truth for every agent session. Stale docs cause hallucinations, repeated work, and broken code. This protocol is mandatory.
 
+### The 4-doc model
+
+**State lives in exactly two files: `SOTU.md` and `NEXT_SESSION.md`. Every other doc is timeless.**
+
+- `SOTU.md` — single source of truth. Backward-looking: what is the state of the world right now. Read first every session.
+- `NEXT_SESSION.md` — forward-looking ordered action list. **Deletion-only** — closed items are removed, not annotated with ✅ or "ALREADY IN PLACE".
+- `CLAUDE.md` — auto-loads into every agent session. Engineering directives only. No session state block. No priorities. No "what's broken right now".
+- `DAILY_CHECKS.md` — session-open operational ritual. Pure procedure. No "current gap" blocks.
+
+If you are tempted to record state in any file other than SOTU/NEXT_SESSION, stop. That is how drift starts. Six truth docs drifted six different ways in Session 20. Do not repeat.
+
 ### What must be updated and when
 
 | Document | Update trigger |
 |----------|---------------|
-| `SOTU.md` | After every merged PR. Before closing any session. |
-| `STATE_OF_THE_TIGER_PATH_FORWARD.md` | After every merged PR. |
-| `CLAUDE.md` (Current Session State block) | At the **start** of each session — update to reflect what is actually deployed and what is open. |
+| `SOTU.md` | After every merged PR that changes platform state. Before closing any session. |
+| `NEXT_SESSION.md` | When a priority is added or closed. **Closed = deleted from the file, not annotated.** |
+| `CLAUDE.md` | Only when engineering rules change. Never for session state. |
+| `DAILY_CHECKS.md` | Only when a daily check is added or removed. Never embed "current gap" blocks — those drift. Broken-thing-right-now belongs in `SOTU.md`. |
 | `ARCHITECTURE.md` | Whenever routes, services, tools, workers, or schema change. |
-| `START_HERE.md` | Whenever the onboarding flow, first priorities, or key commands change. |
 | `RULES.md` | Whenever a new rule is needed or an existing rule changes. |
 
 ### The protocol
 
-1. **Before closing a PR:** ask yourself: does this change affect any of the documents above? If yes, include the doc update in the same PR or open a follow-up immediately.
-2. **At session start:** read `SOTU.md`. If anything in it is wrong, fix it before touching code.
-3. **At session close:** update `SOTU.md` and `STATE_OF_THE_TIGER_PATH_FORWARD.md` before ending. No exceptions.
-4. **CLAUDE.md current session block** is updated at session START, not end — because the end is when context runs out.
+1. **Before closing a PR:** does this change affect SOTU or NEXT_SESSION? If yes, update both in the same PR. If it touches architecture, update `ARCHITECTURE.md` too.
+2. **At session start:** read `SOTU.md`. Run `DAILY_CHECKS.md`. If anything in SOTU is wrong, fix it before touching code.
+3. **At session close:** update `SOTU.md` with what actually shipped (not what was planned). **Delete** closed items from `NEXT_SESSION.md`. Verify every merged PR with `gh pr view <number>` showing MERGED. Verify deploy with `curl https://api.tigerclaw.io/health`. No exceptions.
+
+**That's it. Two files to keep in sync at every session close. Not six.**
 
 ### What causes docs to rot
 
@@ -161,6 +173,8 @@ Documents are the ground truth for every agent session. Stale docs cause halluci
 - Doc updates bundled as the last step of a long session
 - Not verifying what's in the docs before writing new ones
 - Writing docs from memory instead of from the code
+- Recording state in timeless files (CLAUDE.md session blocks, DAILY_CHECKS "current gap" sections, START_HERE first priorities)
+- Annotating closed items with ✅ instead of deleting them
 
 ### The standard
 

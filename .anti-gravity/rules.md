@@ -3,8 +3,8 @@
 ## STOP. READ THESE FIRST. NO EXCEPTIONS.
 
 Before writing a single line of code, read:
-1. `CLAUDE.md` — product philosophy, engineering constraints, non-negotiable directives
-2. `START_HERE.md` — current system state, what's live, what's open
+1. `SOTU.md` — single source of truth: current system state, what's live, what's open
+2. `CLAUDE.md` — product philosophy, engineering constraints, non-negotiable directives
 3. `ARCHITECTURE.md` — locked architecture decisions
 
 **Any architectural change not in those documents requires HUMAN APPROVAL.**

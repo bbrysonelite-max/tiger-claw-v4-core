@@ -4,15 +4,17 @@
 
 **No lying. No assuming. No guessing. Do not claim anything works until tested live.**
 
+**This file is deletion-only. Closed items are removed, not marked ✅. If you finish an item, delete it from this file in the same PR that closed it.**
+
 ---
 
 ## Context — Where We Are
 
-Session 20 closed with ground truth fully reconciled and a new revenue contract on the table. PRs #292–#297 merged.
+Session 20 closed with ground truth fully reconciled, a new revenue contract on the table, and the 6→4 doc collapse shipped. PRs #292–#298 merged. State now lives only in `SOTU.md` and `NEXT_SESSION.md`.
 
 **Two items are ready to execute immediately — do them before anything else:**
 
-1. **SSDI Ticket to Work flavor build** — Pat Solano (founder of ACT! CRM, 1984) invested in the business. His client pays $20K/month for SSDI leads. Full spec is written and approved. Health-wellness flavor is the base. This is first paid revenue.
+1. **SSDI Ticket to Work flavor build** — Pat Sullivan (co-founder of ACT! CRM, 1987) invested in the business. His client pays $20K/month for SSDI leads. Full spec is written and approved. Health-wellness flavor is the base. This is first paid revenue.
 2. **Mine surgery** — 3 self-referential rows to delete, 1 bad scout query to remove, source blocklist to add. Do NOT run the mine until this is done or the next run will compound the pollution.
 
 `brents-tiger-01-mns7wcqk` (Tiger Proof / Nu Skin) is still the only active bot. Cloud Run revision `tiger-claw-api-00456-9rb` is live and healthy.
@@ -25,7 +27,7 @@ Session 20 closed with ground truth fully reconciled and a new revenue contract 
 
 ### 1. SSDI Ticket to Work flavor build — FIRST (revenue)
 
-**Contract:** $20,000/month for SSDI Ticket to Work leads. Partner: Pat Solano (founder of ACT! CRM, 1984).
+**Contract:** $20,000/month for SSDI Ticket to Work leads. Partner: Pat Sullivan (co-founder of ACT! CRM, 1987).
 
 **Base flavor:** health-wellness (`api/src/config/flavors/health-wellness.ts`). Repurpose it — swap the guts, keep the wiring.
 
@@ -110,7 +112,30 @@ Before the `isAlreadyMined` check, skip URLs matching:
 
 ---
 
-### 3. Voice examples for network-marketer flavor — FIRST
+### 3. Research agent classifier audit — investigation, blocks trust in mine data
+
+**Why this is separate from item 2 mine surgery:** item 2 deletes the 3 known self-referential rows, swaps 1 bad scout query, and adds a source blocklist. That handles the known pollution and tightens the input side. It does NOT explain why the classifier assigned `domain="Network Marketer"` at conf=100 to content that is obviously off-topic:
+
+- Row `3c6a9bf5` (conf 100): *"The individual expects to pay between $950 and $1500 per month for housing."* (student budget thread)
+- Row `fa29d39a` (conf 100): *"The salary range for the Senior Specialty Solutions Engineer – Network position is $175,000 – $275,000 annually."* (job listing — the literal word "Network" appears to have triggered classification)
+- Row `25d1fa74` (conf 98): *"The individual reports having $50,200 in savings and is almost 21 years old."*
+
+A loose scout query explains how off-topic content gets scraped. It does NOT explain conf=100 on a student housing budget or on a salary listing for a Network *Engineer*. The classifier itself is assigning domains incorrectly. If the classifier is broken, the next mine run will produce fresh pollution even after item 2's surgical fixes. **Item 2 is necessary but not sufficient. Do NOT run the mine until this audit closes.**
+
+**Investigation (do not write fixes — read and report):**
+1. Trace the research agent code from `captured_by='research-agent'` rows in `market_intelligence`. Likely lives in `api/src/services/orchestrator.ts` or an agent file in `api/src/services/`.
+2. Find where `domain` is assigned to each extracted fact. Determine the mechanism:
+   - (a) LLM-based classification prompt ("Is this fact about X domain?")
+   - (b) Keyword matching against a list
+   - (c) Domain inherited from the scout query that produced the fact, with no post-extraction content verification
+3. For each of the 3 evidence rows above, trace **why** it got `domain="Network Marketer"`. Identify the specific prompt text, keyword list, or inheritance path responsible.
+4. Report back with: file paths, mechanism (a/b/c), and the per-row trace. **Do not fix until Brent has reviewed.** The fix approach depends on the mechanism (tighter classifier prompt, content-verification pass after extraction, source allowlist, or re-extraction from scratch).
+
+**Dependency:** item 2 mine surgery is execution-ready and can run independently of this audit. Item 3 is read-only investigation — no code changes. Both must close before the next mine run. Strike draft generation reads `market_intelligence` directly; if the classifier is broken, Strike drafts for any flavor will cite noise.
+
+---
+
+### 4. Voice examples for network-marketer flavor
 
 The bot now responds intelligently. It does NOT yet respond in Brent's actual voice. The system prompt is still generic "helpful assistant" tone. This is prompt engineering, not architecture.
 
@@ -126,42 +151,7 @@ Do not write code until Brent has provided the example text. This is a pair-prog
 
 ---
 
-### 2. ✅ Wizard Gemini key validator — ALREADY IN PLACE (closed 2026-04-11)
-
-Audited during Session 20. `validateAIKey("google", aiKey)` is called in `api/src/routes/wizard.ts:190` before any provisioning runs. It makes a live HTTP call to `generativelanguage.googleapis.com/v1beta/models`. A bad key returns HTTP 4xx → hatch returns 400 with `field: "aiKey"` → signup page maps the error back to the form field and shows it inline. Nothing to build. The concern was written before the code was audited.
-
----
-
-### 3. Mine content pollution triage — CRITICAL, blocks paid customers
-
-**Found during DAILY_CHECKS.md item 3 dry run at 2026-04-10 ~14:20 PDT.** The mine is functioning (8,051 facts, 388 in the last 24h, `healthy: true`) but the data is NOT usable for Strike draft generation, especially for the Network Marketer flavor that is being tested live.
-
-**Finding 1 — self-referential pollution.** Two of the 5 highest-confidence (conf=100) Network Marketer facts are about the operator's own sunset product, OpenClaw Mastered. The research agent scraped old sales copy and ingested it as prospect intelligence. The mine is training on itself.
-- Row `67cb7c2a` (conf 100): *"OpenClaw Mastered has a server fee of $15 per month after a 14-day free trial period, in addition to the initial $27 cost."*
-- Row `07d6e010` (conf 100): *"The front-end offer for OpenClaw Mastered is priced at $27."*
-
-**Finding 2 — classifier drift.** The research agent is classifying completely off-topic content as Network Marketer signal:
-- Row `3c6a9bf5` (conf 100): *"The individual expects to pay between $950 and $1500 per month for housing."* (student budget Reddit thread)
-- Row `fa29d39a` (conf 100): *"The salary range for the Senior Specialty Solutions Engineer – Network position is $175,000 – $275,000 annually."* (job listing — the literal word "Network" triggered classification)
-- Row `25d1fa74` (conf 98): *"The individual reports having $50,200 in savings and is almost 21 years old."*
-
-Only the lower-confidence rows (`4f46bf3e`, `23ed60d0` — both about "side hustles with low startup costs") are actually on-topic. Lawyer flavor looks better but still has noise (row `f7c386ce`: *"Juniper wants to meet Apollo to discuss something important"* — scraped from unrelated text).
-
-**Finding 3 — `DAILY_CHECKS.md` schema error.** There is no `verbatim` column on `market_intelligence`. The real column is `fact_summary`, and every row is LLM paraphrase in third person ("The individual…", "The user…"), not real user quotes. The mine does not store prospect language verbatim anywhere. (Corrected in the same PR that added this item.)
-
-**Why this is a paid-customer blocker.** Voice examples (item 1 above) only affect the system prompt at turn time. They do not affect the Strike draft pipeline, which reads `market_intelligence` directly. If you hatch a Network Marketer bot and Strike draft generation cites "expects $950–$1500/month housing" or "OpenClaw Mastered has a $15/mo server fee" to a prospect, the draft is garbage and the prospect sees it. A paid customer would churn.
-
-**Triage plan (tomorrow):**
-1. **Targeted DELETE of self-referential rows.** Find every row where `fact_summary ILIKE '%OpenClaw%' OR fact_summary ILIKE '%Tiger Claw%' OR fact_summary ILIKE '%BotCraft%'`. Count, back up (`CREATE TABLE ... AS SELECT`), then DELETE. This is reversible from the backup if the filter is too aggressive.
-2. **Research agent classifier audit.** Find the research agent code (`api/src/services/orchestrator.ts` or similar — trace from `captured_by='research-agent'`). Read the prompt/logic that assigns a `domain` to each extracted fact. Understand how a $175K tech salary ended up tagged as "Network Marketer".
-3. **Source URL audit.** `source_url` is a column — query `SELECT source_url, COUNT(*) FROM market_intelligence WHERE domain='Network Marketer' GROUP BY source_url ORDER BY COUNT(*) DESC LIMIT 20;`. If the top sources are irrelevant domains (job boards, student forums, your own sales pages), build a blocklist.
-4. **Decision point:** after the audit, decide whether the mine needs a domain/source allowlist, tighter classifier prompts, or a full re-extraction. Do not fix until Brent has reviewed the audit findings.
-
-**Dependency:** this triage blocks trust in Strike drafts for any flavor. Voice examples (item 1) can still ship today because voice lives in the system prompt and is independent of the mine.
-
----
-
-### 3b. Verify the mine has a dedicated Gemini key
+### 5. Verify the mine has a dedicated Gemini key
 
 Suspected during the late-night diagnosis but not confirmed. Trace the mine's intelligence path: when `marketIntelligenceWorker` or `factExtractionWorker` runs, which Gemini key does it use? Is it (a) a dedicated mine key, (b) a platform fallback key, or (c) the first tenant's key it finds?
 
@@ -171,7 +161,7 @@ Report findings. Do not fix until Brent has decided the architecture.
 
 ---
 
-### 4. Verify admin hatch + all callers use new field names
+### 6. Verify admin hatch + all callers use new field names
 
 PR #281 renamed `icpBuilder` → `icpProspect` and `icpCustomer` → `icpProduct` at 19:06 PDT on 2026-04-09. The admin hatch route `fdfc803` was still sending the OLD field names at 18:12 PDT — and continued to run at 19:41 PDT (18 minutes after the rename merged), which is how the lobotomy was created.
 
@@ -179,7 +169,7 @@ PR #281 renamed `icpBuilder` → `icpProspect` and `icpCustomer` → `icpProduct
 
 ---
 
-### 5. Integrate Stripe — replace Paddle
+### 7. Integrate Stripe — replace Paddle
 
 **Decision (2026-04-11):** Paddle is dropped. Payment provider is Stripe.
 
@@ -199,32 +189,29 @@ This is the entire business model. It has never been tested end to end. Cannot t
 
 ---
 
-### 6. Admin dashboard — expand dependency monitoring + delete dead pool code
+### 8. Admin dashboard — build dependency health endpoint
 
-Two related problems, one PR.
+**There is no dependency health endpoint on the backend at all.** `GET /admin/pipeline/health` at `api/src/routes/admin.ts:906` looks like it should be one based on its name, but it is actually a **mine statistics** endpoint — it returns `totalFacts`, `factsLast24h`, `byVertical`, `byRegion`, `byCapturedBy`, and a single `healthy` boolean computed from "did any facts land in the last 24h AND newest fact within 48h". It does NOT check Serper, Gemini platform keys, Resend, Oxylabs, Postgres connectivity (beyond the query implicitly needing the DB), Redis, any BullMQ worker, Telegram webhook delivery, Stripe webhook, or OpenRouter. The dashboard UI (`web-onboarding/src/app/admin/dashboard/page.tsx`) does not call it either.
 
-**Problem A: there is no dependency health endpoint on the backend at all.** `GET /admin/pipeline/health` at `api/src/routes/admin.ts:906` looks like it should be one based on its name, but it is actually a **mine statistics** endpoint — it returns `totalFacts`, `factsLast24h`, `byVertical`, `byRegion`, `byCapturedBy`, and a single `healthy` boolean computed from "did any facts land in the last 24h AND newest fact within 48h". It does NOT check Serper, Gemini platform keys, Resend, Oxylabs, Postgres connectivity (beyond the query implicitly needing the DB), Redis, any BullMQ worker, Telegram webhook delivery, Paddle webhook, or OpenRouter. The dashboard UI (`web-onboarding/src/app/admin/dashboard/page.tsx`) does not call it either. Either build a new `GET /admin/dependencies/health` endpoint for the real dependency checks, or expand `/admin/pipeline/health` to add them alongside the mine stats (recommended — one endpoint, loud response, easy to consume).
+Either build a new `GET /admin/dependencies/health` endpoint for the real dependency checks, or expand `/admin/pipeline/health` to add them alongside the mine stats (recommended — one endpoint, loud response, easy to consume).
 
-**Problem B: zombie pool code.** ✅ **Shipped as PR #294 on 2026-04-10** — `PoolHealth` type, pool state, `/admin/pool/health` fetch, pool alarms, `poolStatusColor`/`poolStatusBg`, Bot Pool stats card, and the Pool action hint block all removed from `web-onboarding/src/app/admin/dashboard/page.tsx`. The dashboard no longer 404s. This section is kept for historical context; only Problem A and the expansion steps below are still pending.
+**Build:**
+1. **Expand** `GET /admin/pipeline/health` (or build a new `/admin/dependencies/health`) to check: Postgres connectivity, Redis ping, each BullMQ worker in `api/src/workers/` (alive + recent heartbeat), Telegram webhook delivery (registered count vs active tenants), Serper×3 keys (the ones currently NOT checked anywhere), Gemini platform keys (platform + onboarding + emergency — NOT checked anywhere), Resend email (NOT checked anywhere), **Oxylabs** credentials + a test request, Stripe webhook (timestamp of last event received), OpenRouter circuit breaker state.
+2. **Wire** the dashboard to call the dependency health endpoint (and separately render the mine stats from `/admin/pipeline/health`'s existing payload).
+3. **Render** each dependency as a green/red row. Red surfaces as a loud alarm at the top of the dashboard. Never silently absent.
 
-**Build (A only, B is done):**
-1. ~~Delete pool code from the dashboard component.~~ (Done — PR #294)
-2. **Expand** `GET /admin/pipeline/health` (or build a new `/admin/dependencies/health`) to check: Postgres connectivity, Redis ping, each BullMQ worker in `api/src/workers/` (alive + recent heartbeat), Telegram webhook delivery (registered count vs active tenants), Serper×3 keys (the ones currently NOT checked anywhere), Gemini platform keys (platform + onboarding + emergency — NOT checked anywhere), Resend email (NOT checked anywhere), **Oxylabs** credentials + a test request, Stripe webhook (timestamp of last event received), OpenRouter circuit breaker state.
-3. **Wire** the dashboard to call the dependency health endpoint (and separately render the mine stats from `/admin/pipeline/health`'s existing payload).
-4. **Render** each dependency as a green/red row. Red surfaces as a loud alarm at the top of the dashboard. Never silently absent.
-
-**Acceptance:** open the admin dashboard, every dependency from `/admin/pipeline/health` is visible, Oxylabs is on the list, no pool references anywhere in the dashboard component, no 404s in the browser network tab. `DAILY_CHECKS.md` item 1 becomes fully runnable from the dashboard.
+**Acceptance:** open the admin dashboard, every dependency is visible, Oxylabs is on the list, no 404s in the browser network tab. `DAILY_CHECKS.md` item 1 becomes fully runnable from the dashboard.
 
 ---
 
-### 7. Admin dashboard — mine health panel
+### 9. Admin dashboard — mine health panel
 
 Add a mine status card to the admin dashboard surfacing:
 - Last run timestamp + duration
 - Last run fact count
-- Last 5 verbatims (read-only, for sanity check — is the data usable?)
+- Last 5 fact summaries (read-only, for sanity check — is the data usable?)
 - Worker error count since midnight (`factExtractionWorker`, `marketIntelligenceWorker`)
-- Mine Gemini key identifier (dependent on item 3 above tracing the key first)
+- Mine Gemini key identifier (dependent on item 5 above tracing the key first)
 
 **Acceptance:** `DAILY_CHECKS.md` item 3 becomes fully runnable from the dashboard without manual `psql` queries.
 
@@ -262,13 +249,13 @@ The current flavor system (`api/src/config/flavors/`, 16 registered flavors, fla
 
 ---
 
-## Session Close Protocol
+## Session Close Protocol (4-doc model)
 
 When this session ends:
 1. Update `SOTU.md` with what actually shipped. Not what was planned.
-2. Update `CLAUDE.md` Session State block — First Priority must reflect the NEXT work, not already-done work.
-3. Update `STATE_OF_THE_TIGER_PATH_FORWARD.md`.
-4. Update `NEXT_SESSION.md` with the real priorities for the session after this one.
-5. Verify every merged PR with `gh pr view <number>` showing MERGED.
-6. Verify deploy with `curl https://api.tigerclaw.io/health` returning 200.
-7. No session is CLOSED until all four documents are in sync with each other and with git.
+2. **Delete** closed items from `NEXT_SESSION.md`. Do not mark ✅. Do not leave `ALREADY IN PLACE` annotations. Remove.
+3. Verify every merged PR with `gh pr view <number>` showing MERGED.
+4. Verify deploy with `curl https://api.tigerclaw.io/health` returning 200.
+5. No session is CLOSED until SOTU and NEXT_SESSION are in sync with each other and with git.
+
+**That's it. Two files. No `CLAUDE.md` session block update. No `PATH_FORWARD` update. No `START_HERE` update. Those files are either deleted, archived, or carry no state.**

@@ -1,6 +1,6 @@
 # Tiger Claw — State of the Union
 
-**Last updated:** 2026-04-11 (Session 20 CLOSED — PRs #292–#297 merged, mine audit complete, SSDI flavor spec ready)
+**Last updated:** 2026-04-11 (Session 20 CLOSED — PRs #292–#298 merged + doc collapse 6→4, mine audit complete, SSDI flavor spec ready)
 **This is the single source of truth. Read nothing else until you finish this file.**
 **No lying. No assuming. No guessing. Every fact here is verified against the live system.**
 
@@ -23,20 +23,24 @@
 |----|------|
 | #296 | SOTU reconciliation — Session 20 open state written, Stripe decision recorded, mine pollution corrections applied. |
 | #297 | NEXT_SESSION item 2 closed — Gemini key validator audited and confirmed already in place at `wizard.ts:190`. Nothing to build. |
+| #298 | Session 20 close — SSDI contract recorded ($20K/month), mine audit findings logged, SSDI flavor spec written into NEXT_SESSION.md, priorities reordered (SSDI + mine surgery become items 1–2), Stripe decision propagated to START_HERE. |
+| (this PR) | **Doc collapse 6→4.** `START_HERE.md` deleted, `STATE_OF_THE_TIGER_PATH_FORWARD.md` archived to `docs/archive/`, `CLAUDE.md` stripped to engineering rules only (no session state block), `DAILY_CHECKS.md` stripped of "current gap" sections (procedure only), `RULES.md` Rule 16 rewritten. **State now lives in exactly two files: SOTU.md + NEXT_SESSION.md.** CLAUDE.md + DAILY_CHECKS.md are timeless. |
 
 ### Decisions made this session
 
 **Stripe replaces Paddle.** Brent dropped Paddle — not waiting any longer. All payment work targets Stripe from this point forward. Paddle webhook code on the backend still exists and must be replaced.
 
-**SSDI Ticket to Work — new $20K/month lead gen contract.** Partner: Pat Solano (founder of ACT! CRM, 1984). Client wants leads for the SSA Ticket to Work program — disabled people aged 18–64 who don't know the program exists. Health-wellness flavor chosen as base to repurpose. Full spec written and approved this session. Build not yet executed — first task next session.
+**SSDI Ticket to Work — new $20K/month lead gen contract.** Partner: Pat Sullivan (co-founder of ACT! CRM, 1987). Client wants leads for the SSA Ticket to Work program — disabled people aged 18–64 who don't know the program exists. Health-wellness flavor chosen as base to repurpose. Full spec written and approved this session. Build not yet executed — first task next session.
 
 ### Mine audit — live findings (2026-04-11)
 
 Live query against `market_intelligence` (8,440 total facts, 708 Network Marketer):
 - **3 self-referential rows confirmed** — OpenClaw Mastered pricing copy at conf=100. IDs: `67cb7c2a`, `07d6e010`, `1550c182`. Delete before next mine run.
-- **Root cause of classifier drift:** one bad scout query (`"subreddit:Entrepreneur OR subreddit:WorkFromHome network marketing direct sales home business"`) pulling NM discussions into the Network Marketer domain. Fix: remove query, add replacement targeting pain signals.
-- **Source noise:** `r/u_adam20141977` (OpenClaw review account) and `r/u_softtechhubus` (content farm) appearing repeatedly. Add to blocklist.
-- **Fix is surgical.** No architectural changes. Remove 1 query, add blocklist, delete 3 rows. Do NOT run the mine until this is done.
+- **Two independent causes of classifier drift:**
+  - *Input-side (scout):* one bad scout query (`"subreddit:Entrepreneur OR subreddit:WorkFromHome network marketing direct sales home business"`) pulling off-topic discussions into the Network Marketer domain. Fix: remove query, add replacement targeting pain signals. Execution-ready — `NEXT_SESSION.md` item 2 mine surgery.
+  - *Logic-side (classifier):* the research agent classifier assigned `domain="Network Marketer"` at conf=100 to content that is unambiguously off-topic — student housing budget ($950–1500/mo), a $175K Senior Network **Engineer** salary (the literal word "Network" appears to have triggered classification), and a personal savings figure ($50,200 @ age 21). A loose scout query does not explain conf=100 on a student housing thread. Classifier logic is independently broken. Investigation required before the next mine run — `NEXT_SESSION.md` item 3 classifier audit.
+- **Source noise:** `r/u_adam20141977` (OpenClaw review account) and `r/u_softtechhubus` (content farm) appearing repeatedly. Add to blocklist (included in item 2 mine surgery).
+- **Fix is not purely surgical.** Item 2 (delete 3 rows, swap 1 query, blocklist) is necessary but not sufficient. Item 3 (classifier audit) must also close before trust in mine data is restored. Do NOT run the mine until both are done.
 - **Two-oar model confirmed in code.** `defaultBuilderICP` and `icpProspect`/`icpProduct` onboarding questions already exist in `network-marketer.ts` from prior sessions. The 35-year knowledge moat is already encoded.
 
 ### ICP architecture — clarified this session
@@ -156,7 +160,6 @@ AI sales agent SaaS. Operator brings their own Telegram bot token (BYOB — from
 | **No dependency health endpoint** | Flying blind — Postgres, Redis, workers, Serper, Gemini keys, Oxylabs, OpenRouter all unmonitored. `/admin/pipeline/health` is mine stats only, not dependency checks. | Build `GET /admin/dependencies/health` + wire dashboard |
 | **Stripe integration** | No checkout URL. Paddle dropped. Stripe not yet integrated. Payment path completely unproven. | Integrate Stripe — product, price, webhook handler, checkout flow |
 | Voice layer generic | Bot responds intelligently but not in Brent's voice | Write voice examples, wire into network-marketer flavor system prompt |
-| Wizard Gemini key validation missing | Key tester removed in one-page rewrite, never restored — dead keys won't be caught at hatch | MUST restore before first paid customer |
 | Payment gate open (C4) | Anyone can access wizard without paying | Fix after Stripe loop proven |
 | Admin hatch stale field-name risk | fdfc803 route sent `icpBuilder`/`icpCustomer` after PR #281 rename; current caller status unverified | Verify admin hatch + all callers use new field names |
 | Mine dedicated Gemini key status unknown | Mine may be borrowing a tenant's key — billing leak + silent failure risk | Trace mine intelligence path |
@@ -176,14 +179,15 @@ AI sales agent SaaS. Operator brings their own Telegram bot token (BYOB — from
 - Oxylabs: live, 684 facts on last manual run
 - Resend email: confirmed working
 - Vercel auto-deploy: confirmed working
-- Paddle webhook: live (`POST /webhooks/paddle`)
+- Stripe integration: **not yet built.** Paddle webhook code still on backend (`POST /webhooks/paddle`), must be replaced. No checkout URL exists. Payment path completely unproven.
 
-### Key Docs
-- `SOTU.md` — this file. Single source of truth. Read first every session.
-- `NEXT_SESSION.md` — ordered priority list for the next working session.
-- `DAILY_CHECKS.md` — recurring operational checklist. Run at every session open before any other work.
-- `START_HERE.md` — fast orientation.
-- `STATE_OF_THE_TIGER_PATH_FORWARD.md` — roadmap and merged PR history.
+### Key Docs (4-doc model — only SOTU and NEXT_SESSION contain state)
+- `SOTU.md` — **this file. Single source of truth. Read first every session.** Everything stateful lives here.
+- `NEXT_SESSION.md` — ordered action list for next session. **Deletion-only** — closed items are removed, not annotated with ✅.
+- `CLAUDE.md` — timeless engineering directives. Auto-loads into every agent session. **Contains no session state.**
+- `DAILY_CHECKS.md` — session-open operational ritual. Pure procedure. **Contains no state claims.**
+
+Archived: `docs/archive/STATE_OF_THE_TIGER_PATH_FORWARD.md` — pre-Session-20 session history, preserved out of rotation.
 
 ### Codebase (Verified by Session 18 Audit)
 - **Routes:** 22 route files, ~82 endpoints
@@ -234,9 +238,9 @@ AI sales agent SaaS. Operator brings their own Telegram bot token (BYOB — from
 | 4 BullMQ queues with no worker (global-cron, market-mining, market-intelligence-batch, stan-store-onboarding) | MEDIUM |
 | Admin alert markdown bug (underscores break Telegram parser) | MEDIUM |
 | serperKeyIndex + serperCallsThisRun are module-level globals — broken under concurrency | HIGH |
-| Payment gate open (C4) | HIGH — after Paddle loop proven |
+| Payment gate open (C4) | HIGH — after Stripe loop proven |
 | Telegram message dedup missing | MEDIUM |
-| Stan Store / Stripe dead code | LOW |
+| Stan Store dead code | LOW |
 
 ---
 
