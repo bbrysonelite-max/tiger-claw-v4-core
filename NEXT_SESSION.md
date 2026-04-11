@@ -36,13 +36,9 @@ Do not write code until Brent has provided the example text. This is a pair-prog
 
 ---
 
-### 2. Restore wizard Gemini key validator at hatch
+### 2. ✅ Wizard Gemini key validator — ALREADY IN PLACE (closed 2026-04-11)
 
-The key tester was removed during the one-page signup rewrite and never restored. Every bot hatched since that rewrite could have a dead Gemini key and no one would know until a prospect message arrived and the circuit breaker fell through to OpenRouter.
-
-**This MUST be restored before any paid customer hatches.** Implementation: call Gemini's `models.list` or a 1-token generate on the provided key during the wizard hatch flow, reject the hatch if the call fails, show a specific error to the user ("this key does not work — check for typos or generate a new one at aistudio.google.com").
-
-Test path: hatch with a known-bad key, confirm rejection. Hatch with a real key, confirm pass.
+Audited during Session 20. `validateAIKey("google", aiKey)` is called in `api/src/routes/wizard.ts:190` before any provisioning runs. It makes a live HTTP call to `generativelanguage.googleapis.com/v1beta/models`. A bad key returns HTTP 4xx → hatch returns 400 with `field: "aiKey"` → signup page maps the error back to the form field and shows it inline. Nothing to build. The concern was written before the code was audited.
 
 ---
 
