@@ -1085,6 +1085,64 @@ router.get("/mine/sample", async (req: Request, res: Response) => {
   }
 });
 
+// ── GET /admin/mine/queries ──────────────────────────────────────────────────
+// Rolling-window kept-rate per scoutQuery, aggregated from mine_query_metrics
+// events written by research_agent. Lets the operator see which subreddits
+// earn their slot and which return zero usable facts over N runs.
+//
+// Query params:
+//   sinceDays — rolling window (default 7, max 90)
+//   flavor    — optional flavor id filter (e.g. 'network-marketer')
+router.get("/mine/queries", async (req: Request, res: Response) => {
+  try {
+    const sinceDays = Math.min(
+      Math.max(parseInt(String(req.query.sinceDays ?? "7"), 10) || 7, 1),
+      90,
+    );
+    const flavor = String(req.query.flavor ?? "");
+
+    const pool = getPool();
+    const result = await pool.query(
+      `SELECT
+         details->>'query'       AS query,
+         details->>'flavor'      AS flavor,
+         details->>'displayName' AS display_name,
+         COUNT(*)::int                            AS runs,
+         SUM((details->>'posts')::int)::int       AS posts,
+         SUM((details->>'factsKept')::int)::int   AS kept,
+         SUM((details->>'factsRejected')::int)::int AS rejected,
+         SUM((details->>'duplicates')::int)::int  AS duplicates,
+         AVG((details->>'durationMs')::int)::int  AS avg_duration_ms,
+         CASE
+           WHEN SUM((details->>'posts')::int) > 0
+           THEN ROUND(
+             SUM((details->>'factsKept')::int)::numeric
+             / SUM((details->>'posts')::int)::numeric,
+             3
+           )
+           ELSE NULL
+         END AS kept_rate,
+         MAX(created_at) AS last_run_at
+       FROM admin_events
+       WHERE action = 'mine_query_metrics'
+         AND created_at >= NOW() - ($1 || ' days')::interval
+         AND ($2 = '' OR details->>'flavor' = $2)
+       GROUP BY query, flavor, display_name
+       ORDER BY kept_rate DESC NULLS LAST, kept DESC`,
+      [String(sinceDays), flavor],
+    );
+
+    return res.json({
+      sinceDays,
+      flavor: flavor || null,
+      queries: result.rows,
+    });
+  } catch (err) {
+    console.error("[admin] GET /mine/queries error:", err);
+    return res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
 // ── POST /admin/mine/run ─────────────────────────────────────────────────────
 // Trigger an immediate orchestrated run (bypasses 2 AM cron schedule).
 router.post("/mine/run", async (_req: Request, res: Response) => {

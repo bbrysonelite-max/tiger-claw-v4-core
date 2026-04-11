@@ -10,6 +10,7 @@
 import { tiger_refine } from '../tools/tiger_refine.js';
 import { isAlreadyMined } from './market_intel.js';
 import { reportResearchComplete } from './orchestrator.js';
+import { logAdminEvent } from './db.js';
 import type { FlavorConfig } from '../config/types.js';
 
 type IdealProspectProfile = NonNullable<FlavorConfig['idealProspectProfile']>;
@@ -184,6 +185,15 @@ export async function runResearchAgent(
     let postsFound = 0;
 
     for (const query of queries) {
+        // Per-query counters — written to admin_events as 'mine_query_metrics'
+        // at the end of each query so /admin/mine/queries can compute rolling
+        // kept-rate per scoutQuery and surface dead-weight subs.
+        const queryStartedAt = Date.now();
+        let queryPosts = 0;
+        let queryKept = 0;
+        let queryRejected = 0;
+        let queryDuplicates = 0;
+
         try {
             let posts: MinerPost[] | null = await fetchReddit(query);
             if (posts === null) {
@@ -193,10 +203,12 @@ export async function runResearchAgent(
             for (const post of posts ?? []) {
                 if (await isAlreadyMined(post.sourceUrl)) {
                     console.log(`[ResearchAgent] Duplicate — skipping ${post.sourceUrl}`);
+                    queryDuplicates++;
                     continue;
                 }
 
                 postsFound++;
+                queryPosts++;
 
                 const result = await tiger_refine.execute(
                     {
@@ -217,6 +229,8 @@ export async function runResearchAgent(
                     const rejected = (result.data as any)?.rejectedCount ?? 0;
                     factsSaved += facts.length;
                     factsRejected += rejected;
+                    queryKept += facts.length;
+                    queryRejected += rejected;
                 } else {
                     console.warn(`[ResearchAgent] Refinement failed for ${post.sourceUrl}: ${result.error}`);
                 }
@@ -227,6 +241,22 @@ export async function runResearchAgent(
             console.error(`[ResearchAgent] Error on query "${query.slice(0, 60)}":`, err);
             // Continue — one bad query never stops the flavor run
         }
+
+        // Emit per-query metrics regardless of success/error — a query that
+        // errored out is still signal ("this sub threw on us"). Non-blocking.
+        await logAdminEvent('mine_query_metrics', undefined, {
+            runId,
+            flavor: flavorId,
+            displayName,
+            query,
+            posts: queryPosts,
+            factsKept: queryKept,
+            factsRejected: queryRejected,
+            duplicates: queryDuplicates,
+            durationMs: Date.now() - queryStartedAt,
+        }).catch(err =>
+            console.warn(`[ResearchAgent] Failed to log mine_query_metrics for "${query.slice(0, 60)}": ${err.message}`)
+        );
     }
 
     console.log(`[ResearchAgent] ${displayName} complete — posts: ${postsFound}, saved: ${factsSaved}, rejected: ${factsRejected}`);
