@@ -225,6 +225,19 @@ export interface FlavorConfig {
     currentApproachFailing: string;
     onlinePlatforms: string;
   };
+  idealProspectProfile?: {            // Structured IPP consumed by the mine relevance gate
+    summary: string;                  // One-line prospect description
+    traits: Array<{                   // Positive signals — need at least one present to keep a fact
+      name: string;
+      description: string;
+      language: string[];             // Prospect-language phrases; [] if absence-detected
+    }>;
+    disqualifiers: Array<{            // Hard rejects — any one present kills the fact
+      name: string;
+      signal: string;
+    }>;
+    rejectExamples: string[];         // Categories of content that MUST be rejected
+  };
 }
 
 // ---------------------------------------------------------------------------

@@ -10,6 +10,9 @@
 import { tiger_refine } from '../tools/tiger_refine.js';
 import { isAlreadyMined } from './market_intel.js';
 import { reportResearchComplete } from './orchestrator.js';
+import type { FlavorConfig } from '../config/types.js';
+
+type IdealProspectProfile = NonNullable<FlavorConfig['idealProspectProfile']>;
 
 const RESULTS_PER_QUERY = 15;
 const DELAY_MS = 1000;
@@ -171,8 +174,9 @@ export async function runResearchAgent(
     flavorId: string,
     displayName: string,
     queries: string[],
+    prospectProfile?: IdealProspectProfile,
 ): Promise<{ factsSaved: number; factsRejected: number; postsFound: number }> {
-    console.log(`[ResearchAgent] Starting — flavor: ${displayName}, queries: ${queries.length}, run: ${runId}`);
+    console.log(`[ResearchAgent] Starting — flavor: ${displayName}, queries: ${queries.length}, run: ${runId}, IPP gate: ${prospectProfile ? 'ON' : 'OFF'}`);
 
     const fetchSerper = makeSerperFetcher();
     let factsSaved = 0;
@@ -203,6 +207,7 @@ export async function runResearchAgent(
                         capturedBy: 'research-agent',
                         entityId: post.entityId,
                         miningCost: 0.04,
+                        prospectProfile,
                     },
                     mockContext,
                 );
