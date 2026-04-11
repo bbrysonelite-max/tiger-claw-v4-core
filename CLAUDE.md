@@ -6,6 +6,28 @@
 
 ---
 
+## Session Lifecycle — Non-Negotiable
+
+**Every session starts with this exact sequence. No exceptions.**
+
+1. Read `SOTU.md` — the single source of truth for current state.
+2. Read `NEXT_SESSION.md` — the ordered action list for this session.
+3. Run `DAILY_CHECKS.md` — the operational ritual. If any check fails, stop and fix before any other work.
+
+No code, no investigation, no "just quickly checking something" before these three reads complete.
+
+**Every session ends with this exact sequence. No exceptions.**
+
+1. Update `SOTU.md` with what actually shipped this session — not what was planned.
+2. Delete closed items from `NEXT_SESSION.md`. Do not mark ✅. Do not leave `ALREADY IN PLACE` annotations. Remove.
+3. Verify every merged PR with `gh pr view <number>` showing `MERGED`.
+4. Verify deploy with `curl https://api.tigerclaw.io/health` returning 200.
+5. The session is not closed until `SOTU.md` and `NEXT_SESSION.md` are in sync with each other and with git.
+
+**All Tiger Claw state lives exclusively in this repo.** Do not mirror `SOTU.md`, `NEXT_SESSION.md`, `CLAUDE.md`, or `DAILY_CHECKS.md` to any vault, notes system, document, or external surface. If you are tempted to write Tiger Claw information anywhere other than `~/tiger-claw-v4-core/`, stop and write it here instead.
+
+---
+
 ## Product Philosophy: Integrity First
 
 > "Every system we build must adhere to a strict ethical code: Value must exceed Cost. Do not write code that traps users, obfuscates pricing, or adds unnecessary complexity. Prioritize the user's time and success as a moral obligation. If a feature does not provide immediate, tangible value, it is friction and must be eliminated."
@@ -75,16 +97,13 @@ Operator is building this platform for their own distribution network. Platform 
 
 ---
 
-## ⚠️ THERE IS NO BOT POOL. THIS IS NON-NEGOTIABLE. ⚠️
+## Telegram Bot Tokens
 
-**ALL Telegram bot tokens are BYOB — Bring Your Own Bot.**
-- Every operator gets their token directly from BotFather.
-- The platform does NOT maintain, store, or provision a pool of pre-registered bot tokens.
-- There is no `bot_pool` table in active use. There are no pool management endpoints.
-- `api/src/services/pool.ts` contains ONLY AES-256-GCM crypto helpers and Telegram API utilities. It is NOT a pool manager.
-- If you see any code attempting to pull a token from a pool, assign a bot from a pool, or replenish a pool — **DELETE IT. Do not "fix" it. Delete it.**
-- Admin tokens are operator-held. If an admin token fails, the operator replaces it. There is no auto-rotation.
-- This decision is permanent. Do not re-introduce pool logic under any name or abstraction.
+Every Telegram bot token in Tiger Claw is registered directly with BotFather by the operator. The wizard hatch flow walks the operator through creating their bot, pasting the token into the signup form, and launching the agent.
+
+- Operators hold their own admin tokens. If an admin token fails, the operator generates a new one from BotFather and replaces it through the wizard.
+- Tokens are encrypted at rest with AES-256-GCM. Encryption and Telegram API helpers live in `api/src/services/pool.ts`.
+- The platform never provisions, reserves, or rotates tokens on behalf of operators. Every token in the system belongs to one operator who acquired it themselves.
 
 ---
 
