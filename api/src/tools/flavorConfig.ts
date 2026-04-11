@@ -9,16 +9,11 @@ import { FLAVOR_REGISTRY } from "../config/flavors/index.js";
 
 export { FlavorConfig };
 
-// All valid customer-facing flavors.
+// Tiger Claw is a single-flavor product. Only network-marketer is
+// customer-facing. Hunting-only pipelines (e.g., SSDI Ticket to Work) run as
+// MineCampaigns, not flavors. See api/_archive/flavors/README.md.
 export const VALID_FLAVOR_KEYS = [
     "network-marketer",
-    "real-estate",
-    "health-wellness",
-    "airbnb-host",
-    "lawyer",
-    "plumber",
-    "sales-tiger",
-    "mortgage-broker",
 ] as const;
 
 export type ValidFlavorKey = typeof VALID_FLAVOR_KEYS[number];

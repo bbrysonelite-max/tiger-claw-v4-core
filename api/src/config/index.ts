@@ -12,16 +12,6 @@ import { BASE_CONFIG } from "./base.js";
 import { US_EN_CONFIG } from "./regions/us-en.js";
 import { TH_TH_CONFIG } from "./regions/th-th.js";
 import { NETWORK_MARKETER_FLAVOR } from "./flavors/network-marketer.js";
-import { REAL_ESTATE_FLAVOR } from "./flavors/real-estate.js";
-import { HEALTH_WELLNESS_FLAVOR } from "./flavors/health-wellness.js";
-import { AIRBNB_HOST_FLAVOR } from "./flavors/airbnb-host.js";
-import { BAKER_FLAVOR } from "./flavors/baker.js";
-import { CANDLE_MAKER_FLAVOR } from "./flavors/candle-maker.js";
-import { DOCTOR_FLAVOR } from "./flavors/doctor.js";
-import { GIG_ECONOMY_FLAVOR } from "./flavors/gig-economy.js";
-import { LAWYER_FLAVOR } from "./flavors/lawyer.js";
-import { PLUMBER_FLAVOR } from "./flavors/plumber.js";
-import { SALES_TIGER_FLAVOR } from "./flavors/sales-tiger.js";
 import { ADMIN_FLAVOR } from "./flavors/admin.js";
 
 // ---------------------------------------------------------------------------
@@ -36,16 +26,6 @@ const REGIONS: Record<string, RegionalConfig> = {
 const FLAVORS: Record<string, FlavorConfig> = {
   "admin": ADMIN_FLAVOR,
   "network-marketer": NETWORK_MARKETER_FLAVOR,
-  "real-estate": REAL_ESTATE_FLAVOR,
-  "health-wellness": HEALTH_WELLNESS_FLAVOR,
-  "airbnb-host": AIRBNB_HOST_FLAVOR,
-  "baker": BAKER_FLAVOR,
-  "candle-maker": CANDLE_MAKER_FLAVOR,
-  "doctor": DOCTOR_FLAVOR,
-  "gig-economy": GIG_ECONOMY_FLAVOR,
-  "lawyer": LAWYER_FLAVOR,
-  "plumber": PLUMBER_FLAVOR,
-  "sales-tiger": SALES_TIGER_FLAVOR,
 };
 
 // ---------------------------------------------------------------------------
@@ -91,9 +71,9 @@ export function resolveConfig(
 ): ResolvedConfig {
   const flavorTs = FLAVORS[flavorKey];
   if (!flavorTs) {
-    // Only 3 of 11 flavors have TypeScript soul configs. The other 8 fall back to network-marketer
-    // for SOUL.md generation. To fix: add api/src/config/flavors/${flavorKey}.ts.
-    console.warn(`[config] No TypeScript soul config for flavor "${flavorKey}" — SOUL.md will use network-marketer persona. Add api/src/config/flavors/${flavorKey}.ts to fix.`);
+    // Tiger Claw is a single-flavor product (network-marketer). Anything else
+    // resolves to the NM persona for SOUL.md generation.
+    console.warn(`[config] Unknown flavor "${flavorKey}" — falling back to network-marketer.`);
   }
   const flavor = flavorTs ?? FLAVORS["network-marketer"]!;
   const region = REGIONS[regionCode ?? "us-en"] ?? REGIONS["us-en"];
@@ -259,6 +239,4 @@ export function generateSoulMd(config: ResolvedConfig, tenant: TenantData): stri
 
 export type { ResolvedConfig, FlavorConfig, RegionalConfig };
 export { BASE_CONFIG, US_EN_CONFIG, TH_TH_CONFIG };
-export { NETWORK_MARKETER_FLAVOR, REAL_ESTATE_FLAVOR, HEALTH_WELLNESS_FLAVOR };
-export { AIRBNB_HOST_FLAVOR, BAKER_FLAVOR, CANDLE_MAKER_FLAVOR, DOCTOR_FLAVOR };
-export { GIG_ECONOMY_FLAVOR, LAWYER_FLAVOR, PLUMBER_FLAVOR, SALES_TIGER_FLAVOR };
+export { NETWORK_MARKETER_FLAVOR, ADMIN_FLAVOR };

@@ -227,8 +227,7 @@ describe('provisionTenant — flavor validation', () => {
   });
 
   it.each([
-    'network-marketer', 'real-estate', 'health-wellness', 'airbnb-host',
-    'baker', 'candle-maker', 'gig-economy', 'lawyer', 'plumber', 'sales-tiger',
+    'network-marketer',
   ])('accepts valid flavor key: %s', async (flavor) => {
     mockCreateTenant.mockResolvedValue({ ...MOCK_TENANT, flavor });
     mockGetPoolQuery.mockResolvedValue({ rows: [] });
