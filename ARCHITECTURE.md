@@ -29,38 +29,40 @@ Tiger Claw V4 is **stateless**. No long-running Docker containers per tenant. No
 | AI Provider | Gemini 2.0 Flash — `@google/generative-ai` SDK | ✅ Live. **LOCKED — do not switch to 2.5-flash** (GCP function-calling bug) |
 | AI Fallback | OpenRouter — circuit breaker activates after 3 Gemini errors/hour | ✅ Active |
 | Frontend | Next.js on Vercel — `wizard.tigerclaw.io` | ✅ Live. Auto-deploy confirmed working. |
-| Payments | Paddle (primary) | ✅ Webhook live. Product/price not yet created. |
+| Payments | **Stripe** | ✅ Live. Payment Link → webhook → user/bot/subscription → wizard auto-verify. Paddle deleted (PR #314). |
 | Email | Resend — `tigerclaw.io` domain verified | ✅ Live |
 | Search | Serper — 3 keys round-robin (`SERPER_KEY_1/2/3`) | ✅ Active |
 | Web scraping | Oxylabs Realtime API | ✅ Live. 684 facts on last run. |
 | Reddit | Public JSON API | ❌ 403 from Cloud Run egress. Oxylabs + Serper fallback active. |
-| Stripe | Placeholder only | ❌ Not used |
+| Stripe | See Payments row above | ✅ Live |
 | LINE | Deferred | ❌ Phase 2. Code present, not active. |
 | GCP Project | `hybrid-matrix-472500-k5` | |
 | Multi-region | `us-central1` primary + `asia-southeast1`. Global HTTPS LB at `api.tigerclaw.io` | ✅ Live |
 
 ---
 
-## 3. Customer Onboarding Flow (Paddle — Current)
+## 3. Customer Onboarding Flow (Stripe — Current)
 
 ```
-Customer pays via Paddle checkout
-  → Paddle fires POST /webhooks/paddle (transaction.completed)
+Customer pays via Stripe Payment Link ($147/mo)
+  → Stripe fires POST /webhooks/stripe (checkout.session.completed)
   → Webhook: createBYOKUser + createBYOKBot + createBYOKSubscription(pending_setup)
-  → Customer navigates to wizard.tigerclaw.io
-  → Wizard: flavor selection → agent name → Telegram bot token → Gemini key
-  → POST /wizard/hatch → BullMQ tenant-provisioning job
-  → Provisioner:
-      - Registers Telegram webhook (with TELEGRAM_WEBHOOK_SECRET)
-      - Pre-seeds onboard_state.json: phase="complete" IF product provided, else "identity"
-      - ICP pre-seeded from flavor defaultBuilderICP
+  → Stripe redirects customer to wizard.tigerclaw.io/signup?session_id={CHECKOUT_SESSION_ID}
+  → GET /auth/stripe-session exchanges session_id for user identity (no email typing)
+  → Wizard: 2 steps — (1) Telegram bot token, (2) Gemini API key
+  → POST /wizard/hatch → pre-seeds onboard_state.json + BullMQ tenant-provisioning job
+  → Hatch identity:
+      - identity.name = operator's real name from Stripe (tenant.name)
+      - identity.botName = "Tiger" (default, no wizard input)
+      - No productOrOpportunity, no years, no biggestWin, no differentiator
+      - IPP pre-seeded from flavor defaultBuilderICP
+      - phase = "complete"
+  → Provisioner registers Telegram webhook
   → Status → live
-  → First message: confident ICP-based response, no interview required
+  → First message: Tiger voice with flavor config brain (voice examples, macro narrative, IPP)
 ```
 
-**NOTE:** Paddle product + price not yet created. No checkout URL exists.
-
-**Payment gate is open (C4).** Direct wizard access bypasses payment.
+**Payment gate is closed.** `/signup` without `session_id` redirects to landing page.
 
 ---
 
@@ -71,12 +73,12 @@ Customer pays via Paddle checkout
 | Mount | File | Key Endpoints |
 |-------|------|--------------|
 | `/health` | health.ts | GET — system health check |
-| `/auth` | auth.ts | POST verify-purchase, POST session |
+| `/auth` | auth.ts | POST verify-purchase, POST session, GET stripe-session |
 | `/wizard` | wizard.ts | POST trial, POST hatch, POST import-contacts, POST validate-key |
 | `/dashboard` | dashboard.ts | GET /:slug, POST /:slug/update-key |
 | `/tenants` | tenants.ts | PATCH /:id/status, POST /:id/keys/activate, POST /:id/scout |
 | `/subscriptions` | subscriptions.ts | POST register, POST checkout, GET trial-checkout |
-| `/webhooks` | webhooks.ts | POST stripe, POST telegram/:id, POST line/:id, POST email, POST stan-store, POST lemon-squeezy, POST paddle |
+| `/webhooks` | webhooks.ts | POST stripe, POST telegram/:id, POST line/:id, POST email, POST stan-store, POST lemon-squeezy |
 | `/webhooks/ops` | ops.ts | POST — admin ops Telegram bot |
 | `/mining` | mining.ts | POST refine |
 | `/keys` | keys.ts | POST validate |
@@ -139,9 +141,13 @@ Loads in parallel:
 4. Hive benchmarks (cross-tenant, anonymized)
 5. Market intelligence (up to 5 facts, confidence ≥ 70, within 7 days)
 
-**`hasOnboarding` requires:** `phase === 'complete'` AND at least one real identity field (`productOrOpportunity` or `biggestWin`). Phase=complete with empty identity falls back to incomplete-onboarding branch.
+**`hasIdentity` requires:** `identity.name` (operator's name from Stripe). Operator name alone is sufficient — the flavor config provides all behavioral context (voice examples, macro narrative, tone directives, IPP, objection buckets, nurture templates). Detailed identity fields (product, years, biggestWin, differentiator) are optional enrichments with `fillTemplate` fallbacks in the tools layer.
 
-**`displayOperatorName`:** Falls back to `"my operator"` when identity is missing — prevents incoherent prospect-facing phrases.
+**`hasOnboarding` requires:** `phase === 'complete'` AND `hasIdentity`. When true, operator identity block includes name, profession (from `flavor.professionLabel`), and any optional fields. When false, bot invites operator to complete setup.
+
+**`displayOperatorName`:** Falls back to `"my operator"` when identity is missing.
+
+**Gemini context cache:** DISABLED. The Google AI SDK's `getGenerativeModelFromCachedContent()` silently overwrites `systemInstruction` with `cachedContent.systemInstruction` (which was `undefined` since the cache stored tools only). This was the root cause of the lobotomy — bots ran with no system prompt. PR #319 bypassed the cache. `getGenerativeModel()` is now used directly.
 
 Domain key for market intelligence = flavor **displayName** (e.g. `"Real Estate Agent"`), NOT flavor key (`"real-estate"`).
 
@@ -263,17 +269,19 @@ curl -X POST https://api.tigerclaw.io/admin/fix-all-webhooks \
 
 ## 13. Test Coverage
 
-- **456 tests** across 44 test files. All passing as of 2026-04-09.
+- **452 tests** across 45 test files. All passing as of 2026-04-11.
 - Run: `npm test` from `api/`
 - CI runs on every PR push (Test + CI Pipeline + Deploy to Cloud Run).
 
 ---
 
-## 14. Flavor Registry (16 Flavors)
+## 14. Flavor Registry (1 Operator-Facing + 1 Internal)
 
-network-marketer, real-estate, sales-tiger, lawyer, doctor, health-wellness, baker, plumber, personal-trainer, interior-designer, airbnb-host, candle-maker, gig-economy, admin, dorm-design, researcher
+- `network-marketer` — the only operator-facing flavor. Two-oar model (builder + customer). Contains voice examples, macro narrative, IPP, objection buckets, nurture templates, scout queries, intent signals.
+- `admin` — internal control bot.
+- 15 others archived to `api/_archive/flavors/` (PR #306, Session 21). Outside TypeScript root.
 
-Each flavor provides: `displayName`, `professionLabel`, `defaultKeywords`, `defaultBuilderICP`, `fallbackIntelligence`.
+Each flavor provides: `displayName`, `professionLabel`, `defaultKeywords`, `defaultBuilderICP`, `fallbackIntelligence`, `soul` (systemPromptPreamble, macroNarrative, toneDirectives), `objectionBuckets`, `nurtureTemplates`.
 
 ---
 
@@ -282,12 +290,12 @@ Each flavor provides: `displayName`, `professionLabel`, `defaultKeywords`, `defa
 | Item | Status |
 |------|--------|
 | Reddit mine source | ❌ 403 from Cloud Run egress. Oxylabs + Serper fallback working. |
-| Paddle product/price | ❌ Not yet created. Webhook live, no checkout URL. |
 | Admin alert markdown | ⚠️ Fails when error text contains underscores. |
 | 4 BullMQ queues (global-cron, market-mining, market-intelligence-batch, stan-store-onboarding) | ⚠️ Queues defined, no workers implemented. |
-| Stripe | ❌ Placeholder. Dead code in routes. |
 | LINE | ❌ Deferred. Requires LINE Official Account. |
 | Cal.com booking | ⚠️ `tiger_book_zoom` built. Inactive — no `calcomBookingUrl` set. |
+| Stan Store dead code | ⚠️ Webhook, queue, worker, URL references still present. |
+| Dead Gemini cache code | ⚠️ Unused after PR #319 — clean up when convenient. |
 
 ---
 

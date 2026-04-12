@@ -10,9 +10,13 @@
 
 ## Context — Where We Are
 
-Session 22 shipped the Stripe payment flow end-to-end and eliminated the email gate. PRs #310–#313 merged. Payment Link → webhook → user/bot/subscription → wizard auto-verify is proven with a $1 test purchase. The wizard is now locked — `/signup` without a Stripe `session_id` redirects to the landing page. No email form anywhere.
+Session 23 found and fixed the root cause of the lobotomy: the Gemini SDK's `getGenerativeModelFromCachedContent()` silently overwrites `systemInstruction` with `cachedContent.systemInstruction` (which was undefined). Every bot was running with NO system prompt. PR #319 bypassed the cache. PR #317 fixed the garbage identity data in the hatch route. PR #320 added operator profession from flavor config.
 
-`brents-tiger-01-mns7wcqk` (Tiger Proof / Nu Skin) is still the only active bot. Awaiting Pat Sullivan's quality review on first SSDI batch (35 leads, delivered 2026-04-12).
+The bot now wakes up with Tiger voice ("Let me take you by the hand and lead you to your brighter future") and can hold prospect conversations. But the prompt needs work — steps need to be smaller for Gemini to follow reliably, and operator interactions need refinement (bot asked "what do you do?" before PR #320).
+
+Wizard is 2 steps: (1) Telegram bot token, (2) Gemini API key. Operator name comes from Stripe automatically.
+
+`brents-tiger-01-mns7wcqk` (Tiger Proof / Nu Skin) is still the only production bot. Awaiting Pat Sullivan's quality review on first SSDI batch (35 leads, delivered 2026-04-12).
 
 ---
 
@@ -20,29 +24,33 @@ Session 22 shipped the Stripe payment flow end-to-end and eliminated the email g
 
 ---
 
-### 1. Voice examples for network-marketer flavor
+### 1. Prompt engineering — make the bot smart enough to do the job
 
-The bot now responds intelligently. It does NOT yet respond in Brent's actual voice. The system prompt is still generic "helpful assistant" tone. This is prompt engineering, not architecture.
+The bot has voice, personality, market intelligence, and the flavor config brain. But Gemini needs the instructions broken into smaller steps to follow them reliably. This is iterative prompt work, not architecture.
 
-**Brent writes the examples in his own voice.** Claude Code wires them into the network-marketer flavor system prompt. Then re-test from a fresh chatId with "I'm tired of my job" and compare against the late-night baseline.
+**Requirements:**
+1. **Test infrastructure** — a set of test bots with pre-loaded Telegram tokens and Gemini keys, so testing doesn't require going through Stripe checkout every time.
+2. **Enough Gemini API quota** for extensive back-and-forth testing.
+3. **Time** to iterate. This is not a one-PR fix.
 
-The examples should cover at minimum:
-- Opening response to a transition-stage prospect (unhappy at current job)
-- Qualifying question that surfaces network-marketing fit without sounding like a pitch
-- Handling "tell me more about the product" without becoming a product brochure
-- Soft close toward a Zoom call
+**What to test:**
+- Prospect first touch (cold open from "hi" or "/start")
+- Prospect qualification (life situation, pain signals)
+- Prospect objection handling (scam?, cost?, trust?)
+- Prospect close to Zoom
+- Operator requests ("find me prospects", "anything good today?", "run a scan")
+- Operator coaching ("nothing is working", "should I focus on LinkedIn or Instagram?")
+- Mixed conversation (prospect sends message, then operator asks about pipeline)
 
-Do not write code until Brent has provided the example text. This is a pair-programming task, not a solo task.
+**Acceptance:** bot handles all scenarios above without exposing tool names, without asking the operator what they do, without falling into generic assistant mode, and without listing capabilities.
 
 ---
 
 ### 2. Stripe cleanup — branding + dead endpoints + signature fix
 
-Stripe payment flow is live and proven. Remaining cleanup:
-
 1. **Stripe branding** (dashboard only): Change business name from "Bot Craft Automation" → "Tiger Claw". Update product description from "AI Recruiting Agent". Set brand color to orange.
 2. **Deactivate 2 dead botcraftwrks.ai webhook endpoints** in Stripe dashboard.
-3. **Deactivate $1 test Payment Link** (`plink_1TLEtH0Fp3hGvMoU3Cp4xMhf`) and refund the test charge.
+3. **Check $1 test Payment Link** (`plink_1TLEtH0Fp3hGvMoU3Cp4xMhf`) — verify status, recreate if needed for Jeff Mack / Debbie Cameron.
 4. **Fix `STRIPE_WEBHOOK_SECRET` mismatch** — secret in Cloud Run doesn't match signing secret for endpoint `we_1TAPuv0Fp3hGvMoUYrbo6ira`. Update via `gcloud secrets` or re-roll the webhook signing secret in Stripe.
 5. **Delete Stan Store dead code** — `POST /webhooks/stan-store`, stan-store-onboarding queue/worker, Stan Store URL references in reactivate.ts and subscriptions.ts. Separate task — touches multiple files.
 
@@ -50,16 +58,12 @@ Stripe payment flow is live and proven. Remaining cleanup:
 
 ### 3. Admin dashboard — build dependency health endpoint
 
-**There is no dependency health endpoint on the backend at all.** `GET /admin/pipeline/health` at `api/src/routes/admin.ts:906` looks like it should be one based on its name, but it is actually a **mine statistics** endpoint — it returns `totalFacts`, `factsLast24h`, `byVertical`, `byRegion`, `byCapturedBy`, and a single `healthy` boolean computed from "did any facts land in the last 24h AND newest fact within 48h". It does NOT check Serper, Gemini platform keys, Resend, Oxylabs, Postgres connectivity (beyond the query implicitly needing the DB), Redis, any BullMQ worker, Telegram webhook delivery, Stripe webhook, or OpenRouter. The dashboard UI (`web-onboarding/src/app/admin/dashboard/page.tsx`) does not call it either.
-
-Either build a new `GET /admin/dependencies/health` endpoint for the real dependency checks, or expand `/admin/pipeline/health` to add them alongside the mine stats (recommended — one endpoint, loud response, easy to consume).
+**There is no dependency health endpoint on the backend at all.** `GET /admin/pipeline/health` is a **mine statistics** endpoint, not dependency checks.
 
 **Build:**
-1. **Expand** `GET /admin/pipeline/health` (or build a new `/admin/dependencies/health`) to check: Postgres connectivity, Redis ping, each BullMQ worker in `api/src/workers/` (alive + recent heartbeat), Telegram webhook delivery (registered count vs active tenants), Serper×3 keys (the ones currently NOT checked anywhere), Gemini platform keys (platform + onboarding + emergency — NOT checked anywhere), Resend email (NOT checked anywhere), **Oxylabs** credentials + a test request, Stripe webhook (timestamp of last event received), OpenRouter circuit breaker state.
-2. **Wire** the dashboard to call the dependency health endpoint (and separately render the mine stats from `/admin/pipeline/health`'s existing payload).
-3. **Render** each dependency as a green/red row. Red surfaces as a loud alarm at the top of the dashboard. Never silently absent.
-
-**Acceptance:** open the admin dashboard, every dependency is visible, Oxylabs is on the list, no 404s in the browser network tab. `DAILY_CHECKS.md` item 1 becomes fully runnable from the dashboard.
+1. **Expand** `GET /admin/pipeline/health` (or build a new `/admin/dependencies/health`) to check: Postgres connectivity, Redis ping, each BullMQ worker, Telegram webhook delivery, Serper×3 keys, Gemini platform keys, Resend email, Oxylabs credentials, Stripe webhook, OpenRouter circuit breaker state.
+2. **Wire** the dashboard to call the dependency health endpoint.
+3. **Render** each dependency as a green/red row. Red surfaces as a loud alarm at the top of the dashboard.
 
 ---
 
@@ -68,17 +72,15 @@ Either build a new `GET /admin/dependencies/health` endpoint for the real depend
 Add a mine status card to the admin dashboard surfacing:
 - Last run timestamp + duration
 - Last run fact count
-- Last 5 fact summaries (read-only, for sanity check — is the data usable?)
-- Worker error count since midnight (`factExtractionWorker`, `marketIntelligenceWorker`)
-- Mine Gemini key identifier (dependent on item 5 above tracing the key first)
-
-**Acceptance:** `DAILY_CHECKS.md` item 3 becomes fully runnable from the dashboard without manual `psql` queries.
+- Last 5 fact summaries (read-only, for sanity check)
+- Worker error count since midnight
+- Mine Gemini key identifier
 
 ---
 
 ## Flag — Not a Fix, Monitor Only
 
-**Gemini model cache at `api/src/services/ai.ts:1350`** — `getGeminiModelWithCache` caches compiled models per key. If the cache holds a stale system prompt between deploys, a bot could respond with old voice examples even after a new deploy. Not a problem during the late-night fix (fresh chatId triggered a fresh build). Flag for future debugging if stale behavior appears after a voice-example deploy.
+**Dead Gemini cache code at `api/src/services/ai.ts`** — `geminiCacheByKey` map, `GEMINI_CACHE_TTL_SECONDS` constant, and `GoogleAICacheManager` import are still in the file but unused after PR #319 bypassed the cache. Clean up when convenient but not urgent.
 
 ---
 

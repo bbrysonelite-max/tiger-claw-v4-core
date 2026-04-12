@@ -93,7 +93,7 @@ Operator is building this platform for their own distribution network. Platform 
 - New tools in `api/src/tools/` MUST be registered in `toolsMap` in `ai.ts`. Missing = infinite tool loop.
 - **`tiger_gmail_send` and `tiger_postiz` are intentionally NOT in toolsMap.** Do not re-add them.
 - **Gemini 2.0 Flash only.** Do not switch to 2.5-flash (GCP function-calling bug).
-- **456 tests must pass** before any PR is opened. Run `npm test` from `api/`.
+- **452 tests must pass** before any PR is opened. Run `npm test` from `api/`.
 
 ---
 
