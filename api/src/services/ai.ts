@@ -807,6 +807,7 @@ export async function buildSystemPrompt(tenant: any): Promise<string> {
         `━━━━ OPERATOR IDENTITY (LOCKED — do not contradict these facts) ━━━━`,
         `Your name: ${botName}`,
         `Operator name: ${operatorName}`,
+        `Their profession: ${flavor.professionLabel ?? flavor.displayName ?? 'business professional'}`,
         ...(identity.productOrOpportunity?.trim() ? [`What they sell / represent: ${sanitizePromptField(identity.productOrOpportunity, 300)}`] : []),
         ...(identity.yearsInProfession?.trim() ? [`Years in profession: ${sanitizePromptField(identity.yearsInProfession, 50)}`] : []),
         ...(identity.biggestWin?.trim() ? [`Their biggest proven result: ${sanitizePromptField(identity.biggestWin, 300)}`] : []),
