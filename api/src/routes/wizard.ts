@@ -210,7 +210,7 @@ router.post("/hatch", async (req: Request, res: Response) => {
 
     // ── All pre-flight checks passed ─────────────────────────────────────────
 
-    let slug = tenant.slug || name.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 30);
+    let slug = tenant.slug || (name || tenant.name || 'tiger').toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 30);
     // Guard against slug collision: if slug belongs to a different tenant, append a random suffix.
     if (!tenant.slug) {
       const existing = await getTenantBySlug(slug);
