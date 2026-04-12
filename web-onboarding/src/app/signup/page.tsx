@@ -37,13 +37,11 @@ interface HatchResponse {
 }
 
 interface FormState {
-  agentName: string;
   telegramToken: string;
   aiKey: string;
 }
 
 interface FormErrors {
-  agentName?: string;
   telegramToken?: string;
   aiKey?: string;
   general?: string;
@@ -191,7 +189,6 @@ interface SignupFormProps {
 
 function SignupForm({ email, botId }: SignupFormProps) {
   const [form, setForm] = useState<FormState>({
-    agentName: "",
     telegramToken: "",
     aiKey: "",
   });
@@ -223,9 +220,6 @@ function SignupForm({ email, botId }: SignupFormProps) {
   const validate = (): boolean => {
     const newErrors: FormErrors = {};
 
-    if (!form.agentName.trim()) newErrors.agentName = "Agent name is required.";
-    else if (form.agentName.trim().length > 30)
-      newErrors.agentName = "Agent name must be 30 characters or fewer.";
     if (!form.telegramToken.trim()) {
       newErrors.telegramToken = "Bot token is required.";
     } else if (!telegramValid) {
@@ -246,7 +240,6 @@ function SignupForm({ email, botId }: SignupFormProps) {
     try {
       const payload = {
         botId,
-        name: form.agentName.trim(),
         email,
         flavor: DEFAULT_FLAVOR,
         botToken: form.telegramToken.trim(),
@@ -270,7 +263,7 @@ function SignupForm({ email, botId }: SignupFormProps) {
           localStorage.setItem("tc_slug", tenantSlug);
         }
         setSuccess({
-          botUsername: data.botUsername || telegramUsername || form.agentName.trim(),
+          botUsername: data.botUsername || telegramUsername || "your Tiger",
         });
       } else {
         // Map server field errors back to form fields
@@ -278,7 +271,6 @@ function SignupForm({ email, botId }: SignupFormProps) {
           botToken: "telegramToken",
           telegramBotToken: "telegramToken",
           aiKey: "aiKey",
-          name: "agentName",
         };
 
         const fieldError = data.field ? fieldMap[data.field] : undefined;
@@ -320,47 +312,11 @@ function SignupForm({ email, botId }: SignupFormProps) {
 
         <div className="flex flex-col gap-10">
           {/* ---------------------------------------------------------------- */}
-          {/* Section 1 — Agent name                                           */}
+          {/* Section 1 — Telegram                                             */}
           {/* ---------------------------------------------------------------- */}
           <section>
             <SectionHeading
               number={1}
-              title="Name your Tiger"
-              subtitle="This becomes your bot's display name in Telegram."
-            />
-
-            <input
-              type="text"
-              value={form.agentName}
-              onChange={(e) => updateForm("agentName", e.target.value)}
-              maxLength={30}
-              placeholder="e.g. Tiger, Max, Scout"
-              className={cn(
-                "w-full bg-zinc-900/80 border rounded-xl px-4 py-3 text-base text-white placeholder:text-white/40 outline-none transition-colors min-h-[52px]",
-                errors.agentName
-                  ? "border-red-500/60 focus:border-red-400"
-                  : "border-white/20 focus:border-orange-500/60"
-              )}
-            />
-            <div className="flex justify-between mt-1">
-              {errors.agentName ? (
-                <p className="text-sm text-red-400 flex items-center gap-1">
-                  <AlertCircle className="w-4 h-4 shrink-0" />
-                  {errors.agentName}
-                </p>
-              ) : (
-                <span />
-              )}
-              <span className="text-xs text-white/30 ml-auto">{form.agentName.length}/30</span>
-            </div>
-          </section>
-
-          {/* ---------------------------------------------------------------- */}
-          {/* Section 2 — Telegram                                             */}
-          {/* ---------------------------------------------------------------- */}
-          <section>
-            <SectionHeading
-              number={2}
               title="Connect your Telegram bot"
               subtitle="Your agent needs a Telegram bot token to operate."
             />
@@ -374,11 +330,11 @@ function SignupForm({ email, botId }: SignupFormProps) {
           </section>
 
           {/* ---------------------------------------------------------------- */}
-          {/* Section 3 — AI key                                               */}
+          {/* Section 2 — AI key                                               */}
           {/* ---------------------------------------------------------------- */}
           <section>
             <SectionHeading
-              number={3}
+              number={2}
               title="Add your AI key"
               subtitle="Your agent uses Google Gemini. The key stays encrypted on our servers."
             />

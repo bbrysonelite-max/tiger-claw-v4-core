@@ -56,7 +56,7 @@ const CustomerProfileSchema = z.object({
 
 const HatchSchema = z.object({
   botId: z.string(),
-  name: z.string().min(1),
+  name: z.string().optional(),
   email: z.string().email(),
   flavor: z.string().optional(),
   language: z.string().optional(),
@@ -252,7 +252,8 @@ router.post("/hatch", async (req: Request, res: Response) => {
       const flavorConfig = (FLAVOR_REGISTRY as any)[flavor || "network-marketer"] ?? {};
       const defaultIcp = flavorConfig.defaultBuilderICP ?? {};
       const twoOar = (flavor || "network-marketer") === "network-marketer";
-      const botDisplayName = name || tenant.name || 'Tiger';
+      const botDisplayName = name || 'Tiger';
+      const operatorRealName = tenant.name || 'your operator';
       const now = new Date().toISOString();
 
       await setBotState(botId, "onboard_state.json", {
@@ -261,11 +262,8 @@ router.post("/hatch", async (req: Request, res: Response) => {
         completedAt: now,
         startedAt: now,
         identity: {
-          name: botDisplayName,
+          name: operatorRealName,
           botName: botDisplayName,
-          // Use the flavor description as a stand-in product — the bot can prospect
-          // immediately. The operator can refine this through the identity setup flow.
-          productOrOpportunity: flavorConfig.description ?? flavorConfig.displayName ?? flavor ?? "their business",
         },
         icpProspect: twoOar ? defaultIcp : {},
         icpProduct: {},
@@ -276,7 +274,7 @@ router.post("/hatch", async (req: Request, res: Response) => {
         language: language || "en",
         tenantId: botId,
       });
-      console.log(`[hatch] onboard_state.json pre-seeded for botId=${botId} (flavor=${flavor}, twoOar=${twoOar})`);
+      console.log(`[hatch] onboard_state.json pre-seeded for botId=${botId} (operator=${operatorRealName}, bot=${botDisplayName}, flavor=${flavor})`);
     } catch (err: any) {
       // Non-fatal — provisioner will write a fallback state. Log and continue.
       console.warn(`[hatch] Failed to pre-seed onboard_state.json for botId=${botId}:`, err.message);
