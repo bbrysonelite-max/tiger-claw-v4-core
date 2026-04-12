@@ -1,8 +1,47 @@
 # Tiger Claw — State of the Union
 
-**Last updated:** 2026-04-11 (Session 20 CLOSED — PRs #292–#298 merged + doc collapse 6→4, mine audit complete, SSDI flavor spec ready)
+**Last updated:** 2026-04-11 (Session 21 — IPP relevance gate live, Network Marketer scout expanded, flavors collapsed to 1, SSDI rebuilt as MineCampaign, lead export endpoint shipped)
 **This is the single source of truth. Read nothing else until you finish this file.**
 **No lying. No assuming. No guessing. Every fact here is verified against the live system.**
+
+---
+
+## Session 21 — Mine Hardening + Campaign Abstraction (2026-04-11)
+
+### What shipped today
+
+| PR | What |
+|----|------|
+| #301 | **Builder-oar rebuild with IPP relevance gate** for network-marketer. `tiger_refine` now branches on the presence of `idealProspectProfile` — when supplied, runs a fail-closed Gemini relevance gate against structured traits + disqualifiers + rejectExamples + sourceUrlBlocklist. On gate failure, ALL facts in the batch are rejected (no silent pollution). The legacy commercial-relevance gate (fail-open) is preserved for flavors that haven't migrated. |
+| #302 | **Network Marketer scout expansion** — 5 additional transition-state subreddits added to the scout queries. Replaces the loose `Entrepreneur OR WorkFromHome` query that was pulling off-topic discussions. |
+| #303 | `GET /admin/mine/sample` — admin endpoint to inspect a random sample of recently-extracted facts post-run, surfaces the actual content the IPP gate kept so quality can be eyeballed before trusting downstream Strike drafts. |
+| #304 | **Strike draft queries consume `relevance_score`** — downstream fact queries now sort by `metadata->>'relevance_score'` DESC NULLS LAST, so high-IPP-confidence facts surface first. Closes the loop between extraction and consumption. |
+| #305 | **`mine_query_metrics`** admin event emitted once per scoutQuery per run with full counter shape (posts, factsKept, factsRejected, duplicates, durationMs). Enables rolling per-query kept-rate tracking so dead-weight subs surface visibly. |
+| #306 | **Flavor shelf** — 15 non-network-marketer flavors moved out of `api/src/config/flavors/` to `api/_archive/flavors/` (outside `src/`, so TypeScript cannot compile them). Both `FLAVOR_REGISTRY` instances trimmed to `network-marketer` + `admin`. `VALID_FLAVOR_KEYS` is now `["network-marketer"]`. Provisioner test reduced to one flavor. README in archive directory warns against importing. Drift mitigation: archived flavors can no longer be referenced by accident. |
+| #307 | **MineCampaign abstraction + SSDI Ticket to Work + lead export.** New `api/src/config/campaigns/` registry. `MineCampaign` interface carries hunting-only fields (scoutQueries, IPP, leadSchema, deliveryMode) — no bot, no soul, no onboarding. SSDI campaign is #1: 8 disability-adjacent subreddits, full IPP, 5 disqualifiers, 8 rejectExamples, sourceUrlBlocklist (ssa.gov + 4 others). Orchestrator iterates both registries on every run. `campaignKey` threads through `research_agent` → `tiger_refine` → stamps `metadata.campaign_key` on every saved fact. New endpoints: `GET /admin/campaigns` (list) and `GET /admin/campaigns/:key/leads?format=csv\|json&sinceDays=N` (CSV-by-default with RFC-4180 quoting, sorted by relevance_score DESC). |
+
+### Decisions made this session
+
+**Flavors collapsed from 16 → 1.** The strategic review on flavors (NEXT_SESSION item from Session 20) is closed. The 15 non-network-marketer flavors were not generating revenue and were a constant source of drift. They live in `api/_archive/` outside the TypeScript root and can be recovered from git history. `network-marketer` is the only operator-facing flavor. `admin` stays as the internal control bot.
+
+**SSDI is a MineCampaign, not a flavor.** Original Session 20 plan was to repurpose the health-wellness flavor for SSDI. That plan is dead. SSDI doesn't need a bot, soul, or onboarding flow — only hunting + IPP + lead export. Building it as a flavor would have forced a no-op bot/soul/onboarding surface and recreated the drift the flavor shelf just eliminated. The MineCampaign abstraction lets hunting-only pipelines stand on their own.
+
+**Lead delivery mode: CSV from admin.** Until SSDI generates green dollars, leads ship via `GET /admin/campaigns/:key/leads?format=csv`. No webhook plumbing, no third-party integration. Operator pulls leads on demand from the admin dashboard.
+
+### Mine pollution remediation status
+
+The Session 20 mine audit identified three independent causes of pollution:
+
+- **Loose scout queries (input-side):** ✅ Closed by #301 + #302. The bad `Entrepreneur OR WorkFromHome` query is gone; 5 transition-state subreddits replaced it.
+- **Loose classifier (logic-side):** ✅ Closed by #301. The IPP relevance gate is now fail-closed on every Network Marketer mine run. The previous classifier accepted student housing budgets and Network *Engineer* salaries at conf=100. The new gate rejects on missing IPP traits or any disqualifier match.
+- **Source noise (3 OpenClaw self-referential rows):** ⚠️ NOT yet deleted. The SQL DELETE from NEXT_SESSION item 2A was not executed this session. Still required before next mine run.
+
+### Codebase state (post-Session-21)
+
+- **Flavors:** 1 operator-facing (`network-marketer`) + 1 internal (`admin`). 15 archived under `api/_archive/flavors/`.
+- **Campaigns:** 1 (`ssdi-ticket-to-work`).
+- **Tests:** 460/460 passing across 46 test files (was 456/44 at Session 20 close).
+- **Cloud Run revision:** Post-#306 deploy at 23:27Z. Health 200, all subsystems ok.
 
 ---
 
@@ -92,11 +131,13 @@ Closing note: tonight's fix was surgical — one UPDATE, one row, zero code chan
 
 | Fact | Value |
 |------|-------|
-| Cloud Run revision | `tiger-claw-api-00456-9rb` — deployed 2026-04-10, health confirmed |
+| Cloud Run revision | Post-#306 deploy 2026-04-11 23:27Z — health 200, all subsystems ok |
 | Health | postgres OK, redis OK, disk OK, workers OK |
-| Tests | 456/456 passing, 44 test files |
+| Tests | 460/460 passing, 46 test files |
 | Active bots | 1 — `brents-tiger-01-mns7wcqk` (Tiger Proof, Nu Skin) — webhook fixed, onboard_state corrected via surgical UPDATE, **verified live from fresh chatId at 2026-04-10 00:49 UTC** (first real-intelligence prospect response in project history) |
-| Open PRs | None |
+| Flavors | 1 operator-facing (`network-marketer`) + 1 internal (`admin`). 15 shelved to `api/_archive/flavors/`. |
+| MineCampaigns | 1 (`ssdi-ticket-to-work`) |
+| Open PRs | #307 (campaign abstraction + SSDI + lead export) — CI green, awaiting merge; #308 (this docs reconcile) |
 | Wizard | `wizard.tigerclaw.io` — Vercel, auto-deploy working (PR #294 deployed — zombie pool card gone) |
 | Payment provider | **Stripe** — Paddle dropped 2026-04-11. Paddle webhook code still on backend, must be replaced. |
 | Repo | `github.com/bbrysonelite-max/tiger-claw-v4-core` |
@@ -155,8 +196,8 @@ AI sales agent SaaS. Operator brings their own Telegram bot token (BYOB — from
 
 | Item | Impact | Status |
 |------|--------|--------|
-| **SSDI flavor build** | Health-wellness flavor repurposed for SSDI Ticket to Work. Full spec ready. Build not yet executed. $20K/month contract. | First task next session |
-| **Mine surgery required** | 3 self-referential rows + 1 bad scout query + source blocklist needed. Do NOT run the mine until fixed. | Execute before next mine run |
+| **3 OpenClaw self-referential rows still in `market_intelligence`** | Old conf=100 OpenClaw pricing copy still polluting Network Marketer domain. SQL DELETE from NEXT_SESSION item 2A not executed this session. | Run the DELETE before next mine run |
+| **First SSDI campaign run** | Campaign abstraction + IPP gate + lead export endpoint all live, but no SSDI mine run has actually executed yet. Cannot prove the pipeline works for Pat Sullivan's contract until a real run produces leads. | Trigger via `POST /admin/mine/run`, verify `metadata.campaign_key='ssdi-ticket-to-work'` lands, pull CSV |
 | **No dependency health endpoint** | Flying blind — Postgres, Redis, workers, Serper, Gemini keys, Oxylabs, OpenRouter all unmonitored. `/admin/pipeline/health` is mine stats only, not dependency checks. | Build `GET /admin/dependencies/health` + wire dashboard |
 | **Stripe integration** | No checkout URL. Paddle dropped. Stripe not yet integrated. Payment path completely unproven. | Integrate Stripe — product, price, webhook handler, checkout flow |
 | Voice layer generic | Bot responds intelligently but not in Brent's voice | Write voice examples, wire into network-marketer flavor system prompt |
@@ -189,14 +230,15 @@ AI sales agent SaaS. Operator brings their own Telegram bot token (BYOB — from
 
 Archived: `docs/archive/STATE_OF_THE_TIGER_PATH_FORWARD.md` — pre-Session-20 session history, preserved out of rotation.
 
-### Codebase (Verified by Session 18 Audit)
-- **Routes:** 22 route files, ~82 endpoints
+### Codebase (Session 18 audit baseline + Session 21 deltas)
+- **Routes:** 22 route files, ~82 endpoints (+2 in #307: `GET /admin/campaigns`, `GET /admin/campaigns/:key/leads`; +1 in #303: `GET /admin/mine/sample`)
 - **Services:** 24 service files
 - **Tools registered in toolsMap:** 26
 - **Workers:** 6 active BullMQ workers, 10 queues defined (4 queues have no worker)
 - **Migrations:** 25 applied
-- **Flavors:** 16 in registry
-- **Tests:** 456/456 passing, 44 files
+- **Flavors:** 1 operator-facing (`network-marketer`) + 1 internal (`admin`). 15 archived to `api/_archive/flavors/` (PR #306).
+- **MineCampaigns:** 1 (`ssdi-ticket-to-work`, PR #307)
+- **Tests:** 460/460 passing, 46 files
 
 ### BYOB / BYOK
 - Every operator provides their own bot token from BotFather. No pool. Ever.
