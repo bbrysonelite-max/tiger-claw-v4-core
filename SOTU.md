@@ -1,8 +1,47 @@
 # Tiger Claw — State of the Union
 
-**Last updated:** 2026-04-12 (Session 21 — IPP relevance gate live, flavors collapsed to 1, SSDI rebuilt as MineCampaign, **first SSDI lead delivery shipped to Pat Sullivan 2026-04-12**)
+**Last updated:** 2026-04-11 (Session 22 — Stripe payment flow end-to-end, email gate eliminated, wizard locked to paying customers only)
 **This is the single source of truth. Read nothing else until you finish this file.**
 **No lying. No assuming. No guessing. Every fact here is verified against the live system.**
+
+---
+
+## Session 22 — Stripe Payment Flow + Email Gate Elimination (2026-04-11)
+
+### What shipped today
+
+| PR | What |
+|----|------|
+| #310 | **Wizard collapse + dead code deletion.** Deleted OnboardingModal, 5 Step components, success page, 2 e2e specs (1,914 lines). Flavors collapsed — 9-flavor picker removed, hardcoded `network-marketer`. Post-hatch screen rebuilt with copyable t.me link, Copy Link + Open in Telegram buttons, BotFather safety net. New landing hero: "A thousand recruits in your pocket." |
+| #311 | **First Stripe Payment Link** wired into landing CTA. |
+| #312 | **New Payment Link with wizard redirect** — created via Stripe API with `after_completion.redirect.url` pointing to `wizard.tigerclaw.io/signup?session_id={CHECKOUT_SESSION_ID}`. Promotion codes enabled for founder pricing. 7 old Payment Links deactivated. |
+| #313 | **Stripe session auto-verify + email gate eliminated.** New `GET /auth/stripe-session` endpoint exchanges Stripe checkout `session_id` for user identity via Stripe API. Wizard auto-calls it when `session_id` is in URL — customer never types email. EmailGate component deleted entirely. `/signup` without `session_id` redirects to landing page. |
+
+### Decisions made this session
+
+**Email gate is dead.** The old pattern (customer types purchase email to prove they bought) is removed. The only path into the wizard is: Stripe checkout → redirect with `session_id` → auto-verify → 3-step form. No manual email entry anywhere.
+
+**Landing page and wizard are separate pages.** Landing (`/`) sells. Wizard (`/signup`) activates. They are NOT merged into one scrolling page.
+
+**"Already purchased?" links to support email**, not the wizard. Since `/signup` requires a `session_id`, there's no self-service re-entry path yet. Customers who lost their session contact support@tigerclaw.io.
+
+### Stripe integration status
+
+| Component | Status |
+|-----------|--------|
+| Payment Link | Live — `plink_1TLEim0Fp3hGvMoUaVgGXyii`, redirects to wizard with `session_id` |
+| Webhook (`POST /webhooks/stripe`) | Working — `checkout.session.completed` creates user + bot + subscription. Signature verification has a mismatch (falls back to API verification, non-blocking). |
+| `GET /auth/stripe-session` | Live — exchanges checkout session_id for session token |
+| Auto-verify in wizard | Live — reads `session_id` from URL, skips email gate |
+| Branding | Needs fix — shows "Bot Craft Automation" instead of "Tiger Claw", product description says "AI Recruiting Agent" |
+| $1 test Payment Link | Active — `plink_1TLEtH0Fp3hGvMoU3Cp4xMhf` — deactivate after testing done |
+| 2 dead botcraftwrks.ai webhook endpoints | Still active in Stripe — deactivate |
+| Webhook log message | Says "STAN STORE PRE-SALE" — should say Stripe |
+| `STRIPE_WEBHOOK_SECRET` mismatch | Secret in Cloud Run doesn't match signing secret for endpoint `we_1TAPuv0Fp3hGvMoUYrbo6ira` |
+
+### Live test result
+
+$1 test purchase completed 2026-04-11. Webhook fired, user + bot + subscription created. Redirect to wizard worked. Payment flow is proven end-to-end for the first time in project history.
 
 ---
 
@@ -153,9 +192,9 @@ Closing note: tonight's fix was surgical — one UPDATE, one row, zero code chan
 | Active bots | 1 — `brents-tiger-01-mns7wcqk` (Tiger Proof, Nu Skin) — webhook fixed, onboard_state corrected via surgical UPDATE, **verified live from fresh chatId at 2026-04-10 00:49 UTC** (first real-intelligence prospect response in project history) |
 | Flavors | 1 operator-facing (`network-marketer`) + 1 internal (`admin`). 15 shelved to `api/_archive/flavors/`. |
 | MineCampaigns | 1 (`ssdi-ticket-to-work`) — **first delivery shipped to Pat Sullivan 2026-04-12** |
-| Open PRs | #309 (this docs update — first SSDI delivery) |
-| Wizard | `wizard.tigerclaw.io` — Vercel, auto-deploy working (PR #294 deployed — zombie pool card gone) |
-| Payment provider | **Stripe** — Paddle dropped 2026-04-11. Paddle webhook code still on backend, must be replaced. |
+| Open PRs | None |
+| Wizard | `wizard.tigerclaw.io` — Vercel, auto-deploy working. Email gate removed — `/signup` requires `session_id` from Stripe redirect. |
+| Payment provider | **Stripe** — live. Payment Link → webhook → user/bot/subscription → wizard auto-verify. Proven end-to-end with $1 test 2026-04-11. Paddle webhook code still on backend (dead code, not called). |
 | Repo | `github.com/bbrysonelite-max/tiger-claw-v4-core` |
 
 ---
@@ -215,9 +254,12 @@ AI sales agent SaaS. Operator brings their own Telegram bot token (BYOB — from
 | **3 OpenClaw self-referential rows still in `market_intelligence`** | Old conf=100 OpenClaw pricing copy still polluting Network Marketer domain. SQL DELETE from NEXT_SESSION item 2A not executed this session. | Run the DELETE before next mine run |
 | **Awaiting Pat Sullivan's quality review on first SSDI batch** | First batch of 35 leads delivered 2026-04-12. If quality passes, scale cadence + subreddit set. If quality fails, tune IPP traits/disqualifiers/blocklist. | Wait for Pat's reply, then iterate |
 | **No dependency health endpoint** | Flying blind — Postgres, Redis, workers, Serper, Gemini keys, Oxylabs, OpenRouter all unmonitored. `/admin/pipeline/health` is mine stats only, not dependency checks. | Build `GET /admin/dependencies/health` + wire dashboard |
-| **Stripe integration** | No checkout URL. Paddle dropped. Stripe not yet integrated. Payment path completely unproven. | Integrate Stripe — product, price, webhook handler, checkout flow |
+| **Stripe branding** | Checkout shows "Bot Craft Automation" not "Tiger Claw" | Fix in Stripe dashboard — business name, product description, brand color |
+| **Stripe webhook signature mismatch** | `STRIPE_WEBHOOK_SECRET` in Cloud Run doesn't match endpoint signing secret. API fallback catches it (non-blocking). | Update secret in Cloud Run or re-roll webhook signing secret |
+| **2 dead botcraftwrks.ai webhook endpoints** | Stale endpoints in Stripe, not receiving events | Deactivate in Stripe dashboard |
+| **$1 test Payment Link still active** | `plink_1TLEtH0Fp3hGvMoU3Cp4xMhf` — deactivate after testing done | Deactivate + refund test charge |
+| **Webhook log says "STAN STORE PRE-SALE"** | Misleading log message in webhook handler | Update to say "Stripe" |
 | Voice layer generic | Bot responds intelligently but not in Brent's voice | Write voice examples, wire into network-marketer flavor system prompt |
-| Payment gate open (C4) | Anyone can access wizard without paying | Fix after Stripe loop proven |
 | Admin hatch stale field-name risk | fdfc803 route sent `icpBuilder`/`icpCustomer` after PR #281 rename; current caller status unverified | Verify admin hatch + all callers use new field names |
 | Mine dedicated Gemini key status unknown | Mine may be borrowing a tenant's key — billing leak + silent failure risk | Trace mine intelligence path |
 | Reddit 403 from Cloud Run | Mine uses Oxylabs + Serper fallback (working) | Awaiting Reddit API or proxy |
@@ -236,7 +278,7 @@ AI sales agent SaaS. Operator brings their own Telegram bot token (BYOB — from
 - Oxylabs: live, 684 facts on last manual run
 - Resend email: confirmed working
 - Vercel auto-deploy: confirmed working
-- Stripe integration: **not yet built.** Paddle webhook code still on backend (`POST /webhooks/paddle`), must be replaced. No checkout URL exists. Payment path completely unproven.
+- Stripe integration: **live.** Payment Link redirects to wizard with `session_id`. Webhook handles `checkout.session.completed`. `GET /auth/stripe-session` auto-verifies. End-to-end proven with $1 test 2026-04-11. Paddle webhook code still on backend (dead, not called).
 
 ### Key Docs (4-doc model — only SOTU and NEXT_SESSION contain state)
 - `SOTU.md` — **this file. Single source of truth. Read first every session.** Everything stateful lives here.
@@ -296,7 +338,7 @@ Archived: `docs/archive/STATE_OF_THE_TIGER_PATH_FORWARD.md` — pre-Session-20 s
 | 4 BullMQ queues with no worker (global-cron, market-mining, market-intelligence-batch, stan-store-onboarding) | MEDIUM |
 | Admin alert markdown bug (underscores break Telegram parser) | MEDIUM |
 | serperKeyIndex + serperCallsThisRun are module-level globals — broken under concurrency | HIGH |
-| Payment gate open (C4) | HIGH — after Stripe loop proven |
+| Paddle webhook dead code (`POST /webhooks/paddle`) | LOW — replace or delete |
 | Telegram message dedup missing | MEDIUM |
 | Stan Store dead code | LOW |
 
