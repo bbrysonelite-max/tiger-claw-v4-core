@@ -602,17 +602,64 @@ function SignupForm({ email, botId }: SignupFormProps) {
 
 function SignupPageInner() {
   const searchParams = useSearchParams();
+  const sessionId = searchParams.get("session_id") ?? "";
   const emailParam = searchParams.get("email") ?? "";
 
   const [verified, setVerified] = useState(false);
   const [verifiedEmail, setVerifiedEmail] = useState("");
   const [botId, setBotId] = useState("");
+  const [stripeError, setStripeError] = useState("");
 
   const handleVerified = (email: string, id: string, _sessionToken: string) => {
     setVerifiedEmail(email);
     setBotId(id);
     setVerified(true);
   };
+
+  // Auto-verify from Stripe session_id — customer never types email
+  useEffect(() => {
+    if (!sessionId || verified) return;
+
+    (async () => {
+      try {
+        const res = await fetch(`${API_URL}/auth/stripe-session?session_id=${encodeURIComponent(sessionId)}`);
+        const data = await res.json();
+
+        if (res.ok && data.ok && data.botId) {
+          localStorage.setItem("tc_session_token", data.sessionToken ?? "");
+          localStorage.setItem("tc_bot_id", data.botId);
+          handleVerified(data.email, data.botId, data.sessionToken ?? "");
+        } else {
+          setStripeError(data.error || "Could not verify payment session.");
+        }
+      } catch {
+        setStripeError("Could not reach the server. Please refresh the page.");
+      }
+    })();
+  }, [sessionId, verified]);
+
+  // Stripe session auto-verify in progress
+  if (sessionId && !verified && !stripeError) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center px-4 py-16 gap-4">
+        <Loader2 className="w-8 h-8 text-orange-500 animate-spin" />
+        <p className="text-white/60 text-base">Verifying your payment...</p>
+      </div>
+    );
+  }
+
+  // Stripe session failed — fall back to email gate with error shown
+  if (sessionId && stripeError) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center px-4 py-16 gap-4">
+        <div className="flex items-start gap-2 text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 max-w-md">
+          <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+          <span>{stripeError}</span>
+        </div>
+        <EmailGate prefillEmail="" onVerified={handleVerified} />
+      </div>
+    );
+  }
 
   if (!verified) {
     return <EmailGate prefillEmail={emailParam} onVerified={handleVerified} />;

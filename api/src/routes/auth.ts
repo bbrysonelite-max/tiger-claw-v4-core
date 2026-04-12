@@ -10,7 +10,12 @@ import { Router, type Request, type Response, type NextFunction } from "express"
 import { createHmac, timingSafeEqual } from "crypto";
 import { z } from "zod";
 import { rateLimit } from "express-rate-limit";
+import Stripe from "stripe";
 import { lookupPurchaseByEmail, createBYOKUser, createBYOKBot, createBYOKSubscription, findActiveSessionByEmail } from "../services/db.js";
+
+const stripe = process.env["STRIPE_SECRET_KEY"]
+  ? new Stripe(process.env["STRIPE_SECRET_KEY"])
+  : null;
 
 // Rate limiter: 10 attempts per IP per 15 minutes.
 // Prevents email enumeration and on-demand DB record spam.
@@ -172,6 +177,57 @@ router.post("/session", verifyPurchaseLimiter, async (req: Request, res: Respons
   } catch (err) {
     console.error("[auth] session error:", err);
     return res.status(500).json({ error: "Could not retrieve session. Please try again." });
+  }
+});
+
+// ── GET /auth/stripe-session — auto-verify from Stripe Checkout redirect ─────
+// Payment Link redirects to /signup?session_id={CHECKOUT_SESSION_ID}.
+// The wizard calls this endpoint with the session_id. We resolve the customer
+// email via Stripe API, look up the user record the webhook created, and return
+// a session token. The customer never types their email.
+router.get("/stripe-session", verifyPurchaseLimiter, async (req: Request, res: Response) => {
+  const sessionId = req.query["session_id"];
+  if (!sessionId || typeof sessionId !== "string") {
+    return res.status(400).json({ error: "session_id is required." });
+  }
+
+  if (!stripe) {
+    console.error("[auth] STRIPE_SECRET_KEY not set — cannot resolve checkout session.");
+    return res.status(503).json({ error: "Payment verification unavailable." });
+  }
+
+  try {
+    const checkoutSession = await stripe.checkout.sessions.retrieve(sessionId);
+    const email = checkoutSession.customer_details?.email ?? checkoutSession.customer_email;
+
+    if (!email) {
+      console.warn(`[auth] Stripe session ${sessionId} has no customer email.`);
+      return res.status(400).json({ error: "No email associated with this payment session." });
+    }
+
+    const purchase = await lookupPurchaseByEmail(email);
+    if (!purchase) {
+      console.warn(`[auth] Stripe session resolved to ${email} but no purchase record found.`);
+      return res.status(404).json({ error: "Payment received but account setup is still processing. Please wait a moment and refresh." });
+    }
+
+    const { sessionToken, expires } = generateSessionToken(email, purchase.botId, purchase.userId);
+    console.log(`[auth] Stripe session auto-verify for ${email} — botId: ${purchase.botId}`);
+
+    return res.json({
+      ok: true,
+      sessionToken,
+      expires,
+      botId: purchase.botId,
+      name: purchase.name,
+      email,
+    });
+  } catch (err: any) {
+    if (err?.type === "StripeInvalidRequestError") {
+      return res.status(400).json({ error: "Invalid payment session." });
+    }
+    console.error("[auth] stripe-session error:", err);
+    return res.status(500).json({ error: "Could not verify payment. Please try again." });
   }
 });
 
