@@ -802,10 +802,11 @@ export async function buildSystemPrompt(tenant: any): Promise<string> {
     const icpSingle = onboardState?.icpSingle ?? {};
     const botName = sanitizePromptField(onboardState?.botName ?? 'Tiger', 80);
     const operatorName = sanitizePromptField(identity.name ?? tenant.name ?? 'your operator', 80);
-    // hasOnboarding requires BOTH phase=complete AND at least one real identity field.
-    // phase=complete with empty identity (e.g. admin-hatched without product) is treated as
-    // incomplete — the bot invites the operator to finish setup rather than exposing blank lines.
-    const hasIdentity = !!(identity.productOrOpportunity?.trim() || identity.biggestWin?.trim());
+    // hasOnboarding requires BOTH phase=complete AND the operator's name.
+    // The flavor config (voice examples, macro narrative, tone directives, IPP) provides all
+    // behavioral context. Detailed identity fields (product, years, biggestWin) are optional
+    // enrichments — their absence is handled by fillTemplate fallbacks in the tools layer.
+    const hasIdentity = !!(identity.name?.trim());
     const hasOnboarding = onboardState?.phase === 'complete' && hasIdentity;
     // Use operator name in prospect-facing phrases only when it's a real identity.
     // Fallback to "my operator" when identity is missing so phrases remain coherent.
