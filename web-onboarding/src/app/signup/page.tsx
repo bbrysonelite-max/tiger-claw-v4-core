@@ -478,8 +478,12 @@ function SignupPageInner() {
   const [verifiedEmail, setVerifiedEmail] = useState("");
   const [botId, setBotId] = useState("");
   const [stripeError, setStripeError] = useState("");
+  const [checked, setChecked] = useState(false);
 
-  const handleVerified = (email: string, id: string, _sessionToken: string) => {
+  const handleVerified = (email: string, id: string, sessionToken: string) => {
+    localStorage.setItem("tc_session_token", sessionToken);
+    localStorage.setItem("tc_bot_id", id);
+    localStorage.setItem("tc_email", email);
     setVerifiedEmail(email);
     setBotId(id);
     setVerified(true);
@@ -487,24 +491,37 @@ function SignupPageInner() {
 
   // Auto-verify from Stripe session_id — customer never types email
   useEffect(() => {
-    if (!sessionId || verified) return;
+    if (verified) return;
 
-    (async () => {
-      try {
-        const res = await fetch(`${API_URL}/auth/stripe-session?session_id=${encodeURIComponent(sessionId)}`);
-        const data = await res.json();
+    // 1. Fresh from Stripe checkout — session_id in URL
+    if (sessionId) {
+      (async () => {
+        try {
+          const res = await fetch(`${API_URL}/auth/stripe-session?session_id=${encodeURIComponent(sessionId)}`);
+          const data = await res.json();
 
-        if (res.ok && data.ok && data.botId) {
-          localStorage.setItem("tc_session_token", data.sessionToken ?? "");
-          localStorage.setItem("tc_bot_id", data.botId);
-          handleVerified(data.email, data.botId, data.sessionToken ?? "");
-        } else {
-          setStripeError(data.error || "Could not verify payment session.");
+          if (res.ok && data.ok && data.botId) {
+            handleVerified(data.email, data.botId, data.sessionToken ?? "");
+          } else {
+            setStripeError(data.error || "Could not verify payment session.");
+          }
+        } catch {
+          setStripeError("Could not reach the server. Please refresh the page.");
         }
-      } catch {
-        setStripeError("Could not reach the server. Please refresh the page.");
-      }
-    })();
+      })();
+      return;
+    }
+
+    // 2. Returning to wizard — resume from localStorage
+    const savedToken = localStorage.getItem("tc_session_token");
+    const savedBotId = localStorage.getItem("tc_bot_id");
+    const savedEmail = localStorage.getItem("tc_email");
+    if (savedToken && savedBotId && savedEmail) {
+      setVerifiedEmail(savedEmail);
+      setBotId(savedBotId);
+      setVerified(true);
+    }
+    setChecked(true);
   }, [sessionId, verified]);
 
   // Stripe session auto-verify in progress
@@ -541,8 +558,8 @@ function SignupPageInner() {
     );
   }
 
-  // No session_id — this page requires a purchase. Send them to buy.
-  if (!verified) {
+  // No session_id and no saved session — redirect to buy.
+  if (!verified && checked) {
     if (typeof window !== "undefined") {
       window.location.href = "/";
     }
