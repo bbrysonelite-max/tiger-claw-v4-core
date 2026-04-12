@@ -92,9 +92,6 @@ app.use("/webhooks/stripe", express.raw({ type: "application/json" }));
 // LINE requires raw body for HMAC-SHA256 signature verification
 app.use("/webhooks/line", express.raw({ type: "application/json" }));
 
-// Paddle requires raw body for HMAC-SHA256 signature verification
-app.use("/webhooks/paddle", express.raw({ type: "application/json" }));
-
 // Everything else gets JSON
 app.use(express.json());
 

@@ -20,19 +20,7 @@ Session 22 shipped the Stripe payment flow end-to-end and eliminated the email g
 
 ---
 
-### 1. Delete 3 OpenClaw self-referential rows from `market_intelligence`
-
-Carryover from Session 20 mine audit, never executed. Low priority, but keep on the list until actually deleted:
-
-```sql
-SELECT id, LEFT(fact_summary, 60) FROM market_intelligence WHERE fact_summary ILIKE '%OpenClaw%';
-CREATE TABLE market_intelligence_backup_20260412 AS SELECT * FROM market_intelligence WHERE fact_summary ILIKE '%OpenClaw%' OR fact_summary ILIKE '%Tiger Claw%';
-DELETE FROM market_intelligence WHERE id IN ('<full-uuid-1>', '<full-uuid-2>', '<full-uuid-3>');
-```
-
----
-
-### 2. Voice examples for network-marketer flavor
+### 1. Voice examples for network-marketer flavor
 
 The bot now responds intelligently. It does NOT yet respond in Brent's actual voice. The system prompt is still generic "helpful assistant" tone. This is prompt engineering, not architecture.
 
@@ -48,25 +36,7 @@ Do not write code until Brent has provided the example text. This is a pair-prog
 
 ---
 
-### 3. Verify the mine has a dedicated Gemini key
-
-Suspected during the late-night diagnosis but not confirmed. Trace the mine's intelligence path: when `marketIntelligenceWorker` or `factExtractionWorker` runs, which Gemini key does it use? Is it (a) a dedicated mine key, (b) a platform fallback key, or (c) the first tenant's key it finds?
-
-If the mine is borrowing a tenant's key, that's a billing leak and a silent failure risk (if that tenant's key dies, the mine dies with it).
-
-Report findings. Do not fix until Brent has decided the architecture.
-
----
-
-### 4. Verify admin hatch + all callers use new field names
-
-PR #281 renamed `icpBuilder` → `icpProspect` and `icpCustomer` → `icpProduct` at 19:06 PDT on 2026-04-09. The admin hatch route `fdfc803` was still sending the OLD field names at 18:12 PDT — and continued to run at 19:41 PDT (18 minutes after the rename merged), which is how the lobotomy was created.
-
-**Audit required:** grep the codebase for `icpBuilder` and `icpCustomer`. Every hit that is not in a migration file, archived doc, or test fixture should be fixed. Verify the admin hatch client (wherever it lives — dashboard, Claude Code session, a script) is sending the new field names.
-
----
-
-### 5. Stripe cleanup — branding + dead endpoints + signature fix
+### 2. Stripe cleanup — branding + dead endpoints + signature fix
 
 Stripe payment flow is live and proven. Remaining cleanup:
 
@@ -74,12 +44,11 @@ Stripe payment flow is live and proven. Remaining cleanup:
 2. **Deactivate 2 dead botcraftwrks.ai webhook endpoints** in Stripe dashboard.
 3. **Deactivate $1 test Payment Link** (`plink_1TLEtH0Fp3hGvMoU3Cp4xMhf`) and refund the test charge.
 4. **Fix `STRIPE_WEBHOOK_SECRET` mismatch** — secret in Cloud Run doesn't match signing secret for endpoint `we_1TAPuv0Fp3hGvMoUYrbo6ira`. Update via `gcloud secrets` or re-roll the webhook signing secret in Stripe.
-5. **Update webhook log message** — handler says "STAN STORE PRE-SALE", should say "Stripe".
-6. **Delete Paddle webhook dead code** — `POST /webhooks/paddle` handler is unused.
+5. **Delete Stan Store dead code** — `POST /webhooks/stan-store`, stan-store-onboarding queue/worker, Stan Store URL references in reactivate.ts and subscriptions.ts. Separate task — touches multiple files.
 
 ---
 
-### 6. Admin dashboard — build dependency health endpoint
+### 3. Admin dashboard — build dependency health endpoint
 
 **There is no dependency health endpoint on the backend at all.** `GET /admin/pipeline/health` at `api/src/routes/admin.ts:906` looks like it should be one based on its name, but it is actually a **mine statistics** endpoint — it returns `totalFacts`, `factsLast24h`, `byVertical`, `byRegion`, `byCapturedBy`, and a single `healthy` boolean computed from "did any facts land in the last 24h AND newest fact within 48h". It does NOT check Serper, Gemini platform keys, Resend, Oxylabs, Postgres connectivity (beyond the query implicitly needing the DB), Redis, any BullMQ worker, Telegram webhook delivery, Stripe webhook, or OpenRouter. The dashboard UI (`web-onboarding/src/app/admin/dashboard/page.tsx`) does not call it either.
 
@@ -94,7 +63,7 @@ Either build a new `GET /admin/dependencies/health` endpoint for the real depend
 
 ---
 
-### 7. Admin dashboard — mine health panel
+### 4. Admin dashboard — mine health panel
 
 Add a mine status card to the admin dashboard surfacing:
 - Last run timestamp + duration
