@@ -260,8 +260,6 @@ AI sales agent SaaS. Operator brings their own Telegram bot token (BYOB — from
 | **$1 test Payment Link still active** | `plink_1TLEtH0Fp3hGvMoU3Cp4xMhf` — deactivate after testing done | Deactivate + refund test charge |
 | **Webhook log says "STAN STORE PRE-SALE"** | Misleading log message in webhook handler | Update to say "Stripe" |
 | Voice layer generic | Bot responds intelligently but not in Brent's voice | Write voice examples, wire into network-marketer flavor system prompt |
-| Admin hatch stale field-name risk | fdfc803 route sent `icpBuilder`/`icpCustomer` after PR #281 rename; current caller status unverified | Verify admin hatch + all callers use new field names |
-| Mine dedicated Gemini key status unknown | Mine may be borrowing a tenant's key — billing leak + silent failure risk | Trace mine intelligence path |
 | Reddit 403 from Cloud Run | Mine uses Oxylabs + Serper fallback (working) | Awaiting Reddit API or proxy |
 | Admin alert markdown bug | Alerts with underscores fail silently | Fix when convenient |
 | Gemini model cache staleness (potential) | `getGeminiModelWithCache` at ai.ts:1350 may hold stale prompt between deploys | Monitor only |
