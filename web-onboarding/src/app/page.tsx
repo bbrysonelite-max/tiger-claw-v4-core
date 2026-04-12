@@ -4,7 +4,7 @@ import { Suspense } from "react";
 import { motion } from "framer-motion";
 import { Zap, Bot, Shield, ArrowRight } from "lucide-react";
 
-const STRIPE_PAYMENT_LINK = "https://buy.stripe.com/28E7sDgO22Gs5PI8kw9AA06";
+const STRIPE_PAYMENT_LINK = "https://buy.stripe.com/14A8wHapE4OAemeeIU9AA07";
 
 // Suspense boundary required by Next.js App Router
 export default function Home() {
