@@ -10,9 +10,9 @@
 
 ## Context — Where We Are
 
-Session 21 hardened the mine, introduced the MineCampaign abstraction, and shipped the first SSDI lead delivery (35 leads, avg IPP score 74/100) to Pat Sullivan 2026-04-12. PRs #301–#309 shipped (see SOTU.md). Flavors collapsed to 1 operator-facing (`network-marketer`) + 1 internal (`admin`). SSDI Ticket to Work is live as a `MineCampaign`. CSV lead export endpoint is live at `GET /admin/campaigns/:key/leads`. Awaiting Pat's quality review on the first batch.
+Session 22 shipped the Stripe payment flow end-to-end and eliminated the email gate. PRs #310–#313 merged. Payment Link → webhook → user/bot/subscription → wizard auto-verify is proven with a $1 test purchase. The wizard is now locked — `/signup` without a Stripe `session_id` redirects to the landing page. No email form anywhere.
 
-`brents-tiger-01-mns7wcqk` (Tiger Proof / Nu Skin) is still the only active bot. Cloud Run is on the post-#307 revision, healthy.
+`brents-tiger-01-mns7wcqk` (Tiger Proof / Nu Skin) is still the only active bot. Awaiting Pat Sullivan's quality review on first SSDI batch (35 leads, delivered 2026-04-12).
 
 ---
 
@@ -66,23 +66,16 @@ PR #281 renamed `icpBuilder` → `icpProspect` and `icpCustomer` → `icpProduct
 
 ---
 
-### 5. Integrate Stripe — replace Paddle
+### 5. Stripe cleanup — branding + dead endpoints + signature fix
 
-**Decision (2026-04-11):** Paddle is dropped. Payment provider is Stripe.
+Stripe payment flow is live and proven. Remaining cleanup:
 
-What exists today: a Paddle webhook handler (`POST /webhooks/paddle`) and Paddle-specific subscription creation logic. None of it is re-usable — Stripe's event model is different.
-
-**Build:**
-1. Create Stripe product + price in the Stripe dashboard.
-2. Replace `POST /webhooks/paddle` with `POST /webhooks/stripe` — handle `checkout.session.completed` (or `payment_intent.succeeded` depending on Stripe Checkout vs Payment Links flow). Create user + bot + subscription on success. Verify Stripe webhook signature.
-3. Replace Paddle checkout URL generation with a Stripe Checkout Session or Payment Link.
-4. Test the full flow end to end:
-
-```
-Checkout → Stripe fires checkout.session.completed → POST /webhooks/stripe → user + bot + subscription created → Wizard hatch → bot live
-```
-
-This is the entire business model. It has never been tested end to end. Cannot take a paying customer without this.
+1. **Stripe branding** (dashboard only): Change business name from "Bot Craft Automation" → "Tiger Claw". Update product description from "AI Recruiting Agent". Set brand color to orange.
+2. **Deactivate 2 dead botcraftwrks.ai webhook endpoints** in Stripe dashboard.
+3. **Deactivate $1 test Payment Link** (`plink_1TLEtH0Fp3hGvMoU3Cp4xMhf`) and refund the test charge.
+4. **Fix `STRIPE_WEBHOOK_SECRET` mismatch** — secret in Cloud Run doesn't match signing secret for endpoint `we_1TAPuv0Fp3hGvMoUYrbo6ira`. Update via `gcloud secrets` or re-roll the webhook signing secret in Stripe.
+5. **Update webhook log message** — handler says "STAN STORE PRE-SALE", should say "Stripe".
+6. **Delete Paddle webhook dead code** — `POST /webhooks/paddle` handler is unused.
 
 ---
 

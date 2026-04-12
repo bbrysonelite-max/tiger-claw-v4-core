@@ -95,8 +95,8 @@ function HomeContent() {
 
         <p className="text-white/30 text-xs mt-16">
           Already purchased?{" "}
-          <a href="/signup" className="text-white/60 hover:text-white underline underline-offset-2">
-            Set up your agent →
+          <a href="mailto:support@tigerclaw.io" className="text-white/60 hover:text-white underline underline-offset-2">
+            Contact support →
           </a>
         </p>
       </div>

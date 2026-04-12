@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, Suspense } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   Loader2,
@@ -22,16 +22,6 @@ const DEFAULT_FLAVOR = "network-marketer";
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
-
-interface VerifyResponse {
-  ok?: boolean;
-  valid?: boolean;
-  botId?: string;
-  sessionToken?: string;
-  slug?: string;
-  message?: string;
-  error?: string;
-}
 
 interface HatchResponse {
   ok?: boolean;
@@ -57,126 +47,6 @@ interface FormErrors {
   telegramToken?: string;
   aiKey?: string;
   general?: string;
-}
-
-// ---------------------------------------------------------------------------
-// Email Gate (isolated, removable)
-// ---------------------------------------------------------------------------
-
-interface EmailGateProps {
-  prefillEmail: string;
-  onVerified: (email: string, botId: string, sessionToken: string) => void;
-}
-
-function EmailGate({ prefillEmail, onVerified }: EmailGateProps) {
-  const [email, setEmail] = useState(prefillEmail);
-  const [status, setStatus] = useState<"idle" | "checking" | "error">("idle");
-  const [errorMsg, setErrorMsg] = useState("");
-
-  const verify = useCallback(
-    async (emailToCheck: string) => {
-      const trimmed = emailToCheck.trim();
-      if (!trimmed) return;
-
-      setStatus("checking");
-      setErrorMsg("");
-
-      try {
-        const res = await fetch(`${API_URL}/auth/verify-purchase`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: trimmed }),
-        });
-        const data: VerifyResponse = await res.json();
-
-        if ((data.ok || data.valid) && data.botId) {
-          localStorage.setItem("tc_session_token", data.sessionToken ?? "");
-          localStorage.setItem("tc_bot_id", data.botId);
-          onVerified(trimmed, data.botId, data.sessionToken ?? "");
-        } else {
-          setStatus("error");
-          setErrorMsg(
-            data.message || data.error ||
-              "We couldn't find a purchase for this email. Contact support at support@tigerclaw.io."
-          );
-        }
-      } catch {
-        setStatus("error");
-        setErrorMsg("Could not reach the server. Check your connection and try again.");
-      }
-    },
-    [onVerified]
-  );
-
-  // Auto-verify when email is prefilled from URL param
-  useEffect(() => {
-    if (prefillEmail) {
-      verify(prefillEmail);
-    }
-  }, [prefillEmail, verify]);
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    verify(email);
-  };
-
-  return (
-    <div className="min-h-screen flex items-center justify-center px-4 py-16">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-orange-500/10 border border-orange-500/20 mb-4">
-            <span className="text-3xl">⚡</span>
-          </div>
-          <h1 className="text-3xl font-bold text-white mb-2">Set Up Your Agent</h1>
-          <p className="text-white/60">Enter the email you used to purchase Tiger Claw.</p>
-        </div>
-
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => {
-              setEmail(e.target.value);
-              setStatus("idle");
-              setErrorMsg("");
-            }}
-            placeholder="your@email.com"
-            required
-            className="w-full bg-zinc-900/80 border border-white/20 rounded-xl px-4 py-4 text-base text-white placeholder:text-white/40 outline-none focus:border-orange-500/60 transition-colors min-h-[56px]"
-          />
-
-          {status === "error" && (
-            <div className="flex items-start gap-2 text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">
-              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-              <span>{errorMsg}</span>
-            </div>
-          )}
-
-          <button
-            type="submit"
-            disabled={status === "checking"}
-            className="w-full h-14 rounded-xl bg-orange-500 hover:bg-orange-400 text-black font-bold text-lg flex items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed disabled:scale-100"
-          >
-            {status === "checking" ? (
-              <>
-                <Loader2 className="w-5 h-5 animate-spin" />
-                Verifying purchase...
-              </>
-            ) : (
-              "Continue →"
-            )}
-          </button>
-        </form>
-
-        <p className="text-center text-white/40 text-sm mt-6">
-          Need help?{" "}
-          <a href="mailto:support@tigerclaw.io" className="text-orange-400 hover:underline">
-            support@tigerclaw.io
-          </a>
-        </p>
-      </div>
-    </div>
-  );
 }
 
 // ---------------------------------------------------------------------------
@@ -602,11 +472,12 @@ function SignupForm({ email, botId }: SignupFormProps) {
 
 function SignupPageInner() {
   const searchParams = useSearchParams();
-  const emailParam = searchParams.get("email") ?? "";
+  const sessionId = searchParams.get("session_id") ?? "";
 
   const [verified, setVerified] = useState(false);
   const [verifiedEmail, setVerifiedEmail] = useState("");
   const [botId, setBotId] = useState("");
+  const [stripeError, setStripeError] = useState("");
 
   const handleVerified = (email: string, id: string, _sessionToken: string) => {
     setVerifiedEmail(email);
@@ -614,8 +485,72 @@ function SignupPageInner() {
     setVerified(true);
   };
 
+  // Auto-verify from Stripe session_id — customer never types email
+  useEffect(() => {
+    if (!sessionId || verified) return;
+
+    (async () => {
+      try {
+        const res = await fetch(`${API_URL}/auth/stripe-session?session_id=${encodeURIComponent(sessionId)}`);
+        const data = await res.json();
+
+        if (res.ok && data.ok && data.botId) {
+          localStorage.setItem("tc_session_token", data.sessionToken ?? "");
+          localStorage.setItem("tc_bot_id", data.botId);
+          handleVerified(data.email, data.botId, data.sessionToken ?? "");
+        } else {
+          setStripeError(data.error || "Could not verify payment session.");
+        }
+      } catch {
+        setStripeError("Could not reach the server. Please refresh the page.");
+      }
+    })();
+  }, [sessionId, verified]);
+
+  // Stripe session auto-verify in progress
+  if (sessionId && !verified && !stripeError) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center px-4 py-16 gap-4">
+        <Loader2 className="w-8 h-8 text-orange-500 animate-spin" />
+        <p className="text-white/60 text-base">Verifying your payment...</p>
+      </div>
+    );
+  }
+
+  // Stripe session failed — show error + link back to purchase
+  if (sessionId && stripeError) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center px-4 py-16 gap-6">
+        <div className="flex items-start gap-2 text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 max-w-md">
+          <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+          <span>{stripeError}</span>
+        </div>
+        <a
+          href="/"
+          className="h-14 px-8 rounded-xl bg-orange-500 hover:bg-orange-400 text-black font-bold text-base flex items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-[0.98]"
+        >
+          ← Back to Tiger Claw
+        </a>
+        <p className="text-white/40 text-sm">
+          Need help?{" "}
+          <a href="mailto:support@tigerclaw.io" className="text-orange-400 hover:underline">
+            support@tigerclaw.io
+          </a>
+        </p>
+      </div>
+    );
+  }
+
+  // No session_id — this page requires a purchase. Send them to buy.
   if (!verified) {
-    return <EmailGate prefillEmail={emailParam} onVerified={handleVerified} />;
+    if (typeof window !== "undefined") {
+      window.location.href = "/";
+    }
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-orange-500 animate-spin" />
+      </div>
+    );
   }
 
   return <SignupForm email={verifiedEmail} botId={botId} />;
