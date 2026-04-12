@@ -38,15 +38,9 @@ The mine finds the signal. Tiger Strike creates the touch. The agent closes the 
 
 ---
 
-## 3. Payment Gate Is Open
+## 3. Payment Gate Is Closed — Stripe Live
 
-**Failure:** No Paddle product/price. No checkout URL. Can't charge anyone.
-
-**The fix:** Don't wait. Charge manually right now.
-
-Founding members provisioned via admin hatch. Brent takes payment however he takes it. Agent live within the hour. Revenue today, not after Paddle approves.
-
-When Paddle approves, the checkout URL goes live and the manual process stops. Nothing changes in the platform.
+Stripe Payment Link ($147/mo) → webhook → auto-provision → wizard redirect with `session_id`. No manual provisioning needed. Paddle deleted (PR #314).
 
 ---
 
@@ -90,9 +84,9 @@ Has not yet fired at 2 AM — verify after next mine cycle that facts move from 
 
 ---
 
-## 9. Wizard — Leave It Alone
+## 9. Wizard — 2 Steps Only
 
-The wizard is a single scrolling page with 5 sections. The ICP questions give the operator a sense of ownership — they feel like they're programming their agent. That's a feature. Do not simplify or remove sections. The wizard works.
+The wizard is a single scrolling page with 2 steps: (1) Telegram bot token, (2) Gemini API key. Operator name comes from Stripe automatically. Bot defaults to "Tiger." IPP pre-seeded from flavor config. No interview, no name field, no ICP questions.
 
 ---
 
@@ -125,7 +119,7 @@ Alternative: Serper already indexes Reddit and works. Tiger Strike can pull targ
 | 5 | Wire Tiger Strike Engage after mine | ✅ Done — verify after next 2 AM run |
 | 6 | Confirm Tiger Strike Engage is driving inbound | After 2 AM verification |
 | 7 | Charge first founding member manually | When ready |
-| 8 | Paddle product + price live | When approved |
+| 8 | ~~Paddle~~ → Stripe live | ✅ Done — PR #314 |
 | 9 | Karpathy Ratchet | After #5 proven |
 
 ---
