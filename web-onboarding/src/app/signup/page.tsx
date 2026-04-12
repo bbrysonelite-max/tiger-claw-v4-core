@@ -7,59 +7,17 @@ import {
   AlertCircle,
   ExternalLink,
   Rocket,
+  Copy,
+  Check,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import TelegramTokenInput from "@/components/signup/TelegramTokenInput";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://api.tigerclaw.io";
 
-// ---------------------------------------------------------------------------
-// Flavor data (9 customer-facing flavors)
-// ---------------------------------------------------------------------------
-
-interface Flavor {
-  key: string;
-  displayName: string;
-  description: string;
-}
-
-const FLAVORS: Flavor[] = [
-  {
-    key: "network-marketer",
-    displayName: "Network Marketer",
-    description: "Finds prospects ready to join or buy from a network marketing business",
-  },
-  {
-    key: "real-estate",
-    displayName: "Real Estate Agent",
-    description: "Finds buyers and sellers ready to make a move",
-  },
-  {
-    key: "health-wellness",
-    displayName: "Health & Wellness",
-    description: "Finds people ready to invest in their health transformation",
-  },
-  {
-    key: "mortgage-broker",
-    displayName: "Mortgage Broker",
-    description: "Finds homebuyers and homeowners ready to talk loans",
-  },
-  {
-    key: "lawyer",
-    displayName: "Lawyer / Attorney",
-    description: "Finds people who need legal help and are ready to consult",
-  },
-  {
-    key: "airbnb-host",
-    displayName: "Airbnb Host",
-    description: "Finds travelers and helps maximize bookings",
-  },
-  {
-    key: "plumber",
-    displayName: "Plumber / Trades Professional",
-    description: "Finds homeowners and businesses that need trades work",
-  },
-];
+// The only customer-facing flavor. Hardcoded — no picker. Multi-product
+// returns later when there's a second product to sell.
+const DEFAULT_FLAVOR = "network-marketer";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -89,14 +47,12 @@ interface HatchResponse {
 }
 
 interface FormState {
-  flavor: string;
   agentName: string;
   telegramToken: string;
   aiKey: string;
 }
 
 interface FormErrors {
-  flavor?: string;
   agentName?: string;
   telegramToken?: string;
   aiKey?: string;
@@ -228,54 +184,100 @@ function EmailGate({ prefillEmail, onVerified }: EmailGateProps) {
 // ---------------------------------------------------------------------------
 
 interface SuccessStateProps {
-  agentName: string;
   botUsername: string;
 }
 
-function SuccessState({ agentName, botUsername }: SuccessStateProps) {
+function SuccessState({ botUsername }: SuccessStateProps) {
   const [slug, setSlug] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     setSlug(localStorage.getItem("tc_slug"));
   }, []);
 
+  const telegramUrl = `https://t.me/${botUsername}`;
+  const displayLink = `t.me/${botUsername}`;
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(telegramUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard API can fail in insecure contexts — fall back to prompt
+      window.prompt("Copy this link:", telegramUrl);
+    }
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center px-4 py-16">
-      <div className="w-full max-w-lg text-center">
-        <h1 className="text-4xl font-bold text-white mb-2">{agentName} is ready to hunt.</h1>
-        <p className="text-white/50 text-base mb-10">
-          Your agent already knows who you&apos;re hunting. One message starts it.
+      <div className="w-full max-w-xl">
+        <div className="bg-zinc-900/60 border border-white/10 rounded-3xl p-8 sm:p-12 text-center">
+          <div className="text-5xl mb-4">🐯</div>
+          <h1 className="text-3xl sm:text-4xl font-bold text-white mb-3">Your agent is live.</h1>
+          <p className="text-white/60 text-base mb-8 max-w-md mx-auto">
+            Share this link. Your agent already knows who to look for, what to say, and when to book
+            the call.
+          </p>
+
+          <div className="bg-zinc-950/80 border border-white/10 rounded-xl px-4 py-4 mb-6">
+            <code className="text-orange-400 font-mono text-base sm:text-lg break-all">
+              {displayLink}
+            </code>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-3">
+            <button
+              type="button"
+              onClick={handleCopy}
+              className="flex-1 h-14 rounded-xl bg-orange-500 hover:bg-orange-400 text-black font-bold text-base flex items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-[0.98]"
+            >
+              {copied ? (
+                <>
+                  <Check className="w-5 h-5" />
+                  Copied!
+                </>
+              ) : (
+                <>
+                  <Copy className="w-5 h-5" />
+                  Copy link
+                </>
+              )}
+            </button>
+            <a
+              href={telegramUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-1 h-14 rounded-xl bg-white/5 border border-white/20 hover:bg-white/10 hover:border-white/30 text-white font-bold text-base flex items-center justify-center gap-2 transition-all"
+            >
+              Open in Telegram
+              <ExternalLink className="w-4 h-4 shrink-0" />
+            </a>
+          </div>
+        </div>
+
+        <p className="text-center text-white/40 text-sm mt-6">
+          Lost your bot? Go back to{" "}
+          <a
+            href="https://t.me/BotFather"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-orange-400 hover:underline"
+          >
+            @BotFather
+          </a>{" "}
+          — your token and bot username are always there.
         </p>
 
-        <a
-          href={`https://t.me/${botUsername}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="w-full flex items-center justify-center gap-3 bg-[#0088cc] hover:bg-[#0099dd] text-white font-bold text-xl px-6 py-5 rounded-2xl transition-all hover:scale-[1.02] active:scale-[0.98] mb-8"
-        >
-          Open Telegram → Meet {agentName}
-          <ExternalLink className="w-5 h-5 shrink-0" />
-        </a>
-
-        <ul className="flex flex-col gap-3 text-left mb-10">
-          <li className="text-white/70 text-base">
-            Say hello. Your agent already knows who you&apos;re hunting.
-          </li>
-          <li className="text-white/70 text-base">
-            Every morning at 7 AM, {agentName} sends you a hunt report.
-          </li>
-          <li className="text-white/70 text-base">
-            The Hive is watching. Every run makes the intelligence sharper.
-          </li>
-        </ul>
-
         {slug && (
-          <a
-            href={`/dashboard?slug=${slug}`}
-            className="text-white/30 hover:text-white/60 text-sm transition-colors"
-          >
-            View your dashboard →
-          </a>
+          <p className="text-center mt-4">
+            <a
+              href={`/dashboard?slug=${slug}`}
+              className="text-white/30 hover:text-white/60 text-sm transition-colors"
+            >
+              View your dashboard →
+            </a>
+          </p>
         )}
       </div>
     </div>
@@ -319,7 +321,6 @@ interface SignupFormProps {
 
 function SignupForm({ email, botId }: SignupFormProps) {
   const [form, setForm] = useState<FormState>({
-    flavor: "",
     agentName: "",
     telegramToken: "",
     aiKey: "",
@@ -328,7 +329,7 @@ function SignupForm({ email, botId }: SignupFormProps) {
   const [telegramValid, setTelegramValid] = useState(false);
   const [telegramUsername, setTelegramUsername] = useState<string | null>(null);
   const [launching, setLaunching] = useState(false);
-  const [success, setSuccess] = useState<{ agentName: string; botUsername: string } | null>(null);
+  const [success, setSuccess] = useState<{ botUsername: string } | null>(null);
 
   const updateForm = (field: keyof FormState, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -352,7 +353,6 @@ function SignupForm({ email, botId }: SignupFormProps) {
   const validate = (): boolean => {
     const newErrors: FormErrors = {};
 
-    if (!form.flavor) newErrors.flavor = "Please select an agent type.";
     if (!form.agentName.trim()) newErrors.agentName = "Agent name is required.";
     else if (form.agentName.trim().length > 30)
       newErrors.agentName = "Agent name must be 30 characters or fewer.";
@@ -378,7 +378,7 @@ function SignupForm({ email, botId }: SignupFormProps) {
         botId,
         name: form.agentName.trim(),
         email,
-        flavor: form.flavor,
+        flavor: DEFAULT_FLAVOR,
         botToken: form.telegramToken.trim(),
         aiKey: form.aiKey.trim(),
         preferredChannel: "telegram" as const,
@@ -400,7 +400,6 @@ function SignupForm({ email, botId }: SignupFormProps) {
           localStorage.setItem("tc_slug", tenantSlug);
         }
         setSuccess({
-          agentName: form.agentName.trim(),
           botUsername: data.botUsername || telegramUsername || form.agentName.trim(),
         });
       } else {
@@ -410,7 +409,6 @@ function SignupForm({ email, botId }: SignupFormProps) {
           telegramBotToken: "telegramToken",
           aiKey: "aiKey",
           name: "agentName",
-          flavor: "flavor",
         };
 
         const fieldError = data.field ? fieldMap[data.field] : undefined;
@@ -428,7 +426,7 @@ function SignupForm({ email, botId }: SignupFormProps) {
   };
 
   if (success) {
-    return <SuccessState agentName={success.agentName} botUsername={success.botUsername} />;
+    return <SuccessState botUsername={success.botUsername} />;
   }
 
   return (
@@ -452,56 +450,12 @@ function SignupForm({ email, botId }: SignupFormProps) {
 
         <div className="flex flex-col gap-10">
           {/* ---------------------------------------------------------------- */}
-          {/* Section 1 — Flavor picker                                        */}
+          {/* Section 1 — Agent name                                           */}
           {/* ---------------------------------------------------------------- */}
           <section>
             <SectionHeading
               number={1}
-              title="What kind of agent do you want?"
-              subtitle="Choose the niche that best matches your business."
-            />
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {FLAVORS.map((flavor) => (
-                <button
-                  key={flavor.key}
-                  type="button"
-                  onClick={() => updateForm("flavor", flavor.key)}
-                  className={cn(
-                    "text-left p-4 rounded-xl border transition-all",
-                    form.flavor === flavor.key
-                      ? "bg-orange-500/10 border-orange-500/60 ring-1 ring-orange-500/40"
-                      : "bg-zinc-900/60 border-white/10 hover:border-white/30 hover:bg-zinc-900"
-                  )}
-                >
-                  <div
-                    className={cn(
-                      "font-semibold text-sm mb-1 transition-colors",
-                      form.flavor === flavor.key ? "text-orange-400" : "text-white"
-                    )}
-                  >
-                    {flavor.displayName}
-                  </div>
-                  <div className="text-white/50 text-xs leading-relaxed">{flavor.description}</div>
-                </button>
-              ))}
-            </div>
-
-            {errors.flavor && (
-              <p className="mt-3 text-sm text-red-400 flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 shrink-0" />
-                {errors.flavor}
-              </p>
-            )}
-          </section>
-
-          {/* ---------------------------------------------------------------- */}
-          {/* Section 2 — Agent name                                           */}
-          {/* ---------------------------------------------------------------- */}
-          <section>
-            <SectionHeading
-              number={2}
-              title="Give your agent a name"
+              title="Name your Tiger"
               subtitle="This becomes your bot's display name in Telegram."
             />
 
@@ -532,11 +486,11 @@ function SignupForm({ email, botId }: SignupFormProps) {
           </section>
 
           {/* ---------------------------------------------------------------- */}
-          {/* Section 3 — Telegram                                             */}
+          {/* Section 2 — Telegram                                             */}
           {/* ---------------------------------------------------------------- */}
           <section>
             <SectionHeading
-              number={3}
+              number={2}
               title="Connect your Telegram bot"
               subtitle="Your agent needs a Telegram bot token to operate."
             />
@@ -550,11 +504,11 @@ function SignupForm({ email, botId }: SignupFormProps) {
           </section>
 
           {/* ---------------------------------------------------------------- */}
-          {/* Section 4 — AI key                                               */}
+          {/* Section 3 — AI key                                               */}
           {/* ---------------------------------------------------------------- */}
           <section>
             <SectionHeading
-              number={4}
+              number={3}
               title="Add your AI key"
               subtitle="Your agent uses Google Gemini. The key stays encrypted on our servers."
             />

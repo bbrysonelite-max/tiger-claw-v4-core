@@ -1,11 +1,15 @@
 "use client";
 
-import { useState, Suspense } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { Suspense } from "react";
 import { motion } from "framer-motion";
-import { Zap, Bot, Shield, ArrowRight, Loader2 } from "lucide-react";
+import { Zap, Bot, Shield, ArrowRight } from "lucide-react";
 
-// Suspense boundary required by Next.js App Router for useSearchParams
+// TODO: Paste Stripe Payment Link URL here when it's created in the Stripe dashboard.
+// Product: Tiger Claw, Price: $147/mo. Success redirect should be set in the Stripe
+// dashboard to: https://tigerclaw.io/signup?email={CUSTOMER_EMAIL}
+const STRIPE_PAYMENT_LINK = "https://buy.stripe.com/TODO_REPLACE_ME";
+
+// Suspense boundary required by Next.js App Router
 export default function Home() {
   return (
     <Suspense>
@@ -15,18 +19,6 @@ export default function Home() {
 }
 
 function HomeContent() {
-  const searchParams = useSearchParams();
-  const router = useRouter();
-  const [email, setEmail] = useState(searchParams.get("email") ?? "");
-  const [error, setError] = useState("");
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const trimmed = email.trim().toLowerCase();
-    if (!trimmed) { setError("Please enter your email."); return; }
-    router.push(`/signup?email=${encodeURIComponent(trimmed)}`);
-  };
-
   return (
     <div className="relative min-h-[calc(100vh-64px)] overflow-hidden flex flex-col justify-center">
       {/* Gradient orbs */}
@@ -48,10 +40,10 @@ function HomeContent() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.1 }}
-          className="text-6xl md:text-8xl font-black tracking-tighter mb-6 leading-tight max-w-4xl mx-auto"
+          className="text-5xl md:text-7xl font-black tracking-tighter mb-6 leading-[1.05] max-w-4xl mx-auto"
         >
-          Deploy Your <br className="hidden md:block" />
-          <span className="gradient-text">Agent in 2 Minutes</span>
+          A thousand recruits <br className="hidden md:block" />
+          <span className="gradient-text">in your pocket.</span>
         </motion.h1>
 
         <motion.p
@@ -63,34 +55,23 @@ function HomeContent() {
           Your bot. Your AI key. Your leads. Running while you sleep.
         </motion.p>
 
-        <motion.form
-          onSubmit={handleSubmit}
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.3 }}
-          className="flex flex-col items-center gap-3 max-w-md mx-auto"
+          className="flex flex-col items-center gap-3"
         >
-          <p className="text-white/40 text-sm mb-1">Already purchased? Enter your email to activate.</p>
-          <div className="flex w-full gap-2">
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => { setEmail(e.target.value); setError(""); }}
-              onKeyDown={(e) => e.key === "Enter" && handleSubmit(e as any)}
-              placeholder="your@email.com"
-              className="flex-1 h-12 rounded-full px-5 bg-white/10 border border-white/20 text-white placeholder-white/40 focus:outline-none focus:border-primary text-sm"
-            />
-            <button
-              type="submit"
-              className="group relative inline-flex h-12 items-center justify-center overflow-hidden rounded-full font-bold px-6 bg-primary text-black transition-all hover:scale-105 active:scale-95 whitespace-nowrap"
-            >
-              <span className="flex items-center gap-2">
-                Launch <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-              </span>
-            </button>
-          </div>
-          {error && <p className="text-red-400 text-sm">{error}</p>}
-        </motion.form>
+          <a
+            href={STRIPE_PAYMENT_LINK}
+            className="group relative inline-flex h-16 items-center justify-center overflow-hidden rounded-full font-bold px-10 bg-primary text-black text-lg transition-all hover:scale-105 active:scale-95"
+          >
+            <span className="flex items-center gap-3">
+              Get your agent now
+              <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+            </span>
+          </a>
+          <p className="text-white/40 text-sm mt-2">$147/month · 7-day money-back guarantee</p>
+        </motion.div>
 
         <motion.div
           initial={{ opacity: 0 }}
@@ -114,6 +95,13 @@ function HomeContent() {
             description="Your agent runs 24/7. You wake up to leads, scores, and follow-ups already queued."
           />
         </motion.div>
+
+        <p className="text-white/30 text-xs mt-16">
+          Already purchased?{" "}
+          <a href="/signup" className="text-white/60 hover:text-white underline underline-offset-2">
+            Set up your agent →
+          </a>
+        </p>
       </div>
     </div>
   );
