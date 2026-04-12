@@ -38,7 +38,7 @@ No chaining unrelated changes into one PR. Each PR does one thing. The title des
 
 ## 4. Test Before Opening a PR
 
-Run `npm test` from `api/`. All **456 tests** must pass. If they fail, fix them before opening the PR.
+Run `npm test` from `api/`. All **452 tests** must pass. If they fail, fix them before opening the PR.
 
 ---
 

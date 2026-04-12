@@ -10,20 +10,15 @@ Tiger Claw is an AI agent that hunts for qualified prospects 24/7 and books them
 
 This is what the platform is being built to do. Items marked ⚠️ are not yet live.
 
-### Signup — Single Page, 5 Sections ✅ Live
+### Signup — Stripe → 2-Step Wizard ✅ Live
 
-The wizard is a single scrolling page at `wizard.tigerclaw.io`. All sections visible at once. No modal steps.
+Customer pays via Stripe Payment Link ($147/mo). Stripe redirects to `wizard.tigerclaw.io/signup?session_id={ID}`. Operator name comes from Stripe automatically.
 
-1. **What kind of agent do you want?** — 8 flavor cards (Network Marketer, Real Estate Agent, Health & Wellness, Mortgage Broker, Lawyer/Attorney, Airbnb Host, Plumber/Trades, Sales Tiger)
-2. **Give your agent a name** — display name, 30 char limit
-3. **Who are you trying to reach?** — ideal customer description, problem, where they spend time online
-4. **Connect your Telegram bot** — BotFather instructions + token input (AES-256-GCM encrypted)
-5. **Add your AI key** — Gemini API key from aistudio.google.com
-6. **LAUNCH MY AGENT** button
+The wizard is a single scrolling page with 2 steps:
+1. **Connect your Telegram bot** — BotFather instructions + token input (AES-256-GCM encrypted)
+2. **Add your AI key** — Gemini API key from aistudio.google.com
 
-The ICP questions in section 3 give the operator a sense of ownership — they feel like they're programming their agent. This is intentional. Do not remove or simplify the wizard.
-
-Interior Designer was cut from the API flavor registry (PR #233) and removed from the wizard frontend (PR #261). 8 valid flavors remain.
+That's it. Bot defaults to "Tiger." IPP pre-seeded from flavor config (`network-marketer`). No interview, no name field, no ICP questions. One operator-facing flavor.
 
 ### After Signup
 The agent hatches immediately — calibrated, hunting-ready, no interview. ✅ Live (PR #255)
@@ -48,14 +43,14 @@ The operator sets their availability: one or two Zoom slots per day. ⚠️ Cale
 
 | Item | State |
 |------|-------|
-| Agent hatches calibrated, no interview | ✅ Live — PR #255 |
-| Wizard | ✅ Live — 8 flavors, working, do not change |
+| Agent hatches calibrated, no interview | ✅ Live — PRs #255, #317 |
+| Wizard — 2 steps (token + key) | ✅ Live — 1 flavor (network-marketer), Stripe payment gate closed |
 | First impression in 4 languages | ✅ Live — PR #261. Fires on first `/start` per chatId, language-matched after. |
 | Cal.com Zoom booking | ✅ Built — `tiger_book_zoom` registered. Needs `calcomBookingUrl` set to activate. |
-| Tiger Strike Engage wired to mine | ✅ Wired — PR #261. Fires after 2 AM mine cycle. Unverified — check after next run. |
+| Tiger Strike Engage wired to mine | ✅ Wired — PR #261. Fires after 2 AM mine cycle. |
+| Stripe Payment Link | ✅ Live — $147/mo. Paddle deleted (PR #314). |
 | Scout run for any real tenant | ⚠️ Never triggered in production |
 | Real prospect conversation | ⚠️ Zero — only operator has messaged |
-| Paddle checkout URL | ⚠️ No product/price created yet |
 
 ---
 
@@ -97,33 +92,29 @@ The agent runs 24/7. It does not sleep, forget, or have a bad day.
 
 - Not a CRM. Operators don't manage contacts.
 - Not a chatbot that waits for inbound. It hunts.
-- Not a complex setup. One page, LAUNCH MY AGENT.
-- Not configurable ICP — the flavor already knows the customer better than the operator does.
+- Not a complex setup. Stripe checkout → 2-step wizard → live bot.
+- Not configurable IPP — the flavor already knows the prospect better than the operator does.
 
 ---
 
-## Payment Flow — Paddle (The Only Path)
-
-Stan Store-current payment and traffice flow.  Zapier will not work with Stanstore.  Stan's store has no ability to do webhooks, and Stripe  stripe is a viable option and should be considered in the case that paddle doesn't work out. The Zapier webhook never worked. Payment gate is intentionally open until Paddle merchant of record approval comes through. Paddle is currently in review tokens are live.
+## Payment Flow — Stripe (Live)
 
 ```mermaid
 flowchart TD
-    A[Customer buys via\nPaddle checkout URL] --> B[Paddle fires transaction.completed\nto POST /webhooks/paddle]
-    B --> C[HMAC-SHA256 verification\nRedis idempotency check]
-    C --> D[Provision: user + agent + subscription\nstatus: pending_setup]
-    D --> E[Hatch email sent to customer]
-    E --> F[Customer goes to wizard.tigerclaw.io]
-    F --> G[Single page signup\nflavor · agent name · ICP · Telegram token · Gemini key]
+    A[Customer pays via\nStripe Payment Link — $147/mo] --> B[Stripe fires checkout.session.completed\nto POST /webhooks/stripe]
+    B --> C[Stripe signature verification\nRedis idempotency check]
+    C --> D[Provision: user + bot + subscription\nstatus: pending_setup]
+    D --> E[Stripe redirects to\nwizard.tigerclaw.io/signup?session_id=ID]
+    E --> F[GET /auth/stripe-session\nexchanges session_id for user identity]
+    F --> G[2-step wizard\nTelegram token · Gemini key]
     G --> H[POST /wizard/hatch\nBullMQ job enqueued]
-    H --> I[Agent registered · webhook set\nonboard_state.json pre-seeded from flavor ICP]
-    I --> J[Customer messages agent: 'Start']
-    J --> K[Agent first impression\n✅ 4 languages live — first /start only]
+    H --> I[Agent registered · webhook set\nonboard_state.json pre-seeded from flavor IPP]
+    I --> J[Customer messages agent]
+    J --> K[Tiger voice — first impression\n4 languages on first /start only]
     K --> L[Agent hunting-ready\n⚠️ calcomBookingUrl must be set for booking]
 ```
 
-**Why Paddle:** Direct webhook, no middleware, HMAC-verified, handles global VAT as merchant of record.
-
-**Current state:** Paddle webhook is live. No product/price created yet. Payment gate open until approval.
+**Payment gate is closed.** `/signup` without `session_id` redirects to landing page. Paddle deleted (PR #314). Stan Store dead code still present.
 
 ---
 

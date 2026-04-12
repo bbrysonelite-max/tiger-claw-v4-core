@@ -1,29 +1,68 @@
 # Tiger Claw — State of the Union
 
-**Last updated:** 2026-04-11 (Session 22 — Stripe payment flow end-to-end, email gate eliminated, wizard locked to paying customers only)
+**Last updated:** 2026-04-12 (Session 23 — lobotomy root cause found and fixed, wizard simplified to 2 steps, voice proven live)
 **This is the single source of truth. Read nothing else until you finish this file.**
 **No lying. No assuming. No guessing. Every fact here is verified against the live system.**
 
 ---
 
-## Session 22 — Stripe Payment Flow + Email Gate Elimination (2026-04-11)
+## Session 23 — Lobotomy Root Cause + Wizard Simplification (2026-04-12)
 
 ### What shipped today
+
+| PR | What |
+|----|------|
+| #314 | **Paddle webhook deleted, Stripe log messages fixed.** `POST /webhooks/paddle` handler removed. Paddle secrets removed from deploy script. Webhook log updated from "STAN STORE PRE-SALE" to "Stripe checkout completed". |
+| #315 | **3 prospect voice examples added to SOUL_VOICE_BLOCK.** Displaced builder (company shutdown), new mom (maternity leave ending), Sunday scaries (11-year burnout). All close to a Zoom, not a sale. |
+| #316 | **Wizard session resume via localStorage.** Saves email/token/botId to localStorage so wizard survives navigation away (e.g. clicking the Google AI Studio external link). |
+| #317 | **Hatch identity fix.** `identity.name` now uses operator's real name from Stripe (`tenant.name`) instead of bot display name. Removed garbage `productOrOpportunity` (was flavor description "Two-oar AI prospecting engine"). `hasIdentity` gate changed: operator name is sufficient — no longer requires `productOrOpportunity` or `biggestWin`. Wizard "Name your Tiger" removed — 2 steps only. |
+| #318 | **TS fix** — slug generation fallback for optional `name` field. |
+| #319 | **ROOT CAUSE OF LOBOTOMY FOUND AND FIXED.** The Google AI SDK's `getGenerativeModelFromCachedContent()` silently overwrites `systemInstruction` with `cachedContent.systemInstruction`. Cache was created tools-only (no system instruction), so every bot using the cached path ran with **NO system prompt at all** — pure vanilla Gemini. This is why bots said "Hi there! How can I help you today?", exposed tool names (`tiger_scout`), and listed capabilities like a product catalog. Fix: bypass cached content path entirely, use `getGenerativeModel()` which correctly accepts `systemInstruction`. |
+| #320 | **Operator profession from flavor config.** Added `Their profession: network marketing` (from `flavor.professionLabel`) to operator identity block. Prevents bot from asking operator "what do you do?" |
+
+### Root cause analysis — the lobotomy
+
+The lobotomy bug that plagued Sessions 18–23 had **two independent causes**, both now fixed:
+
+1. **Gemini SDK cache overwrites system instruction (PR #319).** `getGenerativeModelFromCachedContent()` at line 1516 of `@google/generative-ai/dist/index.js` does `Object.assign(Object.assign({}, modelParams), { systemInstruction: cachedContent.systemInstruction })`. Since the cache was created with tools only and no system instruction, `cachedContent.systemInstruction` was `undefined`, which **silently replaced** the system prompt we were passing. Every bot on the cached path had zero personality, zero rules, zero voice. This was the root cause of the generic assistant behavior — "Hi there! How can I help you today?" and exposing tool names.
+
+2. **Hatch route writing garbage identity (PR #317).** The wizard hatch route wrote `flavorConfig.description` ("Two-oar AI prospecting engine for network marketing professionals") as `productOrOpportunity` and the bot display name as the operator name. When combined with the `hasIdentity` gate (which checked `productOrOpportunity` or `biggestWin`), the bot entered prospect mode with meaningless template variables.
+
+### Decisions made this session
+
+**No interview. No wizard identity questions.** If the bot asks the operator questions before it can work, 100% churn. The bot wakes up functional immediately using only: operator name (from Stripe), profession (from flavor config), and the flavor config brain (voice examples, macro narrative, tone directives, IPP, objection buckets, nurture templates, market intelligence).
+
+**Wizard is 2 steps.** (1) Connect Telegram bot token, (2) Add Gemini API key. That's it. "Name your Tiger" removed — bot defaults to "Tiger." Operator name comes from Stripe checkout automatically.
+
+**It's IPP, not ICP.** Session 21 renamed Ideal Customer Profile to Ideal Prospect Profile. The terminology matters — stop using ICP.
+
+**Landing page domain decision deferred.** `tigerclaw.io` serves old marketing site. `wizard.tigerclaw.io` serves new landing + wizard. Brent needs to decide what the front door looks like before sending traffic.
+
+### Live test results
+
+Bot hatched through full Stripe → wizard → hatch flow responded with Tiger voice: "Let me take you by the hand and lead you to your brighter future. What's going on for you right now?" — first time a wizard-hatched bot has responded with real voice and personality. Prospect conversation flowed naturally through qualification. Bot correctly identified operator when they switched modes.
+
+Remaining gap: bot asked operator "tell me about your business — what do you do?" because identity block had no profession. Fixed by PR #320 (adding profession from flavor config). Not yet re-tested after that fix.
+
+### Next priority: prompt engineering
+
+The bot has a brain now. But the prompt needs work so the steps are small enough for Gemini to follow reliably. This will require:
+- A test set of bots with pre-loaded tokens
+- Enough Gemini API quota for extensive testing
+- Time to iterate on the system prompt
+
+---
+
+## Session 22 — Stripe Payment Flow + Email Gate Elimination (2026-04-11)
+
+### What shipped
 
 | PR | What |
 |----|------|
 | #310 | **Wizard collapse + dead code deletion.** Deleted OnboardingModal, 5 Step components, success page, 2 e2e specs (1,914 lines). Flavors collapsed — 9-flavor picker removed, hardcoded `network-marketer`. Post-hatch screen rebuilt with copyable t.me link, Copy Link + Open in Telegram buttons, BotFather safety net. New landing hero: "A thousand recruits in your pocket." |
 | #311 | **First Stripe Payment Link** wired into landing CTA. |
 | #312 | **New Payment Link with wizard redirect** — created via Stripe API with `after_completion.redirect.url` pointing to `wizard.tigerclaw.io/signup?session_id={CHECKOUT_SESSION_ID}`. Promotion codes enabled for founder pricing. 7 old Payment Links deactivated. |
-| #313 | **Stripe session auto-verify + email gate eliminated.** New `GET /auth/stripe-session` endpoint exchanges Stripe checkout `session_id` for user identity via Stripe API. Wizard auto-calls it when `session_id` is in URL — customer never types email. EmailGate component deleted entirely. `/signup` without `session_id` redirects to landing page. |
-
-### Decisions made this session
-
-**Email gate is dead.** The old pattern (customer types purchase email to prove they bought) is removed. The only path into the wizard is: Stripe checkout → redirect with `session_id` → auto-verify → 3-step form. No manual email entry anywhere.
-
-**Landing page and wizard are separate pages.** Landing (`/`) sells. Wizard (`/signup`) activates. They are NOT merged into one scrolling page.
-
-**"Already purchased?" links to support email**, not the wizard. Since `/signup` requires a `session_id`, there's no self-service re-entry path yet. Customers who lost their session contact support@tigerclaw.io.
+| #313 | **Stripe session auto-verify + email gate eliminated.** New `GET /auth/stripe-session` endpoint exchanges Stripe checkout `session_id` for user identity via Stripe API. EmailGate deleted entirely. `/signup` without `session_id` redirects to landing page. |
 
 ### Stripe integration status
 
@@ -34,14 +73,9 @@
 | `GET /auth/stripe-session` | Live — exchanges checkout session_id for session token |
 | Auto-verify in wizard | Live — reads `session_id` from URL, skips email gate |
 | Branding | Needs fix — shows "Bot Craft Automation" instead of "Tiger Claw", product description says "AI Recruiting Agent" |
-| $1 test Payment Link | Active — `plink_1TLEtH0Fp3hGvMoU3Cp4xMhf` — deactivate after testing done |
+| $1 test Payment Link | `plink_1TLEtH0Fp3hGvMoU3Cp4xMhf` — status unclear, may have been deactivated |
 | 2 dead botcraftwrks.ai webhook endpoints | Still active in Stripe — deactivate |
-| Webhook log message | Says "STAN STORE PRE-SALE" — should say Stripe |
 | `STRIPE_WEBHOOK_SECRET` mismatch | Secret in Cloud Run doesn't match signing secret for endpoint `we_1TAPuv0Fp3hGvMoUYrbo6ira` |
-
-### Live test result
-
-$1 test purchase completed 2026-04-11. Webhook fired, user + bot + subscription created. Redirect to wizard worked. Payment flow is proven end-to-end for the first time in project history.
 
 ---
 
@@ -186,15 +220,17 @@ Closing note: tonight's fix was surgical — one UPDATE, one row, zero code chan
 
 | Fact | Value |
 |------|-------|
-| Cloud Run revision | Post-#307 deploy 2026-04-11 23:55Z — health 200, all subsystems ok |
+| Cloud Run revision | `tiger-claw-api-00492-ss6` — deployed 2026-04-12 06:12Z, health 200, all subsystems ok |
 | Health | postgres OK, redis OK, disk OK, workers OK |
-| Tests | 460/460 passing, 46 test files |
-| Active bots | 1 — `brents-tiger-01-mns7wcqk` (Tiger Proof, Nu Skin) — webhook fixed, onboard_state corrected via surgical UPDATE, **verified live from fresh chatId at 2026-04-10 00:49 UTC** (first real-intelligence prospect response in project history) |
+| Tests | 452/452 passing, 45 test files |
+| Active bots | 1 production — `brents-tiger-01-mns7wcqk` (Tiger Proof, Nu Skin). Several test bots from Session 23 fire testing. |
 | Flavors | 1 operator-facing (`network-marketer`) + 1 internal (`admin`). 15 shelved to `api/_archive/flavors/`. |
-| MineCampaigns | 1 (`ssdi-ticket-to-work`) — **first delivery shipped to Pat Sullivan 2026-04-12** |
+| MineCampaigns | 1 (`ssdi-ticket-to-work`) — first delivery shipped to Pat Sullivan 2026-04-12 |
 | Open PRs | None |
-| Wizard | `wizard.tigerclaw.io` — Vercel, auto-deploy working. Email gate removed — `/signup` requires `session_id` from Stripe redirect. |
-| Payment provider | **Stripe** — live. Payment Link → webhook → user/bot/subscription → wizard auto-verify. Proven end-to-end with $1 test 2026-04-11. Paddle webhook code still on backend (dead code, not called). |
+| Wizard | `wizard.tigerclaw.io` — Vercel, auto-deploy. 2-step form: (1) Telegram bot token, (2) Gemini API key. No email gate — `/signup` requires `session_id` from Stripe redirect. Operator name from Stripe automatically. |
+| Payment provider | **Stripe** — live. Payment Link → webhook → user/bot/subscription → wizard auto-verify. Paddle webhook deleted (PR #314). |
+| Gemini cache | **DISABLED.** `getGeminiModelWithCache` no longer uses `CachedContent` — always uses `getGenerativeModel` with `systemInstruction` passed directly. The cache was the root cause of the lobotomy (PR #319). |
+| System prompt | `hasIdentity` requires `identity.name` (operator name) only. Operator identity block includes profession from flavor config. Voice examples, macro narrative, IPP, objection buckets, nurture templates all come from flavor config. |
 | Repo | `github.com/bbrysonelite-max/tiger-claw-v4-core` |
 
 ---
@@ -251,32 +287,33 @@ AI sales agent SaaS. Operator brings their own Telegram bot token (BYOB — from
 
 | Item | Impact | Status |
 |------|--------|--------|
-| **3 OpenClaw self-referential rows still in `market_intelligence`** | Old conf=100 OpenClaw pricing copy still polluting Network Marketer domain. SQL DELETE from NEXT_SESSION item 2A not executed this session. | Run the DELETE before next mine run |
-| **Awaiting Pat Sullivan's quality review on first SSDI batch** | First batch of 35 leads delivered 2026-04-12. If quality passes, scale cadence + subreddit set. If quality fails, tune IPP traits/disqualifiers/blocklist. | Wait for Pat's reply, then iterate |
-| **No dependency health endpoint** | Flying blind — Postgres, Redis, workers, Serper, Gemini keys, Oxylabs, OpenRouter all unmonitored. `/admin/pipeline/health` is mine stats only, not dependency checks. | Build `GET /admin/dependencies/health` + wire dashboard |
-| **Stripe branding** | Checkout shows "Bot Craft Automation" not "Tiger Claw" | Fix in Stripe dashboard — business name, product description, brand color |
-| **Stripe webhook signature mismatch** | `STRIPE_WEBHOOK_SECRET` in Cloud Run doesn't match endpoint signing secret. API fallback catches it (non-blocking). | Update secret in Cloud Run or re-roll webhook signing secret |
-| **2 dead botcraftwrks.ai webhook endpoints** | Stale endpoints in Stripe, not receiving events | Deactivate in Stripe dashboard |
-| **$1 test Payment Link still active** | `plink_1TLEtH0Fp3hGvMoU3Cp4xMhf` — deactivate after testing done | Deactivate + refund test charge |
-| **Webhook log says "STAN STORE PRE-SALE"** | Misleading log message in webhook handler | Update to say "Stripe" |
-| Voice layer generic | Bot responds intelligently but not in Brent's voice | Write voice examples, wire into network-marketer flavor system prompt |
+| **Prompt engineering needed** | Bot has voice and brain but prompt needs work so steps are small enough for Gemini. Operator interactions need refinement. | Next priority — requires test bots, tokens, time |
+| **3 OpenClaw self-referential rows still in `market_intelligence`** | Old conf=100 OpenClaw pricing copy still polluting Network Marketer domain. | Run the DELETE before next mine run |
+| **Awaiting Pat Sullivan's quality review on first SSDI batch** | First batch of 35 leads delivered 2026-04-12. | Wait for Pat's reply, then iterate |
+| **No dependency health endpoint** | `/admin/pipeline/health` is mine stats only, not dependency checks. | Build `GET /admin/dependencies/health` + wire dashboard |
+| **Stripe branding** | Checkout shows "Bot Craft Automation" not "Tiger Claw" | Fix in Stripe dashboard |
+| **Stripe webhook signature mismatch** | `STRIPE_WEBHOOK_SECRET` in Cloud Run doesn't match endpoint signing secret. API fallback catches it (non-blocking). | Update secret or re-roll |
+| **2 dead botcraftwrks.ai webhook endpoints** | Stale endpoints in Stripe | Deactivate in Stripe dashboard |
+| **$1 test Payment Link** | `plink_1TLEtH0Fp3hGvMoU3Cp4xMhf` — status unclear, may be deactivated | Check and recreate if needed for Jeff Mack / Debbie Cameron |
+| **Stan Store dead code** | `POST /webhooks/stan-store`, stan-store-onboarding queue/worker, URL references | Delete — separate task |
+| **Landing page domain** | `tigerclaw.io` has old marketing site, `wizard.tigerclaw.io` has new. Need to decide front door before sending traffic. | Brent's decision — deferred |
 | Reddit 403 from Cloud Run | Mine uses Oxylabs + Serper fallback (working) | Awaiting Reddit API or proxy |
 | Admin alert markdown bug | Alerts with underscores fail silently | Fix when convenient |
-| Gemini model cache staleness (potential) | `getGeminiModelWithCache` at ai.ts:1350 may hold stale prompt between deploys | Monitor only |
+| Dead Gemini cache code | `geminiCacheByKey` map, `GEMINI_CACHE_TTL_SECONDS`, `GoogleAICacheManager` import still in ai.ts — unused after PR #319 | Clean up when convenient |
 
 ---
 
 ## Platform State (Verified)
 
 ### Infrastructure
-- Cloud Run: healthy, revision `tiger-claw-api-00456-9rb`
+- Cloud Run: healthy, revision `tiger-claw-api-00492-ss6`
 - Postgres, Redis, all 6 workers: OK
 - Telegram webhook delivery: wired, `TELEGRAM_WEBHOOK_SECRET` in deploy
 - Serper keys (×3): round-robin active
-- Oxylabs: live, 684 facts on last manual run
+- Oxylabs: live
 - Resend email: confirmed working
 - Vercel auto-deploy: confirmed working
-- Stripe integration: **live.** Payment Link redirects to wizard with `session_id`. Webhook handles `checkout.session.completed`. `GET /auth/stripe-session` auto-verifies. End-to-end proven with $1 test 2026-04-11. Paddle webhook code still on backend (dead, not called).
+- Stripe integration: **live.** Payment Link → webhook → user/bot/subscription → wizard auto-verify. Paddle webhook deleted (PR #314).
 
 ### Key Docs (4-doc model — only SOTU and NEXT_SESSION contain state)
 - `SOTU.md` — **this file. Single source of truth. Read first every session.** Everything stateful lives here.
@@ -286,15 +323,15 @@ AI sales agent SaaS. Operator brings their own Telegram bot token (BYOB — from
 
 Archived: `docs/archive/STATE_OF_THE_TIGER_PATH_FORWARD.md` — pre-Session-20 session history, preserved out of rotation.
 
-### Codebase (Session 18 audit baseline + Session 21 deltas)
-- **Routes:** 22 route files, ~82 endpoints (+2 in #307: `GET /admin/campaigns`, `GET /admin/campaigns/:key/leads`; +1 in #303: `GET /admin/mine/sample`)
+### Codebase (Session 23)
+- **Routes:** 22 route files, ~82 endpoints
 - **Services:** 24 service files
 - **Tools registered in toolsMap:** 26
 - **Workers:** 6 active BullMQ workers, 10 queues defined (4 queues have no worker)
 - **Migrations:** 25 applied
-- **Flavors:** 1 operator-facing (`network-marketer`) + 1 internal (`admin`). 15 archived to `api/_archive/flavors/` (PR #306).
-- **MineCampaigns:** 1 (`ssdi-ticket-to-work`, PR #307)
-- **Tests:** 460/460 passing, 46 files
+- **Flavors:** 1 operator-facing (`network-marketer`) + 1 internal (`admin`). 15 archived to `api/_archive/flavors/`.
+- **MineCampaigns:** 1 (`ssdi-ticket-to-work`)
+- **Tests:** 452/452 passing, 45 files
 
 ### BYOB / BYOK
 - Every operator provides their own bot token from BotFather. No pool. Ever.
@@ -336,9 +373,9 @@ Archived: `docs/archive/STATE_OF_THE_TIGER_PATH_FORWARD.md` — pre-Session-20 s
 | 4 BullMQ queues with no worker (global-cron, market-mining, market-intelligence-batch, stan-store-onboarding) | MEDIUM |
 | Admin alert markdown bug (underscores break Telegram parser) | MEDIUM |
 | serperKeyIndex + serperCallsThisRun are module-level globals — broken under concurrency | HIGH |
-| Paddle webhook dead code (`POST /webhooks/paddle`) | LOW — replace or delete |
 | Telegram message dedup missing | MEDIUM |
-| Stan Store dead code | LOW |
+| Stan Store dead code (`POST /webhooks/stan-store`, queue, worker, URL references) | LOW |
+| Dead Gemini cache code in ai.ts (geminiCacheByKey, GEMINI_CACHE_TTL_SECONDS, GoogleAICacheManager import) | LOW |
 
 ---
 
