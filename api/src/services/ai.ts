@@ -240,50 +240,21 @@ const geminiCacheByKey = new Map<string, GeminiCacheEntry>();
  */
 async function getGeminiModelWithCache(
     genAI: GoogleGenerativeAI,
-    apiKey: string,
+    _apiKey: string,
     modelName: string,
     systemInstruction: string,
 ): Promise<ReturnType<GoogleGenerativeAI['getGenerativeModel']>> {
-    try {
-        const now = Date.now();
-        let cacheEntry = geminiCacheByKey.get(apiKey);
-
-        // Create a new cache if none exists or the existing one has expired
-        if (!cacheEntry || cacheEntry.expiresAt <= now) {
-            const cacheManager = new GoogleAICacheManager(apiKey);
-            const created = await cacheManager.create({
-                model: modelName,
-                // contents is required by the type but tools-only caches work with empty contents.
-                // The Gemini API enforces the 32 768-token minimum server-side.
-                contents: [],
-                tools: geminiTools as any,
-                ttlSeconds: GEMINI_CACHE_TTL_SECONDS,
-            });
-            if (!created.name) {
-                throw new Error('Gemini cache created but returned no name');
-            }
-            cacheEntry = {
-                name: created.name,
-                expiresAt: now + GEMINI_CACHE_TTL_SECONDS * 1000,
-            };
-            geminiCacheByKey.set(apiKey, cacheEntry);
-            console.log(`[AI] Gemini context cache created: ${created.name} (model=${modelName})`);
-        }
-
-        const cachedContent = await new GoogleAICacheManager(apiKey).get(cacheEntry.name);
-        return genAI.getGenerativeModelFromCachedContent(cachedContent, {
-            systemInstruction,
-        });
-    } catch (cacheErr: any) {
-        // Caching is optional — fall back silently to the standard model path
-        // which uses the module-level geminiTools singleton (zero per-request rebuild cost).
-        console.warn(`[AI] Gemini context cache unavailable (${(cacheErr.message ?? String(cacheErr)).slice(0, 120)}). Using non-cached model.`);
-        return genAI.getGenerativeModel({
-            model: modelName,
-            systemInstruction,
-            tools: geminiTools as any,
-        });
-    }
+    // CRITICAL FIX: The Gemini SDK's getGenerativeModelFromCachedContent() silently
+    // overwrites modelParams.systemInstruction with cachedContent.systemInstruction.
+    // Since the cache was created without a system instruction (tools-only), every bot
+    // was running with NO system prompt — causing the lobotomized generic-assistant behavior.
+    // The non-cached path correctly passes systemInstruction to getGenerativeModel().
+    // geminiTools is a module-level singleton, so there is no per-request rebuild cost.
+    return genAI.getGenerativeModel({
+        model: modelName,
+        systemInstruction,
+        tools: geminiTools as any,
+    });
 }
 
 // ─── Redis ───────────────────────────────────────────────────────────────────
