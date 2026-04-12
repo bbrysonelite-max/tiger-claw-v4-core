@@ -4,10 +4,7 @@ import { Suspense } from "react";
 import { motion } from "framer-motion";
 import { Zap, Bot, Shield, ArrowRight } from "lucide-react";
 
-// TODO: Paste Stripe Payment Link URL here when it's created in the Stripe dashboard.
-// Product: Tiger Claw, Price: $147/mo. Success redirect should be set in the Stripe
-// dashboard to: https://tigerclaw.io/signup?email={CUSTOMER_EMAIL}
-const STRIPE_PAYMENT_LINK = "https://buy.stripe.com/TODO_REPLACE_ME";
+const STRIPE_PAYMENT_LINK = "https://buy.stripe.com/28E7sDgO22Gs5PI8kw9AA06";
 
 // Suspense boundary required by Next.js App Router
 export default function Home() {
