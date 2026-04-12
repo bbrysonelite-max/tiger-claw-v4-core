@@ -10,13 +10,9 @@
 
 ## Context — Where We Are
 
-Session 21 hardened the mine and introduced the MineCampaign abstraction. PRs #301–#307 shipped (see SOTU.md for the full breakdown). Flavors collapsed to 1 operator-facing (`network-marketer`) + 1 internal (`admin`). SSDI Ticket to Work is now live as a `MineCampaign`, not a flavor. CSV lead export endpoint is live at `GET /admin/campaigns/:key/leads`.
+Session 21 hardened the mine, introduced the MineCampaign abstraction, and shipped the first SSDI lead delivery (35 leads, avg IPP score 74/100) to Pat Sullivan 2026-04-12. PRs #301–#309 shipped (see SOTU.md). Flavors collapsed to 1 operator-facing (`network-marketer`) + 1 internal (`admin`). SSDI Ticket to Work is live as a `MineCampaign`. CSV lead export endpoint is live at `GET /admin/campaigns/:key/leads`. Awaiting Pat's quality review on the first batch.
 
-**One item is ready to execute immediately:**
-
-1. **Run the SSDI campaign for the first time and pull the CSV.** All the pipework is in place — IPP gate, orchestrator iteration over `MINE_CAMPAIGN_REGISTRY`, `metadata.campaign_key` stamping, lead export endpoint. Nothing has actually mined SSDI subreddits yet. Trigger via `POST /admin/mine/run`, wait for completion, pull `GET /admin/campaigns/ssdi-ticket-to-work/leads?format=csv`. This is the proof that the pipeline works for Pat Sullivan's contract.
-
-`brents-tiger-01-mns7wcqk` (Tiger Proof / Nu Skin) is still the only active bot. Cloud Run is on the post-#306 revision, healthy.
+`brents-tiger-01-mns7wcqk` (Tiger Proof / Nu Skin) is still the only active bot. Cloud Run is on the post-#307 revision, healthy.
 
 ---
 
@@ -24,31 +20,15 @@ Session 21 hardened the mine and introduced the MineCampaign abstraction. PRs #3
 
 ---
 
-### 1. First SSDI campaign run + lead pull — proof of contract
+### 1. Delete 3 OpenClaw self-referential rows from `market_intelligence`
 
-The SSDI MineCampaign exists but has never run. Execute this end-to-end:
+Carryover from Session 20 mine audit, never executed. Low priority, but keep on the list until actually deleted:
 
-1. **Delete the 3 OpenClaw self-referential rows first** (carryover from Session 20 mine audit, never executed):
-   ```sql
-   SELECT id, LEFT(fact_summary, 60) FROM market_intelligence WHERE fact_summary ILIKE '%OpenClaw%';
-   CREATE TABLE market_intelligence_backup_20260412 AS SELECT * FROM market_intelligence WHERE fact_summary ILIKE '%OpenClaw%' OR fact_summary ILIKE '%Tiger Claw%';
-   DELETE FROM market_intelligence WHERE id IN ('<full-uuid-1>', '<full-uuid-2>', '<full-uuid-3>');
-   ```
-2. **Trigger a mine run**: `POST /admin/mine/run` with admin token. Confirm the orchestrator queues both the network-marketer flavor job AND the `campaign:ssdi-ticket-to-work` job (logs should show `count = 2` for jobs queued).
-3. **Wait for completion** — watch logs for `[ResearchAgent] SSDI — Ticket to Work complete`.
-4. **Verify metadata stamping**:
-   ```sql
-   SELECT COUNT(*) FROM market_intelligence WHERE metadata->>'campaign_key' = 'ssdi-ticket-to-work';
-   ```
-   Must be > 0. If 0, the campaign tagging is broken — file a bug.
-5. **Pull the CSV**:
-   ```
-   curl -H "Authorization: Bearer $ADMIN_TOKEN" "https://api.tigerclaw.io/admin/campaigns/ssdi-ticket-to-work/leads?format=csv&sinceDays=1" -o ssdi-leads.csv
-   ```
-6. **Eyeball the leads** — open the CSV, confirm verbatims are real prospect language from disability subs (not affiliate copy or off-topic content). The IPP gate's blocklist should have rejected ssa.gov/nolo.com/disability-benefits-help.org sources.
-7. **Send sample to Pat Sullivan** for client review.
-
-If the run produces zero leads, the IPP is too strict for SSDI signal — tune `idealProspectProfile.traits[].language` and re-run. If the run produces obvious garbage, tighten disqualifiers or add to `sourceUrlBlocklist`.
+```sql
+SELECT id, LEFT(fact_summary, 60) FROM market_intelligence WHERE fact_summary ILIKE '%OpenClaw%';
+CREATE TABLE market_intelligence_backup_20260412 AS SELECT * FROM market_intelligence WHERE fact_summary ILIKE '%OpenClaw%' OR fact_summary ILIKE '%Tiger Claw%';
+DELETE FROM market_intelligence WHERE id IN ('<full-uuid-1>', '<full-uuid-2>', '<full-uuid-3>');
+```
 
 ---
 

@@ -1,12 +1,28 @@
 # Tiger Claw — State of the Union
 
-**Last updated:** 2026-04-11 (Session 21 — IPP relevance gate live, Network Marketer scout expanded, flavors collapsed to 1, SSDI rebuilt as MineCampaign, lead export endpoint shipped)
+**Last updated:** 2026-04-12 (Session 21 — IPP relevance gate live, flavors collapsed to 1, SSDI rebuilt as MineCampaign, **first SSDI lead delivery shipped to Pat Sullivan 2026-04-12**)
 **This is the single source of truth. Read nothing else until you finish this file.**
 **No lying. No assuming. No guessing. Every fact here is verified against the live system.**
 
 ---
 
-## Session 21 — Mine Hardening + Campaign Abstraction (2026-04-11)
+## Session 21 — Mine Hardening + Campaign Abstraction + First SSDI Delivery (2026-04-11/12)
+
+### 🎯 First SSDI lead delivery — SHIPPED 2026-04-12
+
+The pipeline produced real customer-facing output for the first time.
+
+- **Run:** `run_manual_1775952246718`, completed 00:22Z, 18 min duration
+- **Total facts saved:** 96 (network-marketer flavor + ssdi-ticket-to-work campaign combined)
+- **SSDI leads:** 35 unique facts tagged `metadata.campaign_key='ssdi-ticket-to-work'`
+- **IPP score range:** 50–95, average 74/100
+- **Source mix:** real Reddit posts from r/disability, r/SSDI, r/disabilitybenefits, r/ChronicIllness, r/mentalhealth, r/Anxiety, r/ChronicPain, r/careerguidance
+- **Delivery:** CSV pulled from `GET /admin/campaigns/ssdi-ticket-to-work/leads?format=csv`, emailed to Pat Sullivan (pat@contatta.com) from brent@tigerclaw.io 2026-04-12
+- **What Pat received:** real prospect language in the verbatim column ("It would be extremely ironic for me to have to give up my job because I get more steady income from SSA but I'm hoping I can still keep the benefits and work" — r/SSDI, score 90), with relevance reasons explaining IPP trait matches per row
+
+This is the first revenue-side proof that the platform delivers what it claims. Pat is reviewing for quality. Next: scale cadence + subreddit set if quality passes.
+
+### What shipped today
 
 ### What shipped today
 
@@ -39,9 +55,9 @@ The Session 20 mine audit identified three independent causes of pollution:
 ### Codebase state (post-Session-21)
 
 - **Flavors:** 1 operator-facing (`network-marketer`) + 1 internal (`admin`). 15 archived under `api/_archive/flavors/`.
-- **Campaigns:** 1 (`ssdi-ticket-to-work`).
+- **Campaigns:** 1 (`ssdi-ticket-to-work`) — **first delivery shipped 2026-04-12**, 35 leads to Pat Sullivan.
 - **Tests:** 460/460 passing across 46 test files (was 456/44 at Session 20 close).
-- **Cloud Run revision:** Post-#306 deploy at 23:27Z. Health 200, all subsystems ok.
+- **Cloud Run revision:** Post-#307 deploy at 23:55Z. Health 200, all subsystems ok.
 
 ---
 
@@ -131,13 +147,13 @@ Closing note: tonight's fix was surgical — one UPDATE, one row, zero code chan
 
 | Fact | Value |
 |------|-------|
-| Cloud Run revision | Post-#306 deploy 2026-04-11 23:27Z — health 200, all subsystems ok |
+| Cloud Run revision | Post-#307 deploy 2026-04-11 23:55Z — health 200, all subsystems ok |
 | Health | postgres OK, redis OK, disk OK, workers OK |
 | Tests | 460/460 passing, 46 test files |
 | Active bots | 1 — `brents-tiger-01-mns7wcqk` (Tiger Proof, Nu Skin) — webhook fixed, onboard_state corrected via surgical UPDATE, **verified live from fresh chatId at 2026-04-10 00:49 UTC** (first real-intelligence prospect response in project history) |
 | Flavors | 1 operator-facing (`network-marketer`) + 1 internal (`admin`). 15 shelved to `api/_archive/flavors/`. |
-| MineCampaigns | 1 (`ssdi-ticket-to-work`) |
-| Open PRs | #307 (campaign abstraction + SSDI + lead export) — CI green, awaiting merge; #308 (this docs reconcile) |
+| MineCampaigns | 1 (`ssdi-ticket-to-work`) — **first delivery shipped to Pat Sullivan 2026-04-12** |
+| Open PRs | #309 (this docs update — first SSDI delivery) |
 | Wizard | `wizard.tigerclaw.io` — Vercel, auto-deploy working (PR #294 deployed — zombie pool card gone) |
 | Payment provider | **Stripe** — Paddle dropped 2026-04-11. Paddle webhook code still on backend, must be replaced. |
 | Repo | `github.com/bbrysonelite-max/tiger-claw-v4-core` |
@@ -197,7 +213,7 @@ AI sales agent SaaS. Operator brings their own Telegram bot token (BYOB — from
 | Item | Impact | Status |
 |------|--------|--------|
 | **3 OpenClaw self-referential rows still in `market_intelligence`** | Old conf=100 OpenClaw pricing copy still polluting Network Marketer domain. SQL DELETE from NEXT_SESSION item 2A not executed this session. | Run the DELETE before next mine run |
-| **First SSDI campaign run** | Campaign abstraction + IPP gate + lead export endpoint all live, but no SSDI mine run has actually executed yet. Cannot prove the pipeline works for Pat Sullivan's contract until a real run produces leads. | Trigger via `POST /admin/mine/run`, verify `metadata.campaign_key='ssdi-ticket-to-work'` lands, pull CSV |
+| **Awaiting Pat Sullivan's quality review on first SSDI batch** | First batch of 35 leads delivered 2026-04-12. If quality passes, scale cadence + subreddit set. If quality fails, tune IPP traits/disqualifiers/blocklist. | Wait for Pat's reply, then iterate |
 | **No dependency health endpoint** | Flying blind — Postgres, Redis, workers, Serper, Gemini keys, Oxylabs, OpenRouter all unmonitored. `/admin/pipeline/health` is mine stats only, not dependency checks. | Build `GET /admin/dependencies/health` + wire dashboard |
 | **Stripe integration** | No checkout URL. Paddle dropped. Stripe not yet integrated. Payment path completely unproven. | Integrate Stripe — product, price, webhook handler, checkout flow |
 | Voice layer generic | Bot responds intelligently but not in Brent's voice | Write voice examples, wire into network-marketer flavor system prompt |
